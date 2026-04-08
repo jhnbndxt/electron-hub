@@ -18,6 +18,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
+import { getDashboardAnalytics, getAuditLogs } from "../../services/adminService";
 
 interface AuditLog {
   id: string;
@@ -45,36 +46,56 @@ export function SuperAdminDashboard() {
     loadRecentActivity();
   }, []);
 
-  const loadStats = () => {
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-    const enrolledStudents = JSON.parse(localStorage.getItem("enrolled_students") || "[]");
+  const loadStats = async () => {
+    const { data: analytics, error } = await getDashboardAnalytics();
     
-    setStats({
-      totalStudents: registeredUsers.filter((u: any) => u.role === "student").length,
-      pendingApplications: applications.filter((app: any) => app.status === "pending" || app.status === "Pending Review").length,
-      enrolledStudents: enrolledStudents.length,
-      securityAlerts: 0,
-    });
+    if (error) {
+      console.error('Error loading analytics:', error);
+      setStats({
+        totalStudents: 0,
+        pendingApplications: 0,
+        enrolledStudents: 0,
+        securityAlerts: 0,
+      });
+      return;
+    }
+
+    if (analytics) {
+      setStats({
+        totalStudents: analytics.enrolledStudents || 0,
+        pendingApplications: analytics.pendingEnrollments || 0,
+        enrolledStudents: analytics.enrolledStudents || 0,
+        securityAlerts: 0,
+      });
+    }
   };
 
-  const loadRecentActivity = () => {
-    const logs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-    const recentLogs = logs.slice(0, 5).map((log: any) => {
-      const timeDiff = Date.now() - new Date(log.timestamp).getTime();
-      const minutesAgo = Math.floor(timeDiff / 60000);
-      const hoursAgo = Math.floor(timeDiff / 3600000);
-      const timeAgo = hoursAgo > 0 ? `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago` : `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
-      
-      return {
-        id: log.id,
-        action: log.details,
-        user: log.user,
-        timestamp: timeAgo,
-        type: log.action.includes("Submit") ? "submission" : log.action.includes("Approve") ? "approval" : "system",
-      };
-    });
-    setRecentActivity(recentLogs);
+  const loadRecentActivity = async () => {
+    const { data: logs, error } = await getAuditLogs(10);
+    
+    if (error) {
+      console.error('Error loading activity logs:', error);
+      setRecentActivity([]);
+      return;
+    }
+
+    if (logs) {
+      const recentLogs = logs.map((log: any) => {
+        const timeDiff = Date.now() - new Date(log.timestamp).getTime();
+        const minutesAgo = Math.floor(timeDiff / 60000);
+        const hoursAgo = Math.floor(timeDiff / 3600000);
+        const timeAgo = hoursAgo > 0 ? `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago` : `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
+        
+        return {
+          id: log.id,
+          action: log.details,
+          user: log.user_id || 'System',
+          timestamp: timeAgo,
+          type: log.action.includes('SUBMIT') ? 'submission' : log.action.includes('APPROVE') ? 'approval' : 'system',
+        };
+      });
+      setRecentActivity(recentLogs);
+    }
   };
 
   const statCards = [
