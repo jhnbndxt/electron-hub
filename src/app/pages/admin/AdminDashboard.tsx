@@ -1,0 +1,1380 @@
+import {
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  Calendar,
+  Search,
+  X,
+  FileCheck,
+  FileText,
+  Award,
+  CreditCard,
+  Users,
+  Activity,
+  BookOpen,
+  Eye,
+  Image as ImageIcon,
+  UserCircle,
+} from "lucide-react";
+import { useState, useEffect } from "react";
+import { Link } from "react-router";
+import { EmptyState } from "../../components/EmptyState";
+
+interface Student {
+  id: number | string;
+  name: string;
+  email: string;
+  strand: string;
+  applicationDate: string;
+  aiTestScore?: number;
+  status: "pending" | "approved" | "incomplete";
+  documents?: {
+    psaBirthCertificate: boolean;
+    form138: boolean;
+    goodMoralCertificate: boolean;
+    idPicture: boolean;
+    parentGuardianId: boolean;
+  };
+  formData?: any;
+}
+
+interface DocumentReviewState {
+  psaBirthCertificate: "pending" | "accepted" | "rejected";
+  form138: "pending" | "accepted" | "rejected";
+  goodMoralCertificate: "pending" | "accepted" | "rejected";
+  idPicture: "pending" | "accepted" | "rejected";
+  parentGuardianId: "pending" | "accepted" | "rejected";
+}
+
+interface DocumentRejectionReasons {
+  psaBirthCertificate: string;
+  form138: string;
+  goodMoralCertificate: string;
+  idPicture: string;
+  parentGuardianId: string;
+}
+
+interface AuditLog {
+  id: string;
+  action: string;
+  user: string;
+  email: string;
+  timestamp: string;
+  details: string;
+}
+
+export function AdminDashboard() {
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [pendingApplications, setPendingApplications] = useState<Student[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [overviewStats, setOverviewStats] = useState({
+    totalStudents: 0,
+    pendingApplications: 0,
+    verifiedDocuments: 0,
+    pendingPayments: 0,
+  });
+  const [showFullDetails, setShowFullDetails] = useState(false);
+  const [showFormData, setShowFormData] = useState(false);
+
+  // Document review state
+  const [documentReview, setDocumentReview] = useState<DocumentReviewState>({
+    psaBirthCertificate: "pending",
+    form138: "pending",
+    goodMoralCertificate: "pending",
+    idPicture: "pending",
+    parentGuardianId: "pending",
+  });
+  const [rejectionReasons, setRejectionReasons] = useState<DocumentRejectionReasons>({
+    psaBirthCertificate: "",
+    form138: "",
+    goodMoralCertificate: "",
+    idPicture: "",
+    parentGuardianId: "",
+  });
+  const [expandedDocument, setExpandedDocument] = useState<string | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<{type: string, url: string} | null>(null);
+
+  // Load real data from localStorage
+  useEffect(() => {
+    loadApplications();
+    loadAuditLogs();
+    calculateStats();
+  }, []);
+
+  const loadApplications = () => {
+    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+    const formattedApps = applications.map((app: any) => ({
+      id: app.id,
+      name: app.studentName || app.name,
+      email: app.email,
+      strand: app.preferredTrack || app.strand,
+      applicationDate: app.submissionDate ? new Date(app.submissionDate).toLocaleDateString() : app.applicationDate,
+      aiTestScore: app.aiTestScore || 85,
+      status: app.status === "Pending Review" ? "pending" : (app.status?.toLowerCase() || "pending"),
+      documents: {
+        psaBirthCertificate: !!app.documents?.birthCertificate,
+        form138: !!app.documents?.form138,
+        goodMoralCertificate: !!app.documents?.goodMoral,
+        idPicture: !!app.documents?.idPicture,
+        parentGuardianId: !!app.documents?.parentGuardianId,
+      },
+      formData: app,
+    }));
+    setPendingApplications(formattedApps);
+  };
+
+  const loadAuditLogs = () => {
+    const logs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
+    const recentLogs = logs.slice(0, 3).map((log: AuditLog) => {
+      const timeDiff = Date.now() - new Date(log.timestamp).getTime();
+      const minutesAgo = Math.floor(timeDiff / 60000);
+      const hoursAgo = Math.floor(timeDiff / 3600000);
+      const timeAgo = hoursAgo > 0 ? `${hoursAgo} hour${hoursAgo > 1 ? 's' : ''} ago` : `${minutesAgo} minute${minutesAgo > 1 ? 's' : ''} ago`;
+      
+      return {
+        id: log.id,
+        message: log.details,
+        timestamp: timeAgo,
+        type: log.action.includes("Submit") ? "submission" : log.action.includes("Approve") ? "verification" : "payment",
+      };
+    });
+    setRecentActivity(recentLogs);
+  };
+
+  const calculateStats = () => {
+    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+    const enrolledStudents = JSON.parse(localStorage.getItem("enrolled_students") || "[]");
+    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
+    
+    // Count only users with role "student"
+    const studentUsers = registeredUsers.filter((user: any) => user.role === "student");
+    
+    setOverviewStats({
+      totalStudents: studentUsers.length,
+      pendingApplications: applications.filter((app: any) => 
+        app.status === "pending" || app.status === "Pending Review" || app.status === "incomplete"
+      ).length,
+      verifiedDocuments: applications.filter((app: any) => app.status === "approved").length,
+      pendingPayments: 0, // Can be expanded later
+    });
+  };
+
+  const filteredStudents = pendingApplications.filter((student) =>
+    student.name && student.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  // Reset document review state when modal opens
+  const openReviewModal = (student: Student) => {
+    setSelectedStudent(student);
+    setDocumentReview({
+      psaBirthCertificate: "pending",
+      form138: "pending",
+      goodMoralCertificate: "pending",
+      idPicture: "pending",
+      parentGuardianId: "pending",
+    });
+    setRejectionReasons({
+      psaBirthCertificate: "",
+      form138: "",
+      goodMoralCertificate: "",
+      idPicture: "",
+      parentGuardianId: "",
+    });
+    setExpandedDocument(null);
+  };
+
+  // Check if all documents have been reviewed
+  const allDocumentsReviewed =
+    documentReview.psaBirthCertificate !== "pending" &&
+    documentReview.form138 !== "pending" &&
+    documentReview.goodMoralCertificate !== "pending" &&
+    documentReview.idPicture !== "pending" &&
+    documentReview.parentGuardianId !== "pending";
+
+  // Handle document accept
+  const handleAcceptDocument = (docType: keyof DocumentReviewState) => {
+    setDocumentReview((prev) => ({
+      ...prev,
+      [docType]: "accepted",
+    }));
+    setExpandedDocument(null);
+  };
+
+  // Handle document reject
+  const handleRejectDocument = (docType: keyof DocumentReviewState) => {
+    setDocumentReview((prev) => ({
+      ...prev,
+      [docType]: "rejected",
+    }));
+    setExpandedDocument(docType);
+  };
+
+  // Handle rejection reason submission
+  const handleSubmitRejection = (docType: keyof DocumentRejectionReasons) => {
+    if (!rejectionReasons[docType].trim()) {
+      alert("Please provide a reason for rejection");
+      return;
+    }
+    setExpandedDocument(null);
+  };
+
+  // View document
+  const handleViewDocument = (docType: string, student: Student) => {
+    const studentEmail = student.formData?.studentId || student.email;
+
+    // Map document types to their keys in document_verification
+    const docKeyMap: Record<string, string> = {
+      "birthCertificate": "psaBirthCertificate",
+      "form138": "form138",
+      "goodMoral": "goodMoral",
+      "idPicture": "idPicture",
+      "parentGuardianId": "parentGuardianId",
+    };
+
+    const docKey = docKeyMap[docType];
+
+    // Retrieve document from document_verification localStorage
+    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
+    const userDocs = docVerification[studentEmail] || {};
+    const document = userDocs[docKey];
+
+    if (document && document.fileName) {
+      setViewingDocument({
+        type: docType,
+        url: document.fileName,
+        fileData: document.fileData || null
+      });
+    } else {
+      alert("Document not available");
+    }
+  };
+
+  // Submit final review
+  const handleSubmitFinalReview = () => {
+    if (!selectedStudent) return;
+
+    // Check if all documents are accepted
+    const allAccepted =
+      documentReview.psaBirthCertificate === "accepted" &&
+      documentReview.form138 === "accepted" &&
+      documentReview.goodMoralCertificate === "accepted" &&
+      documentReview.idPicture === "accepted" &&
+      documentReview.parentGuardianId === "accepted";
+
+    if (allAccepted) {
+      // Approve the application
+      handleApprove();
+    } else {
+      // Handle rejection - send notification to student with reasons
+      const rejectedDocs: string[] = [];
+      const reasons: string[] = [];
+
+      if (documentReview.psaBirthCertificate === "rejected") {
+        rejectedDocs.push("PSA Birth Certificate");
+        reasons.push(`PSA Birth Certificate: ${rejectionReasons.psaBirthCertificate}`);
+      }
+      if (documentReview.form138 === "rejected") {
+        rejectedDocs.push("Form 138");
+        reasons.push(`Form 138: ${rejectionReasons.form138}`);
+      }
+      if (documentReview.goodMoralCertificate === "rejected") {
+        rejectedDocs.push("Good Moral Certificate");
+        reasons.push(`Good Moral Certificate: ${rejectionReasons.goodMoralCertificate}`);
+      }
+      if (documentReview.idPicture === "rejected") {
+        rejectedDocs.push("2x2 ID Picture");
+        reasons.push(`2x2 ID Picture: ${rejectionReasons.idPicture}`);
+      }
+      if (documentReview.parentGuardianId === "rejected") {
+        rejectedDocs.push("Parent's/Guardian's ID");
+        reasons.push(`Parent's/Guardian's ID: ${rejectionReasons.parentGuardianId}`);
+      }
+
+      // Update application status
+      const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+      const updatedApps = applications.map((app: any) =>
+        app.id === selectedStudent.id
+          ? { ...app, status: "incomplete", rejectionReason: reasons.join("; ") }
+          : app
+      );
+      localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
+
+      // Update document_verification localStorage with rejection statuses
+      const studentEmail = selectedStudent.formData?.studentId || selectedStudent.email;
+      const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
+
+      if (!docVerification[studentEmail]) {
+        docVerification[studentEmail] = {};
+      }
+
+      // Update each document status with rejection reason or approval
+      if (documentReview.psaBirthCertificate === "rejected") {
+        if (docVerification[studentEmail].psaBirthCertificate) {
+          docVerification[studentEmail].psaBirthCertificate.status = "rejected";
+          docVerification[studentEmail].psaBirthCertificate.rejectionComment = rejectionReasons.psaBirthCertificate;
+        }
+      } else if (documentReview.psaBirthCertificate === "accepted") {
+        if (docVerification[studentEmail].psaBirthCertificate) {
+          docVerification[studentEmail].psaBirthCertificate.status = "approved";
+        }
+      }
+
+      if (documentReview.form138 === "rejected") {
+        if (docVerification[studentEmail].form138) {
+          docVerification[studentEmail].form138.status = "rejected";
+          docVerification[studentEmail].form138.rejectionComment = rejectionReasons.form138;
+        }
+      } else if (documentReview.form138 === "accepted") {
+        if (docVerification[studentEmail].form138) {
+          docVerification[studentEmail].form138.status = "approved";
+        }
+      }
+
+      if (documentReview.goodMoralCertificate === "rejected") {
+        if (docVerification[studentEmail].goodMoral) {
+          docVerification[studentEmail].goodMoral.status = "rejected";
+          docVerification[studentEmail].goodMoral.rejectionComment = rejectionReasons.goodMoralCertificate;
+        }
+      } else if (documentReview.goodMoralCertificate === "accepted") {
+        if (docVerification[studentEmail].goodMoral) {
+          docVerification[studentEmail].goodMoral.status = "approved";
+        }
+      }
+
+      if (documentReview.idPicture === "rejected") {
+        if (docVerification[studentEmail].idPicture) {
+          docVerification[studentEmail].idPicture.status = "rejected";
+          docVerification[studentEmail].idPicture.rejectionComment = rejectionReasons.idPicture;
+        }
+      } else if (documentReview.idPicture === "accepted") {
+        if (docVerification[studentEmail].idPicture) {
+          docVerification[studentEmail].idPicture.status = "approved";
+        }
+      }
+
+      if (documentReview.parentGuardianId === "rejected") {
+        if (docVerification[studentEmail].parentGuardianId) {
+          docVerification[studentEmail].parentGuardianId.status = "rejected";
+          docVerification[studentEmail].parentGuardianId.rejectionComment = rejectionReasons.parentGuardianId;
+        }
+      } else if (documentReview.parentGuardianId === "accepted") {
+        if (docVerification[studentEmail].parentGuardianId) {
+          docVerification[studentEmail].parentGuardianId.status = "approved";
+        }
+      }
+
+      localStorage.setItem("document_verification", JSON.stringify(docVerification));
+
+      // Send notification to student
+      const notificationsKey = `notifications_${studentEmail}`;
+      const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
+
+      // Format detailed rejection message
+      const detailedMessage = reasons.join(". ");
+
+      notifications.unshift({
+        id: `notif-${Date.now()}`,
+        type: "DOCUMENTS_REJECTED",
+        title: "Action Required: Document Rejected",
+        message: detailedMessage.trim(),
+        timestamp: new Date().toISOString(),
+        read: false,
+      });
+      localStorage.setItem(notificationsKey, JSON.stringify(notifications));
+
+      // Add to audit log
+      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
+      auditLogs.unshift({
+        id: `log-${Date.now()}`,
+        action: "Documents Rejected",
+        user: "Registrar",
+        email: "registrar@electroncollege.edu.ph",
+        timestamp: new Date().toISOString(),
+        details: `Documents rejected for ${selectedStudent.name} - ${rejectedDocs.join(", ")}`,
+      });
+      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
+
+      // Reload data
+      loadApplications();
+      loadAuditLogs();
+      calculateStats();
+
+      alert(`Documents rejected. Student has been notified to resubmit: ${rejectedDocs.join(", ")}`);
+      setSelectedStudent(null);
+    }
+  };
+
+  const handleApprove = () => {
+    if (selectedStudent) {
+      // Use studentId (authenticated email) instead of form email field
+      const studentEmail = selectedStudent.formData?.studentId || selectedStudent.email;
+
+      // Update application status to "Documents Verified"
+      const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+      const updatedApps = applications.map((app: any) =>
+        app.id === selectedStudent.id ? { ...app, status: "Documents Verified" } : app
+      );
+      localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
+
+      // Update document_verification localStorage - mark all documents as approved
+      const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
+      if (docVerification[studentEmail]) {
+        // Mark all 5 required documents as approved
+        const docKeys = ["psaBirthCertificate", "form138", "goodMoral", "idPicture", "parentGuardianId"];
+        docKeys.forEach(key => {
+          if (docVerification[studentEmail][key]) {
+            docVerification[studentEmail][key].status = "approved";
+            // Remove rejection comment if it exists
+            delete docVerification[studentEmail][key].rejectionComment;
+          }
+        });
+        localStorage.setItem("document_verification", JSON.stringify(docVerification));
+      }
+
+      // Update student's enrollment progress
+      const enrollmentKey = `enrollment_progress_${studentEmail}`;
+      const currentProgress = JSON.parse(localStorage.getItem(enrollmentKey) || "[]");
+
+      if (currentProgress.length > 0) {
+        // Mark "Documents Verified" as completed and "Payment Submitted" as current
+        const updatedProgress = currentProgress.map((step: any) => {
+          if (step.name === "Documents Submitted") return { ...step, status: "completed" };
+          if (step.name === "Documents Verified") return { ...step, status: "completed" };
+          if (step.name === "Payment Submitted") return { ...step, status: "current" };
+          return step;
+        });
+        localStorage.setItem(enrollmentKey, JSON.stringify(updatedProgress));
+      }
+
+      // Add notification for student
+      const notificationsKey = `notifications_${studentEmail}`;
+      const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
+      notifications.unshift({
+        id: `notif-${Date.now()}`,
+        type: "DOCUMENTS_VERIFIED",
+        title: "Documents Verified",
+        message: "Your enrollment documents have been verified by the Registrar. You can now proceed to payment.",
+        timestamp: new Date().toISOString(),
+        read: false,
+      });
+      localStorage.setItem(notificationsKey, JSON.stringify(notifications));
+
+      // Add to audit log
+      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
+      auditLogs.unshift({
+        id: `log-${Date.now()}`,
+        action: "Documents Verified",
+        user: "Registrar",
+        email: "registrar@electroncollege.edu.ph",
+        timestamp: new Date().toISOString(),
+        details: `Documents verified for ${selectedStudent.name} - Payment section unlocked`,
+      });
+      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
+
+      // Reload data
+      loadApplications();
+      loadAuditLogs();
+      calculateStats();
+      
+      alert(`Documents verified for ${selectedStudent.name}. Student can now proceed to payment.`);
+      setSelectedStudent(null);
+    }
+  };
+
+  const handleCorrection = () => {
+    if (selectedStudent) {
+      // Add to audit log
+      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
+      auditLogs.unshift({
+        id: `log-${Date.now()}`,
+        action: "Correction Requested",
+        user: "System Admin",
+        email: "electronadmin@gmail.com",
+        timestamp: new Date().toISOString(),
+        details: `Correction requested for ${selectedStudent.name}`,
+      });
+      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
+
+      loadAuditLogs();
+      
+      alert(`Correction request sent to: ${selectedStudent.name}`);
+      setSelectedStudent(null);
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch (status) {
+      case "pending":
+        return {
+          bg: "#FEF3C7",
+          text: "#92400E",
+          border: "#FCD34D",
+        };
+      case "approved":
+        return {
+          bg: "#D1FAE5",
+          text: "#065F46",
+          border: "#6EE7B7",
+        };
+      case "incomplete":
+        return {
+          bg: "#FEE2E2",
+          text: "#991B1B",
+          border: "#FCA5A5",
+        };
+      default:
+        return {
+          bg: "#F3F4F6",
+          text: "#374151",
+          border: "#D1D5DB",
+        };
+    }
+  };
+
+  return (
+    <div className="flex gap-6 p-8 bg-gray-50">
+      {/* Main Content */}
+      <div className="flex-1">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Welcome, Registrar
+            </h1>
+            <p className="text-gray-600">
+              Manage student applications and enrollment records
+            </p>
+          </div>
+          <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
+            <Calendar className="w-5 h-5 text-gray-500" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="border-none outline-none text-sm font-medium text-gray-700"
+              style={{ accentColor: "#1E3A8A" }}
+            />
+          </div>
+        </div>
+
+        {/* Section Header */}
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Dashboard Overview</h2>
+
+        {/* Overview Stats - 4 Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Total Students */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
+                style={{ backgroundColor: "#1E3A8A" }}
+              >
+                <Users className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <h3 className="text-4xl font-bold text-gray-900 mb-2">
+              {overviewStats.totalStudents}
+            </h3>
+            <p className="text-sm text-gray-600 font-medium">Total Students</p>
+          </div>
+
+          {/* Pending Applications */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
+                style={{ backgroundColor: "#F59E0B" }}
+              >
+                <Clock className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <h3 className="text-4xl font-bold text-gray-900 mb-2">
+              {overviewStats.pendingApplications}
+            </h3>
+            <p className="text-sm text-gray-600 font-medium">
+              Pending Applications
+            </p>
+          </div>
+
+          {/* Verified Documents */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
+                style={{ backgroundColor: "#10B981" }}
+              >
+                <CheckCircle className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <h3 className="text-4xl font-bold text-gray-900 mb-2">
+              {overviewStats.verifiedDocuments}
+            </h3>
+            <p className="text-sm text-gray-600 font-medium">
+              Verified Documents
+            </p>
+          </div>
+
+          {/* Pending Payments */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
+                style={{ backgroundColor: "#EF4444" }}
+              >
+                <CreditCard className="w-7 h-7 text-white" />
+              </div>
+            </div>
+            <h3 className="text-4xl font-bold text-gray-900 mb-2">
+              {overviewStats.pendingPayments}
+            </h3>
+            <p className="text-sm text-gray-600 font-medium">
+              Pending Payments
+            </p>
+          </div>
+        </div>
+
+        {/* Section Header */}
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Pending Applications</h2>
+
+        {/* Pending Applications Table */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-gray-900">
+                Pending Applications
+              </h2>
+              <div className="relative">
+                <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Search students..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                  style={{ accentColor: "#10B981" }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Strand
+                  </th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                      No pending applications at the moment
+                    </td>
+                  </tr>
+                ) : (
+                  filteredStudents.map((student) => {
+                    const statusStyle = getStatusStyle(student.status);
+                    return (
+                      <tr
+                        key={student.id}
+                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                        onClick={() => openReviewModal(student)}
+                      >
+                        <td className="px-6 py-4">
+                          <p className="text-sm font-medium text-gray-900">
+                            {student.name}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-600">{student.email}</p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className="inline-flex px-3 py-1 rounded-full text-xs font-semibold"
+                            style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}
+                          >
+                            {student.strand}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <p className="text-sm text-gray-600">
+                            {new Date(student.applicationDate).toLocaleDateString(
+                              "en-US",
+                              {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              }
+                            )}
+                          </p>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span
+                            className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border"
+                            style={{
+                              backgroundColor: statusStyle.bg,
+                              color: statusStyle.text,
+                              borderColor: statusStyle.border,
+                            }}
+                          >
+                            {student.status.charAt(0).toUpperCase() +
+                              student.status.slice(1)}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <button
+                            className="text-sm font-medium hover:underline"
+                            style={{ color: "#10B981" }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openReviewModal(student);
+                            }}
+                          >
+                            Review
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <p className="text-sm text-gray-600">
+              Showing <span className="font-medium">{filteredStudents.length}</span> pending
+              applications
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity Sidebar */}
+      <div className="w-80 flex-shrink-0">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm sticky top-8">
+          <div className="p-6 border-b border-gray-200" style={{ backgroundColor: "#F0FDF4" }}>
+            <div className="flex items-center gap-2">
+              <Activity className="w-5 h-5" style={{ color: "#10B981" }} />
+              <h2 className="text-lg font-semibold text-gray-900">
+                Recent Activity
+              </h2>
+            </div>
+          </div>
+
+          <div className="p-4">
+            {recentActivity.length === 0 ? (
+              <p className="text-sm text-gray-500 text-center py-8">No recent activity</p>
+            ) : (
+              <div className="space-y-4">
+                {recentActivity.map((activity) => (
+                  <div
+                    key={activity.id}
+                    className="flex gap-3 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                  >
+                    <div
+                      className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: "#D1FAE5" }}
+                    >
+                      {activity.type === "submission" && (
+                        <FileText className="w-5 h-5" style={{ color: "#10B981" }} />
+                      )}
+                      {activity.type === "verification" && (
+                        <FileCheck className="w-5 h-5" style={{ color: "#10B981" }} />
+                      )}
+                      {activity.type === "payment" && (
+                        <CreditCard className="w-5 h-5" style={{ color: "#10B981" }} />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 mb-1">
+                        {activity.message}
+                      </p>
+                      <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="p-4 border-t border-gray-200 bg-gray-50">
+            <button
+              className="w-full px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+              style={{ backgroundColor: "#10B981" }}
+              onClick={loadAuditLogs}
+            >
+              Refresh Activity
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Review Modal */}
+      {selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div
+              className="p-6 border-b border-gray-200"
+              style={{ backgroundColor: "#F0FDF4" }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">
+                    Review Application
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1">
+                    {selectedStudent.name} - {selectedStudent.strand}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSelectedStudent(null)}
+                  className="w-10 h-10 rounded-lg hover:bg-gray-200 flex items-center justify-center transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              {/* Student Info */}
+              <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Email</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {selectedStudent.email}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Application Date</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {new Date(selectedStudent.applicationDate).toLocaleDateString(
+                      "en-US",
+                      {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      }
+                    )}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">AI Test Score</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {selectedStudent.aiTestScore || "N/A"}%
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Recommended Strand</p>
+                  <p className="text-sm font-medium text-gray-900">
+                    {selectedStudent.strand}
+                  </p>
+                </div>
+              </div>
+
+              {/* Documents Checklist */}
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Required Documents
+                </h3>
+                <div className="space-y-3">
+                  {/* PSA Birth Certificate */}
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 bg-white">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileCheck className="w-4 h-4" style={{ color: selectedStudent.documents?.psaBirthCertificate ? "#10B981" : "#9CA3AF" }} />
+                          <span className="text-sm font-medium text-gray-900">PSA Birth Certificate</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewDocument("birthCertificate", selectedStudent)}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-50 transition-all border"
+                          style={{ borderColor: "#1E3A8A", color: "#1E3A8A" }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {documentReview.psaBirthCertificate === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleAcceptDocument("psaBirthCertificate")}
+                              className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                              style={{ backgroundColor: "#10B981" }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectDocument("psaBirthCertificate")}
+                              className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-all border-2"
+                              style={{ borderColor: "#B91C1C", color: "#B91C1C" }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {documentReview.psaBirthCertificate === "accepted" && (
+                          <span className="text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {documentReview.psaBirthCertificate === "rejected" && expandedDocument === "psaBirthCertificate" && (
+                      <div className="p-4 bg-red-50 border-t border-red-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Reason for rejection:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Image is blurry, missing signature..."
+                          value={rejectionReasons.psaBirthCertificate}
+                          onChange={(e) => setRejectionReasons((prev) => ({ ...prev, psaBirthCertificate: e.target.value }))}
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          onClick={() => handleSubmitRejection("psaBirthCertificate")}
+                          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                          style={{ backgroundColor: "#B91C1C" }}
+                        >
+                          Submit Reason
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Form 138 */}
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 bg-white">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4" style={{ color: selectedStudent.documents?.form138 ? "#10B981" : "#9CA3AF" }} />
+                          <span className="text-sm font-medium text-gray-900">Form 138 (Report Card)</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewDocument("form138", selectedStudent)}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-50 transition-all border"
+                          style={{ borderColor: "#1E3A8A", color: "#1E3A8A" }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {documentReview.form138 === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleAcceptDocument("form138")}
+                              className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                              style={{ backgroundColor: "#10B981" }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectDocument("form138")}
+                              className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-all border-2"
+                              style={{ borderColor: "#B91C1C", color: "#B91C1C" }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {documentReview.form138 === "accepted" && (
+                          <span className="text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {documentReview.form138 === "rejected" && expandedDocument === "form138" && (
+                      <div className="p-4 bg-red-50 border-t border-red-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Reason for rejection:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Image is blurry, missing signature..."
+                          value={rejectionReasons.form138}
+                          onChange={(e) => setRejectionReasons((prev) => ({ ...prev, form138: e.target.value }))}
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          onClick={() => handleSubmitRejection("form138")}
+                          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                          style={{ backgroundColor: "#B91C1C" }}
+                        >
+                          Submit Reason
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Good Moral Certificate */}
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 bg-white">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <FileCheck className="w-4 h-4" style={{ color: selectedStudent.documents?.goodMoralCertificate ? "#10B981" : "#9CA3AF" }} />
+                          <span className="text-sm font-medium text-gray-900">Good Moral Certificate</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewDocument("goodMoral", selectedStudent)}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-50 transition-all border"
+                          style={{ borderColor: "#1E3A8A", color: "#1E3A8A" }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {documentReview.goodMoralCertificate === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleAcceptDocument("goodMoralCertificate")}
+                              className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                              style={{ backgroundColor: "#10B981" }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectDocument("goodMoralCertificate")}
+                              className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-all border-2"
+                              style={{ borderColor: "#B91C1C", color: "#B91C1C" }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {documentReview.goodMoralCertificate === "accepted" && (
+                          <span className="text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {documentReview.goodMoralCertificate === "rejected" && expandedDocument === "goodMoralCertificate" && (
+                      <div className="p-4 bg-red-50 border-t border-red-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Reason for rejection:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Image is blurry, missing signature..."
+                          value={rejectionReasons.goodMoralCertificate}
+                          onChange={(e) => setRejectionReasons((prev) => ({ ...prev, goodMoralCertificate: e.target.value }))}
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          onClick={() => handleSubmitRejection("goodMoralCertificate")}
+                          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                          style={{ backgroundColor: "#B91C1C" }}
+                        >
+                          Submit Reason
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 2x2 ID Picture */}
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 bg-white">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4" style={{ color: selectedStudent.documents?.idPicture ? "#10B981" : "#9CA3AF" }} />
+                          <span className="text-sm font-medium text-gray-900">2x2 ID Picture</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewDocument("idPicture", selectedStudent)}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-50 transition-all border"
+                          style={{ borderColor: "#1E3A8A", color: "#1E3A8A" }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {documentReview.idPicture === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleAcceptDocument("idPicture")}
+                              className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                              style={{ backgroundColor: "#10B981" }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectDocument("idPicture")}
+                              className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-all border-2"
+                              style={{ borderColor: "#B91C1C", color: "#B91C1C" }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {documentReview.idPicture === "accepted" && (
+                          <span className="text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {documentReview.idPicture === "rejected" && expandedDocument === "idPicture" && (
+                      <div className="p-4 bg-red-50 border-t border-red-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Reason for rejection:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Image is blurry, not 2x2 size..."
+                          value={rejectionReasons.idPicture}
+                          onChange={(e) => setRejectionReasons((prev) => ({ ...prev, idPicture: e.target.value }))}
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          onClick={() => handleSubmitRejection("idPicture")}
+                          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                          style={{ backgroundColor: "#B91C1C" }}
+                        >
+                          Submit Reason
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Parent's/Guardian's ID */}
+                  <div className="border-2 border-gray-200 rounded-lg overflow-hidden">
+                    <div className="flex items-center gap-3 p-4 bg-white">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <UserCircle className="w-4 h-4" style={{ color: selectedStudent.documents?.parentGuardianId ? "#10B981" : "#9CA3AF" }} />
+                          <span className="text-sm font-medium text-gray-900">Photocopy of Parent's/Guardian's ID</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleViewDocument("parentGuardianId", selectedStudent)}
+                          className="px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-50 transition-all border"
+                          style={{ borderColor: "#1E3A8A", color: "#1E3A8A" }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {documentReview.parentGuardianId === "pending" && (
+                          <>
+                            <button
+                              onClick={() => handleAcceptDocument("parentGuardianId")}
+                              className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                              style={{ backgroundColor: "#10B981" }}
+                            >
+                              Accept
+                            </button>
+                            <button
+                              onClick={() => handleRejectDocument("parentGuardianId")}
+                              className="px-4 py-2 rounded-lg text-sm font-medium hover:bg-red-50 transition-all border-2"
+                              style={{ borderColor: "#B91C1C", color: "#B91C1C" }}
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {documentReview.parentGuardianId === "accepted" && (
+                          <span className="text-xs font-semibold px-3 py-1.5 rounded" style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}>
+                            Verified
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {documentReview.parentGuardianId === "rejected" && expandedDocument === "parentGuardianId" && (
+                      <div className="p-4 bg-red-50 border-t border-red-200">
+                        <label className="block text-sm font-medium text-gray-900 mb-2">Reason for rejection:</label>
+                        <input
+                          type="text"
+                          placeholder="e.g., Image is blurry, ID is expired..."
+                          value={rejectionReasons.parentGuardianId}
+                          onChange={(e) => setRejectionReasons((prev) => ({ ...prev, parentGuardianId: e.target.value }))}
+                          className="w-full px-3 py-2 border border-red-300 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-red-500"
+                        />
+                        <button
+                          onClick={() => handleSubmitRejection("parentGuardianId")}
+                          className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all"
+                          style={{ backgroundColor: "#B91C1C" }}
+                        >
+                          Submit Reason
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* View Enrollment Form Data */}
+              <div className="mb-6">
+                <button
+                  onClick={() => setShowFormData(!showFormData)}
+                  className="w-full flex items-center justify-between p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <BookOpen className="w-5 h-5 text-blue-900" />
+                    <span className="text-sm font-semibold text-blue-900">
+                      View Complete Enrollment Form
+                    </span>
+                  </div>
+                  <div className="text-blue-900">
+                    {showFormData ? "▲" : "▼"}
+                  </div>
+                </button>
+
+                {showFormData && selectedStudent.formData && (
+                  <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-4 max-h-96 overflow-y-auto">
+                    {/* Personal Information */}
+                    <div>
+                      <h4 className="text-sm font-bold text-gray-900 mb-2">Personal Information</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-gray-500">Full Name:</span> <span className="font-medium">{selectedStudent.formData.firstName} {selectedStudent.formData.middleName} {selectedStudent.formData.lastName}</span></div>
+                        <div><span className="text-gray-500">LRN:</span> <span className="font-medium">{selectedStudent.formData.lrn}</span></div>
+                        <div><span className="text-gray-500">Sex:</span> <span className="font-medium">{selectedStudent.formData.sex}</span></div>
+                        <div><span className="text-gray-500">Birthday:</span> <span className="font-medium">{selectedStudent.formData.birthday}</span></div>
+                        <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{selectedStudent.formData.contactNumber}</span></div>
+                        <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selectedStudent.formData.email}</span></div>
+                      </div>
+                    </div>
+
+                    {/* Address */}
+                    <div className="pt-3 border-t border-gray-300">
+                      <h4 className="text-sm font-bold text-gray-900 mb-2">Address</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-gray-500">Region:</span> <span className="font-medium">{selectedStudent.formData.region}</span></div>
+                        <div><span className="text-gray-500">Province:</span> <span className="font-medium">{selectedStudent.formData.province || 'N/A'}</span></div>
+                        <div><span className="text-gray-500">City:</span> <span className="font-medium">{selectedStudent.formData.city}</span></div>
+                        <div><span className="text-gray-500">Barangay:</span> <span className="font-medium">{selectedStudent.formData.barangay}</span></div>
+                        <div className="col-span-2"><span className="text-gray-500">Home Address:</span> <span className="font-medium">{selectedStudent.formData.homeAddress}</span></div>
+                      </div>
+                    </div>
+
+                    {/* Enrollment Details */}
+                    <div className="pt-3 border-t border-gray-300">
+                      <h4 className="text-sm font-bold text-gray-900 mb-2">Enrollment Details</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-gray-500">Track:</span> <span className="font-medium">{selectedStudent.formData.preferredTrack}</span></div>
+                        <div><span className="text-gray-500">Year Level:</span> <span className="font-medium">{selectedStudent.formData.yearLevel}</span></div>
+                        <div><span className="text-gray-500">Elective 1:</span> <span className="font-medium">{selectedStudent.formData.elective1}</span></div>
+                        <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{selectedStudent.formData.elective2}</span></div>
+                      </div>
+                    </div>
+
+                    {/* Parent Information */}
+                    <div className="pt-3 border-t border-gray-300">
+                      <h4 className="text-sm font-bold text-gray-900 mb-2">Parent/Guardian Information</h4>
+                      <div className="space-y-2">
+                        <div className="text-xs">
+                          <p className="text-gray-500 font-medium mb-1">Father:</p>
+                          <p className="font-medium">{selectedStudent.formData.fatherFirstName} {selectedStudent.formData.fatherLastName}</p>
+                          <p className="text-gray-600">{selectedStudent.formData.fatherOccupation} • {selectedStudent.formData.fatherContact}</p>
+                        </div>
+                        <div className="text-xs">
+                          <p className="text-gray-500 font-medium mb-1">Mother:</p>
+                          <p className="font-medium">{selectedStudent.formData.motherFirstName} {selectedStudent.formData.motherLastName}</p>
+                          <p className="text-gray-600">{selectedStudent.formData.motherOccupation} • {selectedStudent.formData.motherContact}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Education Background */}
+                    <div className="pt-3 border-t border-gray-300">
+                      <h4 className="text-sm font-bold text-gray-900 mb-2">Educational Background</h4>
+                      <div className="space-y-2 text-xs">
+                        <div>
+                          <p className="text-gray-500">Primary School:</p>
+                          <p className="font-medium">{selectedStudent.formData.primarySchool} ({selectedStudent.formData.primaryYearGraduated})</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Secondary School:</p>
+                          <p className="font-medium">{selectedStudent.formData.secondarySchool} ({selectedStudent.formData.secondaryYearGraduated})</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-4">
+                <button
+                  onClick={handleSubmitFinalReview}
+                  disabled={!allDocumentsReviewed}
+                  className="flex-1 px-6 py-4 rounded-lg text-white font-semibold text-base hover:opacity-90 transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: "#10B981" }}
+                >
+                  <CheckCircle className="w-5 h-5" />
+                  Submit Final Review
+                </button>
+              </div>
+              {!allDocumentsReviewed && (
+                <p className="text-sm text-gray-500 text-center mt-2">
+                  Please review all documents before submitting
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document View Modal */}
+      {viewingDocument && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200 flex items-center justify-between" style={{ backgroundColor: "#F0FDF4" }}>
+              <h2 className="text-2xl font-semibold text-gray-900">View Document</h2>
+              <button
+                onClick={() => setViewingDocument(null)}
+                className="w-10 h-10 rounded-lg hover:bg-gray-200 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <div className="p-6">
+              {viewingDocument.fileData ? (
+                <div className="bg-gray-100 rounded-lg p-4 min-h-[400px] flex items-center justify-center">
+                  {viewingDocument.fileData.startsWith('data:application/pdf') ? (
+                    <iframe
+                      src={viewingDocument.fileData}
+                      className="w-full h-[600px] rounded"
+                      title="Document Viewer"
+                    />
+                  ) : (
+                    <img
+                      src={viewingDocument.fileData}
+                      alt="Document"
+                      className="max-w-full max-h-[600px] object-contain rounded"
+                    />
+                  )}
+                </div>
+              ) : (
+                <div className="bg-gray-100 rounded-lg p-8 text-center min-h-[400px] flex items-center justify-center">
+                  <div>
+                    <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                    <p className="text-gray-600 mb-2 font-medium">Document: {viewingDocument.url}</p>
+                    <p className="text-sm text-gray-500">
+                      Document preview not available. The student uploaded this file, but the preview could not be stored due to storage limitations.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

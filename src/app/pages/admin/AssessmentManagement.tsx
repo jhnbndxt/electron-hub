@@ -1,0 +1,888 @@
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  Brain,
+  Calculator,
+  Beaker,
+  Lightbulb,
+  Heart,
+  Edit2,
+  Trash2,
+  Save,
+  X,
+  Plus,
+  ChevronDown,
+  ChevronUp,
+  FileText,
+  CheckCircle,
+} from "lucide-react";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+
+interface AssessmentQuestion {
+  id: number;
+  question: string;
+  options: string[];
+  correctAnswer?: number;
+  category: string;
+}
+
+const categories = [
+  { name: "Verbal", icon: Brain, color: "#1E3A8A" },
+  { name: "Math", icon: Calculator, color: "#F59E0B" },
+  { name: "Science", icon: Beaker, color: "#10B981" },
+  { name: "Logical", icon: Lightbulb, color: "#8B5CF6" },
+  { name: "Interests", icon: Heart, color: "#EF4444" },
+];
+
+export function AssessmentManagement() {
+  const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editedQuestion, setEditedQuestion] = useState<AssessmentQuestion | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<string[]>(
+    categories.map((c) => c.name)
+  );
+  const [addingCategory, setAddingCategory] = useState<string | null>(null);
+  const [newQuestion, setNewQuestion] = useState<Partial<AssessmentQuestion>>({
+    question: "",
+    options: ["", "", "", ""],
+    correctAnswer: 0,
+  });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: number | null }>({
+    show: false,
+    id: null,
+  });
+
+  useEffect(() => {
+    loadQuestions();
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, []);
+
+  const loadQuestions = () => {
+    const stored = localStorage.getItem("assessment_questions");
+    if (stored) {
+      const parsedQuestions = JSON.parse(stored);
+      const questionsWithCategory = parsedQuestions.map((q: any) => ({
+        ...q,
+        category: q.category || getCategoryForQuestion(q.id)
+      }));
+      setQuestions(questionsWithCategory);
+    } else {
+      const defaultQuestions = getDefaultQuestions();
+      localStorage.setItem("assessment_questions", JSON.stringify(defaultQuestions));
+      setQuestions(defaultQuestions);
+    }
+  };
+
+  const getCategoryForQuestion = (id: number): string => {
+    if (id <= 10) return "Verbal";
+    if (id <= 20) return "Math";
+    if (id <= 30) return "Science";
+    if (id <= 40) return "Logical";
+    return "Interests";
+  };
+
+  const getDefaultQuestions = (): AssessmentQuestion[] => {
+    return [
+      // Verbal Section (1-10)
+      {
+        id: 1,
+        question: "rapid = ?",
+        options: ["slow", "fast", "weak", "late"],
+        correctAnswer: 1,
+        category: "Verbal",
+      },
+      {
+        id: 2,
+        question: "assist = ?",
+        options: ["help", "ignore", "stop", "delay"],
+        correctAnswer: 0,
+        category: "Verbal",
+      },
+      {
+        id: 3,
+        question: "She _ to school",
+        options: ["go", "goes", "going", "gone"],
+        correctAnswer: 1,
+        category: "Verbal",
+      },
+      {
+        id: 4,
+        question: "Correct sentence",
+        options: [
+          "He don't like math",
+          "He doesn't likes math",
+          "He doesn't like math",
+          "He not like math",
+        ],
+        correctAnswer: 2,
+        category: "Verbal",
+      },
+      {
+        id: 5,
+        question: '"Technology helps students learn faster" - Main idea?',
+        options: ["dislike", "improves learning", "difficult", "lazy"],
+        correctAnswer: 1,
+        category: "Verbal",
+      },
+      {
+        id: 6,
+        question: "Teacher : School :: Doctor : _",
+        options: ["medicine", "hospital", "patient", "clinic"],
+        correctAnswer: 1,
+        category: "Verbal",
+      },
+      {
+        id: 7,
+        question: "Opposite of increase",
+        options: ["reduce", "expand", "grow", "rise"],
+        correctAnswer: 0,
+        category: "Verbal",
+      },
+      {
+        id: 8,
+        question: "They _ dinner",
+        options: ["eat", "eats", "ate", "eating"],
+        correctAnswer: 2,
+        category: "Verbal",
+      },
+      {
+        id: 9,
+        question: "Incorrect sentence",
+        options: ["She sings well", "They plays outside", "We study", "I read"],
+        correctAnswer: 1,
+        category: "Verbal",
+      },
+      {
+        id: 10,
+        question: "manageable = ?",
+        options: ["impossible", "easy", "controllable", "useless"],
+        correctAnswer: 2,
+        category: "Verbal",
+      },
+      // Math Section (11-20)
+      {
+        id: 11,
+        question: "7(5+3) = ?",
+        options: ["48", "56", "64", "40"],
+        correctAnswer: 1,
+        category: "Math",
+      },
+      {
+        id: 12,
+        question: "2x + 4 = 10",
+        options: ["2", "3", "4", "5"],
+        correctAnswer: 1,
+        category: "Math",
+      },
+      {
+        id: 13,
+        question: "45% of 200",
+        options: ["80", "85", "90", "95"],
+        correctAnswer: 2,
+        category: "Math",
+      },
+      {
+        id: 14,
+        question: "18/24 simplified",
+        options: ["2/3", "3/4", "1/2", "4/5"],
+        correctAnswer: 1,
+        category: "Math",
+      },
+      {
+        id: 15,
+        question: "Triangle area (base=10, height=5)",
+        options: ["25", "50", "30", "15"],
+        correctAnswer: 0,
+        category: "Math",
+      },
+      {
+        id: 16,
+        question: "2, 4, 8, 16, __",
+        options: ["20", "24", "32", "30"],
+        correctAnswer: 2,
+        category: "Math",
+      },
+      {
+        id: 17,
+        question: "4x + 3 = 15",
+        options: ["2", "3", "4", "5"],
+        correctAnswer: 1,
+        category: "Math",
+      },
+      {
+        id: 18,
+        question: "Which is a prime number?",
+        options: ["15", "21", "29", "35"],
+        correctAnswer: 2,
+        category: "Math",
+      },
+      {
+        id: 19,
+        question: "Speed: 60km in 1 hour",
+        options: ["60", "30", "120", "90"],
+        correctAnswer: 0,
+        category: "Math",
+      },
+      {
+        id: 20,
+        question: "Sum of triangle angles",
+        options: ["90", "180", "270", "360"],
+        correctAnswer: 1,
+        category: "Math",
+      },
+      // Science Section (21-30)
+      {
+        id: 21,
+        question: "What do lungs do?",
+        options: ["digest food", "help breathing", "pump blood", "filter toxins"],
+        correctAnswer: 1,
+        category: "Science",
+      },
+      {
+        id: 22,
+        question: "Day and night are caused by:",
+        options: ["moon phases", "earth rotation", "sun movement", "seasons"],
+        correctAnswer: 1,
+        category: "Science",
+      },
+      {
+        id: 23,
+        question: "Which is renewable energy?",
+        options: ["coal", "oil", "solar", "gas"],
+        correctAnswer: 2,
+        category: "Science",
+      },
+      {
+        id: 24,
+        question: "Gravity is a force that:",
+        options: ["pushes away", "pulls objects", "creates heat", "makes light"],
+        correctAnswer: 1,
+        category: "Science",
+      },
+      {
+        id: 25,
+        question: "The heart's main function:",
+        options: ["digest", "think", "pump blood", "breathe"],
+        correctAnswer: 2,
+        category: "Science",
+      },
+      {
+        id: 26,
+        question: "Ice when heated:",
+        options: ["freezes", "melts", "evaporates", "condenses"],
+        correctAnswer: 1,
+        category: "Science",
+      },
+      {
+        id: 27,
+        question: "Which is NOT matter?",
+        options: ["water", "air", "rock", "energy"],
+        correctAnswer: 3,
+        category: "Science",
+      },
+      {
+        id: 28,
+        question: "Plants make food through:",
+        options: ["respiration", "digestion", "photosynthesis", "transpiration"],
+        correctAnswer: 2,
+        category: "Science",
+      },
+      {
+        id: 29,
+        question: "Force is measured in:",
+        options: ["meters", "newtons", "liters", "watts"],
+        correctAnswer: 1,
+        category: "Science",
+      },
+      {
+        id: 30,
+        question: "Which conducts electricity?",
+        options: ["wood", "plastic", "metal", "rubber"],
+        correctAnswer: 2,
+        category: "Science",
+      },
+      // Logical Section (31-40)
+      {
+        id: 31,
+        question: "3, 6, 9, 12, __",
+        options: ["13", "15", "16", "18"],
+        correctAnswer: 1,
+        category: "Logical",
+      },
+      {
+        id: 32,
+        question: "Which is odd one out?",
+        options: ["bus", "train", "plane", "car"],
+        correctAnswer: 3,
+        category: "Logical",
+      },
+      {
+        id: 33,
+        question: "Knife is used to:",
+        options: ["cut", "write", "measure", "cook"],
+        correctAnswer: 0,
+        category: "Logical",
+      },
+      {
+        id: 34,
+        question: "A, C, E, G, __",
+        options: ["H", "I", "J", "K"],
+        correctAnswer: 1,
+        category: "Logical",
+      },
+      {
+        id: 35,
+        question: "All cats are animals. Some animals are cats.",
+        options: ["always true", "sometimes true", "never true", "cannot tell"],
+        correctAnswer: 1,
+        category: "Logical",
+      },
+      {
+        id: 36,
+        question: "1, 1, 2, 3, 5, __",
+        options: ["6", "7", "8", "9"],
+        correctAnswer: 2,
+        category: "Logical",
+      },
+      {
+        id: 37,
+        question: "Which is odd one out?",
+        options: ["apple", "orange", "grape", "banana"],
+        correctAnswer: 3,
+        category: "Logical",
+      },
+      {
+        id: 38,
+        question: "RIGHT reversed is:",
+        options: ["THGIR", "RIGHT", "WRONG", "LEFT"],
+        correctAnswer: 0,
+        category: "Logical",
+      },
+      {
+        id: 39,
+        question: "10:100 :: 5:__",
+        options: ["10", "25", "50", "75"],
+        correctAnswer: 1,
+        category: "Logical",
+      },
+      {
+        id: 40,
+        question: "2, 5, 10, 17, __",
+        options: ["22", "24", "26", "28"],
+        correctAnswer: 2,
+        category: "Logical",
+      },
+      // Interests Section (41-55)
+      { id: 41, question: "I enjoy solving math problems", options: [], category: "Interests" },
+      { id: 42, question: "I like reading/writing", options: [], category: "Interests" },
+      { id: 43, question: "I enjoy science experiments", options: [], category: "Interests" },
+      { id: 44, question: "I like hands-on work", options: [], category: "Interests" },
+      { id: 45, question: "I am interested in business", options: [], category: "Interests" },
+      { id: 46, question: "I like computers/tech", options: [], category: "Interests" },
+      { id: 47, question: "I like helping people", options: [], category: "Interests" },
+      { id: 48, question: "I enjoy cooking", options: [], category: "Interests" },
+      { id: 49, question: "I like arts/design", options: [], category: "Interests" },
+      { id: 50, question: "I like outdoor work", options: [], category: "Interests" },
+      { id: 51, question: "I prefer practical work", options: [], category: "Interests" },
+      { id: 52, question: "I enjoy analyzing problems", options: [], category: "Interests" },
+      { id: 53, question: "I like teamwork", options: [], category: "Interests" },
+      { id: 54, question: "I like machines/electronics", options: [], category: "Interests" },
+      { id: 55, question: "I like physical activities", options: [], category: "Interests" },
+    ];
+  };
+
+  const toggleCategory = (categoryName: string) => {
+    setExpandedCategories((prev) =>
+      prev.includes(categoryName)
+        ? prev.filter((c) => c !== categoryName)
+        : [...prev, categoryName]
+    );
+  };
+
+  const handleEdit = (question: AssessmentQuestion) => {
+    setEditingId(question.id);
+    setEditedQuestion({ ...question });
+  };
+
+  const handleSave = (id: number) => {
+    if (editedQuestion) {
+      const updatedQuestions = questions.map((q) =>
+        q.id === id ? editedQuestion : q
+      );
+      setQuestions(updatedQuestions);
+      localStorage.setItem("assessment_questions", JSON.stringify(updatedQuestions));
+      setEditingId(null);
+      setEditedQuestion(null);
+
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    }
+  };
+
+  const handleCancel = () => {
+    setEditingId(null);
+    setEditedQuestion(null);
+  };
+
+  const handleDelete = (id: number) => {
+    setDeleteConfirm({ show: true, id });
+  };
+
+  const handleConfirmDelete = (id: number) => {
+    const updatedQuestions = questions.filter((q) => q.id !== id);
+    setQuestions(updatedQuestions);
+    localStorage.setItem("assessment_questions", JSON.stringify(updatedQuestions));
+    setDeleteConfirm({ show: false, id: null });
+  };
+
+  const handleAddQuestion = (category: string) => {
+    const maxId = Math.max(...questions.map((q) => q.id), 0);
+    const newQ: AssessmentQuestion = {
+      id: maxId + 1,
+      question: newQuestion.question || "",
+      options: category === "Interests" ? [] : (newQuestion.options || ["", "", "", ""]),
+      correctAnswer: category === "Interests" ? undefined : (newQuestion.correctAnswer || 0),
+      category,
+    };
+
+    const updatedQuestions = [...questions, newQ];
+    setQuestions(updatedQuestions);
+    localStorage.setItem("assessment_questions", JSON.stringify(updatedQuestions));
+
+    setAddingCategory(null);
+    setNewQuestion({
+      question: "",
+      options: ["", "", "", ""],
+      correctAnswer: 0,
+    });
+  };
+
+  const getQuestionsByCategory = (categoryName: string) => {
+    return questions.filter((q) => q.category === categoryName);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Fixed Header */}
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                Assessment Question Bank
+              </h1>
+              <p className="text-gray-600">
+                Manage and customize assessment questions across all categories
+              </p>
+            </div>
+            <div className="flex items-center gap-3 bg-blue-50 px-4 py-2 rounded-lg">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <div className="text-sm">
+                <p className="font-semibold text-blue-900">{questions.length}</p>
+                <p className="text-blue-600">Total Questions</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Success Message */}
+          <AnimatePresence>
+            {saveSuccess && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2"
+              >
+                <CheckCircle className="w-5 h-5" />
+                <span className="font-medium">Changes saved successfully!</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Category Stats */}
+        <div className="px-6 pb-4">
+          <div className="grid grid-cols-5 gap-3">
+            {categories.map((category) => {
+              const Icon = category.icon;
+              const count = getQuestionsByCategory(category.name).length;
+              return (
+                <div
+                  key={category.name}
+                  className="bg-white border border-gray-200 rounded-lg p-3 text-center"
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg mx-auto mb-2 flex items-center justify-center"
+                    style={{ backgroundColor: `${category.color}20` }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color: category.color }} />
+                  </div>
+                  <p className="text-2xl font-bold text-gray-900">{count}</p>
+                  <p className="text-xs text-gray-600">{category.name}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-6">
+        <div className="max-w-7xl mx-auto space-y-4">
+          {categories.map((category) => {
+            const Icon = category.icon;
+            const categoryQuestions = getQuestionsByCategory(category.name);
+            const isExpanded = expandedCategories.includes(category.name);
+            const isAdding = addingCategory === category.name;
+
+            return (
+              <motion.div
+                key={category.name}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden"
+              >
+                {/* Category Header */}
+                <div
+                  className="flex items-center justify-between p-5 cursor-pointer hover:bg-gray-50 transition-colors border-l-4"
+                  onClick={() => toggleCategory(category.name)}
+                  style={{ borderLeftColor: category.color }}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center"
+                      style={{ backgroundColor: `${category.color}20` }}
+                    >
+                      <Icon className="w-6 h-6" style={{ color: category.color }} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900">
+                        {category.name}
+                      </h2>
+                      <p className="text-sm text-gray-500">
+                        {categoryQuestions.length} question{categoryQuestions.length !== 1 ? "s" : ""}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAddingCategory(category.name);
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Question
+                    </button>
+                    {isExpanded ? (
+                      <ChevronUp className="w-5 h-5 text-gray-400" />
+                    ) : (
+                      <ChevronDown className="w-5 h-5 text-gray-400" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Category Content */}
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: "auto", opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="border-t border-gray-200"
+                    >
+                      <div className="p-5 space-y-3 bg-gray-50">
+                        {/* Add New Question Form */}
+                        <AnimatePresence>
+                          {isAdding && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.95 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              className="bg-white border-2 border-blue-200 rounded-lg p-5 mb-4"
+                            >
+                              <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-lg font-semibold text-gray-900">
+                                  Add New {category.name} Question
+                                </h3>
+                                <button
+                                  onClick={() => setAddingCategory(null)}
+                                  className="text-gray-400 hover:text-gray-600"
+                                >
+                                  <X className="w-5 h-5" />
+                                </button>
+                              </div>
+
+                              {/* Question Input */}
+                              <div className="mb-4">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Question Text
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newQuestion.question}
+                                  onChange={(e) =>
+                                    setNewQuestion({ ...newQuestion, question: e.target.value })
+                                  }
+                                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="Enter your question here..."
+                                />
+                              </div>
+
+                              {/* Options (only for non-Interest questions) */}
+                              {category.name !== "Interests" && (
+                                <div className="mb-4">
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Answer Options (select correct answer)
+                                  </label>
+                                  <div className="space-y-2">
+                                    {newQuestion.options?.map((option, index) => (
+                                      <div key={index} className="flex items-center gap-3">
+                                        <input
+                                          type="radio"
+                                          name="correctAnswer"
+                                          checked={newQuestion.correctAnswer === index}
+                                          onChange={() =>
+                                            setNewQuestion({ ...newQuestion, correctAnswer: index })
+                                          }
+                                          className="w-5 h-5"
+                                          style={{ accentColor: category.color }}
+                                        />
+                                        <input
+                                          type="text"
+                                          value={option}
+                                          onChange={(e) => {
+                                            const updatedOptions = [...(newQuestion.options || [])];
+                                            updatedOptions[index] = e.target.value;
+                                            setNewQuestion({ ...newQuestion, options: updatedOptions });
+                                          }}
+                                          className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                          placeholder={`Option ${String.fromCharCode(65 + index)}`}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {category.name === "Interests" && (
+                                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                                  <p className="text-sm text-blue-800">
+                                    <strong>Note:</strong> Interest questions use a 5-point Likert scale
+                                    (1=Strongly Disagree to 5=Strongly Agree)
+                                  </p>
+                                </div>
+                              )}
+
+                              {/* Save Button */}
+                              <button
+                                onClick={() => handleAddQuestion(category.name)}
+                                className="w-full py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                              >
+                                <Plus className="w-5 h-5" />
+                                Add Question to {category.name}
+                              </button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+
+                        {/* Question List */}
+                        {categoryQuestions.length === 0 ? (
+                          <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
+                            <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                            <p className="text-gray-600 font-medium">No questions in this category yet</p>
+                            <p className="text-sm text-gray-500 mt-1">Click "Add Question" to create one</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {categoryQuestions.map((question, qIndex) => (
+                              <motion.div
+                                key={question.id}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                className="bg-white rounded-lg border border-gray-200 hover:border-gray-300 transition-all p-4"
+                              >
+                                {editingId === question.id ? (
+                                  // Edit Mode
+                                  <div>
+                                    <div className="mb-4">
+                                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Question Text
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={editedQuestion?.question}
+                                        onChange={(e) =>
+                                          setEditedQuestion({
+                                            ...editedQuestion!,
+                                            question: e.target.value,
+                                          })
+                                        }
+                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                      />
+                                    </div>
+
+                                    {category.name !== "Interests" && (
+                                      <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                          Options (select correct answer)
+                                        </label>
+                                        <div className="space-y-2">
+                                          {editedQuestion?.options.map((option, index) => (
+                                            <div key={index} className="flex items-center gap-3">
+                                              <input
+                                                type="radio"
+                                                name={`correctAnswer-${question.id}`}
+                                                checked={editedQuestion.correctAnswer === index}
+                                                onChange={() =>
+                                                  setEditedQuestion({
+                                                    ...editedQuestion,
+                                                    correctAnswer: index,
+                                                  })
+                                                }
+                                                className="w-5 h-5"
+                                                style={{ accentColor: category.color }}
+                                              />
+                                              <input
+                                                type="text"
+                                                value={option}
+                                                onChange={(e) => {
+                                                  const updatedOptions = [...editedQuestion.options];
+                                                  updatedOptions[index] = e.target.value;
+                                                  setEditedQuestion({
+                                                    ...editedQuestion,
+                                                    options: updatedOptions,
+                                                  });
+                                                }}
+                                                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                              />
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="flex gap-3">
+                                      <button
+                                        onClick={() => handleSave(question.id)}
+                                        className="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors flex items-center justify-center gap-2"
+                                      >
+                                        <Save className="w-4 h-4" />
+                                        Save Changes
+                                      </button>
+                                      <button
+                                        onClick={handleCancel}
+                                        className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+                                      >
+                                        <X className="w-4 h-4" />
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // View Mode
+                                  <div>
+                                    <div className="flex items-start justify-between mb-3">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <span
+                                            className="text-xs font-bold px-2 py-1 rounded"
+                                            style={{
+                                              backgroundColor: `${category.color}20`,
+                                              color: category.color,
+                                            }}
+                                          >
+                                            {category.name} #{qIndex + 1}
+                                          </span>
+                                        </div>
+                                        <p className="text-base font-medium text-gray-900">
+                                          {question.question}
+                                        </p>
+                                      </div>
+                                      <div className="flex items-center gap-2 ml-4">
+                                        <button
+                                          onClick={() => handleEdit(question)}
+                                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                        >
+                                          <Edit2 className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDelete(question.id)}
+                                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {category.name !== "Interests" && question.options.length > 0 && (
+                                      <div className="grid grid-cols-2 gap-2 mt-3">
+                                        {question.options.map((option, index) => (
+                                          <div
+                                            key={index}
+                                            className={`px-3 py-2 rounded-lg text-sm ${
+                                              question.correctAnswer === index
+                                                ? "bg-green-50 text-green-800 font-semibold border-2 border-green-300"
+                                                : "bg-gray-50 text-gray-700 border border-gray-200"
+                                            }`}
+                                          >
+                                            <span className="font-bold mr-2">
+                                              {String.fromCharCode(65 + index)}.
+                                            </span>
+                                            {option}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {category.name === "Interests" && (
+                                      <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                        <p className="text-xs text-gray-600 mb-2 font-medium">
+                                          Likert Scale Response:
+                                        </p>
+                                        <div className="grid grid-cols-5 gap-2">
+                                          {["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"].map((label, index) => (
+                                            <div
+                                              key={index}
+                                              className="px-2 py-1 rounded bg-white text-gray-700 border border-gray-200 text-center text-xs"
+                                              title={label}
+                                            >
+                                              {index + 1}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirm.show}
+        title="Delete Question"
+        message="Are you sure you want to delete this question? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={() => deleteConfirm.id && handleConfirmDelete(deleteConfirm.id)}
+        onClose={() => setDeleteConfirm({ show: false, id: null })}
+      />
+    </div>
+  );
+}

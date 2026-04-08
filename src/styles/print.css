@@ -1,0 +1,285 @@
+/* Print Stylesheet for Electron College Documents */
+
+@media print {
+  /* Reset page margins and ensure proper spacing */
+  @page {
+    margin: 0.5in;
+    size: letter portrait;
+  }
+
+  /* Hide all navigation, headers, footers, and interactive elements */
+  body {
+    background: white !important;
+    font-family: 'Inter', sans-serif !important;
+    color: #000 !important;
+  }
+
+  /* Hide unwanted elements */
+  .print\\:hidden,
+  nav,
+  header,
+  footer,
+  button:not(.print-show),
+  .no-print {
+    display: none !important;
+  }
+
+  /* Show only print content */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Document header for all prints */
+  .print-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px;
+    border-bottom: 3px solid #1E3A8A;
+    margin-bottom: 30px;
+    page-break-after: avoid;
+  }
+
+  .print-logo {
+    display: flex !important;
+    align-items: center;
+    gap: 15px;
+  }
+
+  .print-logo-circle {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: bold;
+    font-size: 24px;
+  }
+
+  .print-logo-text h1 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1E3A8A;
+    margin: 0;
+    line-height: 1.2;
+  }
+
+  .print-logo-text p {
+    font-size: 11px;
+    color: #6B7280;
+    margin: 2px 0 0 0;
+  }
+
+  .print-meta {
+    text-align: right;
+    font-size: 11px;
+    color: #6B7280;
+  }
+
+  .print-meta strong {
+    color: #1F2937;
+    font-weight: 600;
+  }
+
+  /* Document footer */
+  .print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 15px 30px;
+    border-top: 2px solid #E5E7EB;
+    font-size: 10px;
+    color: #6B7280;
+    text-align: center;
+    background: white;
+  }
+
+  /* Remove shadows and adjust colors for print */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Ensure tables print well */
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tfoot {
+    display: table-footer-group;
+  }
+
+  /* Adjust borders for print */
+  table,
+  th,
+  td {
+    border-color: #9CA3AF !important;
+  }
+
+  /* Make sure text is readable */
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    page-break-after: avoid;
+    color: #1F2937 !important;
+  }
+
+  p {
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* Remove backgrounds from cards for clean printing */
+  .bg-gray-50,
+  .bg-blue-50,
+  .bg-green-50,
+  .bg-yellow-50,
+  .bg-red-50 {
+    background: white !important;
+    border: 1px solid #E5E7EB !important;
+  }
+
+  /* Ensure badges print well */
+  .badge,
+  span[class*="badge"],
+  span[class*="px-2"],
+  span[class*="rounded-full"] {
+    border: 1px solid currentColor !important;
+    background: transparent !important;
+    color: #1F2937 !important;
+    font-weight: 600 !important;
+  }
+
+  /* QR Code and images */
+  img,
+  svg {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Avoid breaking these elements */
+  .print-no-break {
+    page-break-inside: avoid !important;
+  }
+
+  /* Links */
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+
+  /* Custom print title */
+  .print-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: #1E3A8A;
+    text-align: center;
+    margin: 20px 0;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* Document metadata section */
+  .print-info-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin: 20px 0;
+    padding: 15px;
+    border: 2px solid #E5E7EB;
+    border-radius: 8px;
+    page-break-inside: avoid;
+  }
+
+  .print-info-item {
+    margin-bottom: 8px;
+  }
+
+  .print-info-label {
+    font-size: 11px;
+    color: #6B7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  .print-info-value {
+    font-size: 14px;
+    color: #1F2937;
+    font-weight: 600;
+    margin-top: 2px;
+  }
+
+  /* Signature section for official documents */
+  .print-signature-section {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 40px;
+    margin-top: 60px;
+    page-break-inside: avoid;
+  }
+
+  .print-signature-box {
+    text-align: center;
+  }
+
+  .print-signature-line {
+    border-top: 2px solid #1F2937;
+    margin-bottom: 8px;
+    padding-top: 40px;
+  }
+
+  .print-signature-label {
+    font-size: 12px;
+    color: #1F2937;
+    font-weight: 600;
+  }
+
+  .print-signature-role {
+    font-size: 10px;
+    color: #6B7280;
+    margin-top: 2px;
+  }
+
+  /* Official stamp area */
+  .print-stamp {
+    position: absolute;
+    right: 30px;
+    bottom: 100px;
+    width: 120px;
+    height: 120px;
+    border: 3px solid #B91C1C;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotate(-15deg);
+    opacity: 0.3;
+  }
+
+  .print-stamp-text {
+    font-size: 14px;
+    font-weight: 700;
+    color: #B91C1C;
+    text-align: center;
+    line-height: 1.2;
+  }
+}
