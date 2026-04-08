@@ -12,6 +12,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { getPendingApplications, approveEnrollment, rejectEnrollment, updateDocumentStatus } from "../../services/adminService";
 
 interface Student {
   id: number | string;
@@ -52,30 +53,44 @@ export function PendingApplications() {
     loadApplications();
   }, []);
 
-  const loadApplications = () => {
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+  const loadApplications = async () => {
+    const { data: applications, error } = await getPendingApplications();
     
-    // Filter out approved applications - only show pending ones
-    const pendingApps = applications.filter((app: any) => 
-      app.status === "Pending Review" || app.status === "pending" || app.status === "incomplete"
-    );
+    if (error) {
+      console.error('Error loading applications:', error);
+      setStudents([]);
+      return;
+    }
+
+    if (!applications || applications.length === 0) {
+      setStudents([]);
+      console.log('📋 No pending applications found');
+      return;
+    }
     
-    const formattedApps = pendingApps.map((app: any) => ({
-      id: app.id,
-      name: app.studentName,
-      email: app.email,
-      applicationDate: new Date(app.submissionDate).toLocaleDateString(),
-      aiTestScore: 85,
-      status: app.status === "Pending Review" ? "pending" : app.status.toLowerCase(),
-      strandApplied: app.preferredTrack,
-      documents: {
-        psaBirthCertificate: !!app.documents?.birthCertificate,
-        form138: !!app.documents?.form138,
-        goodMoralCertificate: !!app.documents?.goodMoral,
-      },
-    }));
+    // Format applications from Supabase
+    const formattedApps = applications.map((app: any) => {
+      const formData = app.form_data || {};
+      return {
+        id: app.id,
+        name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
+        email: formData.email,
+        applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
+        aiTestScore: 85,
+        status: 'pending',
+        strandApplied: formData.preferredTrack || formData.track || 'Not Set',
+        documents: {
+          psaBirthCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'birthCertificate') || false,
+          form138: app.enrollment_documents?.some((d: any) => d.document_type === 'form138') || false,
+          goodMoralCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'goodMoral') || false,
+        },
+        enrollmentId: app.id,
+        enrollmentData: app,
+      };
+    });
+    
     setStudents(formattedApps);
-    console.log('📋 Loaded', formattedApps.length, 'pending applications (approved students hidden)');
+    console.log('📋 Loaded', formattedApps.length, 'pending applications from Supabase');
   };
 
   const documentNames: Record<string, string> = {
@@ -136,57 +151,38 @@ export function PendingApplications() {
     setDocumentRejectionComment(docs[docKey]?.rejectionComment || "");
   };
 
-  const handleApproveDocument = () => {
+  const handleApproveDocument = async () => {
     if (!reviewingStudent || !selectedDocument) return;
 
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    const email = reviewingStudent.email || "";
-    
-    if (!docVerification[email] || !docVerification[email][selectedDocument.key]) {
-      alert("Document data not found");
+    // Find the document in the enrollment
+    const documentId = reviewingStudent.enrollmentData?.enrollment_documents?.find(
+      (d: any) => d.document_type === selectedDocument.key
+    )?.id;
+
+    if (!documentId) {
+      alert("Document not found");
       return;
     }
-    
-    docVerification[email][selectedDocument.key].status = "approved";
-    docVerification[email][selectedDocument.key].rejectionComment = "";
-    localStorage.setItem("document_verification", JSON.stringify(docVerification));
 
-    const allDocs = docVerification[email];
-    const allApproved = Object.values(allDocs).every((doc: any) => doc.status === "approved");
+    const { error } = await updateDocumentStatus(documentId, 'approved');
 
-    if (allApproved) {
-      const progressKey = `enrollment_progress_${email}`;
-      const progress = JSON.parse(localStorage.getItem(progressKey) || "[]");
-      const updatedProgress = progress.map((step: any) => {
-        if (step.name === "Documents Verified") {
-          return { ...step, status: "completed" };
-        }
-        if (step.name === "Payment Submitted" && step.status === "upcoming") {
-          return { ...step, status: "current" };
-        }
-        return step;
-      });
-      localStorage.setItem(progressKey, JSON.stringify(updatedProgress));
-
-      const notificationsKey = `notifications_${email}`;
-      const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
-      notifications.unshift({
-        id: `notif-${Date.now()}`,
-        type: "documents_approved",
-        title: "All Documents Approved! ✅",
-        message: "All your documents have been approved! You can now proceed with payment.",
-        timestamp: new Date().toISOString(),
-        read: false,
-      });
-      localStorage.setItem(notificationsKey, JSON.stringify(notifications));
+    if (error) {
+      alert(`Error approving document: ${error}`);
+      return;
     }
 
+    // Create notification
+    import('../../utils/notificationSystem').then(({ addNotification }) => {
+      addNotification(reviewingStudent.email || "", 'DOCUMENT_APPROVED');
+    });
+
+    alert("✅ Document approved successfully!");
     setSelectedDocument(null);
     setDocumentRejectionComment("");
-    alert("✅ Document approved successfully!");
+    loadApplications();
   };
 
-  const handleRejectDocument = () => {
+  const handleRejectDocument = async () => {
     if (!reviewingStudent || !selectedDocument) return;
     
     if (!documentRejectionComment.trim()) {
@@ -199,37 +195,32 @@ export function PendingApplications() {
       return;
     }
 
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    const email = reviewingStudent.email || "";
-    
-    if (!docVerification[email] || !docVerification[email][selectedDocument.key]) {
-      alert("Document data not found");
+    // Find the document in the enrollment
+    const documentId = reviewingStudent.enrollmentData?.enrollment_documents?.find(
+      (d: any) => d.document_type === selectedDocument.key
+    )?.id;
+
+    if (!documentId) {
+      alert("Document not found");
       return;
     }
-    
-    docVerification[email][selectedDocument.key].status = "rejected";
-    docVerification[email][selectedDocument.key].rejectionComment = documentRejectionComment.trim();
-    localStorage.setItem("document_verification", JSON.stringify(docVerification));
 
-    const notificationsKey = `notifications_${email}`;
-    const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
-    
-    notifications.unshift({
-      id: `notif-${Date.now()}`,
-      type: "document_rejected",
-      title: "Document Rejected ❌",
-      message: `Your ${documentNames[selectedDocument.key]} has been rejected. Reason: ${documentRejectionComment.trim()}`,
-      documentName: documentNames[selectedDocument.key],
-      rejectionReason: documentRejectionComment.trim(),
-      timestamp: new Date().toISOString(),
-      read: false,
+    const { error } = await updateDocumentStatus(documentId, 'rejected', documentRejectionComment.trim());
+
+    if (error) {
+      alert(`Error rejecting document: ${error}`);
+      return;
+    }
+
+    // Create notification
+    import('../../utils/notificationSystem').then(({ addNotification }) => {
+      addNotification(reviewingStudent.email || "", 'DOCUMENT_REJECTED');
     });
-    
-    localStorage.setItem(notificationsKey, JSON.stringify(notifications));
 
+    alert(`✅ Document rejected. Student has been notified.`);
     setSelectedDocument(null);
     setDocumentRejectionComment("");
-    alert(`✅ Document rejected. Student has been notified.`);
+    loadApplications();
   };
 
   const getMissingDocuments = (student: Student): string[] => {
@@ -319,70 +310,66 @@ export function PendingApplications() {
     setShowRejectModal(true);
   };
 
-  const confirmApprove = () => {
+  const confirmApprove = async () => {
     if (actionStudentId) {
       const student = students.find(s => s.id === actionStudentId);
       
       if (student) {
-        const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-        const updatedApps = applications.map((app: any) => 
-          app.id === actionStudentId ? { ...app, status: "approved" } : app
-        );
-        localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
+        // Approve enrollment in Supabase
+        const { error } = await approveEnrollment(actionStudentId);
+        
+        if (error) {
+          alert(`❌ Error approving application: ${error}`);
+          setShowApproveModal(false);
+          return;
+        }
 
-        const enrolledStudents = JSON.parse(localStorage.getItem("enrolled_students") || "[]");
-        const newStudent = {
-          id: `student-${Date.now()}`,
-          studentId: `2026-${String(enrolledStudents.length + 1).padStart(4, '0')}`,
-          name: student.name,
-          email: student.email || "",
-          enrollmentDate: new Date().toISOString(),
-          status: "enrolled",
-          strandEnrolled: student.strandApplied,
-          yearLevel: "Grade 11",
-        };
-        enrolledStudents.push(newStudent);
-        localStorage.setItem("enrolled_students", JSON.stringify(enrolledStudents));
-
-        const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-        auditLogs.unshift({
-          id: `log-${Date.now()}`,
-          action: "Application Approved",
-          user: "Registrar",
-          email: "registrar@electron.edu",
-          timestamp: new Date().toISOString(),
-          details: `Application approved for ${student.name}`,
-          status: "success",
+        // Create notification for student
+        import('../../utils/notificationSystem').then(({ addNotification }) => {
+          addNotification(student.email || "", 'ENROLLMENT_APPROVED');
         });
-        localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
 
-        const notificationsKey = `notifications_${student.email}`;
-        const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
-        notifications.unshift({
-          id: `notif-${Date.now()}`,
-          type: "application_approved",
-          title: "Application Approved! 🎉",
-          message: "Your enrollment application has been approved!",
-          timestamp: new Date().toISOString(),
-          read: false,
-        });
-        localStorage.setItem(notificationsKey, JSON.stringify(notifications));
-
-        setStudents(students.filter(s => s.id !== actionStudentId));
+        alert(`✅ ${student.name}'s application has been approved!`);
+        setShowApproveModal(false);
+        setActionStudentId(null);
+        
+        // Reload applications
+        loadApplications();
       }
-      
-      setShowApproveModal(false);
-      setActionStudentId(null);
-      loadApplications();
     }
   };
 
-  const confirmReject = () => {
+  const confirmReject = async () => {
     if (actionStudentId && rejectionReason.trim()) {
       const student = students.find(s => s.id === actionStudentId);
       
       if (student) {
-        const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+        // Reject enrollment in Supabase
+        const { error } = await rejectEnrollment(actionStudentId, rejectionReason.trim());
+        
+        if (error) {
+          alert(`❌ Error rejecting application: ${error}`);
+          setShowRejectModal(false);
+          return;
+        }
+
+        // Create notification for student
+        import('../../utils/notificationSystem').then(({ addNotification }) => {
+          addNotification(student.email || "", 'ENROLLMENT_REJECTED');
+        });
+
+        alert(`✅ ${student.name}'s application has been rejected.`);
+        setShowRejectModal(false);
+        setActionStudentId(null);
+        setRejectionReason("");
+        
+        // Reload applications
+        loadApplications();
+      }
+    } else {
+      alert("❌ Please provide a rejection reason.");
+    }
+  };
         const updatedApps = applications.map((app: any) => 
           app.id === actionStudentId ? { 
             ...app, 

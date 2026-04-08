@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, CheckCircle, User, FileText, CreditCard, GraduationCap } from "lucide-react";
+import { getPendingApplications, getEnrolledStudents, enrollStudent, getStudentPaymentStatus } from "../../services/adminService";
 
 interface StudentApplication {
   id: string;
@@ -26,104 +27,93 @@ export function EnrollmentManagement() {
     loadApplications();
   }, []);
 
-  const loadApplications = () => {
-    const apps = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-    setApplications(apps);
-  };
+  const loadApplications = async () => {
+    const { data: pendingApps, error: pendingError } = await getPendingApplications();
+    const { data: enrolledApps, error: enrolledError } = await getEnrolledStudents();
 
-  const getStudentProgress = (email: string) => {
-    const progressKey = `enrollment_progress_${email}`;
-    return JSON.parse(localStorage.getItem(progressKey) || "[]");
+    const formattedApps: StudentApplication[] = [];
+
+    // Add pending applications  
+    if (pendingApps) {
+      for (const app of pendingApps) {
+        const formData = app.form_data || {};
+        const { isVerified: paymentVerified } = await getStudentPaymentStatus(formData.email);
+        
+        formattedApps.push({
+          id: app.id,
+          email: formData.email,
+          studentName: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          preferredTrack: formData.preferredTrack,
+          yearLevel: formData.yearLevel,
+          status: 'pending',
+          submissionDate: app.enrollment_date,
+          documentsVerified: false,
+          paymentVerified,
+        });
+      }
+    }
+
+    // Add enrolled students
+    if (enrolledApps) {
+      enrolledApps.forEach((app: any) => {
+        const formData = app.form_data || {};
+        formattedApps.push({
+          id: app.id,
+          email: app.user_id,
+          studentName: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          preferredTrack: formData.preferredTrack,
+          yearLevel: formData.yearLevel,
+          status: 'enrolled',
+          submissionDate: app.enrollment_date,
+          documentsVerified: true,
+          paymentVerified: true,
+        });
+      });
+    }
+
+    setApplications(formattedApps);
   };
 
   const isPaymentVerified = (email: string) => {
-    const progress = getStudentProgress(email);
-    const paymentStep = progress.find((step: any) => step.name === "Payment Verified");
-    return paymentStep?.status === "completed";
+    const app = applications.find(a => a.email === email);
+    return app?.paymentVerified || false;
   };
 
   const isEnrolled = (email: string) => {
-    const progress = getStudentProgress(email);
-    const enrolledStep = progress.find((step: any) => step.name === "Enrolled");
-    return enrolledStep?.status === "completed";
+    const app = applications.find(a => a.email === email);
+    return app?.status === 'enrolled';
   };
 
   const isDocumentsVerified = (email: string) => {
-    const progress = getStudentProgress(email);
-    const docsStep = progress.find((step: any) => step.name === "Documents Verified");
-    return docsStep?.status === "completed";
+    const app = applications.find(a => a.email === email);
+    return app?.documentsVerified || false;
   };
 
-  const handleEnrollStudent = (student: StudentApplication) => {
+  const handleEnrollStudent = async (student: StudentApplication) => {
     if (!isPaymentVerified(student.email)) {
       alert("Payment must be verified before enrolling the student. Please verify payment first.");
       return;
     }
 
     if (confirm(`Are you sure you want to enroll ${student.studentName}?`)) {
-      // Update enrollment progress
-      const progressKey = `enrollment_progress_${student.email}`;
-      const progress = getStudentProgress(student.email);
-      const updatedProgress = progress.map((step: any) => {
-        if (step.name === "Enrolled") {
-          return { ...step, status: "completed" };
-        }
-        return step;
-      });
-      localStorage.setItem(progressKey, JSON.stringify(updatedProgress));
+      const { error } = await enrollStudent(student.id, student.email);
 
-      // Update application status
-      const apps = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-      const enrollmentDate = new Date().toISOString();
-      const updatedApps = apps.map((app: any) =>
-        app.email === student.email
-          ? { ...app, status: "Enrolled", enrollmentDate }
-          : app
-      );
-      localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
-
-      // Add to enrolled students (check for duplicates first)
-      const enrolledStudents = JSON.parse(localStorage.getItem("enrolled_students") || "[]");
-
-      // Check if student already exists
-      const existingIndex = enrolledStudents.findIndex((s: any) => s.email === student.email);
-
-      const enrolledStudent = {
-        id: existingIndex >= 0 ? enrolledStudents[existingIndex].id : `student-${Date.now()}`,
-        studentId: existingIndex >= 0 ? enrolledStudents[existingIndex].studentId : `2026-${String(enrolledStudents.length + 1).padStart(4, "0")}`,
-        name: student.studentName || `${student.firstName || ""} ${student.lastName || ""}`.trim(),
-        email: student.email,
-        enrollmentDate: enrollmentDate,
-        status: "Enrolled",
-        strandEnrolled: student.preferredTrack || student.recommendedTrack || student.track || "Not Set",
-        yearLevel: student.yearLevel || "Grade 11",
-      };
-
-      if (existingIndex >= 0) {
-        // Update existing student
-        enrolledStudents[existingIndex] = enrolledStudent;
-      } else {
-        // Add new student
-        enrolledStudents.push(enrolledStudent);
+      if (error) {
+        alert(`Error enrolling student: ${error}`);
+        return;
       }
 
-      localStorage.setItem("enrolled_students", JSON.stringify(enrolledStudents));
-
-      // Create audit log entry
-      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-      auditLogs.push({
-        id: `audit-${Date.now()}`,
-        timestamp: new Date().toLocaleString(),
-        user: "Branch Coordinator",
-        action: "Student Enrolled",
-        details: `Enrolled student: ${student.studentName} (${student.email})`,
-        status: "success",
+      // Create notification for student
+      import('../../utils/notificationSystem').then(({ addNotification }) => {
+        addNotification(student.email, 'STUDENT_ENROLLED');
       });
-      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
 
-      // Reload applications
-      loadApplications();
       alert(`${student.studentName} has been successfully enrolled!`);
+      loadApplications();
     }
   };
 

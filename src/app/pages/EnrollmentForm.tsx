@@ -21,6 +21,13 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "motion/react";
 import { getLatestAssessmentResult } from "../utils/assessmentStorage";
+import { 
+  saveDraft, 
+  loadDraft, 
+  checkExistingEnrollment, 
+  submitEnrollment,
+  uploadDocument 
+} from "../../services/enrollmentService";
 import {
   regions,
   getProvincesByRegion,
@@ -205,62 +212,62 @@ export function EnrollmentForm() {
   useEffect(() => {
     const userEmail = userData?.email || "student@gmail.com";
     
-    // Check if enrollment already submitted
-    const existingApplications = JSON.parse(localStorage.getItem('pending_applications') || '[]');
-    const alreadySubmitted = existingApplications.some((app: any) => app.studentId === userEmail);
-    
-    if (alreadySubmitted) {
-      setShowAlreadySubmittedModal(true);
-      return; // Don't load draft if already submitted
-    }
-    
-    // Try to restore autosaved draft first
-    const draftKey = `enrollment_draft_${userEmail}`;
-    const savedDraft = localStorage.getItem(draftKey);
-    
-    if (savedDraft) {
-      try {
-        const draft = JSON.parse(savedDraft);
-        // Restore form data (excluding files which can't be stored in localStorage)
-        const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draft;
-        setFormData(prev => ({
-          ...prev,
-          ...restData
-        }));
-        console.log("✅ Enrollment draft restored");
-      } catch (error) {
-        console.error("Failed to restore draft:", error);
-      }
-    }
-    
-    // Load AI assessment results
-    const result = getLatestAssessmentResult(userEmail);
-    
-    if (result) {
-      setAiRecommendation({
-        track: result.track,
-        electives: result.electives,
-      });
+    const initializeForm = async () => {
+      // Check if enrollment already submitted
+      const { data: existingEnrollment, error: checkError } = await checkExistingEnrollment(userEmail);
       
-      // Only set default values if no draft exists
-      if (!savedDraft) {
-        setFormData(prev => ({
-          ...prev,
-          preferredTrack: result.track,
-          elective1: result.electives[0] || "",
-          elective2: result.electives[1] || "",
-        }));
+      if (existingEnrollment) {
+        setShowAlreadySubmittedModal(true);
+        return; // Don't load draft if already submitted
       }
-      setHasAssessment(true);
-    } else {
-      setHasAssessment(false);
-    }
+      
+      // Try to restore autosaved draft
+      const { data: draftData, error: draftError } = await loadDraft(userEmail);
+      
+      if (draftData) {
+        try {
+          // Restore form data (excluding files which can't be stored in Supabase JSON)
+          const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draftData;
+          setFormData(prev => ({
+            ...prev,
+            ...restData
+          }));
+          console.log("✅ Enrollment draft restored from Supabase");
+        } catch (error) {
+          console.error("Failed to restore draft:", error);
+        }
+      }
+      
+      // Load AI assessment results
+      const result = getLatestAssessmentResult(userEmail);
+      
+      if (result) {
+        setAiRecommendation({
+          track: result.track,
+          electives: result.electives,
+        });
+        
+        // Only set default values if no draft exists
+        if (!draftData) {
+          setFormData(prev => ({
+            ...prev,
+            preferredTrack: result.track,
+            elective1: result.electives[0] || "",
+            elective2: result.electives[1] || "",
+          }));
+        }
+        setHasAssessment(true);
+      } else {
+        setHasAssessment(false);
+      }
+    };
+    
+    initializeForm();
   }, [userData]);
 
   // Autosave effect - save draft on every form data change
   useEffect(() => {
     const userEmail = userData?.email || "student@gmail.com";
-    const draftKey = `enrollment_draft_${userEmail}`;
 
     // Don't save if form is completely empty
     const hasData = Object.values(formData).some(value => {
@@ -276,7 +283,7 @@ export function EnrollmentForm() {
         ...dataToSave,
         lastSaved: new Date().toISOString()
       };
-      localStorage.setItem(draftKey, JSON.stringify(draft));
+      saveDraft(userEmail, draft);
     }
   }, [formData, userData]);
 
@@ -284,34 +291,37 @@ export function EnrollmentForm() {
   useEffect(() => {
     const reupload = searchParams.get('reupload');
     if (reupload === 'true' && userData?.email) {
-      // Load the existing enrollment data
-      const enrollmentKey = `enrollment_${userData.email}`;
-      const storedEnrollment = localStorage.getItem(enrollmentKey);
+      const initializeReupload = async () => {
+        // Load the existing enrollment data
+        const { data: enrollmentData, error } = await checkExistingEnrollment(userData.email);
 
-      if (storedEnrollment) {
-        try {
-          const existingData = JSON.parse(storedEnrollment);
-          // Load the form data (excluding file uploads which need to be re-uploaded)
-          const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...savedFormData } = existingData.formData || {};
-          setFormData(prev => ({
-            ...prev,
-            ...savedFormData,
-            // Clear the file fields so user can re-upload
-            form138: null,
-            form137: null,
-            goodMoral: null,
-            birthCertificate: null,
-            idPicture: null,
-            diploma: null,
-            escCertificate: null,
-          }));
+        if (enrollmentData) {
+          try {
+            const formDataFromDb = enrollmentData.form_data || {};
+            // Load the form data (excluding file uploads which need to be re-uploaded)
+            const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...savedFormData } = formDataFromDb;
+            setFormData(prev => ({
+              ...prev,
+              ...savedFormData,
+              // Clear the file fields so user can re-upload
+              form138: null,
+              form137: null,
+              goodMoral: null,
+              birthCertificate: null,
+              idPicture: null,
+              diploma: null,
+              escCertificate: null,
+            }));
 
-          // Navigate directly to page 6 (document upload)
-          setCurrentPage(6);
-        } catch (e) {
-          console.error("Failed to load enrollment data:", e);
+            // Navigate directly to page 6 (document upload)
+            setCurrentPage(6);
+          } catch (e) {
+            console.error("Failed to load enrollment data:", e);
+          }
         }
-      }
+      };
+
+      initializeReupload();
     }
   }, [searchParams, userData]);
 
@@ -499,7 +509,7 @@ export function EnrollmentForm() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!certificationChecked) {
       alert("Please certify that the information you provided is true and correct before submitting.");
       return;
@@ -510,41 +520,47 @@ export function EnrollmentForm() {
       
       // Create enrollment submission data
       const enrollmentData = {
-        id: `ENR-${Date.now()}`,
-        studentId: userEmail,
         studentName: `${formData.firstName} ${formData.middleName} ${formData.lastName}`,
         email: formData.email,
         contactNumber: formData.contactNumber,
         submissionDate: new Date().toISOString(),
-        status: "Pending Review",
         ...formData,
-        // File names (actual files can't be stored in localStorage)
-        documents: {
-          form138: formData.form138?.name || null,
-          form137: formData.form137?.name || null,
-          goodMoral: formData.goodMoral?.name || null,
-          birthCertificate: formData.birthCertificate?.name || null,
-          idPicture: formData.idPicture?.name || null,
-          diploma: formData.diploma?.name || null,
-          escCertificate: formData.escCertificate?.name || null,
-        }
+        // Exclude file objects
+        form138: undefined,
+        form137: undefined,
+        goodMoral: undefined,
+        birthCertificate: undefined,
+        idPicture: undefined,
+        diploma: undefined,
+        escCertificate: undefined,
       };
 
-      // Save to localStorage
-      const existingApplications = JSON.parse(localStorage.getItem('pending_applications') || '[]');
-      existingApplications.push(enrollmentData);
-      localStorage.setItem('pending_applications', JSON.stringify(existingApplications));
+      // Prepare documents for upload
+      const documentFiles = {
+        form138: formData.form138,
+        form137: formData.form137,
+        goodMoral: formData.goodMoral,
+        birthCertificate: formData.birthCertificate,
+        idPicture: formData.idPicture,
+        diploma: formData.diploma,
+        escCertificate: formData.escCertificate,
+      };
 
-      // Clear the enrollment draft
-      const draftKey = `enrollment_draft_${userEmail}`;
-      localStorage.removeItem(draftKey);
+      // Submit to Supabase
+      const { error, data: enrollmentResult } = await submitEnrollment(userEmail, enrollmentData, documentFiles);
+
+      if (error) {
+        alert(`Error submitting enrollment: ${error}`);
+        console.error('Enrollment submission error:', error);
+        return;
+      }
+
+      console.log('✅ Enrollment submitted to Supabase successfully', enrollmentResult);
 
       // Add notification
       import('../utils/notificationSystem').then(({ addNotification }) => {
         addNotification(userEmail, 'ENROLLMENT_SUBMITTED');
       });
-
-      console.log('✅ Enrollment submitted and saved to localStorage');
 
       // Update enrollment progress
       updateEnrollmentProgress("Documents Submitted", "completed");
