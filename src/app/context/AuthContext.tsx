@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, ReactNode, useEffect } from "react";
 
 interface UserData {
+  id?: string;
   name: string;
   email: string;
   adminType?: "branchcoordinator" | "registrar" | "cashier"; // Updated role types

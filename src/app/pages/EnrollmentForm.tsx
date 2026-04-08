@@ -212,30 +212,29 @@ export function EnrollmentForm() {
   // Load AI assessment results on mount
   useEffect(() => {
     const userEmail = userData?.email || "student@gmail.com";
+    const userId = userData?.id;
     
     const initializeForm = async () => {
       // Check if enrollment already submitted
-      const { data: existingEnrollment, error: checkError } = await checkExistingEnrollment(userEmail);
-      
-      if (existingEnrollment) {
-        setShowAlreadySubmittedModal(true);
-        return; // Don't load draft if already submitted
+      if (userId) {
+        const { data: existingEnrollment, error: checkError } = await checkExistingEnrollment(userId);
+        if (existingEnrollment) {
+          setShowAlreadySubmittedModal(true);
+          return;
+        }
       }
       
       // Try to restore autosaved draft
-      const { data: draftData, error: draftError } = await loadDraft(userEmail);
-      
-      if (draftData) {
-        try {
-          // Restore form data (excluding files which can't be stored in Supabase JSON)
-          const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draftData;
-          setFormData(prev => ({
-            ...prev,
-            ...restData
-          }));
-          console.log("✅ Enrollment draft restored from Supabase");
-        } catch (error) {
-          console.error("Failed to restore draft:", error);
+      if (userId) {
+        const { data: draftData, error: draftError } = await loadDraft(userId);
+        if (draftData) {
+          try {
+            const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draftData;
+            setFormData(prev => ({ ...prev, ...restData }));
+            console.log("✅ Enrollment draft restored from Supabase");
+          } catch (error) {
+            console.error("Failed to restore draft:", error);
+          }
         }
       }
       
@@ -273,7 +272,8 @@ export function EnrollmentForm() {
 
   // Autosave effect - save draft on every form data change
   useEffect(() => {
-    const userEmail = userData?.email || "student@gmail.com";
+    const userId = userData?.id;
+    if (!userId) return;
 
     // Don't save if form is completely empty
     const hasData = Object.values(formData).some(value => {
@@ -289,7 +289,7 @@ export function EnrollmentForm() {
         ...dataToSave,
         lastSaved: new Date().toISOString()
       };
-      saveDraft(userEmail, draft);
+      saveDraft(userId, draft);
     }
   }, [formData, userData]);
 
@@ -523,6 +523,12 @@ export function EnrollmentForm() {
     
     if (validatePage(6)) {
       const userEmail = userData?.email || "student@gmail.com";
+      const userId = userData?.id;
+
+      if (!userId) {
+        alert("Error: User session invalid. Please log out and log in again.");
+        return;
+      }
       
       // Create enrollment submission data
       const enrollmentData = {
@@ -553,7 +559,7 @@ export function EnrollmentForm() {
       };
 
       // Submit to Supabase
-      const { error, data: enrollmentResult } = await submitEnrollment(userEmail, enrollmentData, documentFiles);
+      const { error, data: enrollmentResult } = await submitEnrollment(userId, enrollmentData, documentFiles);
 
       if (error) {
         alert(`Error submitting enrollment: ${error}`);

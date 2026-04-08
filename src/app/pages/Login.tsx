@@ -72,6 +72,7 @@ export function Login() {
       // Login user based on their role
       if (userRole === "registrar") {
         login("registrar", {
+          id: user.id,
           name: user.full_name,
           email: user.email,
           adminType: "registrar"
@@ -79,6 +80,7 @@ export function Login() {
         navigate("/registrar", { replace: true });
       } else if (userRole === "branchcoordinator") {
         login("branchcoordinator", {
+          id: user.id,
           name: user.full_name,
           email: user.email,
           adminType: "branchcoordinator"
@@ -86,6 +88,7 @@ export function Login() {
         navigate("/branchcoordinator", { replace: true });
       } else if (userRole === "cashier") {
         login("cashier", {
+          id: user.id,
           name: user.full_name,
           email: user.email,
           adminType: "cashier"
@@ -94,6 +97,7 @@ export function Login() {
       } else {
         // Default to student role
         login("student", {
+          id: user.id,
           name: user.full_name,
           email: user.email
         });
