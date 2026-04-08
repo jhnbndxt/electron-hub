@@ -17,6 +17,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../services/adminService";
+import { triggerNotification } from "../../services/notificationService";
 
 interface OnlinePayment {
   id: string;
@@ -109,9 +110,11 @@ export function CashierDashboard() {
     );
 
     // Create notification
-    import('../../utils/notificationSystem').then(({ addNotification }) => {
-      addNotification(selectedPayment.studentEmail, 'PAYMENT_VERIFIED');
-    });
+    try {
+      await triggerNotification(selectedPayment.studentEmail, 'PAYMENT_VERIFIED');
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
 
     alert("Payment approved! Student has been enrolled successfully.");
     loadPayments();
@@ -142,9 +145,11 @@ export function CashierDashboard() {
     );
 
     // Create notification
-    import('../../utils/notificationSystem').then(({ addNotification }) => {
-      addNotification(selectedPayment.studentEmail, 'PAYMENT_REJECTED');
-    });
+    try {
+      await triggerNotification(selectedPayment.studentEmail, 'PAYMENT_REJECTED');
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
 
     alert("Payment rejected. Student will be notified.");
     loadPayments();

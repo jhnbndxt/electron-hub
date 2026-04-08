@@ -20,7 +20,7 @@ import {
 import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "motion/react";
-import { getLatestAssessmentResult } from "../utils/assessmentStorage";
+import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 import { 
   saveDraft, 
   loadDraft, 
@@ -28,6 +28,7 @@ import {
   submitEnrollment,
   uploadDocument 
 } from "../../services/enrollmentService";
+import { triggerNotification } from "../../services/notificationService";
 import {
   regions,
   getProvincesByRegion,
@@ -239,25 +240,30 @@ export function EnrollmentForm() {
       }
       
       // Load AI assessment results
-      const result = getLatestAssessmentResult(userEmail);
-      
-      if (result) {
-        setAiRecommendation({
-          track: result.track,
-          electives: result.electives,
-        });
+      try {
+        const result = await getLatestAssessmentResult(userEmail);
         
-        // Only set default values if no draft exists
-        if (!draftData) {
-          setFormData(prev => ({
-            ...prev,
-            preferredTrack: result.track,
-            elective1: result.electives[0] || "",
-            elective2: result.electives[1] || "",
-          }));
+        if (result) {
+          setAiRecommendation({
+            track: result.track,
+            electives: result.electives,
+          });
+          
+          // Only set default values if no draft exists
+          if (!draftData) {
+            setFormData(prev => ({
+              ...prev,
+              preferredTrack: result.track,
+              elective1: result.electives[0] || "",
+              elective2: result.electives[1] || "",
+            }));
+          }
+          setHasAssessment(true);
+        } else {
+          setHasAssessment(false);
         }
-        setHasAssessment(true);
-      } else {
+      } catch (error) {
+        console.error("Error loading assessment results:", error);
         setHasAssessment(false);
       }
     };
@@ -557,10 +563,12 @@ export function EnrollmentForm() {
 
       console.log('✅ Enrollment submitted to Supabase successfully', enrollmentResult);
 
-      // Add notification
-      import('../utils/notificationSystem').then(({ addNotification }) => {
-        addNotification(userEmail, 'ENROLLMENT_SUBMITTED');
-      });
+      // Add notification via Supabase
+      try {
+        await triggerNotification(userEmail, 'ENROLLMENT_SUBMITTED');
+      } catch (error) {
+        console.error('Error creating notification:', error);
+      }
 
       // Update enrollment progress
       updateEnrollmentProgress("Documents Submitted", "completed");

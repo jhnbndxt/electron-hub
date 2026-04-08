@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, CheckCircle, User, FileText, CreditCard, GraduationCap } from "lucide-react";
 import { getPendingApplications, getEnrolledStudents, enrollStudent, getStudentPaymentStatus } from "../../services/adminService";
+import { triggerNotification } from "../../services/notificationService";
 
 interface StudentApplication {
   id: string;
@@ -108,9 +109,11 @@ export function EnrollmentManagement() {
       }
 
       // Create notification for student
-      import('../../utils/notificationSystem').then(({ addNotification }) => {
-        addNotification(student.email, 'STUDENT_ENROLLED');
-      });
+      try {
+        await triggerNotification(student.email, 'ENROLLMENT_APPROVED');
+      } catch (error) {
+        console.error('Error creating notification:', error);
+      }
 
       alert(`${student.studentName} has been successfully enrolled!`);
       loadApplications();

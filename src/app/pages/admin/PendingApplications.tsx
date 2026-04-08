@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getPendingApplications, approveEnrollment, rejectEnrollment, updateDocumentStatus } from "../../services/adminService";
+import { triggerNotification } from "../../services/notificationService";
 
 interface Student {
   id: number | string;
@@ -172,9 +173,11 @@ export function PendingApplications() {
     }
 
     // Create notification
-    import('../../utils/notificationSystem').then(({ addNotification }) => {
-      addNotification(reviewingStudent.email || "", 'DOCUMENT_APPROVED');
-    });
+    try {
+      await triggerNotification(reviewingStudent.email || "", 'DOCUMENTS_VERIFIED');
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
 
     alert("✅ Document approved successfully!");
     setSelectedDocument(null);
@@ -213,9 +216,11 @@ export function PendingApplications() {
     }
 
     // Create notification
-    import('../../utils/notificationSystem').then(({ addNotification }) => {
-      addNotification(reviewingStudent.email || "", 'DOCUMENT_REJECTED');
-    });
+    try {
+      await triggerNotification(reviewingStudent.email || "", 'DOCUMENT_REJECTED');
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
 
     alert(`✅ Document rejected. Student has been notified.`);
     setSelectedDocument(null);
@@ -325,9 +330,11 @@ export function PendingApplications() {
         }
 
         // Create notification for student
-        import('../../utils/notificationSystem').then(({ addNotification }) => {
-          addNotification(student.email || "", 'ENROLLMENT_APPROVED');
-        });
+        try {
+          await triggerNotification(student.email || "", 'ENROLLMENT_APPROVED');
+        } catch (error) {
+          console.error('Error creating notification:', error);
+        }
 
         alert(`✅ ${student.name}'s application has been approved!`);
         setShowApproveModal(false);
@@ -354,9 +361,11 @@ export function PendingApplications() {
         }
 
         // Create notification for student
-        import('../../utils/notificationSystem').then(({ addNotification }) => {
-          addNotification(student.email || "", 'ENROLLMENT_REJECTED');
-        });
+        try {
+          await triggerNotification(student.email || "", 'ENROLLMENT_REJECTED');
+        } catch (error) {
+          console.error('Error creating notification:', error);
+        }
 
         alert(`✅ ${student.name}'s application has been rejected.`);
         setShowRejectModal(false);
