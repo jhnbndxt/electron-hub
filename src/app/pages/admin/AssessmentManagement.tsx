@@ -24,6 +24,7 @@ import {
   deleteQuestion,
   questionsExistInDatabase,
   initializeQuestions,
+  getDefaultAssessmentQuestions,
 } from "../../services/assessmentService";
 
 interface AssessmentQuestion {
@@ -71,13 +72,21 @@ export function AssessmentManagement() {
     const exists = await questionsExistInDatabase();
     
     if (!exists) {
-      // Load default questions and initialize database
-      const defaultQuestions = getDefaultQuestions();
+      // Load default 75 questions and initialize database
+      const defaultQuestions = getDefaultAssessmentQuestions();
       const { error } = await initializeQuestions(defaultQuestions);
       
       if (error) {
         console.error('Error initializing questions:', error);
-        setQuestions(defaultQuestions);
+        // Still set them locally as fallback
+        const formatted = defaultQuestions.map((q, index) => ({
+          id: index + 1,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          category: q.category,
+        }));
+        setQuestions(formatted);
         return;
       }
       
@@ -100,7 +109,15 @@ export function AssessmentManagement() {
       if (error) {
         console.error('Error loading questions:', error);
         // Fallback to default questions
-        setQuestions(getDefaultQuestions());
+        const defaultQuestions = getDefaultAssessmentQuestions();
+        const formatted = defaultQuestions.map((q, index) => ({
+          id: index + 1,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          category: q.category,
+        }));
+        setQuestions(formatted);
         return;
       }
       
@@ -114,7 +131,16 @@ export function AssessmentManagement() {
         }));
         setQuestions(formattedQuestions);
       } else {
-        setQuestions(getDefaultQuestions());
+        // Fallback: initialize with default questions
+        const defaultQuestions = getDefaultAssessmentQuestions();
+        const formatted = defaultQuestions.map((q, index) => ({
+          id: index + 1,
+          question: q.question,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          category: q.category,
+        }));
+        setQuestions(formatted);
       }
     }
   };
@@ -127,315 +153,6 @@ export function AssessmentManagement() {
     return "Interests";
   };
 
-  const getDefaultQuestions = (): AssessmentQuestion[] => {
-    return [
-      // Verbal Section (1-10)
-      {
-        id: 1,
-        question: "rapid = ?",
-        options: ["slow", "fast", "weak", "late"],
-        correctAnswer: 1,
-        category: "Verbal",
-      },
-      {
-        id: 2,
-        question: "assist = ?",
-        options: ["help", "ignore", "stop", "delay"],
-        correctAnswer: 0,
-        category: "Verbal",
-      },
-      {
-        id: 3,
-        question: "She _ to school",
-        options: ["go", "goes", "going", "gone"],
-        correctAnswer: 1,
-        category: "Verbal",
-      },
-      {
-        id: 4,
-        question: "Correct sentence",
-        options: [
-          "He don't like math",
-          "He doesn't likes math",
-          "He doesn't like math",
-          "He not like math",
-        ],
-        correctAnswer: 2,
-        category: "Verbal",
-      },
-      {
-        id: 5,
-        question: '"Technology helps students learn faster" - Main idea?',
-        options: ["dislike", "improves learning", "difficult", "lazy"],
-        correctAnswer: 1,
-        category: "Verbal",
-      },
-      {
-        id: 6,
-        question: "Teacher : School :: Doctor : _",
-        options: ["medicine", "hospital", "patient", "clinic"],
-        correctAnswer: 1,
-        category: "Verbal",
-      },
-      {
-        id: 7,
-        question: "Opposite of increase",
-        options: ["reduce", "expand", "grow", "rise"],
-        correctAnswer: 0,
-        category: "Verbal",
-      },
-      {
-        id: 8,
-        question: "They _ dinner",
-        options: ["eat", "eats", "ate", "eating"],
-        correctAnswer: 2,
-        category: "Verbal",
-      },
-      {
-        id: 9,
-        question: "Incorrect sentence",
-        options: ["She sings well", "They plays outside", "We study", "I read"],
-        correctAnswer: 1,
-        category: "Verbal",
-      },
-      {
-        id: 10,
-        question: "manageable = ?",
-        options: ["impossible", "easy", "controllable", "useless"],
-        correctAnswer: 2,
-        category: "Verbal",
-      },
-      // Math Section (11-20)
-      {
-        id: 11,
-        question: "7(5+3) = ?",
-        options: ["48", "56", "64", "40"],
-        correctAnswer: 1,
-        category: "Math",
-      },
-      {
-        id: 12,
-        question: "2x + 4 = 10",
-        options: ["2", "3", "4", "5"],
-        correctAnswer: 1,
-        category: "Math",
-      },
-      {
-        id: 13,
-        question: "45% of 200",
-        options: ["80", "85", "90", "95"],
-        correctAnswer: 2,
-        category: "Math",
-      },
-      {
-        id: 14,
-        question: "18/24 simplified",
-        options: ["2/3", "3/4", "1/2", "4/5"],
-        correctAnswer: 1,
-        category: "Math",
-      },
-      {
-        id: 15,
-        question: "Triangle area (base=10, height=5)",
-        options: ["25", "50", "30", "15"],
-        correctAnswer: 0,
-        category: "Math",
-      },
-      {
-        id: 16,
-        question: "2, 4, 8, 16, __",
-        options: ["20", "24", "32", "30"],
-        correctAnswer: 2,
-        category: "Math",
-      },
-      {
-        id: 17,
-        question: "4x + 3 = 15",
-        options: ["2", "3", "4", "5"],
-        correctAnswer: 1,
-        category: "Math",
-      },
-      {
-        id: 18,
-        question: "Which is a prime number?",
-        options: ["15", "21", "29", "35"],
-        correctAnswer: 2,
-        category: "Math",
-      },
-      {
-        id: 19,
-        question: "Speed: 60km in 1 hour",
-        options: ["60", "30", "120", "90"],
-        correctAnswer: 0,
-        category: "Math",
-      },
-      {
-        id: 20,
-        question: "Sum of triangle angles",
-        options: ["90", "180", "270", "360"],
-        correctAnswer: 1,
-        category: "Math",
-      },
-      // Science Section (21-30)
-      {
-        id: 21,
-        question: "What do lungs do?",
-        options: ["digest food", "help breathing", "pump blood", "filter toxins"],
-        correctAnswer: 1,
-        category: "Science",
-      },
-      {
-        id: 22,
-        question: "Day and night are caused by:",
-        options: ["moon phases", "earth rotation", "sun movement", "seasons"],
-        correctAnswer: 1,
-        category: "Science",
-      },
-      {
-        id: 23,
-        question: "Which is renewable energy?",
-        options: ["coal", "oil", "solar", "gas"],
-        correctAnswer: 2,
-        category: "Science",
-      },
-      {
-        id: 24,
-        question: "Gravity is a force that:",
-        options: ["pushes away", "pulls objects", "creates heat", "makes light"],
-        correctAnswer: 1,
-        category: "Science",
-      },
-      {
-        id: 25,
-        question: "The heart's main function:",
-        options: ["digest", "think", "pump blood", "breathe"],
-        correctAnswer: 2,
-        category: "Science",
-      },
-      {
-        id: 26,
-        question: "Ice when heated:",
-        options: ["freezes", "melts", "evaporates", "condenses"],
-        correctAnswer: 1,
-        category: "Science",
-      },
-      {
-        id: 27,
-        question: "Which is NOT matter?",
-        options: ["water", "air", "rock", "energy"],
-        correctAnswer: 3,
-        category: "Science",
-      },
-      {
-        id: 28,
-        question: "Plants make food through:",
-        options: ["respiration", "digestion", "photosynthesis", "transpiration"],
-        correctAnswer: 2,
-        category: "Science",
-      },
-      {
-        id: 29,
-        question: "Force is measured in:",
-        options: ["meters", "newtons", "liters", "watts"],
-        correctAnswer: 1,
-        category: "Science",
-      },
-      {
-        id: 30,
-        question: "Which conducts electricity?",
-        options: ["wood", "plastic", "metal", "rubber"],
-        correctAnswer: 2,
-        category: "Science",
-      },
-      // Logical Section (31-40)
-      {
-        id: 31,
-        question: "3, 6, 9, 12, __",
-        options: ["13", "15", "16", "18"],
-        correctAnswer: 1,
-        category: "Logical",
-      },
-      {
-        id: 32,
-        question: "Which is odd one out?",
-        options: ["bus", "train", "plane", "car"],
-        correctAnswer: 3,
-        category: "Logical",
-      },
-      {
-        id: 33,
-        question: "Knife is used to:",
-        options: ["cut", "write", "measure", "cook"],
-        correctAnswer: 0,
-        category: "Logical",
-      },
-      {
-        id: 34,
-        question: "A, C, E, G, __",
-        options: ["H", "I", "J", "K"],
-        correctAnswer: 1,
-        category: "Logical",
-      },
-      {
-        id: 35,
-        question: "All cats are animals. Some animals are cats.",
-        options: ["always true", "sometimes true", "never true", "cannot tell"],
-        correctAnswer: 1,
-        category: "Logical",
-      },
-      {
-        id: 36,
-        question: "1, 1, 2, 3, 5, __",
-        options: ["6", "7", "8", "9"],
-        correctAnswer: 2,
-        category: "Logical",
-      },
-      {
-        id: 37,
-        question: "Which is odd one out?",
-        options: ["apple", "orange", "grape", "banana"],
-        correctAnswer: 3,
-        category: "Logical",
-      },
-      {
-        id: 38,
-        question: "RIGHT reversed is:",
-        options: ["THGIR", "RIGHT", "WRONG", "LEFT"],
-        correctAnswer: 0,
-        category: "Logical",
-      },
-      {
-        id: 39,
-        question: "10:100 :: 5:__",
-        options: ["10", "25", "50", "75"],
-        correctAnswer: 1,
-        category: "Logical",
-      },
-      {
-        id: 40,
-        question: "2, 5, 10, 17, __",
-        options: ["22", "24", "26", "28"],
-        correctAnswer: 2,
-        category: "Logical",
-      },
-      // Interests Section (41-55)
-      { id: 41, question: "I enjoy solving math problems", options: [], category: "Interests" },
-      { id: 42, question: "I like reading/writing", options: [], category: "Interests" },
-      { id: 43, question: "I enjoy science experiments", options: [], category: "Interests" },
-      { id: 44, question: "I like hands-on work", options: [], category: "Interests" },
-      { id: 45, question: "I am interested in business", options: [], category: "Interests" },
-      { id: 46, question: "I like computers/tech", options: [], category: "Interests" },
-      { id: 47, question: "I like helping people", options: [], category: "Interests" },
-      { id: 48, question: "I enjoy cooking", options: [], category: "Interests" },
-      { id: 49, question: "I like arts/design", options: [], category: "Interests" },
-      { id: 50, question: "I like outdoor work", options: [], category: "Interests" },
-      { id: 51, question: "I prefer practical work", options: [], category: "Interests" },
-      { id: 52, question: "I enjoy analyzing problems", options: [], category: "Interests" },
-      { id: 53, question: "I like teamwork", options: [], category: "Interests" },
-      { id: 54, question: "I like machines/electronics", options: [], category: "Interests" },
-      { id: 55, question: "I like physical activities", options: [], category: "Interests" },
-    ];
-  };
 
   const toggleCategory = (categoryName: string) => {
     setExpandedCategories((prev) =>
