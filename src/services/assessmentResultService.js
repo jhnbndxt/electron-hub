@@ -7,7 +7,26 @@
  * - Track scores and domains
  */
 
-import { supabase } from './supabaseClient';
+import { supabase } from '../supabase';
+
+/**
+ * Get student user ID by email
+ */
+async function getStudentIdByEmail(email) {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .single();
+
+    if (error) throw error;
+    return data?.id;
+  } catch (error) {
+    console.error('Error getting student ID:', error);
+    throw error;
+  }
+}
 
 /**
  * Save a new assessment result
@@ -16,17 +35,36 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
   try {
     const { track, electives, scores, topDomains, topInterests } = assessmentData;
 
+    // Get student ID from email
+    const student_id = await getStudentIdByEmail(userEmail);
+    if (!student_id) {
+      throw new Error('Student not found');
+    }
+
+    // Ensure scores is an object with individual scores
+    const scoreData = scores || {
+      verbal_ability_score: assessmentData.verbal_ability_score || 0,
+      mathematical_ability_score: assessmentData.mathematical_ability_score || 0,
+      spatial_ability_score: assessmentData.spatial_ability_score || 0,
+      logical_reasoning_score: assessmentData.logical_reasoning_score || 0,
+      overall_score: assessmentData.overall_score || 0
+    };
+
     const { data, error } = await supabase
       .from('assessment_results')
       .insert({
-        user_email: userEmail,
-        track,
-        electives: electives || [],
-        scores: scores || {},
+        student_id,
+        assessment_date: new Date().toISOString().split('T')[0],
+        recommended_track: track,
+        elective_1: electives?.[0],
+        elective_2: electives?.[1],
+        verbal_ability_score: scoreData.verbal_ability_score,
+        mathematical_ability_score: scoreData.mathematical_ability_score,
+        spatial_ability_score: scoreData.spatial_ability_score,
+        logical_reasoning_score: scoreData.logical_reasoning_score,
+        overall_score: scoreData.overall_score,
         top_domains: topDomains || [],
-        top_interests: topInterests || [],
-        overall_score: calculateOverallScore(scores),
-        completed_at: new Date().toISOString(),
+        top_interests: topInterests || []
       })
       .select();
 
@@ -45,11 +83,16 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
  */
 export async function getAssessmentHistory(userEmail) {
   try {
+    const student_id = await getStudentIdByEmail(userEmail);
+    if (!student_id) {
+      return { data: [], error: null };
+    }
+
     const { data, error } = await supabase
       .from('assessment_results')
       .select('*')
-      .eq('user_email', userEmail)
-      .order('completed_at', { ascending: false });
+      .eq('student_id', student_id)
+      .order('assessment_date', { ascending: false });
 
     if (error) throw error;
 
@@ -68,11 +111,14 @@ export async function getAssessmentHistory(userEmail) {
  */
 export async function getLatestAssessmentResult(userEmail) {
   try {
+    const student_id = await getStudentIdByEmail(userEmail);
+    if (!student_id) return null;
+
     const { data, error } = await supabase
       .from('assessment_results')
       .select('*')
-      .eq('user_email', userEmail)
-      .order('completed_at', { ascending: false })
+      .eq('student_id', student_id)
+      .order('assessment_date', { ascending: false })
       .limit(1)
       .single();
 
@@ -89,11 +135,14 @@ export async function getLatestAssessmentResult(userEmail) {
  */
 export async function getAllUserAssessmentResults(userEmail) {
   try {
+    const student_id = await getStudentIdByEmail(userEmail);
+    if (!student_id) return [];
+
     const { data, error } = await supabase
       .from('assessment_results')
       .select('*')
-      .eq('user_email', userEmail)
-      .order('completed_at', { ascending: false });
+      .eq('student_id', student_id)
+      .order('assessment_date', { ascending: false });
 
     if (error) throw error;
     return data || [];
@@ -104,15 +153,15 @@ export async function getAllUserAssessmentResults(userEmail) {
 }
 
 /**
- * Get assessment results for specific domain/track
+ * Get assessment results for specific track
  */
 export async function getResultsByTrack(track) {
   try {
     const { data, error } = await supabase
       .from('assessment_results')
       .select('*')
-      .eq('track', track)
-      .order('completed_at', { ascending: false });
+      .eq('recommended_track', track)
+      .order('assessment_date', { ascending: false });
 
     if (error) throw error;
     return data || [];
