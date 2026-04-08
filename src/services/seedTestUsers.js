@@ -7,7 +7,7 @@ const testUsers = [
     email: "electronbranchcoor@gmail.com",
     password: "branchcoor123",
     full_name: "Branch Coordinator",
-    role: "admin",
+    role: "branchcoordinator",
     admin_type: "branchcoordinator",
     status: "active"
   },
@@ -15,7 +15,7 @@ const testUsers = [
     email: "electronregistrar@gmail.com",
     password: "registrar123",
     full_name: "Registrar",
-    role: "admin",
+    role: "registrar",
     admin_type: "registrar",
     status: "active"
   },
@@ -23,7 +23,7 @@ const testUsers = [
     email: "electroncashier123@gmail.com",
     password: "cashier123",
     full_name: "Cashier",
-    role: "admin",
+    role: "cashier",
     admin_type: "cashier",
     status: "active"
   },
