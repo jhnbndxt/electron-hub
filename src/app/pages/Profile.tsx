@@ -2,7 +2,24 @@ import { User, Mail, Phone, MapPin, Calendar, Award, FileText, CheckCircle, User
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation } from "react-router";
 import { useState, useEffect } from "react";
-import { getAssessmentHistory, formatAssessmentDate, type AssessmentResult } from "../utils/assessmentStorage";
+import { getAssessmentHistory } from "../../services/assessmentResultService";
+
+interface AssessmentResult {
+  id: string;
+  date: string;
+  track: string;
+  electives: string[];
+  scores: { VA: number; MA: number; SA: number; LRA: number };
+  topDomains: string[];
+  topInterests: string[];
+  overallScore: number;
+}
+
+// Helper to format assessment date
+function formatAssessmentDate(isoDate: string): string {
+  const date = new Date(isoDate);
+  return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
 
 export function Profile() {
   const { userData, enrollmentProgress } = useAuth();
@@ -49,7 +66,7 @@ export function Profile() {
   const [paymentData, setPaymentData] = useState<any>(null);
 
   // Function to check enrollment and assessment status
-  const checkStatus = () => {
+  const checkStatus = async () => {
     const userEmail = userData?.email || "student@gmail.com";
     
     // Check enrollment data from pending_applications
@@ -57,9 +74,14 @@ export function Profile() {
     const userEnrollment = pendingApplications.find((app: any) => app.studentId === userEmail || app.email === userEmail);
     setEnrollmentData(userEnrollment);
 
-    // Check assessment history
-    const history = getAssessmentHistory(userEmail);
-    setAssessmentHistory(history.results);
+    // Check assessment history from Supabase
+    try {
+      const history = await getAssessmentHistory(userEmail);
+      setAssessmentHistory(history.results);
+    } catch (error) {
+      console.error('Error fetching assessment history:', error);
+      setAssessmentHistory([]);
+    }
     
     // Check payment data
     const paymentQueue = JSON.parse(localStorage.getItem('payment_queue') || '[]');

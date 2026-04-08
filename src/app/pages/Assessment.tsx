@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { saveAssessmentResult } from "../utils/assessmentStorage";
+import { saveAssessmentResult } from "../../services/assessmentResultService";
 
 interface Question {
   id: number;
@@ -31,43 +31,51 @@ export function Assessment() {
     // Scroll to top immediately when component mounts
     window.scrollTo(0, 0);
 
-    // Check if user has already taken the assessment
-    const userEmail = userData?.email || "student@gmail.com";
-    const existingResults = localStorage.getItem(`assessmentResults_${userEmail}`);
+    const initializeAssessment = async () => {
+      // Check if user has already taken the assessment
+      const userEmail = userData?.email || "student@gmail.com";
+      const existingResults = localStorage.getItem(`assessmentResults_${userEmail}`);
 
-    if (existingResults) {
-      // User has already taken the assessment, show completion message
-      setAssessmentCompleted(true);
+      if (existingResults) {
+        // User has already taken the assessment, show completion message
+        setAssessmentCompleted(true);
+        setLoading(false);
+        return;
+      }
+
+      // Check for public assessment results and transfer them
+      const publicResults = localStorage.getItem("publicAssessmentResults");
+      if (publicResults && userEmail) {
+        // Transfer public assessment to user account
+        localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
+        
+        // Also save to assessment history via Supabase
+        try {
+          const publicAssessment = JSON.parse(publicResults);
+          await saveAssessmentResult(userEmail, publicAssessment);
+        } catch (error) {
+          console.error("Error saving assessment result:", error);
+        }
+        
+        // Clear public assessment
+        localStorage.removeItem("publicAssessmentResults");
+        
+        // Update enrollment progress
+        updateEnrollmentProgress("AI Assessment Completed", "completed");
+        updateEnrollmentProgress("Documents Submitted", "current");
+        
+        // Show completion message
+        setAssessmentCompleted(true);
+        setLoading(false);
+        return;
+      }
+
+      // Load questions from localStorage (same as admin uses)
+      loadQuestionsFromStorage();
       setLoading(false);
-      return;
-    }
+    };
 
-    // Check for public assessment results and transfer them
-    const publicResults = localStorage.getItem("publicAssessmentResults");
-    if (publicResults && userEmail) {
-      // Transfer public assessment to user account
-      localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
-      
-      // Also save to assessment history
-      const publicAssessment = JSON.parse(publicResults);
-      saveAssessmentResult(userEmail, publicAssessment);
-      
-      // Clear public assessment
-      localStorage.removeItem("publicAssessmentResults");
-      
-      // Update enrollment progress
-      updateEnrollmentProgress("AI Assessment Completed", "completed");
-      updateEnrollmentProgress("Documents Submitted", "current");
-      
-      // Show completion message
-      setAssessmentCompleted(true);
-      setLoading(false);
-      return;
-    }
-
-    // Load questions from localStorage (same as admin uses)
-    loadQuestionsFromStorage();
-    setLoading(false);
+    initializeAssessment();
   }, [userData, updateEnrollmentProgress]);
 
   const loadQuestionsFromStorage = () => {
@@ -561,7 +569,7 @@ export function Assessment() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Calculate scores
     const verbalCorrect = sections[0].questions.filter(
       (q) => answers[q.id] === q.correctAnswer
@@ -688,8 +696,12 @@ export function Assessment() {
       overallScore,
     };
 
-    // Save to assessment history
-    saveAssessmentResult(userEmail, assessmentResult);
+    // Save to assessment history via Supabase
+    try {
+      await saveAssessmentResult(userEmail, assessmentResult);
+    } catch (error) {
+      console.error("Error saving assessment result:", error);
+    }
 
     // Update enrollment progress - Mark AI Assessment as completed
     updateEnrollmentProgress("AI Assessment Completed", "completed");

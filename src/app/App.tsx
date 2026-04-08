@@ -47,20 +47,10 @@ import { StudentPaymentLookup } from "./pages/admin/StudentPaymentLookup";
 import { AssessmentManagement } from "./pages/admin/AssessmentManagement";
 import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
-import {
-  shouldInitializeSystem,
-  initializeSystemCleanState,
-} from "./utils/initializeSystem";
 
 export default function App() {
-  // Initialize system with clean state on first load
+  // Clean up any old navigation state that might reference removed routes
   useEffect(() => {
-    if (shouldInitializeSystem()) {
-      console.log("🚀 Initializing Electron Hub with clean state...");
-      initializeSystemCleanState();
-    }
-    
-    // Clean up any old navigation state that might reference removed routes
     try {
       // Clear any cached navigation state
       sessionStorage.removeItem('lastVisitedRoute');
