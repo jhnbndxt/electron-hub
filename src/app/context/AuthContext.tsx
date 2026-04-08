@@ -40,13 +40,26 @@ const initialEnrollmentSteps: EnrollmentStep[] = [
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
-  const [userRole, setUserRole] = useState<"student" | "registrar" | "branchcoordinator" | "cashier" | null>(null);
-  const [userData, setUserData] = useState<UserData | null>(null);
+  const [userRole, setUserRole] = useState<"student" | "registrar" | "branchcoordinator" | "cashier" | null>(() => {
+    return (localStorage.getItem('userRole') as any) || null;
+  });
+  const [userData, setUserData] = useState<UserData | null>(() => {
+    try {
+      const saved = localStorage.getItem('userData');
+      return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
+  });
   const [enrollmentProgress, setEnrollmentProgress] = useState<EnrollmentStep[]>(initialEnrollmentSteps);
   const [isDocumentsVerified, setIsDocumentsVerified] = useState(false);
   const [hasVisitedPayment, setHasVisitedPayment] = useState(false);
 
-  // Load enrollment progress from localStorage on mount
+  // Restore admin flag from persisted role
+  useEffect(() => {
+    const role = localStorage.getItem('userRole');
+    if (role === 'registrar' || role === 'branchcoordinator' || role === 'cashier') {
+      setIsAdminAuthenticated(true);
+    }
+  }, []);
   useEffect(() => {
     if (userData?.email) {
       const storageKey = `enrollment_progress_${userData.email}`;
@@ -85,8 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (role: "student" | "registrar" | "branchcoordinator" | "cashier", userData?: UserData) => {
     setUserRole(role);
+    localStorage.setItem('userRole', role);
     if (userData) {
       setUserData(userData);
+      localStorage.setItem('userData', JSON.stringify(userData));
       
       // Check if this is a first-time user
       const storageKey = `enrollment_progress_${userData.email}`;
@@ -110,6 +125,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setEnrollmentProgress(initialEnrollmentSteps);
     setIsDocumentsVerified(false);
     setHasVisitedPayment(false);
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userData');
   };
 
   const updateEnrollmentProgress = (stepName: string, status: "completed" | "current" | "pending") => {
