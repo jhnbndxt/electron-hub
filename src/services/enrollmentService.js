@@ -101,14 +101,14 @@ export const submitEnrollment = async (userId, enrollmentData, documentFiles = {
       return { error: enrollmentError.message, data: null };
     }
 
-    // Upload documents if provided
+    // Upload documents if provided (non-fatal - enrollment saves even if uploads fail)
     if (documentFiles && Object.keys(documentFiles).length > 0) {
       for (const [docType, file] of Object.entries(documentFiles)) {
         if (file) {
           const { error: docError } = await uploadDocument(enrollment.id, file, docType);
           if (docError) {
-            console.error(`Document upload error for ${docType}:`, docError);
-            return { error: docError, data: null };
+            console.warn(`Document upload failed for ${docType} (non-fatal):`, docError);
+            // Continue - don't fail the whole enrollment for a failed upload
           }
         }
       }
