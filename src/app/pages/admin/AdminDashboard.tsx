@@ -1252,12 +1252,12 @@ export function AdminDashboard() {
                     <div>
                       <h4 className="text-sm font-bold text-gray-900 mb-2">Personal Information</h4>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div><span className="text-gray-500">Full Name:</span> <span className="font-medium">{selectedStudent.formData.firstName} {selectedStudent.formData.middleName} {selectedStudent.formData.lastName}</span></div>
-                        <div><span className="text-gray-500">LRN:</span> <span className="font-medium">{selectedStudent.formData.lrn}</span></div>
-                        <div><span className="text-gray-500">Sex:</span> <span className="font-medium">{selectedStudent.formData.sex}</span></div>
-                        <div><span className="text-gray-500">Birthday:</span> <span className="font-medium">{selectedStudent.formData.birthday}</span></div>
-                        <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{selectedStudent.formData.contactNumber}</span></div>
-                        <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selectedStudent.formData.email}</span></div>
+                        <div><span className="text-gray-500">Full Name:</span> <span className="font-medium">{selectedStudent.formData.form_data?.firstName} {selectedStudent.formData.form_data?.middleName} {selectedStudent.formData.form_data?.lastName}</span></div>
+                        <div><span className="text-gray-500">LRN:</span> <span className="font-medium">{selectedStudent.formData.form_data?.lrn}</span></div>
+                        <div><span className="text-gray-500">Sex:</span> <span className="font-medium">{selectedStudent.formData.form_data?.sex}</span></div>
+                        <div><span className="text-gray-500">Birthday:</span> <span className="font-medium">{selectedStudent.formData.form_data?.birthday}</span></div>
+                        <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{selectedStudent.formData.form_data?.contactNumber}</span></div>
+                        <div><span className="text-gray-500">Email:</span> <span className="font-medium">{selectedStudent.formData.form_data?.email}</span></div>
                       </div>
                     </div>
 
@@ -1265,11 +1265,11 @@ export function AdminDashboard() {
                     <div className="pt-3 border-t border-gray-300">
                       <h4 className="text-sm font-bold text-gray-900 mb-2">Address</h4>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div><span className="text-gray-500">Region:</span> <span className="font-medium">{selectedStudent.formData.region}</span></div>
-                        <div><span className="text-gray-500">Province:</span> <span className="font-medium">{selectedStudent.formData.province || 'N/A'}</span></div>
-                        <div><span className="text-gray-500">City:</span> <span className="font-medium">{selectedStudent.formData.city}</span></div>
-                        <div><span className="text-gray-500">Barangay:</span> <span className="font-medium">{selectedStudent.formData.barangay}</span></div>
-                        <div className="col-span-2"><span className="text-gray-500">Home Address:</span> <span className="font-medium">{selectedStudent.formData.homeAddress}</span></div>
+                        <div><span className="text-gray-500">Region:</span> <span className="font-medium">{selectedStudent.formData.form_data?.region}</span></div>
+                        <div><span className="text-gray-500">Province:</span> <span className="font-medium">{selectedStudent.formData.form_data?.province || 'N/A'}</span></div>
+                        <div><span className="text-gray-500">City:</span> <span className="font-medium">{selectedStudent.formData.form_data?.city}</span></div>
+                        <div><span className="text-gray-500">Barangay:</span> <span className="font-medium">{selectedStudent.formData.form_data?.barangay}</span></div>
+                        <div className="col-span-2"><span className="text-gray-500">Home Address:</span> <span className="font-medium">{selectedStudent.formData.form_data?.homeAddress}</span></div>
                       </div>
                     </div>
 
@@ -1277,10 +1277,10 @@ export function AdminDashboard() {
                     <div className="pt-3 border-t border-gray-300">
                       <h4 className="text-sm font-bold text-gray-900 mb-2">Enrollment Details</h4>
                       <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div><span className="text-gray-500">Track:</span> <span className="font-medium">{selectedStudent.formData.preferredTrack}</span></div>
-                        <div><span className="text-gray-500">Year Level:</span> <span className="font-medium">{selectedStudent.formData.yearLevel}</span></div>
-                        <div><span className="text-gray-500">Elective 1:</span> <span className="font-medium">{selectedStudent.formData.elective1}</span></div>
-                        <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{selectedStudent.formData.elective2}</span></div>
+                        <div><span className="text-gray-500">Track:</span> <span className="font-medium">{selectedStudent.formData.form_data?.preferredTrack}</span></div>
+                        <div><span className="text-gray-500">Year Level:</span> <span className="font-medium">{selectedStudent.formData.form_data?.yearLevel}</span></div>
+                        <div><span className="text-gray-500">Elective 1:</span> <span className="font-medium">{selectedStudent.formData.form_data?.elective1}</span></div>
+                        <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{selectedStudent.formData.form_data?.elective2}</span></div>
                       </div>
                     </div>
 
@@ -1290,13 +1290,13 @@ export function AdminDashboard() {
                       <div className="space-y-2">
                         <div className="text-xs">
                           <p className="text-gray-500 font-medium mb-1">Father:</p>
-                          <p className="font-medium">{selectedStudent.formData.fatherFirstName} {selectedStudent.formData.fatherLastName}</p>
-                          <p className="text-gray-600">{selectedStudent.formData.fatherOccupation} • {selectedStudent.formData.fatherContact}</p>
+                          <p className="font-medium">{selectedStudent.formData.form_data?.fatherFirstName} {selectedStudent.formData.form_data?.fatherLastName}</p>
+                          <p className="text-gray-600">{selectedStudent.formData.form_data?.fatherOccupation} • {selectedStudent.formData.form_data?.fatherContact}</p>
                         </div>
                         <div className="text-xs">
                           <p className="text-gray-500 font-medium mb-1">Mother:</p>
-                          <p className="font-medium">{selectedStudent.formData.motherFirstName} {selectedStudent.formData.motherLastName}</p>
-                          <p className="text-gray-600">{selectedStudent.formData.motherOccupation} • {selectedStudent.formData.motherContact}</p>
+                          <p className="font-medium">{selectedStudent.formData.form_data?.motherFirstName} {selectedStudent.formData.form_data?.motherLastName}</p>
+                          <p className="text-gray-600">{selectedStudent.formData.form_data?.motherOccupation} • {selectedStudent.formData.form_data?.motherContact}</p>
                         </div>
                       </div>
                     </div>
@@ -1307,11 +1307,11 @@ export function AdminDashboard() {
                       <div className="space-y-2 text-xs">
                         <div>
                           <p className="text-gray-500">Primary School:</p>
-                          <p className="font-medium">{selectedStudent.formData.primarySchool} ({selectedStudent.formData.primaryYearGraduated})</p>
+                          <p className="font-medium">{selectedStudent.formData.form_data?.primarySchool} ({selectedStudent.formData.form_data?.primaryYearGraduated})</p>
                         </div>
                         <div>
                           <p className="text-gray-500">Secondary School:</p>
-                          <p className="font-medium">{selectedStudent.formData.secondarySchool} ({selectedStudent.formData.secondaryYearGraduated})</p>
+                          <p className="font-medium">{selectedStudent.formData.form_data?.secondarySchool} ({selectedStudent.formData.form_data?.secondaryYearGraduated})</p>
                         </div>
                       </div>
                     </div>
