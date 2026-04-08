@@ -82,13 +82,6 @@ export async function getQuestionsByCategory() {
  */
 export async function calculateDynamicScores(answers) {
   try {
-    // Get question stats from database
-    const stats = await getQuestionStats();
-    if (!stats) {
-      console.error('Could not fetch question statistics');
-      return null;
-    }
-
     // Get questions grouped by category
     const questionsByCategory = await getQuestionsByCategory();
     if (!questionsByCategory) {
@@ -96,7 +89,6 @@ export async function calculateDynamicScores(answers) {
       return null;
     }
 
-    console.log('📊 Question Stats:', stats);
     console.log('🎯 Student Answers:', answers);
 
     // Calculate correct answers per category
