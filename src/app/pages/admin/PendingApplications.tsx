@@ -379,42 +379,6 @@ export function PendingApplications() {
       alert("❌ Please provide a rejection reason.");
     }
   };
-        const updatedApps = applications.map((app: any) => 
-          app.id === actionStudentId ? { 
-            ...app, 
-            status: "rejected",
-            rejectionReason: rejectionReason.trim()
-          } : app
-        );
-        localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
-
-        const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-        auditLogs.unshift({
-          id: `log-${Date.now()}`,
-          action: "Application Rejected",
-          user: "Registrar",
-          email: "registrar@electron.edu",
-          timestamp: new Date().toISOString(),
-          details: `Application rejected for ${student.name}: ${rejectionReason.trim()}`,
-          status: "success",
-        });
-        localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
-
-        setStudents(students.map(s => 
-          s.id === actionStudentId ? { 
-            ...s, 
-            status: "rejected" as const, 
-            rejectionReason: rejectionReason.trim()
-          } : s
-        ));
-      }
-      
-      setShowRejectModal(false);
-      setRejectionReason("");
-      setActionStudentId(null);
-      loadApplications();
-    }
-  };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
