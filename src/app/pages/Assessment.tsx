@@ -3,7 +3,7 @@ import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { saveAssessmentResult } from "../../services/assessmentResultService";
-import { getQuestionsByCategory, calculateDynamicScores, determineTrack, getTopDomains, getTopInterests } from "../../services/assessmentScoringService";
+import { determineTrack, getTopDomains, getTopInterests } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
 
@@ -343,24 +343,48 @@ export function Assessment() {
   };
 
   const handleSubmit = async () => {
-    console.log("🚀 Submitting assessment with dynamic scoring...");
-    
-    // Use dynamic scoring service
-    const scores = await calculateDynamicScores(answers);
-    
-    if (!scores) {
-      console.error("❌ Failed to calculate scores");
-      alert("Error calculating scores. Please try again.");
-      return;
-    }
+    console.log("🚀 Submitting assessment with local scoring...");
+
+    // Build questionsByCategory directly from already-loaded sections (no extra DB call)
+    const questionsByCategory: Record<string, Question[]> = {
+      Verbal: [], Math: [], Science: [], Logical: [], Interests: []
+    };
+    sections.forEach(section => {
+      if (questionsByCategory[section.name] !== undefined) {
+        questionsByCategory[section.name] = section.questions;
+      }
+    });
+
+    // Calculate scores per category
+    const categoryNames = ['Verbal', 'Math', 'Science', 'Logical', 'Interests'];
+    const categoryScores: Record<string, number> = {};
+    categoryNames.forEach(cat => {
+      const qs = questionsByCategory[cat];
+      if (!qs || qs.length === 0) { categoryScores[cat] = 0; return; }
+      let correct = 0;
+      qs.forEach(q => { if (answers[q.id] === q.correctAnswer) correct++; });
+      categoryScores[cat] = Math.round((correct / qs.length) * 100);
+    });
+
+    const allVals = Object.values(categoryScores);
+    const overallScore = Math.round(allVals.reduce((a, b) => a + b, 0) / allVals.length);
+
+    const scores = {
+      verbal_ability_score: categoryScores.Verbal,
+      mathematical_ability_score: categoryScores.Math,
+      spatial_ability_score: categoryScores.Science,
+      logical_reasoning_score: categoryScores.Logical,
+      overall_score: overallScore,
+    };
+
+    console.log("📊 Scores:", scores);
 
     const userEmail = userData?.email || "student@gmail.com";
-    
+
     // Determine track
     const track = determineTrack(scores);
-    
-    // Get top 2 domains
-    const questionsByCategory = await getQuestionsByCategory();
+
+    // Get top domains and interests
     const topDomains = getTopDomains(scores);
     const topInterests = getTopInterests(answers, questionsByCategory);
 
