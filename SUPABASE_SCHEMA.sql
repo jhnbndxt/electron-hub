@@ -187,6 +187,37 @@ CREATE INDEX idx_assessment_results_student_id ON assessment_results(student_id)
 CREATE INDEX idx_assessment_results_date ON assessment_results(assessment_date);
 
 -- ============================================================================
+-- 5.5 ASSESSMENT QUESTIONS
+-- ============================================================================
+
+CREATE TABLE assessment_questions (
+  id BIGSERIAL PRIMARY KEY,
+  question VARCHAR(500) NOT NULL,
+  options JSONB NOT NULL DEFAULT '[]',
+  correct_answer SMALLINT,
+  category VARCHAR(50) NOT NULL CHECK (category IN ('Verbal', 'Math', 'Science', 'Logical', 'Interests')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_assessment_questions_category ON assessment_questions(category);
+
+-- Insert default assessment questions
+INSERT INTO assessment_questions (question, options, correct_answer, category) 
+VALUES
+('rapid = ?', '["slow", "fast", "weak", "late"]', 1, 'Verbal'),
+('What type of activities do you enjoy most?', '["Solving problems", "Building things", "Reading/writing", "Helping others"]', 1, 'Math'),
+('Which career path appeals to you?', '["Engineering", "Medicine", "Arts", "Business"]', 0, 'Verbal'),
+('How do you prefer to learn?', '["Hands-on practice", "Reading/research", "Group discussions", "Visual demos"]', 0, 'Logical'),
+('What is your strongest skill?', '["Analytical thinking", "Creativity", "Communication", "Technical skills"]', 3, 'Science'),
+('Which subject would you like to study in depth?', '["Physics", "Computer Science", "Biology", "Literature"]', 1, 'Science'),
+('What motivates you most?', '["Understanding theories", "Creating solutions", "Expressing ideas", "Helping communities"]', 1, 'Interests'),
+('Which environment do you prefer?', '["Laboratory", "Workshop", "Library", "Office"]', 1, 'Science'),
+('What type of projects interest you?', '["Research projects", "Building prototypes", "Writing essays", "Organizing events"]', 1, 'Interests'),
+('Select your interest', '["STEM", "Humanities", "Business", "Arts"]', 0, 'Interests')
+ON CONFLICT DO NOTHING;
+
+-- ============================================================================
 -- 6. PAYMENTS
 -- ============================================================================
 
