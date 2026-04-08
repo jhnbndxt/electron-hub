@@ -1,29 +1,30 @@
-import { supabase } from "../utils/supabaseClient";
+import { supabase } from '../supabase';
+import bcrypt from 'bcryptjs';
 
 // Test users to seed into Supabase
 const testUsers = [
   {
     email: "electronbranchcoor@gmail.com",
     password: "branchcoor123",
-    name: "Branch Coordinator",
+    full_name: "Branch Coordinator",
     role: "Branch Coordinator"
   },
   {
     email: "electronregistrar@gmail.com",
     password: "registrar123",
-    name: "Registrar",
+    full_name: "Registrar",
     role: "Registrar"
   },
   {
     email: "electroncashier123@gmail.com",
     password: "cashier123",
-    name: "Cashier",
+    full_name: "Cashier",
     role: "Cashier"
   },
   {
     email: "joshua@gmail.com",
     password: "root",
-    name: "Joshua",
+    full_name: "Joshua",
     role: "Student"
   }
 ];
@@ -41,38 +42,30 @@ export async function seedTestUsers() {
         .single();
       
       if (existingUser) {
-        console.log(`User ${user.email} already exists, skipping...`);
+        console.log(`✓ User ${user.email} already exists`);
         continue;
       }
       
-      // Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: user.email,
-        password: user.password
-      });
+      // Hash the password
+      const saltRounds = 10;
+      const password_hash = await bcrypt.hash(user.password, saltRounds);
       
-      if (authError) {
-        console.error(`Error creating auth user ${user.email}:`, authError);
-        continue;
-      }
-      
-      const userId = authData.user?.id;
-      
-      // Add user to users table
-      const { error: dbError } = await supabase
+      // Insert user into database
+      const { data: newUser, error: dbError } = await supabase
         .from("users")
-        .insert({
-          id: userId,
+        .insert([{
           email: user.email,
-          name: user.name,
+          password_hash: password_hash,
+          full_name: user.full_name,
           role: user.role,
           status: "active",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        }])
+        .select();
       
       if (dbError) {
-        console.error(`Error inserting user ${user.email} to database:`, dbError);
+        console.error(`Error creating user ${user.email}:`, dbError);
         continue;
       }
       
@@ -94,10 +87,10 @@ export async function initializeTestUsers() {
       .select("email")
       .in("email", testUsers.map(u => u.email));
     
-    if (!users || users.length === 0) {
+    if (!users || users.length < testUsers.length) {
       await seedTestUsers();
     } else {
-      console.log("Test users already exist in database");
+      console.log("✓ Test users already exist in database");
     }
   } catch (error) {
     console.error("Error initializing test users:", error);
