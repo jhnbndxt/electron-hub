@@ -10,18 +10,22 @@ import {
   Mail,
   Calendar,
   Download,
+  Loader,
 } from "lucide-react";
+import { supabase } from "../../services/supabaseClient";
 
 interface StudentDocument {
+  studentId: string;
   email: string;
   studentName: string;
   documents: {
     [key: string]: {
+      id: string;
       status: "pending" | "approved" | "rejected";
       uploadDate: string;
-      fileSize: string;
-      fileData: string;
       fileName: string;
+      fileUrl: string;
+      documentType: string;
       rejectionComment?: string;
     };
   };
@@ -38,38 +42,85 @@ export function DocumentVerification() {
   } | null>(null);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [rejectionComment, setRejectionComment] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadStudentDocuments();
   }, []);
 
-  const loadStudentDocuments = () => {
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
+  const loadStudentDocuments = async () => {
+    setIsLoading(true);
+    try {
+      // Get all enrollments with documents
+      const { data: enrollments, error } = await supabase
+        .from("enrollments")
+        .select("id, email, student_name, status")
+        .neq("status", "rejected")
+        .order("created_at", { ascending: false });
 
-    const studentsWithDocs: StudentDocument[] = [];
-
-    Object.keys(docVerification).forEach((email) => {
-      const application = applications.find((app: any) => app.email === email);
-      if (application) {
-        studentsWithDocs.push({
-          email,
-          studentName: application.studentName || application.name || email,
-          documents: docVerification[email],
-        });
+      if (error) throw error;
+      if (!enrollments) {
+        setStudents([]);
+        setIsLoading(false);
+        return;
       }
-    });
 
-    setStudents(studentsWithDocs);
+      // Get documents for each enrollment
+      const studentsWithDocuments: StudentDocument[] = [];
+
+      for (const enrollment of enrollments) {
+        const { data: documents, error: docError } = await supabase
+          .from("enrollment_documents")
+          .select("id, document_type, file_url, status, rejection_reason, created_at")
+          .eq("enrollment_id", enrollment.id);
+
+        if (docError) throw docError;
+
+        if (documents && documents.length > 0) {
+          const documentsMap: any = {};
+
+          documents.forEach((doc) => {
+            documentsMap[doc.document_type] = {
+              id: doc.id,
+              status: doc.status,
+              uploadDate: new Date(doc.created_at).toLocaleDateString(),
+              fileName: doc.file_url.split("/").pop() || "document",
+              fileUrl: doc.file_url,
+              documentType: doc.document_type,
+              rejectionComment: doc.rejection_reason || undefined,
+            };
+          });
+
+          studentsWithDocuments.push({
+            studentId: enrollment.id,
+            email: enrollment.email,
+            studentName: enrollment.student_name,
+            documents: documentsMap,
+          });
+        }
+      }
+
+      setStudents(studentsWithDocuments);
+    } catch (error) {
+      console.error("Error loading documents:", error);
+      alert("Failed to load documents. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const documentNames: Record<string, string> = {
-    psaBirthCertificate: "PSA Birth Certificate",
-    form138: "Form 138 (Report Card)",
-    form137: "Form 137",
-    goodMoral: "Good Moral Certificate",
-    idPicture: "2x2 ID Picture",
+    psa_birth_certificate: "PSA Birth Certificate",
+    form_138: "Form 138 (Report Card)",
+    form_137: "Form 137",
+    good_moral: "Good Moral Certificate",
+    id_picture: "2x2 ID Picture",
     diploma: "Grade 10 Diploma",
+    birth_certificate: "PSA Birth Certificate",
+    report_card: "Form 138 (Report Card)",
+    moral_certificate: "Good Moral Certificate",
+    valid_id: "2x2 ID Picture",
   };
 
   const getDocumentCounts = (docs: any) => {
@@ -98,53 +149,70 @@ export function DocumentVerification() {
     setRejectionComment("");
   };
 
-  const handleApproveDocument = () => {
+  const handleApproveDocument = async () => {
     if (!selectedStudent || !selectedDocument) return;
 
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    
-    if (!docVerification[selectedStudent.email] || !docVerification[selectedStudent.email][selectedDocument.key]) {
-      alert("Document data not found");
-      return;
+    setIsSaving(true);
+    try {
+      const docId = selectedDocument.data.id;
+
+      // Update document status in database
+      const { error } = await supabase
+        .from("enrollment_documents")
+        .update({ status: "approved", rejection_reason: null })
+        .eq("id", docId);
+
+      if (error) throw error;
+
+      // Create audit log
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user?.email) {
+        await supabase.from("audit_logs").insert({
+          admin_id: user.user.email,
+          action: "document_approved",
+          details: {
+            enrollment_id: selectedStudent.studentId,
+            document_type: selectedDocument.key,
+            document_name: selectedDocument.name,
+          },
+        });
+      }
+
+      // Check if all documents for this enrollment are approved
+      const { data: allDocs } = await supabase
+        .from("enrollment_documents")
+        .select("status")
+        .eq("enrollment_id", selectedStudent.studentId);
+
+      const allApproved = allDocs?.every((doc) => doc.status === "approved");
+
+      if (allApproved) {
+        // Update enrollment status to documents_verified
+        await supabase
+          .from("enrollments")
+          .update({ status: "documents_verified" })
+          .eq("id", selectedStudent.studentId);
+      }
+
+      // Reload and close
+      await loadStudentDocuments();
+      setShowReviewModal(false);
+      setSelectedStudent(null);
+      setSelectedDocument(null);
+      setRejectionComment("");
+    } catch (error) {
+      console.error("Error approving document:", error);
+      alert("Failed to approve document. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
-    
-    docVerification[selectedStudent.email][selectedDocument.key].status = "approved";
-    docVerification[selectedStudent.email][selectedDocument.key].rejectionComment = "";
-    localStorage.setItem("document_verification", JSON.stringify(docVerification));
-
-    // Check if all documents are approved
-    const allDocs = docVerification[selectedStudent.email];
-    const allApproved = Object.values(allDocs).every((doc: any) => doc.status === "approved");
-
-    if (allApproved) {
-      // Update enrollment progress
-      const progressKey = `enrollment_progress_${selectedStudent.email}`;
-      const progress = JSON.parse(localStorage.getItem(progressKey) || "[]");
-      const updatedProgress = progress.map((step: any) => {
-        if (step.name === "Documents Verified") {
-          return { ...step, status: "completed" };
-        }
-        if (step.name === "Payment Submitted" && step.status === "upcoming") {
-          return { ...step, status: "current" };
-        }
-        return step;
-      });
-      localStorage.setItem(progressKey, JSON.stringify(updatedProgress));
-    }
-
-    // Reload and close
-    loadStudentDocuments();
-    setShowReviewModal(false);
-    setSelectedStudent(null);
-    setSelectedDocument(null);
-    setRejectionComment("");
   };
 
-  const handleRejectDocument = () => {
+  const handleRejectDocument = async () => {
     if (!selectedStudent || !selectedDocument) return;
-    
+
     if (!rejectionComment.trim()) {
-      alert("❌ Rejection reason is required. Please provide a clear explanation for why this document is being rejected.");
+      alert("❌ Rejection reason is required. Please provide a clear explanation.");
       return;
     }
 
@@ -153,153 +221,168 @@ export function DocumentVerification() {
       return;
     }
 
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    
-    if (!docVerification[selectedStudent.email] || !docVerification[selectedStudent.email][selectedDocument.key]) {
-      alert("Document data not found");
-      return;
+    setIsSaving(true);
+    try {
+      const docId = selectedDocument.data.id;
+
+      // Update document status to rejected
+      const { error } = await supabase
+        .from("enrollment_documents")
+        .update({
+          status: "rejected",
+          rejection_reason: rejectionComment.trim(),
+        })
+        .eq("id", docId);
+
+      if (error) throw error;
+
+      // Create audit log
+      const { data: user } = await supabase.auth.getUser();
+      if (user?.user?.email) {
+        await supabase.from("audit_logs").insert({
+          admin_id: user.user.email,
+          action: "document_rejected",
+          details: {
+            enrollment_id: selectedStudent.studentId,
+            document_type: selectedDocument.key,
+            document_name: selectedDocument.name,
+            rejection_reason: rejectionComment.trim(),
+          },
+        });
+      }
+
+      // Create notification for student
+      await supabase.from("notifications").insert({
+        user_id: selectedStudent.email,
+        type: "document_rejected",
+        title: "Document Rejected",
+        message: `Your ${selectedDocument.name} has been rejected. Reason: ${rejectionComment.trim()}`,
+        read: false,
+      });
+
+      // Reload and close
+      await loadStudentDocuments();
+      setShowReviewModal(false);
+      setSelectedStudent(null);
+      setSelectedDocument(null);
+      setRejectionComment("");
+      alert(`✅ Document rejected. The student has been notified with your feedback.`);
+    } catch (error) {
+      console.error("Error rejecting document:", error);
+      alert("Failed to reject document. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
-    
-    docVerification[selectedStudent.email][selectedDocument.key].status = "rejected";
-    docVerification[selectedStudent.email][selectedDocument.key].rejectionComment = rejectionComment.trim();
-    localStorage.setItem("document_verification", JSON.stringify(docVerification));
-
-    // Create a notification for the student
-    const notificationsKey = `notifications_${selectedStudent.email}`;
-    const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
-    
-    notifications.unshift({
-      id: `notif-${Date.now()}`,
-      type: "document_rejected",
-      title: "Document Rejected",
-      message: `Your ${documentNames[selectedDocument.key]} has been rejected. Reason: ${rejectionComment.trim()}`,
-      documentName: documentNames[selectedDocument.key],
-      rejectionReason: rejectionComment.trim(),
-      timestamp: new Date().toISOString(),
-      read: false,
-    });
-    
-    localStorage.setItem(notificationsKey, JSON.stringify(notifications));
-
-    // Reload and close
-    loadStudentDocuments();
-    setShowReviewModal(false);
-    setSelectedStudent(null);
-    setSelectedDocument(null);
-    setRejectionComment("");
-    
-    alert(`✅ Document rejected. The student has been notified with your feedback.`);
   };
-
-  const totalPending = students.reduce((sum, student) => {
-    return sum + getDocumentCounts(student.documents).pending;
-  }, 0);
 
   return (
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Document Verification</h1>
-        <p className="text-gray-600">Review and approve student document submissions</p>
+        <p className="text-gray-600">Review and approve student document submissions from Supabase</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Pending Documents</p>
-              <p className="text-3xl font-bold text-gray-900">{totalPending}</p>
-            </div>
-            <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-yellow-600" />
-            </div>
+      {isLoading && (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading documents...</p>
           </div>
         </div>
+      )}
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Students with Documents</p>
-              <p className="text-3xl font-bold text-gray-900">{students.length}</p>
+      {!isLoading && (
+        <>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Pending Documents</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {students.reduce((sum, student) => {
+                      return sum + Object.values(student.documents).filter((doc: any) => doc.status === "pending").length;
+                    }, 0)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-yellow-600" />
+                </div>
+              </div>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-              <User className="w-6 h-6 text-blue-600" />
-            </div>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Total Documents</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {students.reduce((sum, s) => sum + Object.keys(s.documents).length, 0)}
-              </p>
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Students with Documents</p>
+                  <p className="text-3xl font-bold text-gray-900">{students.length}</p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <User className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
             </div>
-            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
-              <FileText className="w-6 h-6 text-purple-600" />
+
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Documents</p>
+                  <p className="text-3xl font-bold text-gray-900">
+                    {students.reduce((sum, s) => sum + Object.keys(s.documents).length, 0)}
+                  </p>
+                </div>
+                <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-purple-600" />
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      {/* Search Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by student name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
-      </div>
+          {/* Search Bar */}
+          <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by student name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
 
-      {/* Students List */}
-      <div className="space-y-4">
-        {/* Debug Info */}
-        {students.length === 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-            <p className="text-sm text-yellow-800">
-              <strong>Debug Info:</strong> No students with documents found. 
-              {Object.keys(JSON.parse(localStorage.getItem("document_verification") || "{}")).length > 0 
-                ? " Documents exist in localStorage but no matching applications found in pending_applications."
-                : " No documents in document_verification localStorage."}
-            </p>
-          </div>
-        )}
-        
-        {filteredStudents.length === 0 && students.length > 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500">No students match your search</p>
-          </div>
-        ) : filteredStudents.length === 0 ? (
-          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
-            <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-            <p className="text-gray-500 mb-2">No student documents found</p>
-            <p className="text-sm text-gray-400">Students will appear here once they upload their enrollment documents</p>
-          </div>
-        ) : (
-          filteredStudents.map((student) => {
-            const counts = getDocumentCounts(student.documents);
-            return (
-              <div key={student.email} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                {/* Student Header */}
-                <div 
-                  className="bg-gray-50 px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => {
-                    // Open first document when clicking student row
-                    const firstDocKey = Object.keys(student.documents)[0];
-                    if (firstDocKey) {
-                      handleViewDocument(student, firstDocKey);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between">
+          {/* Students List */}
+          <div className="space-y-4">
+            {filteredStudents.length === 0 && students.length > 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-500">No students match your search</p>
+              </div>
+            ) : filteredStudents.length === 0 ? (
+              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+                <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-500 mb-2">No student documents found</p>
+                <p className="text-sm text-gray-400">Students will appear here once they upload their enrollment documents</p>
+              </div>
+            ) : (
+              filteredStudents.map((student) => {
+                const counts = getDocumentCounts(student.documents);
+                return (
+                  <div key={student.email} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    {/* Student Header */}
+                    <div 
+                      className="bg-gray-50 px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                      onClick={() => {
+                        // Open first document when clicking student row
+                        const firstDocKey = Object.keys(student.documents)[0];
+                        if (firstDocKey) {
+                          handleViewDocument(student, firstDocKey);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
                         <User className="w-5 h-5 text-blue-600" />
@@ -348,7 +431,7 @@ export function DocumentVerification() {
                           <div className="flex items-center gap-2">
                             <FileText className="w-5 h-5 text-gray-600" />
                             <h4 className="font-medium text-sm text-gray-900">
-                              {documentNames[key]}
+                              {documentNames[key] || key}
                             </h4>
                           </div>
                           {doc.status === "approved" && (
@@ -362,7 +445,7 @@ export function DocumentVerification() {
                           )}
                         </div>
                         <p className="text-xs text-gray-500 mb-3">
-                          Uploaded: {doc.uploadDate} • {doc.fileSize}
+                          Uploaded: {doc.uploadDate}
                         </p>
                         {doc.rejectionComment && (
                           <p className="text-xs text-red-600 mb-2 line-clamp-2">
@@ -439,17 +522,37 @@ export function DocumentVerification() {
                   {/* Document Preview */}
                   <div className="mb-6">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Document Preview</h3>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      {selectedDocument.data.fileData && (
-                        <img
-                          src={selectedDocument.data.fileData}
-                          alt={selectedDocument.name}
-                          className="w-full h-auto"
-                        />
+                    <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
+                      {selectedDocument.data.fileUrl ? (
+                        <div className="p-4">
+                          <img
+                            src={selectedDocument.data.fileUrl}
+                            alt={selectedDocument.name}
+                            className="w-full h-auto max-h-96 object-contain rounded"
+                            onError={(e) => {
+                              console.error("Failed to load image:", selectedDocument.data.fileUrl);
+                              (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'/%3E%3C/svg%3E";
+                            }}
+                          />
+                          <a
+                            href={selectedDocument.data.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Download Original
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="p-12 text-center text-gray-500">
+                          <FileText className="w-16 h-16 mx-auto mb-2 opacity-30" />
+                          <p>No document preview available</p>
+                        </div>
                       )}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      File: {selectedDocument.data.fileName} ({selectedDocument.data.fileSize})
+                      File: {selectedDocument.data.fileName}
                     </p>
                   </div>
 
@@ -522,14 +625,18 @@ export function DocumentVerification() {
                     <div className="flex gap-3">
                       <button
                         onClick={handleRejectDocument}
-                        className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                        disabled={isSaving}
+                        className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
+                        {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                         Reject Document
                       </button>
                       <button
                         onClick={handleApproveDocument}
-                        className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                        disabled={isSaving}
+                        className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                       >
+                        {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                         Approve Document
                       </button>
                     </div>
@@ -543,22 +650,27 @@ export function DocumentVerification() {
                       {selectedDocument.data.status === "approved" && (
                         <button
                           onClick={handleRejectDocument}
-                          className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors"
+                          disabled={isSaving}
+                          className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
+                          {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                           Change to Rejected
                         </button>
                       )}
                       {selectedDocument.data.status === "rejected" && (
                         <button
                           onClick={handleApproveDocument}
-                          className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                          disabled={isSaving}
+                          className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
+                          {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                           Change to Approved
                         </button>
                       )}
                       <button
                         onClick={() => setShowReviewModal(false)}
-                        className="flex-1 py-3 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors"
+                        disabled={isSaving}
+                        className="flex-1 py-3 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
                       >
                         Close
                       </button>
@@ -569,6 +681,8 @@ export function DocumentVerification() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
