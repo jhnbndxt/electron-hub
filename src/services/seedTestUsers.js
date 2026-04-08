@@ -7,25 +7,33 @@ const testUsers = [
     email: "electronbranchcoor@gmail.com",
     password: "branchcoor123",
     full_name: "Branch Coordinator",
-    role: "Branch Coordinator"
+    role: "admin",
+    admin_type: "branchcoordinator",
+    status: "active"
   },
   {
     email: "electronregistrar@gmail.com",
     password: "registrar123",
     full_name: "Registrar",
-    role: "Registrar"
+    role: "admin",
+    admin_type: "registrar",
+    status: "active"
   },
   {
     email: "electroncashier123@gmail.com",
     password: "cashier123",
     full_name: "Cashier",
-    role: "Cashier"
+    role: "admin",
+    admin_type: "cashier",
+    status: "active"
   },
   {
     email: "joshua@gmail.com",
     password: "root",
     full_name: "Joshua",
-    role: "Student"
+    role: "student",
+    admin_type: null,
+    status: "active"
   }
 ];
 
@@ -39,17 +47,13 @@ export async function seedTestUsers() {
       // Check if user already exists
       const { data: existingUser, error: checkError } = await supabase
         .from("users")
-        .select("*")
+        .select("email")
         .eq("email", user.email)
         .single();
       
       if (existingUser) {
-        console.log(`✓ User ${user.email} already exists`);
+        console.log(`✓ User ${user.email} already exists, skipping`);
         continue;
-      }
-      
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error(`Error checking user ${user.email}:`, checkError);
       }
       
       // Hash the password
@@ -64,7 +68,9 @@ export async function seedTestUsers() {
           email: user.email,
           password_hash: password_hash,
           full_name: user.full_name,
-          role: user.role
+          role: user.role,
+          admin_type: user.admin_type,
+          status: user.status
         }])
         .select();
       
@@ -73,7 +79,7 @@ export async function seedTestUsers() {
         continue;
       }
       
-      console.log(`✅ Test user created: ${user.email} (${user.role})`);
+      console.log(`✅ Test user created: ${user.email} (${user.full_name})`);
     } catch (error) {
       console.error(`❌ Unexpected error for user ${user.email}:`, error.message);
     }
