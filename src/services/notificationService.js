@@ -8,7 +8,7 @@
  * - Delete notifications
  */
 
-import { supabase } from './supabaseClient';
+import { supabase } from '../supabase';
 
 /**
  * Add a new notification

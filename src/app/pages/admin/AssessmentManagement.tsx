@@ -25,7 +25,7 @@ import {
   questionsExistInDatabase,
   initializeQuestions,
   getDefaultAssessmentQuestions,
-} from "../../services/assessmentService";
+} from "../../../services/assessmentService";
 
 interface AssessmentQuestion {
   id: number;

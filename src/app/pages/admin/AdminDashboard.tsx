@@ -19,7 +19,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
-import { getPendingApplications, getAuditLogs } from "../../services/adminService";
+import { getPendingApplications, getAuditLogs } from "../../../services/adminService";
 
 interface Student {
   id: number | string;

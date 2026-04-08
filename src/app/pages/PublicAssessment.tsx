@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase } from "lucide-react";
-import { getDefaultAssessmentQuestions } from "../services/assessmentService";
+import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 
 interface Question {
   id: number;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Search, CheckCircle, User, FileText, CreditCard, GraduationCap } from "lucide-react";
-import { getPendingApplications, getEnrolledStudents, enrollStudent, getStudentPaymentStatus } from "../../services/adminService";
-import { triggerNotification } from "../../services/notificationService";
+import { getPendingApplications, getEnrolledStudents, enrollStudent, getStudentPaymentStatus } from "../../../services/adminService";
+import { triggerNotification } from "../../../services/notificationService";
 
 interface StudentApplication {
   id: string;

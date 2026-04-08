@@ -16,8 +16,8 @@ import {
   CreditCard,
   Wallet,
 } from "lucide-react";
-import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../services/adminService";
-import { triggerNotification } from "../../services/notificationService";
+import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
+import { triggerNotification } from "../../../services/notificationService";
 
 interface OnlinePayment {
   id: string;

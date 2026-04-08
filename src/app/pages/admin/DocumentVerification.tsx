@@ -12,7 +12,7 @@ import {
   Download,
   Loader,
 } from "lucide-react";
-import { supabase } from "../../services/supabaseClient";
+import { supabase } from "../../../supabase";
 
 interface StudentDocument {
   studentId: string;

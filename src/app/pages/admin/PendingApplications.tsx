@@ -12,8 +12,8 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getPendingApplications, approveEnrollment, rejectEnrollment, updateDocumentStatus } from "../../services/adminService";
-import { triggerNotification } from "../../services/notificationService";
+import { getPendingApplications, approveEnrollment, rejectEnrollment, updateDocumentStatus } from "../../../services/adminService";
+import { triggerNotification } from "../../../services/notificationService";
 
 interface Student {
   id: number | string;

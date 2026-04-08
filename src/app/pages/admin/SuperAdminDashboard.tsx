@@ -18,7 +18,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
-import { getDashboardAnalytics, getAuditLogs } from "../../services/adminService";
+import { getDashboardAnalytics, getAuditLogs } from "../../../services/adminService";
 
 interface AuditLog {
   id: string;
