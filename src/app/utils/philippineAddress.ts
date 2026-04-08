@@ -122,15 +122,14 @@ export const provinces: Province[] = [
   { code: "P-0870", name: "Southern Leyte", regionCode: "VIII" },
   
   // Region IX - Zamboanga Peninsula
-  { code: "P-0909", name: "Misamis Oriental", regionCode: "VIII" },
   { code: "P-0918", name: "Zamboanga del Norte", regionCode: "IX" },
   { code: "P-0920", name: "Zamboanga del Sur", regionCode: "IX" },
   { code: "P-0925", name: "Zamboanga Sibugay", regionCode: "IX" },
   
   // Region X - Northern Mindanao
+  { code: "P-0909", name: "Misamis Oriental", regionCode: "X" },
   { code: "P-1006", name: "Bukidnon", regionCode: "X" },
   { code: "P-1009", name: "Camiguin", regionCode: "X" },
-  { code: "P-1013", name: "Misamis Oriental", regionCode: "X" },
   
   // Region XI - Davao Region
   { code: "P-1101", name: "Compostela Valley", regionCode: "XI" },

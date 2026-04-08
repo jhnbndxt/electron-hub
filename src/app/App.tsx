@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from "react";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router";
 import { AuthProvider } from "./context/AuthContext";
+import { initializeTestUsers } from "../services/seedTestUsers";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
 import { AdminLayout } from "./layouts/AdminLayout";
@@ -49,6 +50,11 @@ import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 
 export default function App() {
+  // Initialize test users on app load
+  useEffect(() => {
+    initializeTestUsers().catch(err => console.error("Failed to initialize test users:", err));
+  }, []);
+
   // Clean up any old navigation state that might reference removed routes
   useEffect(() => {
     try {
