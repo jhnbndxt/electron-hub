@@ -82,13 +82,6 @@ export function Dashboard() {
   // Check if documents are verified
   const documentsVerified = enrollmentSteps.find(step => step.name === "Documents Verified")?.status === "completed";
   
-  // Handler to simulate admin approving documents
-  const handleSimulateApproval = () => {
-    updateEnrollmentProgress("Documents Submitted", "completed");
-    updateEnrollmentProgress("Documents Verified", "completed");
-    updateEnrollmentProgress("Payment Submitted", "current");
-  };
-  
   // Dynamic status messages based on current step
   const statusMessages: Record<string, { title: string; message: string; estimatedTime?: string }> = {
     "Account Created": {
@@ -413,22 +406,6 @@ export function Dashboard() {
                 )}
               </div>
             </div>
-          </div>
-        )}
-        
-        {/* Admin Approval Simulation Button - Only show if documents are submitted but not verified */}
-        {!documentsVerified && currentStep?.name === "Documents Submitted" && (
-          <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <p className="text-sm text-gray-700 mb-3">
-              <strong>For Testing:</strong> Simulate the admin approving your documents to unlock the Payment tab
-            </p>
-            <button
-              className="px-6 py-3 rounded-lg text-white font-semibold hover:opacity-90 transition-opacity shadow-md"
-              style={{ backgroundColor: "#10B981" }}
-              onClick={handleSimulateApproval}
-            >
-              ✓ Simulate Admin Document Approval
-            </button>
           </div>
         )}
         
