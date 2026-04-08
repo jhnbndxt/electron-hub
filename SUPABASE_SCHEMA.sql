@@ -187,7 +187,7 @@ CREATE INDEX idx_assessment_results_student_id ON assessment_results(student_id)
 CREATE INDEX idx_assessment_results_date ON assessment_results(assessment_date);
 
 -- ============================================================================
--- 5.5 ASSESSMENT QUESTIONS
+-- 5.5 ASSESSMENT QUESTIONS (FLEXIBLE - ANY NUMBER OF QUESTIONS)
 -- ============================================================================
 
 CREATE TABLE assessment_questions (
@@ -200,22 +200,127 @@ CREATE TABLE assessment_questions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Create index for category grouping (needed for dynamic scoring)
 CREATE INDEX idx_assessment_questions_category ON assessment_questions(category);
 
--- Insert default assessment questions
+-- Table to track question count per category for scoring calculations
+CREATE TABLE assessment_question_stats (
+  id BIGSERIAL PRIMARY KEY,
+  category VARCHAR(50) UNIQUE NOT NULL,
+  question_count SMALLINT DEFAULT 0,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Trigger to update question counts when questions are added/removed
+CREATE OR REPLACE FUNCTION update_question_stats()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO assessment_question_stats (category, question_count)
+  SELECT category, COUNT(*) FROM assessment_questions GROUP BY category
+  ON CONFLICT (category) DO UPDATE SET
+    question_count = EXCLUDED.question_count,
+    updated_at = CURRENT_TIMESTAMP;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER assessment_questions_stats_trigger
+AFTER INSERT OR DELETE ON assessment_questions
+FOR EACH STATEMENT EXECUTE FUNCTION update_question_stats();
+
+-- Insert comprehensive assessment questions (75 total - can be expanded anytime)
 INSERT INTO assessment_questions (question, options, correct_answer, category) 
 VALUES
+-- VERBAL (15 questions)
 ('rapid = ?', '["slow", "fast", "weak", "late"]', 1, 'Verbal'),
-('What type of activities do you enjoy most?', '["Solving problems", "Building things", "Reading/writing", "Helping others"]', 1, 'Math'),
-('Which career path appeals to you?', '["Engineering", "Medicine", "Arts", "Business"]', 0, 'Verbal'),
-('How do you prefer to learn?', '["Hands-on practice", "Reading/research", "Group discussions", "Visual demos"]', 0, 'Logical'),
-('What is your strongest skill?', '["Analytical thinking", "Creativity", "Communication", "Technical skills"]', 3, 'Science'),
-('Which subject would you like to study in depth?', '["Physics", "Computer Science", "Biology", "Literature"]', 1, 'Science'),
+('assist = ?', '["help", "ignore", "stop", "delay"]', 0, 'Verbal'),
+('She _ to school', '["go", "goes", "going", "gone"]', 1, 'Verbal'),
+('Correct sentence', '["He don''t like math", "He doesn''t likes math", "He doesn''t like math", "He not like math"]', 2, 'Verbal'),
+('"Technology helps students learn faster" - Main idea?', '["dislike", "improves learning", "difficult", "lazy"]', 1, 'Verbal'),
+('Teacher : School :: Doctor : _', '["medicine", "hospital", "patient", "clinic"]', 1, 'Verbal'),
+('Opposite of increase', '["reduce", "expand", "grow", "rise"]', 0, 'Verbal'),
+('They _ dinner', '["eat", "eats", "ate", "eating"]', 2, 'Verbal'),
+('Incorrect sentence', '["She sings well", "They plays outside", "We study", "I read"]', 1, 'Verbal'),
+('manageable = ?', '["impossible", "easy", "controllable", "useless"]', 2, 'Verbal'),
+('Which word is spelled correctly?', '["accomodate", "accommodate", "acommodate", "acomodate"]', 1, 'Verbal'),
+('What does "ambiguous" mean?', '["clear", "unclear", "definite", "obvious"]', 1, 'Verbal'),
+('Find the synonym of "fortunate"', '["lucky", "unlucky", "smart", "rich"]', 0, 'Verbal'),
+('Complete: "The cake taste__"', '["good", "goods", "goodly", "goodness"]', 0, 'Verbal'),
+('Which is a complete sentence?', '["Running fast", "The dog runs", "Because of rain", "Such a beautiful"]', 1, 'Verbal'),
+
+-- MATH (15 questions)
+('2 + 2 = ?', '["3", "4", "5", "6"]', 1, 'Math'),
+('5 × 6 = ?', '["25", "30", "35", "40"]', 1, 'Math'),
+('100 ÷ 5 = ?', '["15", "20", "25", "30"]', 1, 'Math'),
+('What is 15% of 80?', '["10", "12", "15", "20"]', 1, 'Math'),
+('If x + 3 = 10, then x = ?', '["5", "7", "10", "13"]', 1, 'Math'),
+('What is the square of 7?', '["42", "49", "56", "63"]', 1, 'Math'),
+('3² + 4² = ?', '["12", "19", "25", "34"]', 2, 'Math'),
+('What is 25% of 200?', '["25", "50", "75", "100"]', 1, 'Math'),
+('If 2x = 16, then x = ?', '["6", "8", "10", "12"]', 1, 'Math'),
+('What is the mean of 2, 4, 6, 8?', '["4", "5", "6", "7"]', 1, 'Math'),
+('12 × 11 = ?', '["120", "121", "132", "144"]', 2, 'Math'),
+('What is 10% of 500?', '["25", "50", "100", "250"]', 2, 'Math'),
+('If 3x - 2 = 7, then x = ?', '["2", "3", "4", "5"]', 2, 'Math'),
+('What is 1/2 + 1/4?', '["1/6", "3/4", "1/3", "2/3"]', 1, 'Math'),
+('99 + 1 = ?', '["98", "99", "100", "101"]', 2, 'Math'),
+
+-- SCIENCE (15 questions)
+('What is H2O?', '["Hydrogen", "Water", "Salt", "Sugar"]', 1, 'Science'),
+('How many bones in human body?', '["186", "206", "226", "246"]', 1, 'Science'),
+('What is photosynthesis?', '["Plant respiration", "Light energy to food", "Water absorption", "Root growth"]', 1, 'Science'),
+('What is the powerhouse of the cell?', '["Nucleus", "Mitochondria", "Ribosome", "Chloroplast"]', 1, 'Science'),
+('Which planet is closest to the sun?', '["Venus", "Mercury", "Earth", "Mars"]', 1, 'Science'),
+('What is the speed of light?', '["100,000 km/s", "300,000 km/s", "500,000 km/s", "1,000,000 km/s"]', 1, 'Science'),
+('What is gravity?', '["Light force", "Attractive force", "Repulsive force", "Magnetic force"]', 1, 'Science'),
+('How many chambers in heart?', '["2", "3", "4", "5"]', 2, 'Science'),
+('What does DNA stand for?', '["Dynamic Nucleic Acid", "Deoxyribonucleic Acid", "Distributed Network Area", "Direct Nuclear Acids"]', 1, 'Science'),
+('What is the largest organ?', '["Brain", "Heart", "Liver", "Skin"]', 3, 'Science'),
+('Which is a renewable resource?', '["Coal", "Oil", "Solar energy", "Natural gas"]', 2, 'Science'),
+('What is temperature measured in?', '["Watts", "Celsius", "Joules", "Volts"]', 1, 'Science'),
+('What gas do plants absorb?', '["Oxygen", "Nitrogen", "Carbon dioxide", "Helium"]', 2, 'Science'),
+('What is an atom?', '["Smallest particle of element", "Water droplet", "Light particle", "Energy unit"]', 0, 'Science'),
+('What do lungs do?', '["digest food", "help breathing", "pump blood", "filter toxins"]', 1, 'Science'),
+
+-- LOGICAL (15 questions)
+('If A > B and B > C, then?', '["A > C", "A < C", "A = C", "Cannot determine"]', 0, 'Logical'),
+('Pattern: 2, 4, 6, 8, ?', '["9", "10", "11", "12"]', 1, 'Logical'),
+('What comes next: A, B, C, D, ?', '["E", "F", "G", "H"]', 0, 'Logical'),
+('Pattern: 1, 1, 2, 3, 5, 8, ?', '["11", "12", "13", "14"]', 2, 'Logical'),
+('If all dogs are animals, and Fido is a dog, then?', '["Fido is an animal", "Fido is not an animal", "Some animals are dogs", "Cannot determine"]', 0, 'Logical'),
+('Which number is odd?', '["2", "4", "6", "7"]', 3, 'Logical'),
+('What is the next prime number after 7?', '["8", "9", "10", "11"]', 3, 'Logical'),
+('If X = 5 and Y = 3, what is X + Y?', '["6", "8", "10", "12"]', 1, 'Logical'),
+('Which shape has 4 equal sides?', '["Triangle", "Circle", "Square", "Pentagon"]', 2, 'Logical'),
+('What is logical reasoning used for?', '["Solving problems", "Entertainment", "Exercise", "All of above"]', 0, 'Logical'),
+('Pattern: Z, Y, X, W, ?', '["V", "U", "T", "S"]', 0, 'Logical'),
+('If 3 cats catch 3 mice in 3 days, how many mice do 9 cats catch in 9 days?', '["3", "9", "27", "81"]', 2, 'Logical'),
+('Which number comes next: 5, 10, 20, 40, ?', '["60", "70", "80", "90"]', 2, 'Logical'),
+('If today is Monday, what day is it in 10 days?', '["Monday", "Tuesday", "Wednesday", "Thursday"]', 3, 'Logical'),
+('What is 2^5?', '["16", "32", "64", "128"]', 1, 'Logical'),
+
+-- INTERESTS (15 questions)
+('Which subject would you like to study in depth?', '["Physics", "Computer Science", "Biology", "Literature"]', 1, 'Interests'),
 ('What motivates you most?', '["Understanding theories", "Creating solutions", "Expressing ideas", "Helping communities"]', 1, 'Interests'),
-('Which environment do you prefer?', '["Laboratory", "Workshop", "Library", "Office"]', 1, 'Science'),
+('Which environment do you prefer?', '["Laboratory", "Workshop", "Library", "Office"]', 1, 'Interests'),
 ('What type of projects interest you?', '["Research projects", "Building prototypes", "Writing essays", "Organizing events"]', 1, 'Interests'),
-('Select your interest', '["STEM", "Humanities", "Business", "Arts"]', 0, 'Interests')
+('Select your interest', '["STEM", "Humanities", "Business", "Arts"]', 0, 'Interests'),
+('What interests you most?', '["Science discovery", "Technology innovation", "Social services", "Creative expression"]', 0, 'Interests'),
+('Career goal?', '["Researcher", "Engineer", "Doctor", "Entrepreneur"]', 0, 'Interests'),
+('Which skill do you want to improve?', '["Technical", "Leadership", "Communication", "Problem-solving"]', 0, 'Interests'),
+('What is your learning style?', '["Visual", "Auditory", "Kinesthetic", "Reading/writing"]', 0, 'Interests'),
+('Which activity excites you?', '["Coding", "Designing", "Teaching", "Managing"]', 0, 'Interests'),
+('What drives your passion?', '["Innovation", "Impact", "Excellence", "Security"]', 0, 'Interests'),
+('Preferred work environment?', '["Team", "Independent", "Flexible", "Structured"]', 0, 'Interests'),
+('What kind of problems do you enjoy?', '["Mathematical", "Creative", "Practical", "Ethical"]', 0, 'Interests'),
+('Which industry interests you?', '["Technology", "Healthcare", "Education", "Finance"]', 0, 'Interests'),
+('Your ideal role?', '["Specialist", "Generalist", "Leader", "Innovator"]', 0, 'Interests')
 ON CONFLICT DO NOTHING;
+
+-- Initialize question stats
+INSERT INTO assessment_question_stats (category, question_count)
+SELECT category, COUNT(*) FROM assessment_questions GROUP BY category
+ON CONFLICT (category) DO UPDATE SET question_count = EXCLUDED.question_count;
 
 -- ============================================================================
 -- 6. PAYMENTS

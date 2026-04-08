@@ -3,6 +3,8 @@ import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { saveAssessmentResult } from "../../services/assessmentResultService";
+import { getQuestionsByCategory, calculateDynamicScores, determineTrack, getTopDomains, getTopInterests } from "../../services/assessmentScoringService";
+import { supabase } from "../../supabase";
 
 interface Question {
   id: number;
@@ -70,15 +72,79 @@ export function Assessment() {
         return;
       }
 
-      // Load questions from localStorage (same as admin uses)
-      loadQuestionsFromStorage();
+      // Load questions from Supabase first, fallback to default if needed
+      await loadQuestionsFromSupabase();
       setLoading(false);
     };
 
     initializeAssessment();
   }, [userData, updateEnrollmentProgress]);
 
+  const loadQuestionsFromSupabase = async () => {
+    try {
+      console.log("📚 Loading questions from Supabase...");
+      
+      // Fetch questions from assessment_questions table
+      const { data, error } = await supabase
+        .from('assessment_questions')
+        .select('*')
+        .order('id');
+
+      if (error || !data || data.length === 0) {
+        console.warn("⚠️ No questions in Supabase, using default questions");
+        loadQuestionsFromStorage();
+        return;
+      }
+
+      // Convert Supabase data to Question format
+      const questions: Question[] = data.map(q => ({
+        id: q.id,
+        question: q.question,
+        options: q.options || [],
+        correctAnswer: q.correct_answer,
+        category: q.category
+      }));
+
+      console.log(`✅ Loaded ${questions.length} questions from Supabase`);
+
+      // Organize questions by category
+      const organizedSections: Section[] = [
+        {
+          name: "Verbal",
+          icon: Brain,
+          questions: questions.filter(q => q.category === "Verbal"),
+        },
+        {
+          name: "Math",
+          icon: Calculator,
+          questions: questions.filter(q => q.category === "Math"),
+        },
+        {
+          name: "Science",
+          icon: Beaker,
+          questions: questions.filter(q => q.category === "Science"),
+        },
+        {
+          name: "Logical",
+          icon: Lightbulb,
+          questions: questions.filter(q => q.category === "Logical"),
+        },
+        {
+          name: "Interests",
+          icon: Heart,
+          questions: questions.filter(q => q.category === "Interests"),
+        },
+      ];
+
+      setSections(organizedSections);
+    } catch (error) {
+      console.error("❌ Error loading questions from Supabase:", error);
+      loadQuestionsFromStorage();
+    }
+  };
+
   const loadQuestionsFromStorage = () => {
+    console.log("📦 Loading questions from localStorage...");
     const stored = localStorage.getItem("assessment_questions");
     let questions: Question[] = [];
 
@@ -570,137 +636,57 @@ export function Assessment() {
   };
 
   const handleSubmit = async () => {
-    // Calculate scores
-    const verbalCorrect = sections[0].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-    const mathCorrect = sections[1].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-    const scienceCorrect = sections[2].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-    const logicalCorrect = sections[3].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-
-    // Calculate domain scores (0-100)
-    const VA = (verbalCorrect / 10) * 100;
-    const MA = (mathCorrect / 10) * 100;
-    const SA = (scienceCorrect / 10) * 100;
-    const LRA = (logicalCorrect / 10) * 100;
-
-    // Calculate interest clusters (scaled to 0-20)
-    const academic = ((answers[41] + answers[42] + answers[43] + answers[52]) / 4) * 4;
-    const tech = ((answers[44] + answers[46] + answers[54]) / 3) * 4;
-    const business = answers[45] * 4;
-    const helping = ((answers[47] + answers[53]) / 2) * 4;
-    const home = answers[48] * 4;
-    const creative = answers[49] * 4;
-    const outdoor = answers[50] * 4;
-    const physical = answers[55] * 4;
-    const practical = answers[51] * 4;
-
-    // Calculate track scores
-    const academicScore =
-      VA * 0.25 + MA * 0.25 + SA * 0.25 + LRA * 0.15 + academic * 0.1;
-
-    const techProScore =
-      tech * 0.3 +
-      practical * 0.2 +
-      home * 0.15 +
-      physical * 0.1 +
-      outdoor * 0.1 +
-      LRA * 0.1 +
-      MA * 0.05;
-
-    // Determine track
-    const track = academicScore >= techProScore ? "Academic" : "Technical-Professional";
-
-    // Calculate electives based on track
-    let electives: string[] = [];
+    console.log("🚀 Submitting assessment with dynamic scoring...");
     
-    if (track === "Academic") {
-      const stemScore = MA * 0.4 + SA * 0.4 + LRA * 0.2;
-      const businessScore = MA * 0.4 + business * 0.4 + VA * 0.2;
-      const humanitiesScore = VA * 0.5 + helping * 0.3 + LRA * 0.2;
-      const creativeScore = creative * 0.6 + VA * 0.2 + LRA * 0.2;
-      const sportsScore = physical * 0.6 + SA * 0.2 + LRA * 0.2;
-
-      const electiveScores = [
-        { name: "STEM", score: stemScore, electives: ["Biology", "Physics"] },
-        { name: "BUSINESS", score: businessScore, electives: ["Entrepreneurship", "Marketing"] },
-        { name: "HUMANITIES", score: humanitiesScore, electives: ["Psychology", "Creative Writing"] },
-        { name: "CREATIVE", score: creativeScore, electives: ["Media Arts", "Visual Arts"] },
-        { name: "SPORTS", score: sportsScore, electives: ["Coaching", "Fitness"] },
-      ];
-
-      electiveScores.sort((a, b) => b.score - a.score);
-      electives = electiveScores[0].electives;
-    } else {
-      const ictScore = tech * 0.5 + LRA * 0.3 + MA * 0.2;
-      const homeScore = home * 0.6 + practical * 0.4;
-      const industrialScore = tech * 0.4 + practical * 0.4 + MA * 0.2;
-      const agriScore = outdoor * 0.6 + practical * 0.4;
-      const physicalScore = physical * 0.7 + practical * 0.3;
-
-      const electiveScores = [
-        { name: "ICT", score: ictScore, electives: ["ICT", "Programming"] },
-        { name: "HOME", score: homeScore, electives: ["Cookery", "Bread & Pastry"] },
-        { name: "INDUSTRIAL", score: industrialScore, electives: ["Automotive", "Electrical"] },
-        { name: "AGRI", score: agriScore, electives: ["Agriculture", "Fishery"] },
-        { name: "PHYSICAL", score: physicalScore, electives: ["Fitness Training", "Coaching"] },
-      ];
-
-      electiveScores.sort((a, b) => b.score - a.score);
-      electives = electiveScores[0].electives;
+    // Use dynamic scoring service
+    const scores = await calculateDynamicScores(answers);
+    
+    if (!scores) {
+      console.error("❌ Failed to calculate scores");
+      alert("Error calculating scores. Please try again.");
+      return;
     }
 
-    // Determine top domains for explanation
-    const domainScores = [
-      { name: "Verbal", score: VA },
-      { name: "Math", score: MA },
-      { name: "Science", score: SA },
-      { name: "Logical", score: LRA },
-    ];
-    domainScores.sort((a, b) => b.score - a.score);
-    const topDomains = domainScores.slice(0, 2).map(d => d.name);
-
-    // Determine top interest clusters
-    const interestScores = [
-      { name: "academic subjects", score: academic },
-      { name: "technology", score: tech },
-      { name: "business", score: business },
-      { name: "helping others", score: helping },
-      { name: "culinary arts", score: home },
-      { name: "creative work", score: creative },
-      { name: "outdoor activities", score: outdoor },
-      { name: "physical activities", score: physical },
-      { name: "practical work", score: practical },
-    ];
-    interestScores.sort((a, b) => b.score - a.score);
-    const topInterests = interestScores.slice(0, 2).map(i => i.name);
-
-    // Store results in localStorage with user-specific key
     const userEmail = userData?.email || "student@gmail.com";
     
-    // Calculate overall score (average of domain scores)
-    const overallScore = Math.round((VA + MA + SA + LRA) / 4);
+    // Determine track
+    const track = determineTrack(scores);
+    
+    // Get top 2 domains
+    const questionsByCategory = await getQuestionsByCategory();
+    const topDomains = getTopDomains(scores);
+    const topInterests = getTopInterests(answers, questionsByCategory);
 
+    // Determine electives based on track (simplified)
+    const electives = ['Elective 1', 'Elective 2']; // Can be customized further
+
+    // Prepare result for storage
     const assessmentResult = {
-      track,
+      verbal_ability_score: scores.verbal_ability_score,
+      mathematical_ability_score: scores.mathematical_ability_score,
+      spatial_ability_score: scores.spatial_ability_score,
+      logical_reasoning_score: scores.logical_reasoning_score,
+      overall_score: scores.overall_score,
+      recommended_track: track,
       electives,
-      scores: { VA, MA, SA, LRA },
       topDomains,
       topInterests,
-      overallScore,
+      // Legacy compatibility
+      track,
+      VA: scores.verbal_ability_score,
+      MA: scores.mathematical_ability_score,
+      SA: scores.spatial_ability_score,
+      LRA: scores.logical_reasoning_score,
     };
+
+    console.log("📊 Assessment Result:", assessmentResult);
 
     // Save to assessment history via Supabase
     try {
       await saveAssessmentResult(userEmail, assessmentResult);
+      console.log("✅ Assessment result saved to Supabase");
     } catch (error) {
-      console.error("Error saving assessment result:", error);
+      console.error("❌ Error saving assessment result:", error);
     }
 
     // Update enrollment progress - Mark AI Assessment as completed
