@@ -16,6 +16,7 @@ import {
   CreditCard,
   Wallet,
 } from "lucide-react";
+import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../services/adminService";
 
 interface OnlinePayment {
   id: string;
@@ -58,76 +59,98 @@ export function CashierDashboard() {
     loadPayments();
   }, []);
 
-  const loadPayments = () => {
-    // Load online payments
-    const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-    const onlineOnly = paymentQueue.filter((p: any) => p.paymentMode === "bank" || p.paymentMode === "gcash");
-    setOnlinePayments(onlineOnly);
+  const loadPayments = async () => {
+    // Load pending and completed payments from Supabase
+    const { data: pendingPayments, error: pendingError } = await getAllPayments('pending');
+    const { data: completedPayments, error: completedError } = await getAllPayments('completed');
 
-    // Load cash payments
-    const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-    setCashPayments(cashQueue);
+    if (pendingError || completedError) {
+      console.error('Error loading payments:', pendingError || completedError);
+      setOnlinePayments([]);
+      setCashPayments([]);
+      return;
+    }
+
+    // Format online payments
+    if (pendingPayments) {
+      const formatted = pendingPayments.map((p: any) => ({
+        id: p.id,
+        studentEmail: p.user_id,
+        studentName: p.user_id,
+        paymentMode: p.payment_method === 'bank_transfer' ? 'bank' : 'gcash',
+        referenceNumber: p.reference_number,
+        receiptData: p.receipt_data || '',
+        receiptFileName: 'payment_receipt',
+        status: p.status === 'pending' ? 'pending' : 'approved',
+        submittedDate: new Date(p.created_at).toLocaleDateString(),
+        enrollmentData: {},
+      }));
+      setOnlinePayments(formatted);
+    }
   };
 
-  const handleApproveOnlinePayment = () => {
+  const handleApproveOnlinePayment = async () => {
     if (!selectedPayment) return;
 
-    // Update payment status
-    const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-    const updated = paymentQueue.map((p: any) =>
-      p.id === selectedPayment.id ? { ...p, status: "approved" } : p
+    // Update payment status in Supabase
+    const { error } = await updatePaymentStatus(selectedPayment.id, 'completed', 'cashier');
+
+    if (error) {
+      alert(`Error approving payment: ${error}`);
+      return;
+    }
+
+    // Create audit log
+    await createAuditLog(
+      'cashier',
+      'PAYMENT_VERIFIED',
+      `Payment approved: ${selectedPayment.referenceNumber}`,
+      'success'
     );
-    localStorage.setItem("payment_queue", JSON.stringify(updated));
 
-    // Update enrollment progress and enroll student
-    const progressKey = `enrollment_progress_${selectedPayment.studentEmail}`;
-    const progress = JSON.parse(localStorage.getItem(progressKey) || "[]");
-    const updatedProgress = progress.map((step: any) => {
-      if (step.name === "Payment Verified") {
-        return { ...step, status: "completed" };
-      }
-      if (step.name === "Enrolled") {
-        return { ...step, status: "completed" };
-      }
-      return step;
+    // Create notification
+    import('../../utils/notificationSystem').then(({ addNotification }) => {
+      addNotification(selectedPayment.studentEmail, 'PAYMENT_VERIFIED');
     });
-    localStorage.setItem(progressKey, JSON.stringify(updatedProgress));
 
-    // Mark student as enrolled
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const updatedUsers = users.map((u: any) => {
-      if (u.email === selectedPayment.studentEmail) {
-        return { ...u, accountStatus: "enrolled", enrolledDate: new Date().toISOString() };
-      }
-      return u;
-    });
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
-
+    alert("Payment approved! Student has been enrolled successfully.");
     loadPayments();
     setShowReviewModal(false);
     setSelectedPayment(null);
-    alert("Payment approved! Student has been enrolled successfully.");
   };
 
-  const handleRejectOnlinePayment = () => {
+  const handleRejectOnlinePayment = async () => {
     if (!selectedPayment || !rejectionComment.trim()) {
       alert("Please provide a reason for rejection");
       return;
     }
 
-    const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-    const updated = paymentQueue.map((p: any) =>
-      p.id === selectedPayment.id
-        ? { ...p, status: "rejected", rejectionComment }
-        : p
-    );
-    localStorage.setItem("payment_queue", JSON.stringify(updated));
+    // Update payment status in Supabase
+    const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', 'cashier');
 
+    if (error) {
+      alert(`Error rejecting payment: ${error}`);
+      return;
+    }
+
+    // Create audit log
+    await createAuditLog(
+      'cashier',
+      'PAYMENT_REJECTED',
+      `Payment rejected: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment}`,
+      'warning'
+    );
+
+    // Create notification
+    import('../../utils/notificationSystem').then(({ addNotification }) => {
+      addNotification(selectedPayment.studentEmail, 'PAYMENT_REJECTED');
+    });
+
+    alert("Payment rejected. Student will be notified.");
     loadPayments();
     setShowReviewModal(false);
     setSelectedPayment(null);
     setRejectionComment("");
-    alert("Payment rejected. Student will be notified.");
   };
 
   const handleConfirmCashPayment = () => {
