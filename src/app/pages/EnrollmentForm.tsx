@@ -29,6 +29,7 @@ import {
   uploadDocument 
 } from "../../services/enrollmentService";
 import { triggerNotification } from "../../services/notificationService";
+import { supabase } from "../../supabase";
 import {
   regions,
   getProvincesByRegion,
@@ -523,10 +524,20 @@ export function EnrollmentForm() {
     
     if (validatePage(6)) {
       const userEmail = userData?.email || "student@gmail.com";
-      const userId = userData?.id;
+      let userId = userData?.id;
+
+      // Fallback: look up UUID by email in case session is missing it
+      if (!userId || userId === userEmail) {
+        const { data: userRecord } = await supabase
+          .from('users')
+          .select('id')
+          .eq('email', userEmail)
+          .single();
+        userId = userRecord?.id;
+      }
 
       if (!userId) {
-        alert("Error: User session invalid. Please log out and log in again.");
+        alert("Error: Could not verify your account. Please log out and log in again.");
         return;
       }
       

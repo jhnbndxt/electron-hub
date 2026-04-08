@@ -58,6 +58,7 @@ export function Register() {
       
       // Auto-login the user
       login("student", {
+        id: user.id,
         name: user.full_name,
         email: user.email
       });
