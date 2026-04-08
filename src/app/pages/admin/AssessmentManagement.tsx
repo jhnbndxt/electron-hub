@@ -17,6 +17,14 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import {
+  getAssessmentQuestions,
+  createQuestion,
+  updateQuestion,
+  deleteQuestion,
+  questionsExistInDatabase,
+  initializeQuestions,
+} from "../../services/assessmentService";
 
 interface AssessmentQuestion {
   id: number;
@@ -58,19 +66,56 @@ export function AssessmentManagement() {
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
 
-  const loadQuestions = () => {
-    const stored = localStorage.getItem("assessment_questions");
-    if (stored) {
-      const parsedQuestions = JSON.parse(stored);
-      const questionsWithCategory = parsedQuestions.map((q: any) => ({
-        ...q,
-        category: q.category || getCategoryForQuestion(q.id)
-      }));
-      setQuestions(questionsWithCategory);
-    } else {
+  const loadQuestions = async () => {
+    // First check if questions exist in database
+    const exists = await questionsExistInDatabase();
+    
+    if (!exists) {
+      // Load default questions and initialize database
       const defaultQuestions = getDefaultQuestions();
-      localStorage.setItem("assessment_questions", JSON.stringify(defaultQuestions));
-      setQuestions(defaultQuestions);
+      const { error } = await initializeQuestions(defaultQuestions);
+      
+      if (error) {
+        console.error('Error initializing questions:', error);
+        setQuestions(defaultQuestions);
+        return;
+      }
+      
+      // Reload from database
+      const { data, error: loadError } = await getAssessmentQuestions();
+      if (!loadError && data) {
+        const formattedQuestions = data.map((q: any) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options || [],
+          correctAnswer: q.correct_answer,
+          category: q.category,
+        }));
+        setQuestions(formattedQuestions);
+      }
+    } else {
+      // Load from database
+      const { data, error } = await getAssessmentQuestions();
+      
+      if (error) {
+        console.error('Error loading questions:', error);
+        // Fallback to default questions
+        setQuestions(getDefaultQuestions());
+        return;
+      }
+      
+      if (data && data.length > 0) {
+        const formattedQuestions = data.map((q: any) => ({
+          id: q.id,
+          question: q.question,
+          options: q.options || [],
+          correctAnswer: q.correct_answer,
+          category: q.category,
+        }));
+        setQuestions(formattedQuestions);
+      } else {
+        setQuestions(getDefaultQuestions());
+      }
     }
   };
 
@@ -405,13 +450,26 @@ export function AssessmentManagement() {
     setEditedQuestion({ ...question });
   };
 
-  const handleSave = (id: number) => {
+  const handleSave = async (id: number) => {
     if (editedQuestion) {
+      // Update in Supabase
+      const { error } = await updateQuestion(id, {
+        question: editedQuestion.question,
+        options: editedQuestion.options,
+        correctAnswer: editedQuestion.correctAnswer,
+        category: editedQuestion.category,
+      });
+
+      if (error) {
+        alert(`Error saving question: ${error}`);
+        return;
+      }
+
+      // Update local state
       const updatedQuestions = questions.map((q) =>
         q.id === id ? editedQuestion : q
       );
       setQuestions(updatedQuestions);
-      localStorage.setItem("assessment_questions", JSON.stringify(updatedQuestions));
       setEditingId(null);
       setEditedQuestion(null);
 
@@ -429,16 +487,24 @@ export function AssessmentManagement() {
     setDeleteConfirm({ show: true, id });
   };
 
-  const handleConfirmDelete = (id: number) => {
+  const handleConfirmDelete = async (id: number) => {
+    // Delete from Supabase
+    const { error } = await deleteQuestion(id);
+
+    if (error) {
+      alert(`Error deleting question: ${error}`);
+      return;
+    }
+
+    // Update local state
     const updatedQuestions = questions.filter((q) => q.id !== id);
     setQuestions(updatedQuestions);
-    localStorage.setItem("assessment_questions", JSON.stringify(updatedQuestions));
     setDeleteConfirm({ show: false, id: null });
   };
 
-  const handleAddQuestion = (category: string) => {
+  const handleAddQuestion = async (category: string) => {
     const maxId = Math.max(...questions.map((q) => q.id), 0);
-    const newQ: AssessmentQuestion = {
+    const newQ: Partial<AssessmentQuestion> = {
       id: maxId + 1,
       question: newQuestion.question || "",
       options: category === "Interests" ? [] : (newQuestion.options || ["", "", "", ""]),
@@ -446,9 +512,30 @@ export function AssessmentManagement() {
       category,
     };
 
-    const updatedQuestions = [...questions, newQ];
-    setQuestions(updatedQuestions);
-    localStorage.setItem("assessment_questions", JSON.stringify(updatedQuestions));
+    // Create in Supabase
+    const { error, data } = await createQuestion({
+      question: newQ.question,
+      options: newQ.options,
+      correctAnswer: newQ.correctAnswer,
+      category: newQ.category,
+    });
+
+    if (error) {
+      alert(`Error adding question: ${error}`);
+      return;
+    }
+
+    // Update local state with database response
+    if (data) {
+      const formattedQuestion: AssessmentQuestion = {
+        id: data.id,
+        question: data.question,
+        options: data.options || [],
+        correctAnswer: data.correct_answer,
+        category: data.category,
+      };
+      setQuestions([...questions, formattedQuestion]);
+    }
 
     setAddingCategory(null);
     setNewQuestion({
@@ -456,6 +543,9 @@ export function AssessmentManagement() {
       options: ["", "", "", ""],
       correctAnswer: 0,
     });
+
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
   };
 
   const getQuestionsByCategory = (categoryName: string) => {
