@@ -130,26 +130,30 @@ export function PendingApplications() {
   };
 
   const handleReviewDocuments = (student: Student) => {
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-    const fullApp = applications.find((app: any) => app.id === student.id);
-    setReviewingStudent(fullApp);
+    setReviewingStudent(student.enrollmentData);
     setShowDocumentModal(true);
     setSelectedDocument(null);
   };
 
   const handleViewDocument = (docKey: string) => {
     if (!reviewingStudent) return;
-    const docs = getStudentDocuments(reviewingStudent.email || "");
-    if (!docs[docKey]) {
+    const docs: any[] = reviewingStudent.enrollment_documents || [];
+    const doc = docs.find((d: any) => d.document_type === docKey);
+    if (!doc) {
       alert("This document has not been uploaded yet.");
       return;
     }
     setSelectedDocument({
       key: docKey,
-      name: documentNames[docKey],
-      data: docs[docKey],
+      name: documentNames[docKey] || docKey,
+      data: {
+        ...doc,
+        fileUrl: doc.file_path || doc.file_url,
+        status: doc.status,
+        rejectionComment: doc.rejection_comment || doc.rejection_reason || "",
+      },
     });
-    setDocumentRejectionComment(docs[docKey]?.rejectionComment || "");
+    setDocumentRejectionComment(doc.rejection_comment || doc.rejection_reason || "");
   };
 
   const handleApproveDocument = async () => {
@@ -857,7 +861,19 @@ export function PendingApplications() {
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-6">
                   {(() => {
-                    const docs = getStudentDocuments(reviewingStudent.email || "");
+                    const enrollmentDocs: any[] = reviewingStudent.enrollment_documents || [];
+                    // Build docs map keyed by document_type
+                    const docs: Record<string, any> = {};
+                    enrollmentDocs.forEach((d: any) => {
+                      docs[d.document_type] = {
+                        id: d.id,
+                        status: d.status || "pending",
+                        uploadDate: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—",
+                        fileName: (d.file_path || d.file_url || "").split("/").pop() || "document",
+                        fileUrl: d.file_path || d.file_url || null,
+                        rejectionComment: d.rejection_comment || d.rejection_reason || "",
+                      };
+                    });
                     const docKeys = Object.keys(docs);
                     
                     if (docKeys.length === 0) {
@@ -869,7 +885,7 @@ export function PendingApplications() {
                       );
                     }
 
-                    const docStatus = getDocumentStatus(reviewingStudent.email || "");
+                    const approved = docKeys.filter(k => docs[k].status === "approved").length;
 
                     return (
                       <>
@@ -877,9 +893,9 @@ export function PendingApplications() {
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                           <div className="flex items-center justify-between">
                             <p className="text-sm font-medium text-blue-900">
-                              {docStatus.approved} of {docStatus.uploaded} documents approved
+                              {approved} of {docKeys.length} documents approved
                             </p>
-                            {docStatus.allApproved && (
+                            {approved === docKeys.length && (
                               <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-100 text-green-800 font-semibold text-sm">
                                 <CheckCircle className="w-4 h-4" />
                                 All Approved
@@ -909,7 +925,7 @@ export function PendingApplications() {
                                     <div className="flex items-center gap-2">
                                       <FileText className="w-5 h-5 text-gray-600" />
                                       <h4 className="font-medium text-sm text-gray-900">
-                                        {documentNames[key]}
+                                        {documentNames[key] || key}
                                       </h4>
                                     </div>
                                     {doc.status === "approved" && <CheckCircle className="w-5 h-5 text-green-600" />}
@@ -953,17 +969,34 @@ export function PendingApplications() {
                             
                             {/* Document Preview */}
                             <div className="mb-4">
-                              <div className="border border-gray-200 rounded-lg overflow-hidden">
-                                {selectedDocument.data.fileData && (
-                                  <img
-                                    src={selectedDocument.data.fileData}
-                                    alt={selectedDocument.name}
-                                    className="w-full h-auto"
-                                  />
+                              <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-50 min-h-[200px] flex items-center justify-center">
+                                {selectedDocument.data.fileUrl ? (
+                                  selectedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                                    <img
+                                      src={selectedDocument.data.fileUrl}
+                                      alt={selectedDocument.name}
+                                      className="w-full h-auto"
+                                    />
+                                  ) : (
+                                    <div className="text-center p-6">
+                                      <FileText className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                                      <p className="text-sm text-gray-600 mb-3">{selectedDocument.data.fileName}</p>
+                                      <a
+                                        href={selectedDocument.data.fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                                      >
+                                        Open Document
+                                      </a>
+                                    </div>
+                                  )
+                                ) : (
+                                  <p className="text-gray-400 text-sm">No preview available</p>
                                 )}
                               </div>
                               <p className="text-xs text-gray-500 mt-2">
-                                File: {selectedDocument.data.fileName} ({selectedDocument.data.fileSize})
+                                File: {selectedDocument.data.fileName}
                               </p>
                             </div>
 

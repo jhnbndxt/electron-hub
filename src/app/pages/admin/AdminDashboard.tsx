@@ -97,7 +97,7 @@ export function AdminDashboard() {
     parentGuardianId: "",
   });
   const [expandedDocument, setExpandedDocument] = useState<string | null>(null);
-  const [viewingDocument, setViewingDocument] = useState<{type: string, url: string} | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<{type: string, url: string, fileUrl?: string | null} | null>(null);
 
   // Load real data from Supabase
   useEffect(() => {
@@ -249,29 +249,15 @@ export function AdminDashboard() {
 
   // View document
   const handleViewDocument = (docType: string, student: Student) => {
-    const studentEmail = student.formData?.studentId || student.email;
+    const docs = student.formData?.enrollment_documents as any[] | undefined;
+    const doc = docs?.find((d: any) => d.document_type === docType);
+    const fileUrl = doc?.file_url || doc?.file_path || null;
 
-    // Map document types to their keys in document_verification
-    const docKeyMap: Record<string, string> = {
-      "birthCertificate": "psaBirthCertificate",
-      "form138": "form138",
-      "goodMoral": "goodMoral",
-      "idPicture": "idPicture",
-      "parentGuardianId": "parentGuardianId",
-    };
-
-    const docKey = docKeyMap[docType];
-
-    // Retrieve document from document_verification localStorage
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    const userDocs = docVerification[studentEmail] || {};
-    const document = userDocs[docKey];
-
-    if (document && document.fileName) {
+    if (doc) {
       setViewingDocument({
         type: docType,
-        url: document.fileName,
-        fileData: document.fileData || null
+        url: doc.file_name || docType,
+        fileUrl,
       });
     } else {
       alert("Document not available");
@@ -1369,20 +1355,33 @@ export function AdminDashboard() {
               </button>
             </div>
             <div className="p-6">
-              {viewingDocument.fileData ? (
+              {viewingDocument.fileUrl ? (
                 <div className="bg-gray-100 rounded-lg p-4 min-h-[400px] flex items-center justify-center">
-                  {viewingDocument.fileData.startsWith('data:application/pdf') ? (
+                  {viewingDocument.fileUrl.match(/\.pdf(\?|$)/i) ? (
                     <iframe
-                      src={viewingDocument.fileData}
+                      src={viewingDocument.fileUrl}
                       className="w-full h-[600px] rounded"
                       title="Document Viewer"
                     />
-                  ) : (
+                  ) : viewingDocument.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)(\?|$)/i) ? (
                     <img
-                      src={viewingDocument.fileData}
+                      src={viewingDocument.fileUrl}
                       alt="Document"
                       className="max-w-full max-h-[600px] object-contain rounded"
                     />
+                  ) : (
+                    <div className="text-center">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+                      <p className="text-gray-600 mb-4 font-medium">{viewingDocument.url}</p>
+                      <a
+                        href={viewingDocument.fileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                      >
+                        Open Document
+                      </a>
+                    </div>
                   )}
                 </div>
               ) : (
@@ -1391,7 +1390,7 @@ export function AdminDashboard() {
                     <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-gray-600 mb-2 font-medium">Document: {viewingDocument.url}</p>
                     <p className="text-sm text-gray-500">
-                      Document preview not available. The student uploaded this file, but the preview could not be stored due to storage limitations.
+                      Document preview not available.
                     </p>
                   </div>
                 </div>
