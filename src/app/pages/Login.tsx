@@ -231,9 +231,8 @@ export function Login() {
             >
               {isLoading ? "Signing in..." : "Get Started"}
             </button>
-              <div className="auth-shell-bg flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 sm:p-6 lg:p-8 w-full">
 
-          <div className="mt-6 space-y-3 text-center">
+            <div className="mt-6 space-y-3 text-center">
             <p className="text-sm text-slate-600">
               Don&apos;t have an account?{" "}
               <Link to="/register" className="font-semibold text-[#1E3A8A] hover:underline">
