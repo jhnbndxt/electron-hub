@@ -1,4 +1,4 @@
-import { Search, Filter, Download, Shield, User, Settings, FileText } from "lucide-react";
+import { Search, Filter, Download, Shield, User, Settings, FileText, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
 import { getAuditLogs } from "../../../services/adminService";
 
@@ -20,6 +20,12 @@ export function SuperAdminAuditLogs() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
   const [allLogs, setAllLogs] = useState<AuditLog[]>([]);
+  // Date filter state (default: today)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString().slice(0, 10);
+  });
 
   useEffect(() => {
     loadAuditLogs();
@@ -105,12 +111,19 @@ export function SuperAdminAuditLogs() {
     return "System Config";
   };
 
-  // Filter logs
-  let filteredLogs = allLogs.filter((log) =>
-    log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.details.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Filter logs by selected date
+  let filteredLogs = allLogs.filter((log) => {
+    const logDate = new Date(log.timestamp);
+    const logDateStr = logDate.toISOString().slice(0, 10);
+    return (
+      logDateStr === selectedDate &&
+      (
+        log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.details.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    );
+  });
 
   if (categoryFilter !== "all") {
     filteredLogs = filteredLogs.filter((log) => log.category === categoryFilter);
@@ -180,7 +193,7 @@ export function SuperAdminAuditLogs() {
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
           {/* Search */}
-          <div className="relative w-full md:flex-1 md:min-w-[240px]">
+          <div className="relative w-full md:flex-1 md:min-w-[200px]">
             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -188,6 +201,18 @@ export function SuperAdminAuditLogs() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Date Filter */}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              max={new Date().toISOString().slice(0, 10)}
             />
           </div>
 
