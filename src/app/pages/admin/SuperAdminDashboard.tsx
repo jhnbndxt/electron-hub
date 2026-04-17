@@ -71,7 +71,7 @@ export function SuperAdminDashboard() {
   };
 
   const loadRecentActivity = async () => {
-    const { data: logs, error } = await getAuditLogs(10);
+    const { data: logs, error } = await getAuditLogs(5);
     
     if (error) {
       console.error('Error loading activity logs:', error);
