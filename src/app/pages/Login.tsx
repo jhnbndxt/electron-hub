@@ -231,8 +231,9 @@ export function Login() {
             >
               {isLoading ? "Signing in..." : "Get Started"}
             </button>
+          </form>
 
-            <div className="mt-6 space-y-3 text-center">
+          <div className="mt-6 space-y-3 text-center">
             <p className="text-sm text-slate-600">
               Don&apos;t have an account?{" "}
               <Link to="/register" className="font-semibold text-[#1E3A8A] hover:underline">
