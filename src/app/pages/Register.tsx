@@ -1,3 +1,4 @@
+// Register page component
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { Calendar, CheckCircle, CheckCircle2, Lock, Mail, Phone, User } from "lucide-react";
