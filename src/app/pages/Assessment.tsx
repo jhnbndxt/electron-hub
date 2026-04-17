@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { saveAssessmentResult } from "../../services/assessmentResultService";
-import { determineTrack, getTopDomains, getTopInterests } from "../../services/assessmentScoringService";
+import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/assessmentResultService";
+import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
 
@@ -11,9 +11,11 @@ interface Question {
   id: number;
   question: string;
   options: string[];
-  correctAnswer?: number; // Index of correct answer (for objective questions)
+  correctAnswer?: number;
   category: string;
 }
+
+type AnswerValue = number | number[];
 
 interface Section {
   name: string;
@@ -25,58 +27,61 @@ export function Assessment() {
   const navigate = useNavigate();
   const { userData, updateEnrollmentProgress } = useAuth();
   const [currentSection, setCurrentSection] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
 
-  useEffect(() => {
-    // Scroll to top immediately when component mounts
-    window.scrollTo(0, 0);
+  const isInterestQuestion = (question: Question) => question.category === "Interests";
 
-    // Clear old cached questions from localStorage to force fresh load
+  const getSelectedInterestAnswers = (questionId: number) => {
+    const answer = answers[questionId];
+    return Array.isArray(answer) ? answer : [];
+  };
+
+  const isQuestionAnswered = (question: Question) => {
+    const answer = answers[question.id];
+
+    if (isInterestQuestion(question)) {
+      return Array.isArray(answer) && answer.length > 0;
+    }
+
+    return typeof answer === "number";
+  };
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
     localStorage.removeItem("assessment_questions");
 
     const initializeAssessment = async () => {
-      // Check if user has already taken the assessment
       const userEmail = userData?.email || "student@gmail.com";
-      const existingResults = localStorage.getItem(`assessmentResults_${userEmail}`);
+      const existingResult = await getLatestAssessmentResult(userEmail);
 
-      if (existingResults) {
-        // User has already taken the assessment, show completion message
+      if (existingResult) {
         setAssessmentCompleted(true);
         setLoading(false);
         return;
       }
 
-      // Check for public assessment results and transfer them
       const publicResults = localStorage.getItem("publicAssessmentResults");
       if (publicResults && userEmail) {
-        // Transfer public assessment to user account
         localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
-        
-        // Also save to assessment history via Supabase
+
         try {
           const publicAssessment = JSON.parse(publicResults);
           await saveAssessmentResult(userEmail, publicAssessment);
         } catch (error) {
           console.error("Error saving assessment result:", error);
         }
-        
-        // Clear public assessment
+
         localStorage.removeItem("publicAssessmentResults");
-        
-        // Update enrollment progress
         updateEnrollmentProgress("AI Assessment Completed", "completed");
         updateEnrollmentProgress("Documents Submitted", "current");
-        
-        // Show completion message
         setAssessmentCompleted(true);
         setLoading(false);
         return;
       }
 
-      // Load questions from Supabase first, fallback to default if needed
       await loadQuestionsFromSupabase();
       setLoading(false);
     };
@@ -84,15 +89,37 @@ export function Assessment() {
     initializeAssessment();
   }, [userData, updateEnrollmentProgress]);
 
+  useEffect(() => {
+    const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
+
+    if (!shellMain) {
+      return;
+    }
+
+    const previousOverflowY = shellMain.style.overflowY;
+    const previousOverscrollBehavior = shellMain.style.overscrollBehavior;
+    const shouldLockViewport = window.innerWidth >= 1024 && (loading || assessmentCompleted);
+
+    if (shouldLockViewport) {
+      shellMain.scrollTop = 0;
+      shellMain.style.overflowY = "hidden";
+      shellMain.style.overscrollBehavior = "none";
+    }
+
+    return () => {
+      shellMain.style.overflowY = previousOverflowY;
+      shellMain.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [loading, assessmentCompleted]);
+
   const loadQuestionsFromSupabase = async () => {
     try {
       console.log("📚 Loading questions from Supabase...");
-      
-      // Fetch questions from assessment_questions table
+
       const { data, error } = await supabase
-        .from('assessment_questions')
-        .select('*')
-        .order('id');
+        .from("assessment_questions")
+        .select("*")
+        .order("id");
 
       if (error || !data || data.length === 0) {
         console.warn("⚠️ No questions in Supabase, using default questions");
@@ -100,43 +127,41 @@ export function Assessment() {
         return;
       }
 
-      // Convert Supabase data to Question format
-      const questions: Question[] = data.map(q => ({
-        id: q.id,
-        question: q.question,
-        options: q.options || [],
-        correctAnswer: q.correct_answer,
-        category: q.category
+      const questions: Question[] = data.map((question) => ({
+        id: question.id,
+        question: question.question,
+        options: question.options || [],
+        correctAnswer: question.correct_answer,
+        category: question.category,
       }));
 
       console.log(`✅ Loaded ${questions.length} questions from Supabase`);
 
-      // Organize questions by category
       const organizedSections: Section[] = [
         {
           name: "Verbal",
           icon: Brain,
-          questions: questions.filter(q => q.category === "Verbal"),
+          questions: questions.filter((question) => question.category === "Verbal"),
         },
         {
           name: "Math",
           icon: Calculator,
-          questions: questions.filter(q => q.category === "Math"),
+          questions: questions.filter((question) => question.category === "Math"),
         },
         {
           name: "Science",
           icon: Beaker,
-          questions: questions.filter(q => q.category === "Science"),
+          questions: questions.filter((question) => question.category === "Science"),
         },
         {
           name: "Logical",
           icon: Lightbulb,
-          questions: questions.filter(q => q.category === "Logical"),
+          questions: questions.filter((question) => question.category === "Logical"),
         },
         {
           name: "Interests",
           icon: Heart,
-          questions: questions.filter(q => q.category === "Interests"),
+          questions: questions.filter((question) => question.category === "Interests"),
         },
       ];
 
@@ -155,37 +180,35 @@ export function Assessment() {
     if (stored) {
       questions = JSON.parse(stored);
     } else {
-      // If no questions in storage, use default questions
       questions = getDefaultQuestions();
       localStorage.setItem("assessment_questions", JSON.stringify(questions));
     }
 
-    // Organize questions by category
     const organizedSections: Section[] = [
       {
         name: "Verbal",
         icon: Brain,
-        questions: questions.filter(q => q.category === "Verbal"),
+        questions: questions.filter((question) => question.category === "Verbal"),
       },
       {
         name: "Math",
         icon: Calculator,
-        questions: questions.filter(q => q.category === "Math"),
+        questions: questions.filter((question) => question.category === "Math"),
       },
       {
         name: "Science",
         icon: Beaker,
-        questions: questions.filter(q => q.category === "Science"),
+        questions: questions.filter((question) => question.category === "Science"),
       },
       {
         name: "Logical",
         icon: Lightbulb,
-        questions: questions.filter(q => q.category === "Logical"),
+        questions: questions.filter((question) => question.category === "Logical"),
       },
       {
         name: "Interests",
         icon: Heart,
-        questions: questions.filter(q => q.category === "Interests"),
+        questions: questions.filter((question) => question.category === "Interests"),
       },
     ];
 
@@ -193,21 +216,20 @@ export function Assessment() {
   };
 
   const getDefaultQuestions = (): Question[] => {
-    // Load 75 comprehensive questions from service
     const defaultQuestions = getDefaultAssessmentQuestions();
-    
-    return defaultQuestions.map((q, index) => ({
+
+    return defaultQuestions.map((question, index) => ({
       id: index + 1,
-      question: q.question,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
-      category: q.category,
+      question: question.question,
+      options: question.options,
+      correctAnswer: question.correctAnswer,
+      category: question.category,
     }));
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+      <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:h-[calc(100dvh-5rem)] lg:min-h-0 lg:overflow-hidden lg:p-8">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "var(--electron-blue)" }}></div>
           <p className="text-gray-600">Loading assessment...</p>
@@ -218,13 +240,11 @@ export function Assessment() {
 
   if (assessmentCompleted) {
     return (
-      <div className="h-screen overflow-hidden flex items-center justify-center p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+      <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:h-[calc(100dvh-5rem)] lg:min-h-0 lg:overflow-hidden lg:p-8">
         <div className="max-w-2xl w-full">
-          {/* Success Card */}
-          <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
-            {/* Blue Header */}
+          <div className="portal-glass-panel-strong overflow-hidden rounded-2xl shadow-2xl">
             <div
-              className="p-8 text-center"
+              className="p-6 text-center sm:p-8"
               style={{
                 background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
               }}
@@ -232,20 +252,19 @@ export function Assessment() {
               <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-4">
                 <CheckCircle className="w-12 h-12 text-white" />
               </div>
-              <h1 className="text-4xl font-bold text-white mb-2">
+              <h1 className="mb-2 text-3xl font-bold text-white sm:text-4xl">
                 Assessment Completed Successfully!
               </h1>
-              <p className="text-lg text-white/90">
+              <p className="text-base text-white/90 sm:text-lg">
                 🎉 Congratulations on completing your assessment
               </p>
             </div>
 
-            {/* Content */}
-            <div className="p-8">
-              <div className="bg-blue-50 border-l-4 border-blue-500 p-6 mb-6 rounded-r-lg">
+            <div className="p-5 sm:p-8">
+              <div className="mb-6 rounded-r-lg border-l-4 border-blue-500 bg-blue-50/70 p-6 backdrop-blur-sm">
                 <p className="text-gray-800 leading-relaxed">
-                  Your responses have been <strong className="text-blue-700">recorded and evaluated</strong>. 
-                  The AI has analyzed your answers and generated personalized track and elective recommendations 
+                  Your responses have been <strong className="text-blue-700">recorded and evaluated</strong>.
+                  The AI has analyzed your answers and generated personalized track and elective recommendations
                   tailored to your strengths and interests.
                 </p>
               </div>
@@ -282,8 +301,7 @@ export function Assessment() {
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row">
                 <button
                   onClick={() => navigate("/dashboard/results")}
                   className="flex-1 px-8 py-4 rounded-lg text-white font-semibold transition-all shadow-md hover:opacity-90 flex items-center justify-center gap-2"
@@ -295,10 +313,10 @@ export function Assessment() {
                 <button
                   onClick={() => navigate("/dashboard/enrollment")}
                   className="flex-1 px-8 py-4 rounded-lg font-semibold transition-all shadow-md flex items-center justify-center gap-2"
-                  style={{ 
+                  style={{
                     backgroundColor: "white",
                     color: "var(--electron-blue)",
-                    border: "2px solid var(--electron-blue)"
+                    border: "2px solid var(--electron-blue)",
                   }}
                 >
                   <FileText className="w-5 h-5" />
@@ -307,7 +325,7 @@ export function Assessment() {
               </div>
 
               <p className="text-center text-sm text-gray-500 mt-6">
-                💡 You may now proceed to view your results or continue with the enrollment process
+                💡 Your assessment has already been recorded. Retakes are disabled after submission.
               </p>
             </div>
           </div>
@@ -318,21 +336,42 @@ export function Assessment() {
 
   const currentSectionData = sections[currentSection];
   const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
-  const answeredQuestions = Object.keys(answers).length;
+  const answeredQuestions = sections.reduce((sum, section) => {
+    return sum + section.questions.filter((question) => isQuestionAnswered(question)).length;
+  }, 0);
   const progress = (answeredQuestions / totalQuestions) * 100;
 
   const handleAnswer = (questionId: number, answerIndex: number) => {
-    setAnswers({
-      ...answers,
+    setAnswers((currentAnswers) => ({
+      ...currentAnswers,
       [questionId]: answerIndex,
+    }));
+  };
+
+  const handleInterestToggle = (questionId: number, optionIndex: number) => {
+    setAnswers((currentAnswers) => {
+      const currentSelections = Array.isArray(currentAnswers[questionId])
+        ? [...(currentAnswers[questionId] as number[])]
+        : [];
+      const nextSelections = currentSelections.includes(optionIndex)
+        ? currentSelections.filter((currentIndex) => currentIndex !== optionIndex)
+        : [...currentSelections, optionIndex].sort((leftIndex, rightIndex) => leftIndex - rightIndex);
+      const nextAnswers = { ...currentAnswers };
+
+      if (nextSelections.length === 0) {
+        delete nextAnswers[questionId];
+      } else {
+        nextAnswers[questionId] = nextSelections;
+      }
+
+      return nextAnswers;
     });
   };
 
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
-      // Auto-scroll to top of page
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -343,76 +382,49 @@ export function Assessment() {
   };
 
   const handleSubmit = async () => {
-    console.log("🚀 Submitting assessment with local scoring...");
+    console.log("🚀 Submitting assessment with dynamic scoring...");
 
-    // Build questionsByCategory directly from already-loaded sections (no extra DB call)
     const questionsByCategory: Record<string, Question[]> = {
-      Verbal: [], Math: [], Science: [], Logical: [], Interests: []
+      Verbal: [],
+      Math: [],
+      Science: [],
+      Logical: [],
+      Interests: [],
     };
-    sections.forEach(section => {
+
+    sections.forEach((section) => {
       if (questionsByCategory[section.name] !== undefined) {
         questionsByCategory[section.name] = section.questions;
       }
     });
 
-    // Calculate scores per category
-    const categoryNames = ['Verbal', 'Math', 'Science', 'Logical', 'Interests'];
-    const categoryScores: Record<string, number> = {};
-    categoryNames.forEach(cat => {
-      const qs = questionsByCategory[cat];
-      if (!qs || qs.length === 0) { categoryScores[cat] = 0; return; }
-      let correct = 0;
-      qs.forEach(q => { if (answers[q.id] === q.correctAnswer) correct++; });
-      categoryScores[cat] = Math.round((correct / qs.length) * 100);
-    });
-
-    const allVals = Object.values(categoryScores);
-    const overallScore = Math.round(allVals.reduce((a, b) => a + b, 0) / allVals.length);
-
-    const scores = {
-      verbal_ability_score: categoryScores.Verbal,
-      mathematical_ability_score: categoryScores.Math,
-      spatial_ability_score: categoryScores.Science,
-      logical_reasoning_score: categoryScores.Logical,
-      overall_score: overallScore,
-    };
-
-    console.log("📊 Scores:", scores);
-
-    const userEmail = userData?.email || "student@gmail.com";
-
-    // Determine track
-    const track = determineTrack(scores);
-
-    // Get top domains and interests
-    const topDomains = getTopDomains(scores);
-    const topInterests = getTopInterests(answers, questionsByCategory);
-
-    // Determine electives based on track (simplified)
-    const electives = ['Elective 1', 'Elective 2']; // Can be customized further
-
-    // Prepare result for storage
-    const assessmentResult = {
-      verbal_ability_score: scores.verbal_ability_score,
-      mathematical_ability_score: scores.mathematical_ability_score,
-      spatial_ability_score: scores.spatial_ability_score,
-      logical_reasoning_score: scores.logical_reasoning_score,
-      overall_score: scores.overall_score,
-      recommended_track: track,
-      electives,
-      topDomains,
-      topInterests,
-      // Legacy compatibility
-      track,
-      VA: scores.verbal_ability_score,
-      MA: scores.mathematical_ability_score,
-      SA: scores.spatial_ability_score,
-      LRA: scores.logical_reasoning_score,
-    };
+    const assessmentResult = await formatAssessmentResult(answers, questionsByCategory);
+    if (!assessmentResult) {
+      console.error("❌ Error formatting assessment result");
+      return;
+    }
 
     console.log("📊 Assessment Result:", assessmentResult);
 
-    // Save to assessment history via Supabase
+    const userEmail = userData?.email || "student@gmail.com";
+
+    localStorage.setItem(
+      `assessmentResults_${userEmail}`,
+      JSON.stringify({
+        track: assessmentResult.track,
+        electives: assessmentResult.electives,
+        scores: {
+          VA: assessmentResult.scores.verbal_ability_score,
+          MA: assessmentResult.scores.mathematical_ability_score,
+          SA: assessmentResult.scores.spatial_ability_score,
+          LRA: assessmentResult.scores.logical_reasoning_score,
+        },
+        topDomains: assessmentResult.topDomains,
+        topInterests: assessmentResult.topInterests,
+        overallScore: assessmentResult.scores.overall_score,
+      })
+    );
+
     try {
       await saveAssessmentResult(userEmail, assessmentResult);
       console.log("✅ Assessment result saved to Supabase");
@@ -420,29 +432,24 @@ export function Assessment() {
       console.error("❌ Error saving assessment result:", error);
     }
 
-    // Update enrollment progress - Mark AI Assessment as completed
     updateEnrollmentProgress("AI Assessment Completed", "completed");
     updateEnrollmentProgress("Documents Submitted", "current");
 
-    // Navigate to results and scroll to top instantly
     navigate("/dashboard/results");
-    // Use setTimeout to ensure navigation completes before scroll
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "instant" });
     }, 0);
   };
 
-  const isInterestSection = currentSection === 4;
   const allCurrentQuestionsAnswered = currentSectionData.questions.every(
-    (q) => answers[q.id] !== undefined
+    (question) => isQuestionAnswered(question)
   );
 
   const isLastSection = currentSection === sections.length - 1;
 
   return (
-    <div className="min-h-screen p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1
             className="text-4xl font-bold mb-3"
@@ -458,7 +465,6 @@ export function Assessment() {
           </p>
         </div>
 
-        {/* Progress Bar Steps */}
         <div className="mb-8">
           <div className="flex justify-between items-start mb-4 relative">
             {sections.map((section, index) => {
@@ -496,8 +502,7 @@ export function Assessment() {
                 </div>
               );
             })}
-            
-            {/* Connecting Lines - Behind circles */}
+
             <div className="absolute top-6 left-0 right-0 flex items-center px-12 -z-10">
               {sections.slice(0, -1).map((_, index) => (
                 <div
@@ -510,7 +515,6 @@ export function Assessment() {
             </div>
           </div>
 
-          {/* Overall Progress */}
           <div className="mt-6">
             <div className="flex justify-between text-sm text-gray-600 mb-2">
               <span>Overall Progress</span>
@@ -530,8 +534,7 @@ export function Assessment() {
           </div>
         </div>
 
-        {/* Question Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+        <div className="portal-glass-panel mb-6 rounded-xl p-5 shadow-lg sm:p-8">
           <h2
             className="text-2xl font-bold mb-6"
             style={{ color: "var(--electron-dark-gray)" }}
@@ -540,70 +543,71 @@ export function Assessment() {
           </h2>
 
           <div className="space-y-8">
-            {currentSectionData.questions.map((question, qIndex) => (
+            {currentSectionData.questions.map((question, questionIndex) => (
               <div key={question.id} className="pb-6 border-b border-gray-200 last:border-b-0">
                 <p className="text-lg mb-4 font-medium text-gray-800">
-                  {question.id}. {question.question}
+                  {questionIndex + 1}. {question.question}
                 </p>
 
-                {isInterestSection ? (
-                  // Likert scale for interest questions
-                  <div className="grid grid-cols-5 gap-3">
-                    {[1, 2, 3, 4, 5].map((value) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {isInterestQuestion(question) ? (
+                    <div className="sm:col-span-2">
+                      <p className="mb-4 text-sm font-medium text-red-600">Select all that apply.</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {question.options.map((option, optionIndex) => {
+                          const selectedOptions = getSelectedInterestAnswers(question.id);
+                          const isSelected = selectedOptions.includes(optionIndex);
+
+                          return (
+                            <label
+                              key={optionIndex}
+                              className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 px-4 py-3 transition-all ${
+                                isSelected
+                                  ? "border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
+                                  : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => handleInterestToggle(question.id, optionIndex)}
+                                className="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                              />
+                              <span className="text-sm font-medium leading-6">{option}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    question.options.map((option, optionIndex) => (
                       <button
-                        key={value}
-                        onClick={() => handleAnswer(question.id, value)}
-                        className={`py-3 px-2 rounded-lg border-2 transition-all text-sm font-medium text-center ${
-                          answers[question.id] === value
-                            ? "text-white shadow-md"
-                            : "border-gray-300 text-gray-700 hover:border-blue-300"
-                        }`}
-                        style={
-                          answers[question.id] === value
-                            ? { backgroundColor: "var(--electron-blue)", borderColor: "var(--electron-blue)" }
-                            : {}
-                        }
-                      >
-                        {value === 1 && "Strongly Disagree"}
-                        {value === 2 && "Disagree"}
-                        {value === 3 && "Neutral"}
-                        {value === 4 && "Agree"}
-                        {value === 5 && "Strongly Agree"}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  // Multiple choice for objective questions
-                  <div className="grid grid-cols-2 gap-3">
-                    {question.options.map((option, optIndex) => (
-                      <button
-                        key={optIndex}
-                        onClick={() => handleAnswer(question.id, optIndex)}
+                        key={optionIndex}
+                        onClick={() => handleAnswer(question.id, optionIndex)}
                         className={`py-3 px-4 rounded-lg border-2 transition-all text-left ${
-                          answers[question.id] === optIndex
+                          answers[question.id] === optionIndex
                             ? "text-white shadow-md"
                             : "border-gray-300 text-gray-700 hover:border-blue-300"
                         }`}
                         style={
-                          answers[question.id] === optIndex
+                          answers[question.id] === optionIndex
                             ? { backgroundColor: "var(--electron-blue)", borderColor: "var(--electron-blue)" }
                             : {}
                         }
                       >
                         <span className="font-semibold mr-2">
-                          {String.fromCharCode(97 + optIndex)}.
+                          {String.fromCharCode(97 + optionIndex)}.
                         </span>
                         {option}
                       </button>
-                    ))}
-                  </div>
-                )}
+                    ))
+                  )}
+                </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Navigation Buttons */}
         <div className="flex justify-between items-center">
           <button
             onClick={handlePrevious}
@@ -640,10 +644,11 @@ export function Assessment() {
           )}
         </div>
 
-        {/* Helper Text */}
         {!allCurrentQuestionsAnswered && (
           <p className="text-center text-sm text-gray-500 mt-4">
-            Please answer all questions in this section to continue
+            {currentSectionData.name === "Interests"
+              ? "Please choose at least one checklist item for every interest question to continue"
+              : "Please answer all questions in this section to continue"}
           </p>
         )}
       </div>

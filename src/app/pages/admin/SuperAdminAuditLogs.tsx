@@ -1,5 +1,6 @@
 import { Search, Filter, Download, Shield, User, Settings, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
+import { getAuditLogs } from "../../../services/adminService";
 
 interface AuditLog {
   id: string | number;
@@ -24,19 +25,24 @@ export function SuperAdminAuditLogs() {
     loadAuditLogs();
   }, []);
 
-  const loadAuditLogs = () => {
-    const logs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
+  const loadAuditLogs = async () => {
+    const { data: logs, error } = await getAuditLogs();
+    if (error || !logs) {
+      console.error('Error loading audit logs:', error);
+      setAllLogs([]);
+      return;
+    }
 
-    // Map logs from localStorage to the format expected by the UI
+    // Map logs from Supabase to the format expected by the UI
     const formattedLogs = logs.map((log: any) => ({
       id: log.id || Math.random().toString(),
-      timestamp: log.timestamp || new Date().toLocaleString(),
-      user: log.user || "Unknown User",
-      email: log.email,
-      userRole: log.userRole || "System",
+      timestamp: log.timestamp || log.created_at || new Date().toISOString(),
+      user: log.user_name || log.user || "System",
+      email: log.email || '',
+      userRole: mapUserRole(log.user_role),
       action: log.action || "Unknown Action",
       category: categorizeAction(log.action, log.details),
-      ipAddress: log.ipAddress || "N/A",
+      ipAddress: log.ip_address || "N/A",
       status: log.status || "success",
       details: log.details || log.action || "No details available",
     }));
@@ -49,6 +55,31 @@ export function SuperAdminAuditLogs() {
     });
 
     setAllLogs(formattedLogs);
+  };
+
+  const mapUserRole = (role?: string) => {
+    switch (role) {
+      case "superadmin":
+        return "Super Admin" as const;
+      case "registrar":
+      case "branchcoordinator":
+      case "cashier":
+        return "Admin" as const;
+      default:
+        return "System" as const;
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    return date.toLocaleString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
   };
 
   const categorizeAction = (action: string, details: string): string => {
@@ -134,7 +165,7 @@ export function SuperAdminAuditLogs() {
   };
 
   return (
-    <div className="p-8">
+    <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900 mb-2">
@@ -147,9 +178,9 @@ export function SuperAdminAuditLogs() {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
           {/* Search */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative w-full md:flex-1 md:min-w-[240px]">
             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -161,12 +192,12 @@ export function SuperAdminAuditLogs() {
           </div>
 
           {/* Category Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               style={{ color: "#374151" }}
             >
               <option value="all">All Categories</option>
@@ -182,7 +213,7 @@ export function SuperAdminAuditLogs() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             style={{ color: "#374151" }}
           >
             <option value="all">All Status</option>
@@ -194,7 +225,7 @@ export function SuperAdminAuditLogs() {
           {/* Export Button */}
           <button
             onClick={() => alert("Exporting audit logs...")}
-            className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2 ml-auto"
+            className="w-full sm:w-auto sm:ml-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#7C3AED" }}
           >
             <Download className="w-4 h-4" />
@@ -206,7 +237,7 @@ export function SuperAdminAuditLogs() {
       {/* Data Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         {/* Table Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             System Activity Logs
           </h2>
@@ -214,7 +245,7 @@ export function SuperAdminAuditLogs() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -250,7 +281,7 @@ export function SuperAdminAuditLogs() {
                   >
                     <td className="px-6 py-4">
                       <p className="text-sm text-gray-900 font-mono">
-                        {log.timestamp}
+                        {formatTimestamp(log.timestamp)}
                       </p>
                     </td>
                     <td className="px-6 py-4">
@@ -302,7 +333,7 @@ export function SuperAdminAuditLogs() {
         </div>
 
         {/* Table Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50">
           <p className="text-sm text-gray-600">
             Showing{" "}
             <span className="font-medium">{filteredLogs.length}</span> of{" "}

@@ -1,21 +1,362 @@
 /**
  * Dynamic Assessment Scoring Service
- * 
- * Flexible scoring system that works with ANY number of questions
- * Automatically scales based on database question counts
- * 
- * Features:
- * - Dynamically fetch question counts per category
- * - Calculate scores normalized to 0-100
- * - Support for future question additions without code changes
- * - Handle variable question counts per category
+ *
+ * Objective sections are normalized from the live question counts in Supabase.
+ * Interest clusters are derived from the selected option content in the live
+ * checklist-based Interests question bank. Legacy 1-5 Likert responses are
+ * still supported so older in-progress assessments do not break.
  */
 
 import { supabase } from '../supabase';
 
+const EMPTY_GROUPED_QUESTIONS = {
+  Verbal: [],
+  Math: [],
+  Science: [],
+  Logical: [],
+  Interests: [],
+};
+
+const DYNAMIC_SCORE_CATEGORIES = ['Verbal', 'Math', 'Science', 'Logical'];
+
+const INTEREST_CLUSTER_CONFIG = {
+  academic: { label: 'Academic Subjects', slots: [1, 2, 3, 12] },
+  tech: { label: 'Technology', slots: [4, 6, 14] },
+  business: { label: 'Business', slots: [5] },
+  helping: { label: 'Helping Others', slots: [7, 13] },
+  home: { label: 'Home Economics', slots: [8] },
+  creative: { label: 'Creative Work', slots: [9] },
+  outdoor: { label: 'Outdoor Activities', slots: [10] },
+  practical: { label: 'Practical Tasks', slots: [11] },
+  physical: { label: 'Physical Activities', slots: [15] },
+};
+
+const INTEREST_OPTION_CLUSTER_WEIGHTS = {
+  physics: { academic: 1 },
+  'computer science': { tech: 1 },
+  biology: { academic: 0.7, helping: 0.3 },
+  literature: { creative: 0.6, academic: 0.4 },
+  'understanding theories': { academic: 1 },
+  'creating solutions': { tech: 0.7, practical: 0.3 },
+  'expressing ideas': { creative: 1 },
+  'helping communities': { helping: 1 },
+  laboratory: { academic: 1 },
+  workshop: { practical: 0.6, tech: 0.4 },
+  library: { academic: 0.5, creative: 0.5 },
+  office: { business: 1 },
+  'research projects': { academic: 1 },
+  'building prototypes': { tech: 0.6, practical: 0.4 },
+  'writing essays': { creative: 0.7, academic: 0.3 },
+  'organizing events': { business: 0.6, helping: 0.4 },
+  stem: { academic: 1 },
+  humanities: { helping: 0.6, creative: 0.4 },
+  business: { business: 1 },
+  arts: { creative: 1 },
+  'science discovery': { academic: 1 },
+  'technology innovation': { tech: 1 },
+  'social services': { helping: 1 },
+  'creative expression': { creative: 1 },
+  researcher: { academic: 1 },
+  engineer: { tech: 0.6, practical: 0.4 },
+  doctor: { helping: 0.6, academic: 0.4 },
+  entrepreneur: { business: 1 },
+  technical: { tech: 0.6, practical: 0.4 },
+  leadership: { business: 0.7, helping: 0.3 },
+  communication: { creative: 0.6, helping: 0.4 },
+  'problem-solving': { practical: 1 },
+  visual: { creative: 1 },
+  auditory: { helping: 0.5, creative: 0.5 },
+  kinesthetic: { physical: 0.7, practical: 0.3 },
+  'reading/writing': { academic: 0.6, creative: 0.4 },
+  coding: { tech: 1 },
+  designing: { creative: 1 },
+  teaching: { helping: 1 },
+  managing: { business: 1 },
+  innovation: { tech: 1 },
+  impact: { helping: 1 },
+  excellence: { academic: 1 },
+  security: { home: 0.4, practical: 0.6 },
+  team: { helping: 0.6, physical: 0.4 },
+  independent: { academic: 0.6, practical: 0.4 },
+  flexible: { creative: 0.5, outdoor: 0.5 },
+  structured: { home: 0.5, practical: 0.5 },
+  mathematical: { academic: 1 },
+  creative: { creative: 1 },
+  practical: { practical: 1 },
+  ethical: { helping: 1 },
+  technology: { tech: 1 },
+  healthcare: { helping: 0.7, academic: 0.3 },
+  education: { helping: 0.5, academic: 0.5 },
+  finance: { business: 1 },
+  specialist: { academic: 0.5, tech: 0.5 },
+  generalist: { academic: 0.6, creative: 0.4 },
+  leader: { business: 1 },
+  innovator: { tech: 0.6, creative: 0.4 },
+};
+
+const ELECTIVE_GROUPS = {
+  Academic: [
+    {
+      key: 'STEM',
+      electives: ['Biology', 'Physics'],
+      score: ({ scores }) =>
+        scores.mathematical_ability_score * 0.4 +
+        scores.spatial_ability_score * 0.4 +
+        scores.logical_reasoning_score * 0.2,
+    },
+    {
+      key: 'BUSINESS',
+      electives: ['Entrepreneurship', 'Marketing'],
+      score: ({ scores, interestClusters }) =>
+        scores.mathematical_ability_score * 0.4 +
+        interestClusters.business * 0.4 +
+        scores.verbal_ability_score * 0.2,
+    },
+    {
+      key: 'HUMANITIES',
+      electives: ['Psychology', 'Creative Writing'],
+      score: ({ scores, interestClusters }) =>
+        scores.verbal_ability_score * 0.5 +
+        interestClusters.helping * 0.3 +
+        scores.logical_reasoning_score * 0.2,
+    },
+    {
+      key: 'CREATIVE',
+      electives: ['Media Arts', 'Visual Arts'],
+      score: ({ scores, interestClusters }) =>
+        interestClusters.creative * 0.6 +
+        scores.verbal_ability_score * 0.2 +
+        scores.logical_reasoning_score * 0.2,
+    },
+    {
+      key: 'SPORTS',
+      electives: ['Coaching', 'Fitness'],
+      score: ({ scores, interestClusters }) =>
+        interestClusters.physical * 0.6 +
+        scores.spatial_ability_score * 0.2 +
+        scores.logical_reasoning_score * 0.2,
+    },
+  ],
+  'Technical-Professional': [
+    {
+      key: 'ICT',
+      electives: ['ICT', 'Programming'],
+      score: ({ scores, interestClusters }) =>
+        interestClusters.tech * 0.5 +
+        scores.logical_reasoning_score * 0.3 +
+        scores.mathematical_ability_score * 0.2,
+    },
+    {
+      key: 'HOME',
+      electives: ['Cookery', 'Bread & Pastry'],
+      score: ({ interestClusters }) =>
+        interestClusters.home * 0.6 + interestClusters.practical * 0.4,
+    },
+    {
+      key: 'INDUSTRIAL',
+      electives: ['Automotive', 'Electrical'],
+      score: ({ scores, interestClusters }) =>
+        interestClusters.tech * 0.4 +
+        interestClusters.practical * 0.4 +
+        scores.mathematical_ability_score * 0.2,
+    },
+    {
+      key: 'AGRI',
+      electives: ['Agriculture', 'Fishery'],
+      score: ({ interestClusters }) =>
+        interestClusters.outdoor * 0.6 + interestClusters.practical * 0.4,
+    },
+    {
+      key: 'PHYSICAL',
+      electives: ['Fitness Training', 'Coaching'],
+      score: ({ interestClusters }) =>
+        interestClusters.physical * 0.7 + interestClusters.practical * 0.3,
+    },
+  ],
+};
+
+function normalizeGroupedQuestions(questionsByCategory = {}) {
+  const grouped = {
+    Verbal: [],
+    Math: [],
+    Science: [],
+    Logical: [],
+    Interests: [],
+  };
+
+  Object.entries(questionsByCategory).forEach(([category, questions]) => {
+    if (!grouped[category] || !Array.isArray(questions)) {
+      return;
+    }
+
+    grouped[category] = [...questions].sort(
+      (first, second) => Number(first?.id ?? 0) - Number(second?.id ?? 0)
+    );
+  });
+
+  return grouped;
+}
+
+async function resolveQuestionsByCategory(questionsByCategory = null) {
+  if (questionsByCategory) {
+    return normalizeGroupedQuestions(questionsByCategory);
+  }
+
+  return getQuestionsByCategory();
+}
+
+function buildQuestionStats(questionsByCategory) {
+  return Object.keys(EMPTY_GROUPED_QUESTIONS).reduce((stats, category) => {
+    stats[category] = questionsByCategory?.[category]?.length || 0;
+    return stats;
+  }, {});
+}
+
+function getCorrectAnswer(question) {
+  if (typeof question?.correct_answer === 'number') {
+    return question.correct_answer;
+  }
+
+  if (typeof question?.correctAnswer === 'number') {
+    return question.correctAnswer;
+  }
+
+  return null;
+}
+
+function buildEmptyInterestClusters() {
+  return Object.keys(INTEREST_CLUSTER_CONFIG).reduce((clusters, key) => {
+    clusters[key] = 0;
+    return clusters;
+  }, {});
+}
+
+function getLegacyInterestResponse(interestQuestions, answers, slot) {
+  const question = interestQuestions?.[slot - 1];
+  if (!question) {
+    return 0;
+  }
+
+  const response = Number(answers?.[question.id]);
+  return Number.isFinite(response) && response >= 1 && response <= 5 ? response : 0;
+}
+
+function hasLegacyLikertInterestAnswers(answers, interestQuestions = []) {
+  return interestQuestions.some((question) => {
+    const response = Number(answers?.[question.id]);
+    const optionCount = Array.isArray(question?.options) ? question.options.length : 0;
+
+    return Number.isFinite(response) && optionCount > 0 && response > optionCount - 1;
+  });
+}
+
+function getSelectedInterestOptions(question, answers) {
+  const response = answers?.[question?.id];
+  const options = Array.isArray(question?.options) ? question.options : [];
+
+  if (Array.isArray(response)) {
+    return response
+      .filter((value) => Number.isInteger(value) && options[value])
+      .map((value) => options[value]);
+  }
+
+  const normalizedResponse = Number(response);
+  if (!Number.isInteger(normalizedResponse)) {
+    return [];
+  }
+
+  return options[normalizedResponse] ? [options[normalizedResponse]] : [];
+}
+
+function calculateLegacyInterestClusterScores(answers, interestQuestions) {
+  return Object.entries(INTEREST_CLUSTER_CONFIG).reduce((clusters, [key, config]) => {
+    const total = config.slots.reduce(
+      (sum, slot) => sum + getLegacyInterestResponse(interestQuestions, answers, slot),
+      0
+    );
+
+    clusters[key] = Math.round((total / config.slots.length) * 20);
+    return clusters;
+  }, buildEmptyInterestClusters());
+}
+
+function calculateOptionBasedInterestClusterScores(answers, interestQuestions) {
+  const clusterTotals = buildEmptyInterestClusters();
+  const selectedOptions = interestQuestions.flatMap((question) => getSelectedInterestOptions(question, answers));
+
+  if (!selectedOptions.length) {
+    return clusterTotals;
+  }
+
+  selectedOptions.forEach((selectedOption) => {
+    const normalizedOption = String(selectedOption || '').trim().toLowerCase();
+    const weights = INTEREST_OPTION_CLUSTER_WEIGHTS[normalizedOption];
+
+    if (!weights) {
+      return;
+    }
+
+    Object.entries(weights).forEach(([clusterKey, weight]) => {
+      clusterTotals[clusterKey] += weight;
+    });
+  });
+
+  const totalSelections = selectedOptions.length;
+  Object.keys(clusterTotals).forEach((clusterKey) => {
+    clusterTotals[clusterKey] = Math.round((clusterTotals[clusterKey] / totalSelections) * 100);
+  });
+
+  return clusterTotals;
+}
+
+function calculateTrackScores(scores, interestClusters = {}) {
+  return {
+    academicScore:
+      scores.verbal_ability_score * 0.25 +
+      scores.mathematical_ability_score * 0.25 +
+      scores.spatial_ability_score * 0.25 +
+      scores.logical_reasoning_score * 0.15 +
+      (interestClusters.academic || 0) * 0.1,
+    techProScore:
+      (interestClusters.tech || 0) * 0.3 +
+      (interestClusters.practical || 0) * 0.2 +
+      (interestClusters.home || 0) * 0.15 +
+      (interestClusters.physical || 0) * 0.1 +
+      (interestClusters.outdoor || 0) * 0.1 +
+      scores.logical_reasoning_score * 0.1 +
+      scores.mathematical_ability_score * 0.05,
+  };
+}
+
+function rankElectiveGroups(track, scores, interestClusters = {}) {
+  const groups = ELECTIVE_GROUPS[track] || [];
+
+  return groups
+    .map((group) => ({
+      key: group.key,
+      electives: group.electives,
+      score: group.score({ scores, interestClusters }),
+    }))
+    .sort((first, second) => second.score - first.score);
+}
+
+export function calculateInterestClusterScores(answers, questionsByCategory) {
+  const grouped = normalizeGroupedQuestions(questionsByCategory);
+  const interestQuestions = grouped.Interests;
+
+  if (!interestQuestions.length) {
+    return buildEmptyInterestClusters();
+  }
+
+  if (hasLegacyLikertInterestAnswers(answers, interestQuestions)) {
+    return calculateLegacyInterestClusterScores(answers, interestQuestions);
+  }
+
+  return calculateOptionBasedInterestClusterScores(answers, interestQuestions);
+}
+
 /**
- * Get question count stats for all categories
- * Used to normalize scoring
+ * Get question count stats for all categories.
  */
 export async function getQuestionStats() {
   try {
@@ -23,49 +364,44 @@ export async function getQuestionStats() {
       .from('assessment_question_stats')
       .select('*');
 
-    if (error) throw error;
+    if (!error && data?.length) {
+      const stats = buildQuestionStats(EMPTY_GROUPED_QUESTIONS);
 
-    // Convert to object for easy lookup
-    const stats = {};
-    data?.forEach(row => {
-      stats[row.category] = row.question_count;
-    });
+      data.forEach((row) => {
+        stats[row.category] = row.question_count;
+      });
 
-    return stats;
+      return stats;
+    }
   } catch (error) {
     console.error('Error fetching question stats:', error);
-    return null;
   }
+
+  const questionsByCategory = await getQuestionsByCategory();
+  return questionsByCategory ? buildQuestionStats(questionsByCategory) : null;
 }
 
 /**
- * Get all questions grouped by category
+ * Get all questions grouped by category.
  */
 export async function getQuestionsByCategory() {
   try {
     const { data, error } = await supabase
       .from('assessment_questions')
       .select('id, question, options, correct_answer, category')
-      .order('category');
+      .order('id', { ascending: true });
 
     if (error) throw error;
 
-    // Group by category
-    const grouped = {
-      Verbal: [],
-      Math: [],
-      Science: [],
-      Logical: [],
-      Interests: []
-    };
+    const grouped = normalizeGroupedQuestions(EMPTY_GROUPED_QUESTIONS);
 
-    data?.forEach(q => {
-      if (grouped[q.category]) {
-        grouped[q.category].push(q);
+    data?.forEach((question) => {
+      if (grouped[question.category]) {
+        grouped[question.category].push(question);
       }
     });
 
-    return grouped;
+    return normalizeGroupedQuestions(grouped);
   } catch (error) {
     console.error('Error fetching questions by category:', error);
     return null;
@@ -73,70 +409,49 @@ export async function getQuestionsByCategory() {
 }
 
 /**
- * Calculate scores dynamically based on:
- * - Student's answers
- * - Actual question counts in database
- * - Question-to-score mapping
- * 
- * Returns normalized scores (0-100 scale)
+ * Calculate VA, MA, SA, and LRA dynamically from the live question counts.
  */
-export async function calculateDynamicScores(answers) {
+export async function calculateDynamicScores(answers, questionsByCategory = null) {
   try {
-    // Get questions grouped by category
-    const questionsByCategory = await getQuestionsByCategory();
-    if (!questionsByCategory) {
+    const groupedQuestions = await resolveQuestionsByCategory(questionsByCategory);
+    if (!groupedQuestions) {
       console.error('Could not fetch questions');
       return null;
     }
 
-    console.log('🎯 Student Answers:', answers);
-
-    // Calculate correct answers per category
     const categoryScores = {};
-    const categories = ['Verbal', 'Math', 'Science', 'Logical', 'Interests'];
 
-    categories.forEach(category => {
-      const questions = questionsByCategory[category];
+    DYNAMIC_SCORE_CATEGORIES.forEach((category) => {
+      const questions = groupedQuestions[category] || [];
       const totalQuestions = questions.length;
 
-      if (totalQuestions === 0) {
+      if (!totalQuestions) {
         categoryScores[category] = 0;
         return;
       }
 
-      // Count correct answers for this category
-      let correctCount = 0;
-      questions.forEach(q => {
-        // Check if answer matches correct_answer
-        if (answers[q.id] === q.correct_answer) {
-          correctCount++;
-        }
-      });
+      const correctCount = questions.reduce((count, question) => {
+        const correctAnswer = getCorrectAnswer(question);
+        return answers?.[question.id] === correctAnswer ? count + 1 : count;
+      }, 0);
 
-      // Normalize to 0-100 scale
-      const score = Math.round((correctCount / totalQuestions) * 100);
-      categoryScores[category] = score;
-
-      console.log(`${category}: ${correctCount}/${totalQuestions} = ${score}/100`);
+      categoryScores[category] = Math.round((correctCount / totalQuestions) * 100);
     });
 
-    // Calculate overall score (average of all domains)
-    const allScores = Object.values(categoryScores);
     const overallScore = Math.round(
-      allScores.reduce((a, b) => a + b, 0) / allScores.length
+      DYNAMIC_SCORE_CATEGORIES.reduce(
+        (sum, category) => sum + (categoryScores[category] || 0),
+        0
+      ) / DYNAMIC_SCORE_CATEGORIES.length
     );
 
-    // Calculate domain scores for Supabase storage
-    const scores = {
-      verbal_ability_score: categoryScores.Verbal,
-      mathematical_ability_score: categoryScores.Math,
-      spatial_ability_score: categoryScores.Science,
-      logical_reasoning_score: categoryScores.Logical,
-      overall_score: overallScore
+    return {
+      verbal_ability_score: categoryScores.Verbal || 0,
+      mathematical_ability_score: categoryScores.Math || 0,
+      spatial_ability_score: categoryScores.Science || 0,
+      logical_reasoning_score: categoryScores.Logical || 0,
+      overall_score: overallScore,
     };
-
-    console.log('✅ Final Scores:', scores);
-    return scores;
   } catch (error) {
     console.error('Error calculating dynamic scores:', error);
     return null;
@@ -144,103 +459,108 @@ export async function calculateDynamicScores(answers) {
 }
 
 /**
- * Determine recommended track based on scores
- * Can be customized as needed
+ * Determine the final recommended track.
  */
-export function determineTrack(scores) {
+export function determineTrack(scores, interestClusters = {}) {
   if (!scores) return 'General';
 
-  const { verbal_ability_score, mathematical_ability_score, logical_reasoning_score } = scores;
-  const stemScore = (mathematical_ability_score + logical_reasoning_score) / 2;
-  const humanitiesScore = verbal_ability_score;
-
-  return stemScore > humanitiesScore ? 'STEM' : 'Humanities';
+  const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters);
+  return academicScore >= techProScore ? 'Academic' : 'Technical-Professional';
 }
 
 /**
- * Recommend electives based on top scores
+ * Recommend the elective pair for the highest-ranked elective family.
  */
-export function recommendElectives(scores) {
-  if (!scores) return ['General Studies I', 'General Studies II'];
+export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}) {
+  let track = trackOrScores;
+  let scores = scoresOrInterestClusters;
+  let interestClusters = maybeInterestClusters;
 
-  const scoreArray = [
-    { name: 'Verbal', score: scores.verbal_ability_score },
-    { name: 'Mathematics', score: scores.mathematical_ability_score },
-    { name: 'Science', score: scores.spatial_ability_score },
-    { name: 'Logical Reasoning', score: scores.logical_reasoning_score }
-  ];
+  if (typeof trackOrScores !== 'string') {
+    scores = trackOrScores;
+    interestClusters = scoresOrInterestClusters || {};
+    track = determineTrack(scores, interestClusters);
+  }
 
-  scoreArray.sort((a, b) => b.score - a.score);
-  return scoreArray.slice(0, 2).map(s => s.name);
+  if (!scores || typeof track !== 'string') {
+    return [];
+  }
+
+  const rankedGroups = rankElectiveGroups(track, scores, interestClusters);
+  return rankedGroups[0]?.electives || [];
 }
 
 /**
- * Get top 2 domains from scores
+ * Get top 2 academic domains from scores.
  */
 export function getTopDomains(scores) {
   if (!scores) return [];
 
-  const domains = [
+  return [
     { name: 'Verbal', score: scores.verbal_ability_score },
     { name: 'Math', score: scores.mathematical_ability_score },
     { name: 'Science', score: scores.spatial_ability_score },
-    { name: 'Logical', score: scores.logical_reasoning_score }
-  ];
-
-  domains.sort((a, b) => b.score - a.score);
-  return domains.slice(0, 2).map(d => d.name);
+    { name: 'Logical', score: scores.logical_reasoning_score },
+  ]
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 2)
+    .map((domain) => domain.name);
 }
 
 /**
- * Get student's top interest areas
+ * Get top 2 fixed interest clusters from the ordered Interests section.
  */
 export function getTopInterests(answers, questionsByCategory) {
-  if (!questionsByCategory?.Interests) return [];
+  const grouped = normalizeGroupedQuestions(questionsByCategory);
+  if (!grouped.Interests.length) {
+    return [];
+  }
 
-  // For Interests category, just return the most selected options
-  const interestQuestions = questionsByCategory.Interests;
-  const selectedInterests = {};
+  const interestClusters = calculateInterestClusterScores(answers, grouped);
 
-  interestQuestions.forEach(q => {
-    const selectedOption = answers[q.id];
-    if (selectedOption !== undefined && q.options) {
-      const interest = q.options[selectedOption];
-      selectedInterests[interest] = (selectedInterests[interest] || 0) + 1;
-    }
-  });
-
-  const sorted = Object.entries(selectedInterests)
-    .sort((a, b) => b[1] - a[1])
+  return Object.entries(INTEREST_CLUSTER_CONFIG)
+    .map(([key, config]) => ({
+      name: config.label,
+      score: interestClusters[key] || 0,
+    }))
+    .filter((cluster) => cluster.score > 0)
+    .sort((first, second) => second.score - first.score)
     .slice(0, 2)
-    .map(([interest]) => interest);
-
-  return sorted.length > 0 ? sorted : ['General Interest'];
+    .map((cluster) => cluster.name);
 }
 
 /**
- * Format assessment result for Supabase storage
+ * Format a complete assessment result payload for storage and UI consumption.
  */
-export async function formatAssessmentResult(answers, userEmail) {
+export async function formatAssessmentResult(answers, questionsByCategory = null) {
   try {
-    const scores = await calculateDynamicScores(answers);
+    const groupedQuestions = await resolveQuestionsByCategory(questionsByCategory);
+    if (!groupedQuestions) {
+      return null;
+    }
+
+    const scores = await calculateDynamicScores(answers, groupedQuestions);
     if (!scores) return null;
 
-    const questionsByCategory = await getQuestionsByCategory();
-    const track = determineTrack(scores);
-    const electives = recommendElectives(scores);
+    const interestClusters = calculateInterestClusterScores(answers, groupedQuestions);
+    const track = determineTrack(scores, interestClusters);
+    const electives = recommendElectives(track, scores, interestClusters);
     const topDomains = getTopDomains(scores);
-    const topInterests = getTopInterests(answers, questionsByCategory);
+    const topInterests = getTopInterests(answers, groupedQuestions);
 
     return {
       scores,
+      interestClusters,
       recommended_track: track,
-      elective_1: electives[0],
-      elective_2: electives[1],
+      elective_1: electives[0] || null,
+      elective_2: electives[1] || null,
       top_domains: topDomains,
       top_interests: topInterests,
-      // Legacy compatibility
       track,
-      electives
+      electives,
+      topDomains,
+      topInterests,
+      overallScore: scores.overall_score,
     };
   } catch (error) {
     console.error('Error formatting assessment result:', error);

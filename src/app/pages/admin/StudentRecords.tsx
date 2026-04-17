@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Filter, Download } from "lucide-react";
+import { getEnrolledStudents } from "../../../services/adminService";
 
 interface Student {
   id: string;
@@ -17,48 +18,37 @@ export function StudentRecords() {
   const [filterStrand, setFilterStrand] = useState("all");
   const [allStudents, setAllStudents] = useState<Student[]>([]);
 
-  // Load real enrolled students from localStorage
+  // Load enrolled students from Supabase
   useEffect(() => {
-    loadStudents();
+    void loadStudents();
   }, []);
 
-  const loadStudents = () => {
-    // Get enrolled students from enrolled_students localStorage
-    const enrolledStudents = JSON.parse(localStorage.getItem("enrolled_students") || "[]");
+  const loadStudents = async () => {
+    const { data: enrollments, error } = await getEnrolledStudents();
+    
+    if (error || !enrollments) {
+      console.error('Error loading enrolled students:', error);
+      setAllStudents([]);
+      return;
+    }
 
-    // Also get students from pending_applications who have "Enrolled" status
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-    const enrolledFromApps = applications
-      .filter((app: any) => {
-        // Check if student is marked as Enrolled
-        if (app.status === "Enrolled") return true;
+    const students = enrollments.map((enrollment: any) => {
+      const formData = enrollment.form_data || {};
+      const studentEmail = enrollment.user_id || formData.email || '';
 
-        // Also check enrollment progress
-        const progressKey = `enrollment_progress_${app.email}`;
-        const progress = JSON.parse(localStorage.getItem(progressKey) || "[]");
-        const enrolledStep = progress.find((step: any) => step.name === "Enrolled");
-        return enrolledStep?.status === "completed";
-      })
-      .map((app: any) => ({
-        id: app.id || app.email,
-        studentId: app.studentId || `2026-${Math.floor(Math.random() * 10000).toString().padStart(4, "0")}`,
-        name: app.studentName || `${app.firstName || ""} ${app.lastName || ""}`.trim() || app.email,
-        email: app.email,
-        enrollmentDate: app.enrollmentDate || new Date().toISOString(),
-        strandEnrolled: app.preferredTrack || app.recommendedTrack || app.track || "Not Set",
-        status: app.status || "Enrolled",
-        yearLevel: app.yearLevel || "Grade 11",
-      }));
-
-    // Merge both sources, avoiding duplicates by email
-    const allEnrolled = [...enrolledStudents];
-    enrolledFromApps.forEach((student: Student) => {
-      if (!allEnrolled.find((s: Student) => s.email === student.email)) {
-        allEnrolled.push(student);
-      }
+      return {
+        id: enrollment.id,
+        studentId: formData.studentId || enrollment.id.slice(0, 8),
+        name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || studentEmail || 'Unknown',
+        email: studentEmail,
+        enrollmentDate: enrollment.enrollment_date || enrollment.created_at || '',
+        strandEnrolled: formData.preferredTrack || formData.preferred_track || formData.recommendedTrack || formData.track || 'Not Set',
+        status: enrollment.status || 'Enrolled',
+        yearLevel: formData.yearLevel || formData.year_level || 'Grade 11',
+      };
     });
 
-    setAllStudents(allEnrolled);
+    setAllStudents(students);
   };
 
   // Filter students
@@ -104,10 +94,10 @@ export function StudentRecords() {
   };
 
   return (
-    <div className="p-8">
+    <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
           Student Records
         </h1>
         <p className="text-gray-600">
@@ -117,9 +107,9 @@ export function StudentRecords() {
 
       {/* Search & Filter Bar */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
           {/* Search */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative w-full md:flex-1 md:min-w-[240px]">
             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -131,12 +121,12 @@ export function StudentRecords() {
           </div>
 
           {/* Strand Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={filterStrand}
               onChange={(e) => setFilterStrand(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               style={{ color: "#374151" }}
             >
               <option value="all">All Strands</option>
@@ -151,7 +141,7 @@ export function StudentRecords() {
 
           {/* Export Button */}
           <button
-            className="px-4 py-2 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
             <Download className="w-4 h-4" />
@@ -163,7 +153,7 @@ export function StudentRecords() {
       {/* Student Records Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         {/* Table Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Enrolled Students
           </h2>
@@ -171,7 +161,7 @@ export function StudentRecords() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[760px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -234,14 +224,13 @@ export function StudentRecords() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-gray-600">
-                          {new Date(student.enrollmentDate).toLocaleDateString(
-                            "en-US",
-                            {
-                              year: "numeric",
-                              month: "short",
-                              day: "numeric",
-                            }
-                          )}
+                          {student.enrollmentDate
+                            ? new Date(student.enrollmentDate).toLocaleDateString("en-US", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                              })
+                            : 'N/A'}
                         </p>
                       </td>
                       <td className="px-6 py-4">
@@ -265,7 +254,7 @@ export function StudentRecords() {
         </div>
 
         {/* Table Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50">
           <p className="text-sm text-gray-600">
             Showing <span className="font-medium">{filteredStudents.length}</span> of{" "}
             <span className="font-medium">{allStudents.length}</span> students

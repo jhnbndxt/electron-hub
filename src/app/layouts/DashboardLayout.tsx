@@ -15,22 +15,36 @@ import {
   BarChart3,
   LockKeyhole,
   AlertTriangle,
+  Menu,
+  X,
 } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ChatProvider, useChat } from "../context/ChatContext";
-const logo = "";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { loadProfileImageUrl } from "../utils/profileImage";
+import { supabase } from "../../supabase";
+import logo from "../../assets/electronLogo";
 
 function DashboardLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { logout, isDocumentsVerified, hasVisitedPayment, userData, enrollmentProgress, updateEnrollmentProgress } = useAuth();
+  const {
+    logout,
+    isDocumentsVerified,
+    hasVisitedPayment,
+    enrollmentProgress,
+    userData,
+    refreshEnrollmentProgress,
+    updateUserData,
+  } = useAuth();
   const { isChatOpen, toggleChat } = useChat();
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showPaymentTooltip, setShowPaymentTooltip] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -38,50 +52,103 @@ function DashboardLayoutContent() {
 
   // Get user's name and initial from authenticated user
   const userName = userData?.name || "Student";
-  const userInitial = userName.charAt(0).toUpperCase();
+  const userInitial =
+    userName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((namePart) => namePart[0]?.toUpperCase())
+      .join("") || "S";
   const userGradeLevel = "Student"; // User role label
+  const userProfileImage = userData?.profilePictureUrl || "";
+  const hasStartedPaymentFlow = enrollmentProgress.some(
+    (step) =>
+      (step.name === "Payment Submitted" ||
+        step.name === "Payment Verified" ||
+        step.name === "Enrolled") &&
+      step.status !== "pending"
+  );
 
-  // Load notifications from localStorage
   useEffect(() => {
-    if (userData?.email) {
-      const notifKey = `notifications_${userData.email}`;
-      const storedNotifications = JSON.parse(localStorage.getItem(notifKey) || "[]");
-      setNotifications(storedNotifications);
-    }
-  }, [userData?.email]);
+    let isActive = true;
 
-  // Monitor enrollment progress changes in localStorage
-  useEffect(() => {
-    if (!userData?.email) return;
-
-    const checkProgressUpdates = () => {
-      const enrollmentKey = `enrollment_progress_${userData.email}`;
-      const storedProgress = JSON.parse(localStorage.getItem(enrollmentKey) || "[]");
-      
-      // Check if Documents Verified is completed in localStorage
-      const docsVerifiedInStorage = storedProgress.find((step: any) => step.name === "Documents Verified");
-      const docsVerifiedInContext = enrollmentProgress.find(step => step.name === "Documents Verified");
-      
-      // Only update if there's a mismatch (storage says completed but context doesn't)
-      if (docsVerifiedInStorage && 
-          docsVerifiedInStorage.status === "completed" && 
-          docsVerifiedInContext && 
-          docsVerifiedInContext.status !== "completed") {
-        updateEnrollmentProgress("Documents Verified", "completed");
+    const hydrateProfileImage = async () => {
+      if (!userData?.id && !userData?.email) {
+        return;
       }
 
-      // Reload notifications
-      const notifKey = `notifications_${userData.email}`;
-      const storedNotifications = JSON.parse(localStorage.getItem(notifKey) || "[]");
-      setNotifications(storedNotifications);
+      const imageUrl = await loadProfileImageUrl(userData?.id, userData?.email);
+
+      if (isActive && imageUrl && imageUrl !== userData?.profilePictureUrl) {
+        updateUserData({ profilePictureUrl: imageUrl });
+      }
     };
 
-    // Check on mount and every 2 seconds
+    void hydrateProfileImage();
+
+    return () => {
+      isActive = false;
+    };
+  }, [userData?.id, userData?.email, userData?.profilePictureUrl]);
+
+  // Load notifications from Supabase
+  useEffect(() => {
+    const loadNotifications = async () => {
+      if (!userData?.id) return;
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userData.id)
+        .order('created_at', { ascending: false });
+
+      if (!error && data) {
+        const formatted = data.map((n: any) => ({
+          id: n.id,
+          type: n.data?.trigger || n.type,
+          title: n.title,
+          message: n.message,
+          timestamp: n.created_at,
+          read: Boolean(n.is_read),
+        }));
+        setNotifications(formatted);
+      }
+    };
+    loadNotifications();
+  }, [userData?.id]);
+
+  // Monitor enrollment progress changes from Supabase
+  useEffect(() => {
+    if (!userData?.id) return;
+
+    const checkProgressUpdates = async () => {
+      await refreshEnrollmentProgress();
+
+      // Reload notifications from Supabase
+      const { data: notifData } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userData.id)
+        .order('created_at', { ascending: false });
+
+      if (notifData) {
+        const formatted = notifData.map((n: any) => ({
+          id: n.id,
+          type: n.data?.trigger || n.type,
+          title: n.title,
+          message: n.message,
+          timestamp: n.created_at,
+          read: Boolean(n.is_read),
+        }));
+        setNotifications(formatted);
+      }
+    };
+
+    // Check on mount and every 5 seconds
     checkProgressUpdates();
-    const interval = setInterval(checkProgressUpdates, 2000);
+    const interval = setInterval(checkProgressUpdates, 5000);
 
     return () => clearInterval(interval);
-  }, [userData?.email, enrollmentProgress]); // Don't include updateEnrollmentProgress
+  }, [userData?.id]);
 
   // Calculate unread notification count
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -112,15 +179,17 @@ function DashboardLayoutContent() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const handleNotificationClick = (notificationId: string, notification: any) => {
-    // Mark notification as read
-    if (userData?.email) {
-      const notifKey = `notifications_${userData.email}`;
-      const storedNotifications = JSON.parse(localStorage.getItem(notifKey) || "[]");
-      const updatedNotifications = storedNotifications.map((n: any) =>
+  const handleNotificationClick = async (notificationId: string, notification: any) => {
+    // Mark notification as read in Supabase
+    if (userData?.id) {
+      await supabase
+        .from('notifications')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('id', notificationId);
+
+      const updatedNotifications = notifications.map((n: any) =>
         n.id === notificationId ? { ...n, read: true } : n
       );
-      localStorage.setItem(notifKey, JSON.stringify(updatedNotifications));
       setNotifications(updatedNotifications);
     }
 
@@ -146,32 +215,69 @@ function DashboardLayoutContent() {
     { path: "/dashboard/payment", label: "Payment", icon: CreditCard },
     { path: "/dashboard/profile", label: "Profile", icon: User },
   ];
+  const activeMenuItem = menuItems.find((item) => location.pathname === item.path);
+  const mobileHeaderLabel = activeMenuItem?.label || "Student Portal";
 
   const handleLogout = () => {
     logout();
     navigate("/", { replace: true });
   };
 
+  useEffect(() => {
+    setIsMobileNavOpen(false);
+    setShowPaymentTooltip(false);
+    setShowNotifications(false);
+    setShowProfileMenu(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+
+    if (isMobileNavOpen) {
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isMobileNavOpen]);
+
   return (
-    <div className="min-h-screen flex">
+    <div className="portal-glass-shell min-h-screen flex lg:h-screen lg:overflow-hidden">
+      <div
+        className={`fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          isMobileNavOpen ? "opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => setIsMobileNavOpen(false)}
+      />
+
       {/* Fixed Sidebar */}
       <aside
-        className="w-64 text-white flex flex-col fixed h-full"
-        style={{ backgroundColor: "var(--electron-blue)" }}
+        className={`portal-glass-sidebar fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col overflow-hidden text-white transition-transform duration-300 lg:w-64 ${
+          isMobileNavOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        }`}
       >
         {/* Logo */}
-        <div className="p-6 border-b border-blue-700">
-          <Link to="/dashboard" className="flex items-center gap-2">
-            <img src={logo} alt="Logo" className="w-8 h-8" />
-            <div>
-              <div className="font-semibold text-lg">Electron Hub</div>
+        <div className="portal-glass-sidebar-brand flex items-center justify-between gap-3 border-b border-white/10 p-5 sm:p-6">
+          <Link to="/dashboard" className="flex min-w-0 items-center gap-2" onClick={() => setIsMobileNavOpen(false)}>
+            <img src={logo} alt="Electron College Logo" className="w-8 h-8 object-contain" />
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-lg">Electron Hub</div>
               <div className="text-xs text-blue-200">Student Portal</div>
             </div>
           </Link>
+          <button
+            type="button"
+            onClick={() => setIsMobileNavOpen(false)}
+            className="rounded-lg p-2 text-white transition-colors hover:bg-white/12 lg:hidden"
+            aria-label="Close navigation menu"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 p-4 overflow-y-auto">
+        <nav className="flex-1 overflow-hidden p-4">
           <ul className="space-y-2">
             {menuItems.map((link) => {
               const Icon = link.icon;
@@ -183,28 +289,30 @@ function DashboardLayoutContent() {
               if (isLocked) {
                 return (
                   <li key={link.path} className="relative" ref={paymentTooltipRef}>
-                    <div
+                    <button
+                      type="button"
+                      onClick={() => setShowPaymentTooltip((current) => !current)}
                       onMouseEnter={() => setShowPaymentTooltip(true)}
                       onMouseLeave={() => setShowPaymentTooltip(false)}
-                      className="flex items-center justify-between gap-3 px-4 py-3 rounded-md transition-colors text-blue-300 opacity-60 cursor-not-allowed"
+                      className="portal-glass-nav-link flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left text-white/55 opacity-80 transition-colors"
                     >
                       <div className="flex items-center gap-3">
                         <Icon className="w-5 h-5" />
                         <span>{link.label}</span>
                       </div>
                       <LockKeyhole className="w-4 h-4" />
-                    </div>
+                    </button>
                     
                     {/* Tooltip */}
                     {showPaymentTooltip && (
-                      <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 z-50 w-64">
+                      <div className="mt-2 rounded-lg bg-gray-900 px-3 py-2 text-xs shadow-lg lg:absolute lg:left-full lg:top-1/2 lg:z-50 lg:mt-0 lg:ml-2 lg:w-64 lg:-translate-y-1/2">
                         <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
                           <p className="leading-relaxed">
                             Access restricted. Please wait for the Registrar to verify your documents first.
                           </p>
                           {/* Arrow pointing left */}
                           <div
-                            className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0"
+                            className="absolute right-full top-1/2 hidden h-0 w-0 -translate-y-1/2 lg:block"
                             style={{
                               borderTop: "6px solid transparent",
                               borderBottom: "6px solid transparent",
@@ -224,21 +332,17 @@ function DashboardLayoutContent() {
                   <li key={link.path} className="relative">
                     <Link
                       to={link.path}
-                      className={`flex items-center justify-between gap-3 px-4 py-3 rounded-md transition-colors ${
-                        isActive ? "text-white" : "text-blue-100 hover:bg-blue-700"
+                      onClick={() => setIsMobileNavOpen(false)}
+                      className={`portal-glass-nav-link flex items-center justify-between gap-3 px-4 py-3 rounded-md transition-colors ${
+                        isActive ? "portal-glass-nav-link-active text-white" : "text-white/80 hover:text-white"
                       }`}
-                      style={
-                        isActive
-                          ? { backgroundColor: "var(--electron-red)" }
-                          : {}
-                      }
                     >
                       <div className="flex items-center gap-3">
                         <Icon className="w-5 h-5" />
                         <span>{link.label}</span>
                       </div>
                       {/* Red notification badge - only show if not visited yet */}
-                      {!isActive && !hasVisitedPayment && (
+                      {!isActive && !hasVisitedPayment && !hasStartedPaymentFlow && (
                         <span
                           className="w-2 h-2 rounded-full"
                           style={{ backgroundColor: "#B91C1C" }}
@@ -254,8 +358,9 @@ function DashboardLayoutContent() {
                 <li key={link.path}>
                   <Link
                     to={link.path}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${
-                      isActive ? "bg-blue-700 text-white" : "text-blue-100 hover:bg-blue-700"
+                    onClick={() => setIsMobileNavOpen(false)}
+                    className={`portal-glass-nav-link flex items-center gap-3 px-4 py-3 rounded-md transition-colors ${
+                      isActive ? "portal-glass-nav-link-active text-white" : "text-white/80 hover:text-white"
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -268,10 +373,10 @@ function DashboardLayoutContent() {
         </nav>
 
         {/* Back to Home Button */}
-        <div className="p-4 border-t border-blue-700">
+        <div className="p-4 border-t border-white/10">
           <button
             onClick={() => navigate("/")}
-            className="flex items-center gap-3 px-4 py-3 rounded-md text-blue-100 hover:bg-blue-700 transition-colors w-full"
+            className="portal-glass-nav-link flex w-full items-center gap-3 rounded-md px-4 py-3 text-white/80 transition-colors hover:text-white"
           >
             <Home className="w-5 h-5" />
             <span>Back to Home</span>
@@ -280,22 +385,36 @@ function DashboardLayoutContent() {
       </aside>
 
       {/* Main Content Area with fixed top navbar and scrollable content */}
-      <div className="flex-1 flex flex-col ml-64">
+      <div className="portal-glass-content flex min-h-screen min-w-0 flex-1 flex-col lg:ml-64 lg:h-screen lg:w-[calc(100%-16rem)] lg:flex-none lg:overflow-hidden">
         {/* Fixed Top Navbar */}
         <header
-          className="fixed top-0 right-0 z-40 border-b border-gray-200 bg-white"
-          style={{ left: "256px" }}
+          className="portal-glass-header fixed left-0 right-0 top-0 z-40 lg:left-64"
         >
-          <div className="flex justify-end items-center px-8 py-4">
+          <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:justify-end lg:px-8 lg:py-4">
+            <div className="flex min-w-0 items-center gap-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileNavOpen(true)}
+                className="portal-glass-icon-button rounded-xl p-2 text-gray-700 transition-colors hover:bg-white/70"
+                aria-label="Open navigation menu"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-gray-900">Electron Hub</p>
+                <p className="truncate text-xs text-gray-500">{mobileHeaderLabel}</p>
+              </div>
+            </div>
+
             <div className="flex items-center gap-6">
               {/* Notification Bell with Badge */}
               <div className="relative" ref={notificationRef}>
                 <button
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="relative p-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  className="portal-glass-icon-button relative rounded-xl p-2 text-slate-700 transition-colors hover:bg-white/70 hover:text-slate-900"
                   aria-label="Notifications"
                 >
-                  <Bell className="w-6 h-6 text-black" />
+                  <Bell className="w-6 h-6" />
                   {/* Red Badge */}
                   {unreadCount > 0 && (
                     <span
@@ -310,25 +429,20 @@ function DashboardLayoutContent() {
                 {/* Notification Dropdown */}
                 {showNotifications && (
                   <div
-                    className="absolute right-0 mt-3 w-80 bg-white rounded-lg shadow-2xl overflow-hidden z-50"
-                    style={{
-                      boxShadow:
-                        "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-                    }}
+                    className="portal-glass-menu absolute right-0 z-50 mt-3 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-lg sm:w-80"
                   >
                     {/* Arrow pointing up */}
                     <div
-                      className="absolute -top-2 right-4 w-4 h-4 bg-white transform rotate-45"
-                      style={{ boxShadow: "-2px -2px 2px rgba(0, 0, 0, 0.05)" }}
+                      className="absolute -top-2 right-4 h-4 w-4 rotate-45 border-l border-t border-slate-200/80 bg-slate-50/95 backdrop-blur-md"
                     />
 
                     {/* Header */}
-                    <div className="px-4 py-3 border-b border-gray-200 relative z-10 bg-white">
+                    <div className="relative z-10 border-b border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm">
                       <h3 className="font-semibold text-gray-900">Notifications</h3>
                     </div>
 
                     {/* Notification List */}
-                    <div className="relative z-10 bg-white">
+                    <div className="relative z-10 bg-white/60">
                       {notifications.length === 0 ? (
                         <div className="px-4 py-8 text-center text-gray-500 text-sm">
                           No notifications yet
@@ -343,7 +457,7 @@ function DashboardLayoutContent() {
                                 onClick={() =>
                                   handleNotificationClick(notification.id, notification)
                                 }
-                                className="w-full px-4 py-4 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+                                className="w-full border-b border-slate-200/70 px-4 py-4 text-left transition-colors hover:bg-slate-50/95 last:border-b-0"
                               >
                                 <div className="flex items-start gap-3">
                                   <div
@@ -385,7 +499,7 @@ function DashboardLayoutContent() {
                                 onClick={() =>
                                   handleNotificationClick(notification.id, notification)
                                 }
-                                className="w-full px-4 py-4 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+                                className="w-full border-b border-slate-200/70 px-4 py-4 text-left transition-colors hover:bg-slate-50/95 last:border-b-0"
                               >
                                 <div className="flex items-start gap-3">
                                   <div
@@ -426,7 +540,7 @@ function DashboardLayoutContent() {
                               onClick={() =>
                                 handleNotificationClick(notification.id, notification)
                               }
-                              className="w-full px-4 py-3 hover:bg-gray-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+                              className="w-full border-b border-slate-200/70 px-4 py-3 text-left transition-colors hover:bg-slate-50/95 last:border-b-0"
                             >
                               <div className="flex items-start gap-3">
                                 <div
@@ -456,7 +570,7 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Footer */}
-                    <div className="px-4 py-3 bg-gray-50 relative z-10">
+                    <div className="relative z-10 border-t border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm">
                       <button
                         onClick={() => setShowNotifications(false)}
                         className="text-sm font-medium w-full text-center"
@@ -470,7 +584,7 @@ function DashboardLayoutContent() {
               </div>
 
               {/* User Info */}
-              <div className="text-right">
+              <div className="hidden text-right sm:block">
                 <p className="font-semibold text-sm text-black">
                   {userName}
                 </p>
@@ -482,32 +596,50 @@ function DashboardLayoutContent() {
                 {/* Avatar Button */}
                 <button
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-lg border-2 border-white/20 hover:border-white/40 transition-all cursor-pointer"
-                  style={{ backgroundColor: "var(--electron-red)" }}
+                  className="portal-glass-avatar-button flex h-10 w-10 cursor-pointer items-center justify-center overflow-hidden rounded-full transition-all hover:border-white/50"
                   title="Account Menu"
                 >
-                  {userInitial}
+                  <Avatar className="w-full h-full">
+                    {userProfileImage ? (
+                      <AvatarImage
+                        src={userProfileImage}
+                        alt={`${userName} profile photo`}
+                        className="object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback
+                      className="text-white font-semibold text-sm"
+                      style={{ backgroundColor: "var(--electron-red)" }}
+                    >
+                      {userInitial}
+                    </AvatarFallback>
+                  </Avatar>
                 </button>
 
                 {/* Profile Dropdown Menu */}
                 {showProfileMenu && (
                   <div
-                    className="absolute right-0 mt-3 bg-white overflow-hidden z-50"
-                    style={{
-                      width: "240px",
-                      borderRadius: "12px",
-                      boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
-                    }}
+                    className="portal-glass-menu absolute right-0 z-50 mt-3 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl"
+                    style={{ width: "240px" }}
                   >
                     {/* Header Section */}
-                    <div className="px-4 py-4 border-b border-gray-100">
+                    <div className="border-b border-white/40 px-4 py-4">
                       <div className="flex items-center gap-3">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold flex-shrink-0"
-                          style={{ backgroundColor: "#1E3A8A" }}
-                        >
-                          {userInitial}
-                        </div>
+                        <Avatar className="w-10 h-10 flex-shrink-0">
+                          {userProfileImage ? (
+                            <AvatarImage
+                              src={userProfileImage}
+                              alt={`${userName} profile photo`}
+                              className="object-cover"
+                            />
+                          ) : null}
+                          <AvatarFallback
+                            className="text-white font-semibold"
+                            style={{ backgroundColor: "#1E3A8A" }}
+                          >
+                            {userInitial}
+                          </AvatarFallback>
+                        </Avatar>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm truncate">
                             {userName}
@@ -546,7 +678,7 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Divider */}
-                    <div className="border-t border-gray-100"></div>
+                    <div className="border-t border-white/35"></div>
 
                     {/* Group 2: Enrollment */}
                     <div className="py-1">
@@ -569,7 +701,7 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Divider */}
-                    <div className="border-t border-gray-100"></div>
+                    <div className="border-t border-white/35"></div>
 
                     {/* Group 3: Logout */}
                     <div className="py-1">
@@ -592,7 +724,7 @@ function DashboardLayoutContent() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-auto pt-20" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+        <main className="portal-glass-main min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-20">
           <Outlet />
         </main>
       </div>
@@ -609,14 +741,7 @@ function DashboardLayoutContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <div
-            className="bg-white w-full max-w-sm"
-            style={{
-              borderRadius: "12px",
-              boxShadow:
-                "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-            }}
-          >
+          <div className="portal-glass-modal w-full max-w-sm rounded-xl">
             {/* Question */}
             <div className="p-8 text-center">
               <h3 className="text-2xl font-bold text-gray-900">

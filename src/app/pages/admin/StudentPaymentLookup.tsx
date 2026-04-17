@@ -12,6 +12,7 @@ import {
   FileText,
   Calendar,
 } from "lucide-react";
+import { supabase } from "../../../supabase";
 
 interface StudentPaymentStatus {
   email: string;
@@ -36,49 +37,52 @@ export function StudentPaymentLookup() {
   const [showResult, setShowResult] = useState(false);
   const [notFound, setNotFound] = useState(false);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!searchQuery.trim()) {
       alert("Please enter a student email or name");
       return;
     }
 
-    // Search in registered users
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    const student = registeredUsers.find(
-      (u: any) =>
-        u.role === "student" &&
-        (u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          u.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    );
+    // Search in Supabase users table
+    const { data: students, error: userError } = await supabase
+      .from('users')
+      .select('id, email, full_name, role')
+      .eq('role', 'student')
+      .or(`email.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`);
 
-    if (!student) {
+    if (userError || !students || students.length === 0) {
       setNotFound(true);
       setShowResult(false);
       setSearchResult(null);
       return;
     }
 
-    // Check application status
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-    const application = applications.find((app: any) => app.email === student.email);
+    const student = students[0];
+
+    // Check enrollment/application status
+    const { data: enrollments } = await supabase
+      .from('enrollments')
+      .select('id, status, form_data, enrollment_documents(*)')
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    const enrollment = enrollments?.[0];
+    const hasApplied = !!enrollment;
 
     // Check document verification
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    const studentDocs = docVerification[student.email] || {};
-    const docsApproved =
-      Object.keys(studentDocs).length > 0 &&
-      Object.values(studentDocs).every((doc: any) => doc.status === "approved");
+    const docs = enrollment?.enrollment_documents || [];
+    const docsApproved = docs.length > 0 && docs.every((doc: any) => doc.verified === true || doc.status === 'approved');
 
-    // Check payment status
-    const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-    const onlinePayment = paymentQueue.find((p: any) => p.studentEmail === student.email);
+    // Check payment status from Supabase
+    const { data: payments } = await supabase
+      .from('payments')
+      .select('*')
+      .eq('student_id', student.id)
+      .order('created_at', { ascending: false })
+      .limit(1);
 
-    const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-    const cashPayment = cashQueue.find((p: any) => p.studentEmail === student.email);
-
-    // Check enrollment status
-    const enrolledStudents = JSON.parse(localStorage.getItem("enrolled_students") || "[]");
-    const isEnrolled = enrolledStudents.some((e: any) => e.email === student.email);
+    const payment = payments?.[0];
 
     let paymentStatus: StudentPaymentStatus["paymentStatus"] = "not_submitted";
     let paymentMode: "bank" | "gcash" | "cash" | undefined;
@@ -88,26 +92,34 @@ export function StudentPaymentLookup() {
     let approvedDate: string | undefined;
     let rejectionComment: string | undefined;
 
-    if (onlinePayment) {
-      paymentStatus = onlinePayment.status;
-      paymentMode = onlinePayment.paymentMode;
-      referenceNumber = onlinePayment.referenceNumber;
-      submittedDate = onlinePayment.submittedDate;
-      approvedDate = onlinePayment.approvedDate;
-      rejectionComment = onlinePayment.rejectionComment;
-    } else if (cashPayment) {
-      paymentStatus = cashPayment.status === "paid" ? "paid" : "pending";
-      paymentMode = "cash";
-      queueNumber = cashPayment.queueNumber;
-      submittedDate = cashPayment.generatedDate;
-      approvedDate = cashPayment.paidDate;
+    if (payment) {
+      // Map Supabase status to UI status
+      const statusMap: Record<string, StudentPaymentStatus["paymentStatus"]> = {
+        pending: 'pending',
+        submitted: 'pending',
+        verified: 'approved',
+        approved: 'approved',
+        completed: 'approved',
+        rejected: 'rejected',
+        paid: 'paid',
+      };
+      paymentStatus = statusMap[payment.status] || 'pending';
+      paymentMode = payment.payment_method as "bank" | "gcash" | "cash";
+      referenceNumber = payment.reference_number;
+      queueNumber = payment.queue_number;
+      submittedDate = payment.submitted_at || payment.created_at;
+      approvedDate = payment.verified_at;
+      rejectionComment = payment.notes;
     }
+
+    // Check enrollment status
+    const isEnrolled = enrollment?.status === 'enrolled';
 
     const result: StudentPaymentStatus = {
       email: student.email,
-      name: student.name,
-      hasApplied: !!application,
-      applicationStatus: application?.status,
+      name: student.full_name,
+      hasApplied,
+      applicationStatus: enrollment?.status,
       documentsApproved: docsApproved,
       paymentStatus,
       paymentMode,
@@ -117,7 +129,7 @@ export function StudentPaymentLookup() {
       approvedDate,
       rejectionComment,
       enrollmentStatus: isEnrolled ? "enrolled" : "not_enrolled",
-      track: application?.preferredTrack,
+      track: enrollment?.form_data?.preferredTrack || enrollment?.form_data?.preferred_track,
     };
 
     setSearchResult(result);
@@ -168,7 +180,7 @@ export function StudentPaymentLookup() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Student Payment Lookup</h1>
@@ -176,12 +188,12 @@ export function StudentPaymentLookup() {
       </div>
 
       {/* Search Card */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 mb-8">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 sm:p-8 mb-8">
         <div className="max-w-2xl mx-auto">
           <label className="block text-sm font-semibold text-gray-900 mb-3">
             Search by Student Name or Email
           </label>
-          <div className="flex gap-3">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
               <input
@@ -199,7 +211,7 @@ export function StudentPaymentLookup() {
             </div>
             <button
               onClick={handleSearch}
-              className="px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+              className="w-full sm:w-auto px-8 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors"
             >
               Search
             </button>
@@ -209,7 +221,7 @@ export function StudentPaymentLookup() {
 
       {/* Not Found Message */}
       {notFound && (
-        <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-8 text-center max-w-2xl mx-auto">
+        <div className="bg-yellow-50 border-2 border-yellow-200 rounded-lg p-6 sm:p-8 text-center max-w-2xl mx-auto">
           <AlertCircle className="w-16 h-16 text-yellow-600 mx-auto mb-4" />
           <h3 className="text-xl font-bold text-gray-900 mb-2">Student Not Found</h3>
           <p className="text-gray-600">
@@ -222,8 +234,8 @@ export function StudentPaymentLookup() {
       {showResult && searchResult && (
         <div className="bg-white rounded-lg border border-gray-200 shadow-lg overflow-hidden max-w-3xl mx-auto">
           {/* Student Info Header */}
-          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-8 py-6">
-            <div className="flex items-center gap-4">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-5 py-5 sm:px-8 sm:py-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center">
                 <User className="w-8 h-8 text-white" />
               </div>
@@ -238,12 +250,12 @@ export function StudentPaymentLookup() {
           </div>
 
           {/* Status Details */}
-          <div className="p-8 space-y-6">
+          <div className="p-5 sm:p-8 space-y-6">
             {/* Application Status */}
             <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Application Status</h3>
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm text-gray-600">Application Submitted</span>
                   {searchResult.hasApplied ? (
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -252,7 +264,7 @@ export function StudentPaymentLookup() {
                   )}
                 </div>
                 {searchResult.hasApplied && searchResult.track && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-gray-600">Applied Track</span>
                     <span className="text-sm font-semibold text-blue-600">{searchResult.track}</span>
                   </div>
@@ -283,13 +295,13 @@ export function StudentPaymentLookup() {
                 Payment Status
               </h3>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-sm text-gray-600">Current Status</span>
                   {getPaymentStatusBadge(searchResult.paymentStatus)}
                 </div>
 
                 {searchResult.paymentMode && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-gray-600">Payment Method</span>
                     <div className="flex items-center gap-2">
                       {searchResult.paymentMode === "cash" ? (
@@ -309,7 +321,7 @@ export function StudentPaymentLookup() {
                 )}
 
                 {searchResult.referenceNumber && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-gray-600">Reference Number</span>
                     <span className="text-sm font-mono font-semibold text-gray-900">
                       {searchResult.referenceNumber}
@@ -318,14 +330,14 @@ export function StudentPaymentLookup() {
                 )}
 
                 {searchResult.queueNumber && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-gray-600">Queue Number</span>
                     <span className="text-xl font-bold text-blue-600">{searchResult.queueNumber}</span>
                   </div>
                 )}
 
                 {searchResult.submittedDate && (
-                  <div className="flex justify-between items-center">
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-sm text-gray-600">Submitted Date</span>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-gray-400" />
@@ -362,7 +374,7 @@ export function StudentPaymentLookup() {
             {/* Enrollment Status */}
             <div className="bg-gray-50 rounded-lg p-6 border border-gray-200">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Enrollment Status</h3>
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <span className="text-sm text-gray-600">Current Status</span>
                 {searchResult.enrollmentStatus === "enrolled" ? (
                   <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-100 text-green-800 font-semibold">
@@ -398,7 +410,7 @@ export function StudentPaymentLookup() {
 
       {/* Help Section */}
       {!showResult && !notFound && (
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-8 max-w-3xl mx-auto">
+        <div className="bg-gray-50 rounded-lg border border-gray-200 p-5 sm:p-8 max-w-3xl mx-auto">
           <div className="text-center">
             <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-gray-900 mb-2">Quick Payment Lookup</h3>
@@ -406,7 +418,7 @@ export function StudentPaymentLookup() {
               Enter a student's name or email address to view their complete payment and enrollment
               status.
             </p>
-            <div className="grid md:grid-cols-3 gap-6 text-left">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-left">
               <div className="bg-white rounded-lg p-4 border border-gray-200">
                 <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center mb-3">
                   <FileText className="w-5 h-5 text-blue-600" />

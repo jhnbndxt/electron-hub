@@ -16,8 +16,38 @@ import {
   CreditCard,
   Wallet,
 } from "lucide-react";
+import { useAuth } from "../../context/AuthContext";
+import { supabase } from "../../../supabase";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
+
+const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
+
+function formatCashQueueTime(timeValue?: string | null) {
+  if (!timeValue) {
+    return CASH_QUEUE_TIME_LABEL;
+  }
+
+  if (timeValue.includes("AM") || timeValue.includes("PM") || timeValue.includes("-")) {
+    return timeValue;
+  }
+
+  const [hourPart, minutePart] = timeValue.split(":");
+  const hours = Number(hourPart);
+  const minutes = Number(minutePart || "0");
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return CASH_QUEUE_TIME_LABEL;
+  }
+
+  const startTime = new Date();
+  startTime.setHours(hours, minutes, 0, 0);
+
+  return `${startTime.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })} - 4:00 PM`;
+}
 
 interface OnlinePayment {
   id: string;
@@ -46,6 +76,7 @@ interface CashPayment {
 }
 
 export function CashierDashboard() {
+  const { userData } = useAuth();
   const [activeTab, setActiveTab] = useState<"online" | "cash">("online");
   const [searchQuery, setSearchQuery] = useState("");
   const [onlinePayments, setOnlinePayments] = useState<OnlinePayment[]>([]);
@@ -56,45 +87,87 @@ export function CashierDashboard() {
   const [showCashModal, setShowCashModal] = useState(false);
   const [rejectionComment, setRejectionComment] = useState("");
 
+  const actorReference = userData?.id || userData?.email;
+  const actorName = userData?.name || "Cashier";
+
   useEffect(() => {
     loadPayments();
   }, []);
 
   const loadPayments = async () => {
-    // Load pending and completed payments from Supabase
-    const { data: pendingPayments, error: pendingError } = await getAllPayments('pending');
-    const { data: completedPayments, error: completedError } = await getAllPayments('completed');
+    // Load all payments from Supabase
+    const { data: allPayments, error } = await getAllPayments();
 
-    if (pendingError || completedError) {
-      console.error('Error loading payments:', pendingError || completedError);
+    if (error) {
+      console.error('Error loading payments:', error);
       setOnlinePayments([]);
       setCashPayments([]);
       return;
     }
 
-    // Format online payments
-    if (pendingPayments) {
-      const formatted = pendingPayments.map((p: any) => ({
+    if (!allPayments) {
+      setOnlinePayments([]);
+      setCashPayments([]);
+      return;
+    }
+
+    // Fetch user details for student names
+    const studentIds = [...new Set(allPayments.map((p: any) => p.student_id))];
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, full_name, email")
+      .in("id", studentIds);
+
+    const userMap: Record<string, { name: string; email: string }> = {};
+    users?.forEach((u: any) => {
+      userMap[u.id] = { name: u.full_name, email: u.email };
+    });
+
+    // Separate online vs cash payments
+    const onlinePending = allPayments
+      .filter((p: any) => (p.payment_method === 'bank' || p.payment_method === 'gcash') && p.status === 'pending')
+      .map((p: any) => ({
         id: p.id,
-        studentEmail: p.user_id,
-        studentName: p.user_id,
-        paymentMode: p.payment_method === 'bank_transfer' ? 'bank' : 'gcash',
-        referenceNumber: p.reference_number,
-        receiptData: p.receipt_data || '',
-        receiptFileName: 'payment_receipt',
-        status: p.status === 'pending' ? 'pending' : 'approved',
-        submittedDate: new Date(p.created_at).toLocaleDateString(),
+        studentEmail: userMap[p.student_id]?.email || p.student_id,
+        studentName: userMap[p.student_id]?.name || 'Unknown Student',
+        paymentMode: p.payment_method as "bank" | "gcash",
+        referenceNumber: p.reference_number || '',
+        receiptData: p.receipt_file_url || '',
+        receiptFileName: p.receipt_file_path?.split('/').pop() || 'receipt',
+        status: 'pending' as const,
+        submittedDate: p.submitted_at
+          ? new Date(p.submitted_at).toLocaleDateString()
+          : new Date(p.created_at).toLocaleDateString(),
         enrollmentData: {},
       }));
-      setOnlinePayments(formatted);
-    }
+
+    const cashPending = allPayments
+      .filter((p: any) => p.payment_method === 'cash' && p.status === 'pending')
+      .map((p: any) => ({
+        id: p.id,
+        queueNumber: p.queue_number || '',
+        studentEmail: userMap[p.student_id]?.email || p.student_id,
+        studentName: userMap[p.student_id]?.name || 'Unknown Student',
+        schedule: {
+          date: p.queue_schedule_date
+            ? new Date(p.queue_schedule_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+            : '',
+          time: formatCashQueueTime(p.queue_schedule_time),
+        },
+        status: 'pending' as const,
+        generatedDate: new Date(p.created_at).toLocaleDateString(),
+        enrollmentData: {},
+      }));
+
+    setOnlinePayments(onlinePending);
+    setCashPayments(cashPending);
   };
 
   const handleApproveOnlinePayment = async () => {
     if (!selectedPayment) return;
 
     // Update payment status in Supabase
-    const { error } = await updatePaymentStatus(selectedPayment.id, 'completed', 'cashier');
+    const { error } = await updatePaymentStatus(selectedPayment.id, 'completed', actorReference);
 
     if (error) {
       alert(`Error approving payment: ${error}`);
@@ -103,9 +176,9 @@ export function CashierDashboard() {
 
     // Create audit log
     await createAuditLog(
-      'cashier',
+      actorReference,
       'PAYMENT_VERIFIED',
-      `Payment approved: ${selectedPayment.referenceNumber}`,
+      `Payment approved by ${actorName}: ${selectedPayment.referenceNumber}`,
       'success'
     );
 
@@ -129,7 +202,7 @@ export function CashierDashboard() {
     }
 
     // Update payment status in Supabase
-    const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', 'cashier');
+  const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', actorReference);
 
     if (error) {
       alert(`Error rejecting payment: ${error}`);
@@ -138,9 +211,9 @@ export function CashierDashboard() {
 
     // Create audit log
     await createAuditLog(
-      'cashier',
+      actorReference,
       'PAYMENT_REJECTED',
-      `Payment rejected: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment}`,
+      `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment}`,
       'warning'
     );
 
@@ -158,44 +231,31 @@ export function CashierDashboard() {
     setRejectionComment("");
   };
 
-  const handleConfirmCashPayment = () => {
+  const handleConfirmCashPayment = async () => {
     if (!selectedCashPayment) return;
 
-    // Update cash payment status
-    const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-    const updated = cashQueue.map((p: any) =>
-      p.id === selectedCashPayment.id
-        ? { ...p, status: "paid", paidDate: new Date().toLocaleDateString() }
-        : p
+    // Update payment status in Supabase
+    const { error } = await updatePaymentStatus(selectedCashPayment.id, 'paid', actorReference);
+
+    if (error) {
+      alert(`Error confirming cash payment: ${error}`);
+      return;
+    }
+
+    // Create audit log
+    await createAuditLog(
+      actorReference,
+      'PAYMENT_VERIFIED',
+      `Cash payment confirmed by ${actorName}: Queue #${selectedCashPayment.queueNumber}`,
+      'success'
     );
-    localStorage.setItem("cash_payment_queue", JSON.stringify(updated));
 
-    // Update enrollment progress and enroll student
-    const progressKey = `enrollment_progress_${selectedCashPayment.studentEmail}`;
-    const progress = JSON.parse(localStorage.getItem(progressKey) || "[]");
-    const updatedProgress = progress.map((step: any) => {
-      if (step.name === "Payment Submitted") {
-        return { ...step, status: "completed" };
-      }
-      if (step.name === "Payment Verified") {
-        return { ...step, status: "completed" };
-      }
-      if (step.name === "Enrolled") {
-        return { ...step, status: "completed" };
-      }
-      return step;
-    });
-    localStorage.setItem(progressKey, JSON.stringify(updatedProgress));
-
-    // Mark student as enrolled
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const updatedUsers = users.map((u: any) => {
-      if (u.email === selectedCashPayment.studentEmail) {
-        return { ...u, accountStatus: "enrolled", enrolledDate: new Date().toISOString() };
-      }
-      return u;
-    });
-    localStorage.setItem("users", JSON.stringify(updatedUsers));
+    // Create notification
+    try {
+      await triggerNotification(selectedCashPayment.studentEmail, 'PAYMENT_VERIFIED');
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
 
     loadPayments();
     setShowCashModal(false);
@@ -225,7 +285,7 @@ export function CashierDashboard() {
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
 
   return (
-    <div className="p-8">
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Management</h1>
@@ -233,7 +293,7 @@ export function CashierDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -285,10 +345,10 @@ export function CashierDashboard() {
 
       {/* Tabs */}
       <div className="bg-white rounded-lg border border-gray-200 mb-6">
-        <div className="flex border-b border-gray-200">
+        <div className="flex flex-col sm:flex-row border-b border-gray-200">
           <button
             onClick={() => setActiveTab("online")}
-            className={`flex-1 px-6 py-4 font-semibold transition-colors ${
+            className={`flex-1 px-4 sm:px-6 py-4 font-semibold transition-colors ${
               activeTab === "online"
                 ? "text-blue-600 border-b-2 border-blue-600"
                 : "text-gray-600 hover:text-gray-900"
@@ -301,7 +361,7 @@ export function CashierDashboard() {
           </button>
           <button
             onClick={() => setActiveTab("cash")}
-            className={`flex-1 px-6 py-4 font-semibold transition-colors ${
+            className={`flex-1 px-4 sm:px-6 py-4 font-semibold transition-colors ${
               activeTab === "cash"
                 ? "text-blue-600 border-b-2 border-blue-600"
                 : "text-gray-600 hover:text-gray-900"
@@ -315,7 +375,7 @@ export function CashierDashboard() {
         </div>
 
         {/* Search Bar */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -331,7 +391,7 @@ export function CashierDashboard() {
         {/* Online Payments Tab */}
         {activeTab === "online" && (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[920px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -435,7 +495,7 @@ export function CashierDashboard() {
         {/* Cash Payments Tab */}
         {activeTab === "cash" && (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[920px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -572,6 +632,12 @@ export function CashierDashboard() {
                   <div className="bg-blue-50 rounded-lg p-4 mb-6">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Information</h3>
                     <div className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600">Transaction ID:</span>
+                        <span className="font-mono font-semibold break-all text-right text-gray-900">
+                          {selectedPayment.id}
+                        </span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Reference Number:</span>
                         <span className="font-mono font-semibold text-gray-900">
@@ -749,6 +815,12 @@ export function CashierDashboard() {
                   <div className="bg-green-50 rounded-lg p-4 mb-6">
                     <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Details</h3>
                     <div className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600">Transaction ID:</span>
+                        <span className="font-mono font-semibold break-all text-right text-gray-900">
+                          {selectedCashPayment.id}
+                        </span>
+                      </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Amount Due:</span>
                         <span className="font-bold text-lg text-green-600">₱15,000.00</span>

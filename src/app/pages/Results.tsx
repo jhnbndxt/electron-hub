@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { useEffect, useState } from "react";
 import { Award, ArrowRight, Sparkles, TrendingUp, Download, CheckCircle, GraduationCap, Briefcase } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 
 interface AssessmentResults {
   track: string;
@@ -19,29 +20,63 @@ interface AssessmentResults {
 export function Results() {
   const { userData } = useAuth();
   const [results, setResults] = useState<AssessmentResults | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     // Scroll to top instantly when component mounts
     window.scrollTo({ top: 0, behavior: "instant" });
 
-    // Use user-specific key (matches assessmentStorage.ts)
-    const userEmail = userData?.email || "student@gmail.com";
-    const assessmentKey = `assessmentResults_${userEmail}`;
-    const storedResults = localStorage.getItem(assessmentKey);
-    if (storedResults) {
-      setResults(JSON.parse(storedResults));
-    }
+    const loadResults = async () => {
+      const userEmail = userData?.email || "student@gmail.com";
+
+      try {
+        const latestResult = await getLatestAssessmentResult(userEmail);
+
+        if (latestResult) {
+          setResults({
+            track: latestResult.track,
+            electives: latestResult.electives,
+            scores: latestResult.scores,
+            topDomains: latestResult.topDomains,
+            topInterests: latestResult.topInterests,
+          });
+          setLoading(false);
+          return;
+        }
+
+        const assessmentKey = `assessmentResults_${userEmail}`;
+        const storedResults = localStorage.getItem(assessmentKey);
+        if (storedResults) {
+          setResults(JSON.parse(storedResults));
+        } else {
+          setResults(null);
+        }
+      } catch (error) {
+        console.error("Error loading assessment results:", error);
+        setResults(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadResults();
   }, [userData]);
 
-  // Download results as PDF (simulated with print)
-  const handleDownloadPDF = () => {
-    window.print();
-  };
+  if (loading) {
+    return (
+      <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="portal-glass-panel w-full max-w-xl rounded-2xl p-8 text-center">
+          <p className="text-xl text-gray-600">Loading assessment results...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!results) {
     return (
-      <div className="min-h-screen p-8 flex items-center justify-center" style={{ backgroundColor: "var(--electron-light-gray)" }}>
-        <div className="text-center">
+      <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="portal-glass-panel w-full max-w-xl rounded-2xl p-8 text-center">
           <p className="text-xl text-gray-600 mb-4">No assessment results found.</p>
           <Link
             to="/dashboard/assessment"
@@ -63,6 +98,68 @@ export function Results() {
   // Determine track color based on Electron Blue theme
   const trackColor = "var(--electron-blue)";
   const secondaryColor = "var(--electron-red)";
+  const generatedDateLabel = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const scoreRows = [
+    { name: "Logic / Analytical Reasoning", score: scores.LRA, color: "#F59E0B", key: "LRA" },
+    { name: "Technical / Scientific Aptitude", score: scores.SA, color: "#10B981", key: "SA" },
+    { name: "Mathematical Ability", score: scores.MA, color: "#3B82F6", key: "MA" },
+    { name: "Verbal / Communication", score: scores.VA, color: "#EC4899", key: "VA" },
+  ];
+  const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest domains";
+  const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your preferred interests";
+  const trackStudyHighlights =
+    track === "Academic"
+      ? [
+          "Core academic subjects in Math, Science, English, and Filipino",
+          "Specialized electives aligned with your recommended field",
+          "Research, inquiry, and college-readiness activities",
+          "Structured preparation for tertiary education",
+        ]
+      : [
+          "Hands-on technical and vocational skills development",
+          "Practical application through workshops and performance tasks",
+          "Industry-aligned competencies and certification readiness",
+          "Work immersion and employment-oriented preparation",
+        ];
+  const trackOpportunityHighlights =
+    track === "Academic"
+      ? [
+          "Bachelor's degree pathways in college or university",
+          "Scholarship and honors-track opportunities",
+          "Professional careers that require advanced study or licensure",
+          "Graduate studies and research-oriented options",
+        ]
+      : [
+          "Immediate employment after graduation",
+          "Entrepreneurship or small-business opportunities",
+          "Technical college and vocational degree pathways",
+          "Industry certifications and skills-based career advancement",
+        ];
+  const recommendationSummary = `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
+  const trackExplanation =
+    track === "Academic"
+      ? "The Academic Track provides a solid foundation for higher education. It supports students who perform well in structured academic work and want to build toward university courses and professional careers."
+      : "The Technical-Professional Track emphasizes applied learning and practical competencies. It is well-suited for students who thrive in skill-based environments and want strong preparation for employment, entrepreneurship, or technical degree programs.";
+
+  const getScoreInterpretation = (score: number) => {
+    if (score >= 85) {
+      return "Very Strong";
+    }
+
+    if (score >= 70) {
+      return "Strong";
+    }
+
+    if (score >= 55) {
+      return "Developing";
+    }
+
+    return "Emerging";
+  };
 
   // Helper function to get suggested college courses based on track and elective
   const getSuggestedCourses = (track: string, elective: string): string[] => {
@@ -218,8 +315,372 @@ export function Results() {
     getCareerPathways(track, elective)
   );
 
+  const handleDownloadPDF = async () => {
+    setIsDownloading(true);
+
+    try {
+      const [{ jsPDF }, { default: autoTable }] = await Promise.all([
+        import("jspdf"),
+        import("jspdf-autotable"),
+      ]);
+
+      const doc = new jsPDF({ unit: "pt", format: "letter" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 48;
+      const topMargin = 96;
+      const bottomMargin = 52;
+      const contentWidth = pageWidth - margin * 2;
+      const cardGap = 14;
+      const cardWidth = (contentWidth - cardGap) / 2;
+      const cardHeight = 76;
+      let cursorY = topMargin;
+
+      const ensureSpace = (height: number) => {
+        if (cursorY + height > pageHeight - bottomMargin) {
+          doc.addPage();
+          cursorY = topMargin;
+        }
+      };
+
+      const addSectionTitle = (title: string) => {
+        ensureSpace(28);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(30, 58, 138);
+        doc.text(title, margin, cursorY);
+        cursorY += 10;
+        doc.setDrawColor(219, 234, 254);
+        doc.setLineWidth(1);
+        doc.line(margin, cursorY, pageWidth - margin, cursorY);
+        cursorY += 18;
+      };
+
+      const addParagraph = (
+        text: string,
+        options?: {
+          x?: number;
+          width?: number;
+          fontSize?: number;
+          lineHeight?: number;
+          gapAfter?: number;
+          color?: [number, number, number];
+        }
+      ) => {
+        const x = options?.x ?? margin;
+        const width = options?.width ?? contentWidth;
+        const fontSize = options?.fontSize ?? 11;
+        const lineHeight = options?.lineHeight ?? 14;
+        const gapAfter = options?.gapAfter ?? 10;
+        const color = options?.color ?? [51, 65, 85];
+        const lines = doc.splitTextToSize(text, width);
+
+        ensureSpace(lines.length * lineHeight + gapAfter + 4);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(fontSize);
+        doc.setTextColor(color[0], color[1], color[2]);
+        doc.text(lines, x, cursorY);
+        cursorY += lines.length * lineHeight + gapAfter;
+      };
+
+      const getLastAutoTableFinalY = () => {
+        const lastAutoTable = (doc as any).lastAutoTable as { finalY?: number } | undefined;
+        return lastAutoTable?.finalY ?? cursorY;
+      };
+
+      const drawMetricCard = (
+        x: number,
+        y: number,
+        label: string,
+        value: string,
+        accent: [number, number, number]
+      ) => {
+        doc.setDrawColor(226, 232, 240);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(x, y, cardWidth, cardHeight, 12, 12, "FD");
+        doc.setFillColor(accent[0], accent[1], accent[2]);
+        doc.roundedRect(x + 12, y + 12, 5, cardHeight - 24, 5, 5, "F");
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(label.toUpperCase(), x + 28, y + 22);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(13);
+        doc.setTextColor(31, 41, 55);
+        const valueLines = doc.splitTextToSize(value, cardWidth - 42);
+        doc.text(valueLines, x + 28, y + 42);
+      };
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor(31, 41, 55);
+      doc.text("AI-Assisted Strand Assessment Results", pageWidth / 2, cursorY, {
+        align: "center",
+      });
+      cursorY += 24;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        "Personalized recommendation report generated from your Electron Hub assessment.",
+        pageWidth / 2,
+        cursorY,
+        { align: "center" }
+      );
+      cursorY += 28;
+
+      ensureSpace(cardHeight * 2 + cardGap + 24);
+      const summaryCards = [
+        { label: "Recommended Track", value: track, accent: [30, 58, 138] as [number, number, number] },
+        { label: "Overall Score", value: `${overallScore}%`, accent: [185, 28, 28] as [number, number, number] },
+        { label: "Top Strengths", value: topDomains.join(", ") || "Not available", accent: [16, 185, 129] as [number, number, number] },
+        { label: "Top Interests", value: topInterests.join(", ") || "Not available", accent: [245, 158, 11] as [number, number, number] },
+      ];
+
+      summaryCards.forEach((card, index) => {
+        const x = margin + (index % 2) * (cardWidth + cardGap);
+        const y = cursorY + Math.floor(index / 2) * (cardHeight + cardGap);
+        drawMetricCard(x, y, card.label, card.value, card.accent);
+      });
+      cursorY += cardHeight * 2 + cardGap + 22;
+
+      addSectionTitle("Recommendation Summary");
+      const recommendationLines = doc.splitTextToSize(
+        `${recommendationSummary} ${trackExplanation}`,
+        contentWidth - 32
+      );
+      const recommendationBoxHeight = recommendationLines.length * 14 + 40;
+      ensureSpace(recommendationBoxHeight + 8);
+      doc.setFillColor(239, 246, 255);
+      doc.setDrawColor(191, 219, 254);
+      doc.roundedRect(margin, cursorY, contentWidth, recommendationBoxHeight, 12, 12, "FD");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(30, 58, 138);
+      doc.text(`Recommended Track: ${track}`, margin + 16, cursorY + 22);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(51, 65, 85);
+      doc.text(recommendationLines, margin + 16, cursorY + 42);
+      cursorY += recommendationBoxHeight + 20;
+
+      addSectionTitle("Performance Breakdown");
+      autoTable(doc, {
+        startY: cursorY,
+        margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
+        head: [["Domain", "Score", "Interpretation"]],
+        body: scoreRows.map((domain) => [
+          domain.name,
+          `${domain.score.toFixed(0)}%`,
+          getScoreInterpretation(domain.score),
+        ]),
+        theme: "grid",
+        styles: {
+          fontSize: 10.5,
+          cellPadding: 8,
+          textColor: [31, 41, 55],
+          lineColor: [226, 232, 240],
+          lineWidth: 1,
+        },
+        headStyles: {
+          fillColor: [30, 58, 138],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        bodyStyles: {
+          valign: "middle",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          1: { halign: "center", fontStyle: "bold" },
+          2: { halign: "center" },
+        },
+      });
+      cursorY = getLastAutoTableFinalY() + 22;
+
+      addSectionTitle("Suggested Electives");
+      autoTable(doc, {
+        startY: cursorY,
+        margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
+        head: [["Priority", "Elective"]],
+        body: electives.map((elective, index) => [`Elective ${index + 1}`, elective]),
+        theme: "grid",
+        styles: {
+          fontSize: 10.5,
+          cellPadding: 8,
+          textColor: [31, 41, 55],
+          lineColor: [226, 232, 240],
+          lineWidth: 1,
+        },
+        headStyles: {
+          fillColor: [30, 58, 138],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 94, halign: "center", fontStyle: "bold" },
+        },
+      });
+      cursorY = getLastAutoTableFinalY() + 22;
+
+      addSectionTitle("Track Overview");
+      autoTable(doc, {
+        startY: cursorY,
+        margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
+        head: [["What You'll Study", "Future Opportunities"]],
+        body: [[
+          trackStudyHighlights.map((item) => `• ${item}`).join("\n"),
+          trackOpportunityHighlights.map((item) => `• ${item}`).join("\n"),
+        ]],
+        theme: "grid",
+        styles: {
+          fontSize: 10.5,
+          cellPadding: 10,
+          textColor: [31, 41, 55],
+          lineColor: [226, 232, 240],
+          lineWidth: 1,
+          valign: "top",
+        },
+        headStyles: {
+          fillColor: [30, 58, 138],
+          textColor: [255, 255, 255],
+          fontStyle: "bold",
+        },
+      });
+      cursorY = getLastAutoTableFinalY() + 22;
+
+      if (uniqueCourses.length > 0) {
+        addSectionTitle("Suggested College Courses");
+        autoTable(doc, {
+          startY: cursorY,
+          margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
+          head: [["Course Options"]],
+          body: uniqueCourses.map((course) => [course]),
+          theme: "grid",
+          styles: {
+            fontSize: 10.5,
+            cellPadding: 8,
+            textColor: [31, 41, 55],
+            lineColor: [226, 232, 240],
+            lineWidth: 1,
+          },
+          headStyles: {
+            fillColor: [30, 58, 138],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+        });
+        cursorY = getLastAutoTableFinalY() + 22;
+      }
+
+      if (allCareerPathways.length > 0) {
+        addSectionTitle("Career Pathways");
+        autoTable(doc, {
+          startY: cursorY,
+          margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
+          head: [["College Course", "Career Opportunities"]],
+          body: allCareerPathways.map((pathway) => [
+            pathway.course,
+            pathway.careers.join(", "),
+          ]),
+          theme: "grid",
+          styles: {
+            fontSize: 10.2,
+            cellPadding: 8,
+            textColor: [31, 41, 55],
+            lineColor: [226, 232, 240],
+            lineWidth: 1,
+            valign: "top",
+          },
+          headStyles: {
+            fillColor: [30, 58, 138],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252],
+          },
+          columnStyles: {
+            0: { cellWidth: 156, fontStyle: "bold" },
+          },
+        });
+        cursorY = getLastAutoTableFinalY() + 22;
+      }
+
+      addSectionTitle("Advisory Note");
+      addParagraph(
+        "Use this report as a guide when selecting your strand and planning your enrollment. You may share it with your parents, guardians, or guidance counselor to support your academic decision-making.",
+        { gapAfter: 0 }
+      );
+
+      const totalPages = doc.getNumberOfPages();
+      for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+        doc.setPage(pageNumber);
+
+        doc.setFillColor(30, 58, 138);
+        doc.circle(margin + 16, 40, 16, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.text("EC", margin + 16, 44, { align: "center" });
+
+        doc.setTextColor(31, 41, 55);
+        doc.setFontSize(16);
+        doc.text("Electron College of Technical Education", margin + 42, 36);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(107, 114, 128);
+        doc.text("Valenzuela City, Metro Manila", margin + 42, 51);
+
+        doc.setFontSize(9);
+        doc.setTextColor(75, 85, 99);
+        doc.text(`Generated: ${generatedDateLabel}`, pageWidth - margin, 36, { align: "right" });
+        doc.text(`Student: ${userData?.name || "N/A"}`, pageWidth - margin, 50, { align: "right" });
+
+        doc.setDrawColor(30, 58, 138);
+        doc.setLineWidth(1.2);
+        doc.line(margin, 68, pageWidth - margin, 68);
+
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.8);
+        doc.line(margin, pageHeight - 34, pageWidth - margin, pageHeight - 34);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text("Electron Hub Assessment Results", margin, pageHeight - 20);
+        doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, pageHeight - 20, {
+          align: "right",
+        });
+      }
+
+      const studentFileName = (userData?.name || "student")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+      doc.save(`assessment-results-${studentFileName || "student"}.pdf`);
+    } catch (error) {
+      console.error("Error generating assessment results PDF:", error);
+      window.alert("Unable to generate the assessment results PDF right now. Please try again.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
-    <div className="min-h-screen p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       {/* Print-only Header */}
       <div className="print-only print-header" style={{ display: 'none' }}>
         <div className="print-logo">
@@ -244,7 +705,7 @@ export function Results() {
       <div className="max-w-7xl mx-auto">
         {/* Congratulations Hero Section */}
         <div
-          className="relative overflow-hidden rounded-2xl shadow-2xl p-12 mb-8 text-center"
+          className="relative mb-8 overflow-hidden rounded-2xl p-6 text-center shadow-2xl sm:p-8 lg:p-12"
           style={{
             background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
           }}
@@ -257,10 +718,10 @@ export function Results() {
             <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-6">
               <Award className="w-12 h-12 text-white" />
             </div>
-            <h1 className="text-5xl font-bold text-white mb-4">
+            <h1 className="mb-4 text-3xl font-bold text-white sm:text-5xl">
               🎉 Congratulations!
             </h1>
-            <p className="text-2xl text-white/90 mb-2">
+            <p className="mb-2 text-xl text-white/90 sm:text-2xl">
               You've Successfully Completed the Assessment
             </p>
             <p className="text-lg text-white/80">
@@ -270,14 +731,15 @@ export function Results() {
         </div>
 
         {/* Download Button Row */}
-        <div className="flex justify-end mb-6">
+        <div className="mb-6 flex justify-stretch sm:justify-end">
           <button
             onClick={handleDownloadPDF}
-            className="px-6 py-3 rounded-lg text-white font-semibold transition-all hover:opacity-90 shadow-md inline-flex items-center gap-2 print:hidden"
+            disabled={isDownloading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold shadow-md transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 print:hidden sm:w-auto"
             style={{ backgroundColor: "var(--electron-blue)" }}
           >
             <Download className="w-5 h-5" />
-            Download Results as PDF
+            {isDownloading ? "Preparing PDF..." : "Download Results as PDF"}
           </button>
         </div>
 
@@ -285,7 +747,7 @@ export function Results() {
           {/* Left Column: Circular Progress & Summary */}
           <div className="lg:col-span-1">
             {/* Circular Progress Card */}
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+            <div className="mb-6 rounded-xl bg-white p-5 shadow-lg sm:p-8">
               <h3 className="text-xl font-bold mb-6 text-center" style={{ color: "var(--electron-blue)" }}>
                 Overall Score
               </h3>
@@ -319,7 +781,7 @@ export function Results() {
                   </svg>
                   {/* Center text */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-5xl font-bold" style={{ color: "var(--electron-blue)" }}>
+                    <span className="text-4xl font-bold sm:text-5xl" style={{ color: "var(--electron-blue)" }}>
                       {overallScore}%
                     </span>
                     <span className="text-sm text-gray-500 mt-1">Score</span>
@@ -337,7 +799,7 @@ export function Results() {
 
             {/* Recommended Track Card */}
             <div
-              className="bg-white rounded-xl shadow-lg p-8 border-t-4"
+              className="rounded-xl border-t-4 bg-white p-5 shadow-lg sm:p-8"
               style={{ borderColor: "var(--electron-blue)" }}
             >
               <p className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide text-center">
@@ -361,7 +823,7 @@ export function Results() {
           {/* Right Column: Detailed Breakdown */}
           <div className="lg:col-span-2">
             {/* Detailed Score Breakdown Table */}
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+            <div className="mb-6 rounded-xl bg-white p-5 shadow-lg sm:p-8">
               <div className="flex items-center gap-2 mb-6">
                 <TrendingUp className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
                 <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -370,7 +832,7 @@ export function Results() {
               </div>
               
               {/* Table */}
-              <div className="overflow-hidden rounded-lg border border-gray-200">
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
                 <table className="w-full">
                   <thead style={{ backgroundColor: "var(--electron-blue)" }}>
                     <tr>
@@ -380,12 +842,7 @@ export function Results() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[
-                      { name: "Logic / Analytical Reasoning", score: scores.LRA, color: "#F59E0B", key: "LRA" },
-                      { name: "Technical / Scientific Aptitude", score: scores.SA, color: "#10B981", key: "SA" },
-                      { name: "Mathematical Ability", score: scores.MA, color: "#3B82F6", key: "MA" },
-                      { name: "Verbal / Communication", score: scores.VA, color: "#EC4899", key: "VA" },
-                    ].map((domain, index) => (
+                    {scoreRows.map((domain, index) => (
                       <tr key={domain.key} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                         <td className="px-6 py-4 font-semibold" style={{ color: "var(--electron-dark-gray)" }}>
                           {domain.name}
@@ -414,7 +871,7 @@ export function Results() {
             </div>
 
             {/* Suggested Electives */}
-            <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+            <div className="mb-6 rounded-xl bg-white p-5 shadow-lg sm:p-8">
               <h3 className="text-2xl font-bold mb-4" style={{ color: "var(--electron-dark-gray)" }}>
                 Suggested Electives
               </h3>
@@ -422,9 +879,8 @@ export function Results() {
                 {electives.map((elective, index) => (
                   <div
                     key={index}
-                    className="p-4 rounded-lg border-l-4 flex items-center gap-3"
+                    className="portal-glass-panel flex items-center gap-3 rounded-lg border-l-4 p-4"
                     style={{
-                      backgroundColor: "var(--electron-light-gray)",
                       borderColor: index === 0 ? "var(--electron-blue)" : "var(--electron-red)",
                     }}
                   >
@@ -447,7 +903,7 @@ export function Results() {
 
             {/* AI Analysis */}
             <div
-              className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl shadow-lg p-8 border-2"
+              className="portal-glass-panel-strong rounded-xl border p-5 shadow-lg sm:p-8"
               style={{ borderColor: "var(--electron-blue)" }}
             >
               <div className="flex items-start gap-4">
@@ -464,7 +920,7 @@ export function Results() {
                   <p className="text-lg leading-relaxed text-gray-800 mb-4">
                     Based on your assessment results, we recommend the <strong style={{ color: "var(--electron-blue)" }}>{track} Track</strong> due to your exceptional performance in <strong>{topDomains.join(" and ")}</strong> and demonstrated interests in <strong>{topInterests.join(" and ")}</strong>. This track aligns perfectly with your cognitive strengths and personal passions, positioning you for academic excellence and career success.
                   </p>
-                  <div className="mt-4 p-4 rounded-lg" style={{ backgroundColor: "white" }}>
+                  <div className="portal-glass-panel mt-4 rounded-lg p-4">
                     <h4 className="font-bold text-gray-900 mb-2">Why This Track?</h4>
                     <p className="text-gray-700 leading-relaxed">
                       {track === "Academic"
@@ -479,7 +935,7 @@ export function Results() {
         </div>
 
         {/* Track Overview Section */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+        <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
             Your Track: {track}
           </h3>
@@ -581,7 +1037,7 @@ export function Results() {
 
         {/* NEW SECTION: Suggested College Courses */}
         {uniqueCourses.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
             <div className="flex items-center gap-2 mb-2">
               <GraduationCap className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
               <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -595,9 +1051,8 @@ export function Results() {
               {uniqueCourses.map((course, index) => (
                 <div
                   key={index}
-                  className="p-4 rounded-lg border-l-4 transition-all hover:shadow-md"
+                  className="portal-glass-panel rounded-lg border-l-4 p-4 transition-all hover:shadow-md"
                   style={{
-                    backgroundColor: "var(--electron-light-gray)",
                     borderColor: "var(--electron-blue)",
                   }}
                 >
@@ -612,7 +1067,7 @@ export function Results() {
 
         {/* NEW SECTION: Career Pathways */}
         {allCareerPathways.length > 0 && (
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
             <div className="flex items-center gap-2 mb-2">
               <Briefcase className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
               <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -626,7 +1081,7 @@ export function Results() {
               {allCareerPathways.map((pathway, index) => (
                 <div
                   key={index}
-                  className="border-2 rounded-xl p-6 transition-all hover:shadow-lg"
+                  className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
                   style={{ borderColor: "var(--electron-blue)" }}
                 >
                   <div className="flex items-center gap-3 mb-4">
@@ -662,7 +1117,7 @@ export function Results() {
         )}
 
         {/* What's Next - Action Buttons */}
-        <div className="bg-white rounded-xl shadow-lg p-8 print:hidden">
+        <div className="rounded-xl bg-white p-5 shadow-lg print:hidden sm:p-8">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
             What's Next?
           </h3>
@@ -671,7 +1126,7 @@ export function Results() {
           </p>
           <Link
             to="/dashboard/enrollment"
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-lg text-white font-bold text-lg transition-all hover:opacity-90 shadow-lg"
+            className="inline-flex w-full items-center justify-center gap-3 rounded-lg px-6 py-4 text-base font-bold text-white shadow-lg transition-all hover:opacity-90 sm:w-auto sm:px-8 sm:text-lg"
             style={{ backgroundColor: "var(--electron-blue)" }}
           >
             Enroll Now

@@ -2,8 +2,38 @@ import { useState, useEffect } from "react";
 import { Building2, Wallet, Banknote, Upload, CheckCircle2, X, Copy, Check, Calendar, Clock } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
+import { supabase } from "../../supabase";
 
 type PaymentMode = "bank" | "gcash" | "cash" | null;
+
+const CASH_QUEUE_TIME_VALUE = "09:00:00";
+const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
+
+function formatCashQueueTime(timeValue?: string | null) {
+  if (!timeValue) {
+    return CASH_QUEUE_TIME_LABEL;
+  }
+
+  if (timeValue.includes("AM") || timeValue.includes("PM") || timeValue.includes("-")) {
+    return timeValue;
+  }
+
+  const [hourPart, minutePart] = timeValue.split(":");
+  const hours = Number(hourPart);
+  const minutes = Number(minutePart || "0");
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return CASH_QUEUE_TIME_LABEL;
+  }
+
+  const startTime = new Date();
+  startTime.setHours(hours, minutes, 0, 0);
+
+  return `${startTime.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  })} - 4:00 PM`;
+}
 
 export function Payment() {
   const { updateEnrollmentProgress, isDocumentsVerified, markPaymentVisited, userData } = useAuth();
@@ -18,40 +48,63 @@ export function Payment() {
   const [copied, setCopied] = useState(false);
   const [paymentApproved, setPaymentApproved] = useState(false);
   const [approvedPaymentData, setApprovedPaymentData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Check if payment already submitted or approved
+  // Check if payment already submitted or approved from Supabase
   useEffect(() => {
-    if (userData?.email) {
-      // Check for online payment submissions (bank/gcash)
-      const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-      const existingOnlinePayment = paymentQueue.find((p: any) => p.studentEmail === userData.email);
-      
-      if (existingOnlinePayment && (existingOnlinePayment.paymentMode === "bank" || existingOnlinePayment.paymentMode === "gcash")) {
-        if (existingOnlinePayment.status === "approved") {
-          setPaymentApproved(true);
-          setApprovedPaymentData(existingOnlinePayment);
-        } else {
-          setIsSubmitted(true);
-        }
-        setSelectedMode(existingOnlinePayment.paymentMode);
+    const checkExistingPayment = async () => {
+      if (!userData?.id) {
+        setIsLoading(false);
         return;
       }
 
-      // Check for cash payment queue
-      const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-      const existingCashPayment = cashQueue.find((q: any) => q.studentEmail === userData.email);
-      
-      if (existingCashPayment) {
-        if (existingCashPayment.status === "paid") {
-          setPaymentApproved(true);
-          setApprovedPaymentData(existingCashPayment);
-        } else {
-          setQueueNumber(existingCashPayment.queueNumber);
-          setQueueSchedule(existingCashPayment.schedule);
-          setShowQueueTicket(true);
+      try {
+        const { data: payment } = await supabase
+          .from("payments")
+          .select("*")
+          .eq("student_id", userData.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (payment) {
+          const mode = payment.payment_method as PaymentMode;
+          setSelectedMode(mode);
+
+          if (payment.status === "verified" || payment.status === "approved" || payment.status === "paid") {
+            setPaymentApproved(true);
+            setApprovedPaymentData({
+              paymentMode: mode,
+              referenceNumber: payment.reference_number,
+              queueNumber: payment.queue_number,
+              paidDate: payment.paid_at
+                ? new Date(payment.paid_at).toLocaleDateString()
+                : payment.verified_at
+                ? new Date(payment.verified_at).toLocaleDateString()
+                : new Date().toLocaleDateString(),
+            });
+          } else if (mode === "cash" && payment.status === "pending") {
+            setQueueNumber(payment.queue_number);
+            if (payment.queue_schedule_date) {
+              const schedDate = new Date(payment.queue_schedule_date);
+              setQueueSchedule({
+                date: schedDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+                time: formatCashQueueTime(payment.queue_schedule_time),
+              });
+            }
+            setShowQueueTicket(true);
+          } else if (payment.status === "pending" || payment.status === "submitted") {
+            setIsSubmitted(true);
+          }
         }
+      } catch (err) {
+        console.error("Error checking existing payment:", err);
+      } finally {
+        setIsLoading(false);
       }
-    }
+    };
+
+    checkExistingPayment();
   }, [userData]);
 
   // Redirect if documents aren't verified
@@ -68,26 +121,49 @@ export function Payment() {
     }
   }, [isDocumentsVerified, markPaymentVisited]);
 
+  useEffect(() => {
+    const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
+
+    if (!shellMain) {
+      return;
+    }
+
+    const previousOverflowY = shellMain.style.overflowY;
+    const previousOverscrollBehavior = shellMain.style.overscrollBehavior;
+    const shouldLockViewport = window.innerWidth >= 1024 && paymentApproved;
+
+    if (shouldLockViewport) {
+      shellMain.scrollTop = 0;
+      shellMain.style.overflowY = "hidden";
+      shellMain.style.overscrollBehavior = "none";
+    }
+
+    return () => {
+      shellMain.style.overflowY = previousOverflowY;
+      shellMain.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [paymentApproved]);
+
   // If payment is already approved, show success message immediately
   if (paymentApproved && approvedPaymentData) {
     return (
-      <div className="p-8 max-w-4xl mx-auto">
-        <div className="bg-white rounded-xl shadow-xl p-12 text-center border-2 border-green-500">
+      <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:h-[calc(100dvh-5rem)] lg:min-h-0 lg:overflow-hidden lg:p-8">
+        <div className="portal-glass-panel-strong w-full max-w-4xl rounded-2xl border p-6 text-center shadow-xl sm:p-10 lg:p-12" style={{ borderColor: "rgba(16, 185, 129, 0.42)" }}>
           <div
             className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6"
             style={{ backgroundColor: "#10B981" }}
           >
             <CheckCircle2 className="w-16 h-16 text-white" />
           </div>
-          <h1 className="text-4xl font-bold mb-4" style={{ color: "#10B981" }}>
+          <h1 className="mb-4 text-3xl font-bold sm:text-4xl" style={{ color: "#10B981" }}>
             Payment Successfully Verified!
           </h1>
-          <p className="text-xl text-gray-600 mb-8">
+          <p className="mb-8 text-lg text-gray-600 sm:text-xl">
             Congratulations! Your payment has been approved and processed.
           </p>
 
           {/* Payment Details */}
-          <div className="bg-green-50 rounded-xl p-6 mb-8 text-left max-w-md mx-auto">
+          <div className="portal-glass-panel mx-auto mb-8 max-w-lg rounded-xl p-6 text-left">
             <h3 className="text-lg font-semibold mb-4 text-center" style={{ color: "var(--electron-dark-gray)" }}>
               Payment Information
             </h3>
@@ -125,7 +201,7 @@ export function Payment() {
           </div>
 
           {/* Success Message */}
-          <div className="bg-blue-50 rounded-lg p-6 mb-8 text-left max-w-md mx-auto">
+          <div className="portal-glass-panel-strong mx-auto mb-8 max-w-lg rounded-lg border p-6 text-left" style={{ borderColor: "rgba(59, 130, 246, 0.28)" }}>
             <h3 className="text-lg font-semibold mb-3" style={{ color: "var(--electron-dark-gray)" }}>
               Enrollment Status
             </h3>
@@ -141,7 +217,7 @@ export function Payment() {
           {/* Action Button */}
           <button
             onClick={() => navigate("/dashboard")}
-            className="px-12 py-4 rounded-lg text-white text-lg font-semibold transition-all hover:opacity-90 shadow-lg"
+            className="w-full rounded-lg px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:opacity-90 sm:w-auto sm:px-12 sm:text-lg"
             style={{ backgroundColor: "var(--electron-blue)" }}
           >
             Go to Dashboard
@@ -182,55 +258,87 @@ export function Payment() {
   };
 
   const handleSubmitPayment = async () => {
-    if (!userData?.email || !uploadedFile || !referenceNumber) return;
+    if (!userData?.id || !userData?.email || !uploadedFile || !referenceNumber) return;
 
-    // Convert file to base64
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Data = reader.result as string;
+    try {
+      // Upload receipt to Supabase Storage
+      const timestamp = Date.now();
+      const fileExt = uploadedFile.name.split(".").pop();
+      const storagePath = `receipts/${userData.id}/${timestamp}.${fileExt}`;
 
-      // Get enrollment data
-      const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-      const studentApp = applications.find((app: any) => app.email === userData.email);
+      const { error: storageError } = await supabase.storage
+        .from("enrollment_documents")
+        .upload(storagePath, uploadedFile, { upsert: true });
 
-      // Save payment to queue
-      const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-      
-      paymentQueue.push({
-        id: Date.now().toString(),
-        studentEmail: userData.email,
-        studentName: studentApp?.studentName || userData.name,
-        paymentMode: selectedMode,
-        referenceNumber: referenceNumber,
-        receiptData: base64Data,
-        receiptFileName: uploadedFile.name,
+      let receiptUrl = "";
+      if (!storageError) {
+        const { data: urlData } = supabase.storage
+          .from("enrollment_documents")
+          .getPublicUrl(storagePath);
+        receiptUrl = urlData.publicUrl;
+      }
+
+      // Find the student's enrollment
+      const { data: enrollment } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq("user_id", userData.email)
+        .neq("status", "rejected")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Insert payment record into Supabase
+      const { error: paymentError } = await supabase.from("payments").insert({
+        student_id: userData.id,
+        enrollment_id: enrollment?.id || null,
+        payment_method: selectedMode,
+        amount: 15000,
+        reference_number: referenceNumber,
+        receipt_file_path: storagePath,
+        receipt_file_url: receiptUrl,
         status: "pending",
-        submittedDate: new Date().toLocaleDateString(),
-        enrollmentData: studentApp,
+        submitted_at: new Date().toISOString(),
       });
 
-      localStorage.setItem("payment_queue", JSON.stringify(paymentQueue));
+      if (paymentError) {
+        console.error("Payment insert error:", paymentError);
+        alert("Failed to submit payment. Please try again.");
+        return;
+      }
 
-      // Update enrollment progress - Mark Payment Submitted as completed for online payments
+      // Update enrollment progress
       updateEnrollmentProgress("Payment Submitted", "completed");
       updateEnrollmentProgress("Payment Verified", "current");
       setIsSubmitted(true);
-    };
-
-    reader.readAsDataURL(uploadedFile);
+    } catch (err) {
+      console.error("Payment submission error:", err);
+      alert("An unexpected error occurred. Please try again.");
+    }
   };
 
-  const handleGenerateQueue = () => {
-    if (!userData?.email) return;
+  const handleGenerateQueue = async () => {
+    if (!userData?.id || !userData?.email) return;
 
-    // Check if queue already exists for this user
-    const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-    const existingQueue = cashQueue.find((q: any) => q.studentEmail === userData.email);
-    
-    if (existingQueue) {
-      // Use existing queue instead of generating a new one
-      setQueueNumber(existingQueue.queueNumber);
-      setQueueSchedule(existingQueue.schedule);
+    // Check if queue already exists in Supabase
+    const { data: existingPayment } = await supabase
+      .from("payments")
+      .select("*")
+      .eq("student_id", userData.id)
+      .eq("payment_method", "cash")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (existingPayment && existingPayment.queue_number) {
+      setQueueNumber(existingPayment.queue_number);
+      if (existingPayment.queue_schedule_date) {
+        const schedDate = new Date(existingPayment.queue_schedule_date);
+        setQueueSchedule({
+          date: schedDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }),
+          time: formatCashQueueTime(existingPayment.queue_schedule_time),
+        });
+      }
       setShowQueueTicket(true);
       return;
     }
@@ -250,40 +358,54 @@ export function Payment() {
       day: "numeric", 
       year: "numeric" 
     });
-    const formattedTime = "9:00 AM - 4:00 PM";
-    
-    setQueueNumber(qNum);
-    setQueueSchedule({ date: formattedDate, time: formattedTime });
-    setShowQueueTicket(true);
 
-    // Get enrollment data
-    const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-    const studentApp = applications.find((app: any) => app.email === userData.email);
+    // Find the student's enrollment
+    const { data: enrollment } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("user_id", userData.email)
+      .neq("status", "rejected")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    // Save to cash payment queue (only if doesn't exist)
-    cashQueue.push({
-      id: Date.now().toString(),
-      queueNumber: qNum,
-      studentEmail: userData.email,
-      studentName: studentApp?.studentName || userData.name,
-      schedule: { date: formattedDate, time: formattedTime },
+    // Save to Supabase payments table
+    const { error } = await supabase.from("payments").insert({
+      student_id: userData.id,
+      enrollment_id: enrollment?.id || null,
+      payment_method: "cash",
+      amount: 15000,
+      queue_number: qNum,
+      queue_schedule_date: scheduleDate.toISOString().split("T")[0],
+      queue_schedule_time: CASH_QUEUE_TIME_VALUE,
       status: "pending",
-      generatedDate: new Date().toLocaleDateString(),
-      enrollmentData: studentApp,
+      submitted_at: new Date().toISOString(),
     });
-    localStorage.setItem("cash_payment_queue", JSON.stringify(cashQueue));
+
+    if (error) {
+      console.error("Cash payment queue error:", error);
+      alert("Failed to generate your cash queue number. Please try again.");
+      return;
+    }
+
+    setQueueNumber(qNum);
+    setQueueSchedule({ date: formattedDate, time: CASH_QUEUE_TIME_LABEL });
+    setShowQueueTicket(true);
 
     // Update enrollment progress
     updateEnrollmentProgress("Payment Submitted", "current");
   };
 
-  const handleCancelCashPayment = () => {
-    if (!userData?.email) return;
+  const handleCancelCashPayment = async () => {
+    if (!userData?.id) return;
     
-    // Remove from cash payment queue
-    const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-    const updatedQueue = cashQueue.filter((q: any) => q.studentEmail !== userData.email);
-    localStorage.setItem("cash_payment_queue", JSON.stringify(updatedQueue));
+    // Delete from Supabase
+    await supabase
+      .from("payments")
+      .delete()
+      .eq("student_id", userData.id)
+      .eq("payment_method", "cash")
+      .eq("status", "pending");
     
     // Reset state
     setShowQueueTicket(false);
@@ -308,7 +430,7 @@ export function Payment() {
   // Queue Ticket View
   if (showQueueTicket && queueNumber && queueSchedule && !paymentApproved) {
     return (
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="portal-dashboard-page mx-auto w-full max-w-6xl p-4 sm:p-6 lg:p-8">
         {/* Print-only Header */}
         <div className="print-only print-header" style={{ display: 'none' }}>
           <div className="print-logo">
@@ -329,7 +451,7 @@ export function Payment() {
           Cashier Payment Queue Ticket
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl p-12 text-center border-2" style={{ borderColor: "var(--electron-blue)" }}>
+        <div className="portal-glass-panel mx-auto w-full max-w-5xl rounded-2xl border-2 p-8 text-center shadow-xl lg:p-12" style={{ borderColor: "var(--electron-blue)" }}>
           {/* Success Icon */}
           <div className="flex justify-center mb-6">
             <div
@@ -373,7 +495,7 @@ export function Payment() {
           </div>
 
           {/* Payment Schedule */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 mb-8">
+          <div className="portal-glass-panel mx-auto mb-8 max-w-3xl rounded-xl border p-6" style={{ borderColor: "#FCD34D" }}>
             <h3 className="text-lg font-bold mb-4 text-gray-900">
               Scheduled Payment Date
             </h3>
@@ -393,7 +515,7 @@ export function Payment() {
           </div>
 
           {/* Instructions */}
-          <div className="bg-gray-50 rounded-xl p-6 mb-8 text-left">
+          <div className="portal-glass-panel mx-auto mb-8 max-w-3xl rounded-xl p-6 text-left">
             <h3 className="text-lg font-bold mb-3" style={{ color: "var(--electron-dark-gray)" }}>
               Instructions:
             </h3>
@@ -440,7 +562,7 @@ export function Payment() {
   }
 
   return (
-    <div className="p-8 max-w-6xl mx-auto">
+    <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>

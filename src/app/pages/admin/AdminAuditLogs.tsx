@@ -1,5 +1,6 @@
-import { Search, Filter, Download, FileText } from "lucide-react";
+import { Search, Filter, Download, FileText, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
+import { getAuditLogs } from "../../../services/adminService";
 
 interface AuditLog {
   id: string;
@@ -8,31 +9,60 @@ interface AuditLog {
   email: string;
   timestamp: string;
   details: string;
-  status?: "success" | "failed";
+  status?: "success" | "failed" | "warning" | "info";
 }
 
 export function AdminAuditLogs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [allLogs, setAllLogs] = useState<AuditLog[]>([]);
+  // Date filter state (default: today)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today.toISOString().slice(0, 10);
+  });
 
-  // Load real audit logs from localStorage
+  // Load audit logs from Supabase
   useEffect(() => {
     loadAuditLogs();
   }, []);
 
-  const loadAuditLogs = () => {
-    const logs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-    setAllLogs(logs);
+  const loadAuditLogs = async () => {
+    const { data: logs, error } = await getAuditLogs();
+    if (error || !logs) {
+      console.error('Error loading audit logs:', error);
+      setAllLogs([]);
+      return;
+    }
+    const formatted = logs.map((log: any) => ({
+      id: log.id,
+      action: log.action || '',
+      user: log.user_name || log.user || 'System',
+      email: log.email || '',
+      timestamp: log.timestamp || log.created_at || new Date().toISOString(),
+      details: log.details || '',
+      status: log.status || 'success',
+    }));
+    setAllLogs(formatted);
   };
 
-  // Filter logs
-  let filteredLogs = allLogs.filter((log) =>
-    log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.details.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+
+  // Filter logs by selected date
+  let filteredLogs = allLogs.filter((log) => {
+    // Date match
+    const logDate = new Date(log.timestamp);
+    const logDateStr = logDate.toISOString().slice(0, 10);
+    return (
+      logDateStr === selectedDate &&
+      (
+        log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        log.details.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    );
+  });
 
   if (statusFilter !== "all") {
     filteredLogs = filteredLogs.filter((log) => (log.status || "success") === statusFilter);
@@ -51,6 +81,18 @@ export function AdminAuditLogs() {
           bg: "#FEE2E2",
           text: "#991B1B",
           border: "#EF4444",
+        };
+      case "warning":
+        return {
+          bg: "#FEF3C7",
+          text: "#92400E",
+          border: "#F59E0B",
+        };
+      case "info":
+        return {
+          bg: "#DBEAFE",
+          text: "#1D4ED8",
+          border: "#60A5FA",
         };
       default:
         return {
@@ -74,7 +116,7 @@ export function AdminAuditLogs() {
   };
 
   return (
-    <div className="p-8">
+    <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-gray-900 mb-2">
@@ -87,9 +129,9 @@ export function AdminAuditLogs() {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
           {/* Search */}
-          <div className="relative flex-1 min-w-[240px]">
+          <div className="relative w-full md:flex-1 md:min-w-[200px]">
             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -100,25 +142,39 @@ export function AdminAuditLogs() {
             />
           </div>
 
+          {/* Date Filter */}
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={e => setSelectedDate(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              max={new Date().toISOString().slice(0, 10)}
+            />
+          </div>
+
           {/* Status Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               style={{ color: "#374151" }}
             >
               <option value="all">All Status</option>
               <option value="success">Success</option>
               <option value="failed">Failed</option>
+              <option value="warning">Warning</option>
+              <option value="info">Info</option>
             </select>
           </div>
 
           {/* Refresh Button */}
           <button
             onClick={loadAuditLogs}
-            className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
             <Download className="w-4 h-4" />
@@ -128,7 +184,7 @@ export function AdminAuditLogs() {
           {/* Export Button */}
           <button
             onClick={() => alert("Exporting audit logs...")}
-            className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
             <Download className="w-4 h-4" />
@@ -140,7 +196,7 @@ export function AdminAuditLogs() {
       {/* Data Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         {/* Table Header */}
-        <div className="p-6 border-b border-gray-200">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">
             Activity Logs
           </h2>
@@ -148,7 +204,7 @@ export function AdminAuditLogs() {
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -237,7 +293,7 @@ export function AdminAuditLogs() {
         </div>
 
         {/* Table Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50">
           <p className="text-sm text-gray-600">
             Showing{" "}
             <span className="font-medium">{filteredLogs.length}</span> of{" "}

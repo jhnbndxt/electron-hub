@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase } from "lucide-react";
+import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
+import { supabase } from "../../supabase";
 
 interface Question {
   id: number;
@@ -10,6 +12,8 @@ interface Question {
   correctAnswer?: number;
   category: string;
 }
+
+type AnswerValue = number | number[];
 
 interface Section {
   name: string;
@@ -34,7 +38,7 @@ interface AssessmentResult {
 export function PublicAssessment() {
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, number>>({});
+  const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
@@ -43,31 +47,107 @@ export function PublicAssessment() {
   const [userInfo, setUserInfo] = useState({ fullName: "", email: "" });
   const [agreeToPrivacy, setAgreeToPrivacy] = useState(false);
   const [errors, setErrors] = useState({ fullName: "", email: "", privacy: "" });
+  const publicAssessmentShellStyle = {
+    background:
+      "radial-gradient(circle at top left, rgba(37, 99, 235, 0.16) 0%, transparent 26%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.1) 0%, transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f8fafc 100%)",
+  };
+
+  const isInterestQuestion = (question: Question) => question.category === "Interests";
+
+  const getSelectedInterestAnswers = (questionId: number) => {
+    const answer = answers[questionId];
+    return Array.isArray(answer) ? answer : [];
+  };
+
+  const isQuestionAnswered = (question: Question) => {
+    const answer = answers[question.id];
+
+    if (isInterestQuestion(question)) {
+      return Array.isArray(answer) && answer.length > 0;
+    }
+
+    return typeof answer === "number";
+  };
 
   useEffect(() => {
     window.scrollTo(0, 0);
-
-    // Clear old cached questions from localStorage to force fresh load
     localStorage.removeItem("assessment_questions");
 
-    // Check if user has already taken the public assessment
-    const existingResults = localStorage.getItem("publicAssessmentResults");
-    const storedUserInfo = localStorage.getItem("publicAssessmentUserInfo");
+    const initializeAssessment = async () => {
+      const existingResults = localStorage.getItem("publicAssessmentResults");
+      const storedUserInfo = localStorage.getItem("publicAssessmentUserInfo");
 
-    if (existingResults) {
-      setAssessmentCompleted(true);
-      setResults(JSON.parse(existingResults));
-      if (storedUserInfo) {
-        setUserInfo(JSON.parse(storedUserInfo));
+      if (existingResults) {
+        setAssessmentCompleted(true);
+        setResults(JSON.parse(existingResults));
+        if (storedUserInfo) {
+          setUserInfo(JSON.parse(storedUserInfo));
+        }
+        setLoading(false);
+        return;
       }
-      setLoading(false);
-      return;
-    }
 
-    // Load questions from localStorage (same as admin uses)
-    loadQuestionsFromStorage();
-    setLoading(false);
+      await loadQuestionsFromSupabase();
+      setLoading(false);
+    };
+
+    initializeAssessment();
   }, []);
+
+  const loadQuestionsFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("assessment_questions")
+        .select("*")
+        .order("id");
+
+      if (error || !data || data.length === 0) {
+        loadQuestionsFromStorage();
+        return;
+      }
+
+      const questions: Question[] = data.map((question) => ({
+        id: question.id,
+        question: question.question,
+        options: question.options || [],
+        correctAnswer: question.correct_answer,
+        category: question.category,
+      }));
+
+      const organizedSections: Section[] = [
+        {
+          name: "Verbal",
+          icon: Brain,
+          questions: questions.filter((question) => question.category === "Verbal"),
+        },
+        {
+          name: "Math",
+          icon: Calculator,
+          questions: questions.filter((question) => question.category === "Math"),
+        },
+        {
+          name: "Science",
+          icon: Beaker,
+          questions: questions.filter((question) => question.category === "Science"),
+        },
+        {
+          name: "Logical",
+          icon: Lightbulb,
+          questions: questions.filter((question) => question.category === "Logical"),
+        },
+        {
+          name: "Interests",
+          icon: Heart,
+          questions: questions.filter((question) => question.category === "Interests"),
+        },
+      ];
+
+      setSections(organizedSections);
+    } catch (error) {
+      console.error("❌ Error loading questions from Supabase:", error);
+      loadQuestionsFromStorage();
+    }
+  };
 
   const loadQuestionsFromStorage = () => {
     const stored = localStorage.getItem("assessment_questions");
@@ -80,32 +160,31 @@ export function PublicAssessment() {
       localStorage.setItem("assessment_questions", JSON.stringify(questions));
     }
 
-    // Organize questions by category
     const organizedSections: Section[] = [
       {
         name: "Verbal",
         icon: Brain,
-        questions: questions.filter(q => q.category === "Verbal"),
+        questions: questions.filter((question) => question.category === "Verbal"),
       },
       {
         name: "Math",
         icon: Calculator,
-        questions: questions.filter(q => q.category === "Math"),
+        questions: questions.filter((question) => question.category === "Math"),
       },
       {
         name: "Science",
         icon: Beaker,
-        questions: questions.filter(q => q.category === "Science"),
+        questions: questions.filter((question) => question.category === "Science"),
       },
       {
         name: "Logical",
         icon: Lightbulb,
-        questions: questions.filter(q => q.category === "Logical"),
+        questions: questions.filter((question) => question.category === "Logical"),
       },
       {
         name: "Interests",
         icon: Heart,
-        questions: questions.filter(q => q.category === "Interests"),
+        questions: questions.filter((question) => question.category === "Interests"),
       },
     ];
 
@@ -127,8 +206,8 @@ export function PublicAssessment() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "var(--electron-light-gray)" }}>
-        <div className="text-center">
+      <div className="min-h-screen flex items-center justify-center p-6" style={publicAssessmentShellStyle}>
+        <div className="portal-glass-panel rounded-[1.75rem] px-10 py-9 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "var(--electron-blue)" }}></div>
           <p className="text-gray-600">Loading assessment...</p>
         </div>
@@ -141,7 +220,6 @@ export function PublicAssessment() {
     const trackColor = "var(--electron-blue)";
     const secondaryColor = "var(--electron-red)";
 
-    // Helper function to get suggested college courses
     const getSuggestedCourses = (track: string, elective: string): string[] => {
       const normalizedElective = elective.toLowerCase();
       
@@ -154,10 +232,12 @@ export function PublicAssessment() {
           return ["Psychology", "Education", "Social Work"];
         } else if (normalizedElective.includes("creative writing")) {
           return ["Communication", "Journalism", "Literature"];
-        } else if (normalizedElective.includes("entrepreneurship")) {
+        } else if (normalizedElective.includes("entrepreneurship") || normalizedElective.includes("marketing")) {
           return ["Business Administration", "Marketing", "Management"];
-        } else if (normalizedElective.includes("media arts")) {
+        } else if (normalizedElective.includes("media arts") || normalizedElective.includes("visual arts")) {
           return ["Multimedia Arts", "Film", "Graphic Design"];
+        } else if (normalizedElective.includes("coaching") || normalizedElective.includes("fitness")) {
+          return ["Physical Education", "Sports Science", "Sports Management"];
         }
       } else if (track === "Technical-Professional") {
         if (normalizedElective.includes("ict")) {
@@ -176,6 +256,8 @@ export function PublicAssessment() {
           return ["Agriculture", "Agribusiness"];
         } else if (normalizedElective.includes("fishery")) {
           return ["Fisheries", "Marine Biology"];
+        } else if (normalizedElective.includes("fitness") || normalizedElective.includes("coaching")) {
+          return ["Physical Education", "Sports Management"];
         }
       }
       
@@ -183,7 +265,7 @@ export function PublicAssessment() {
     };
 
     return (
-      <div className="min-h-screen p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+      <div className="min-h-screen p-4 sm:p-6 lg:p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
         <div className="max-w-6xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
@@ -197,7 +279,7 @@ export function PublicAssessment() {
           </div>
 
           {/* Main Results Card */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+          <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left Column - Track Recommendation */}
               <div>
@@ -327,7 +409,7 @@ export function PublicAssessment() {
           </div>
 
           {/* Available Tracks */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+          <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
             <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
               Available Academic Tracks
             </h2>
@@ -387,7 +469,7 @@ export function PublicAssessment() {
           </div>
 
           {/* Action Buttons */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
+          <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-bold mb-2" style={{ color: "var(--electron-dark-gray)" }}>
                 Ready to Enroll?
@@ -399,7 +481,7 @@ export function PublicAssessment() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/register"
-                className="px-8 py-4 rounded-lg text-white font-semibold transition-all shadow-md hover:opacity-90 flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 sm:px-8 py-4 rounded-lg text-white font-semibold transition-all shadow-md hover:opacity-90 flex items-center justify-center gap-2"
                 style={{ backgroundColor: "var(--electron-blue)" }}
               >
                 <FileText className="w-5 h-5" />
@@ -407,7 +489,7 @@ export function PublicAssessment() {
               </Link>
               <Link
                 to="/login"
-                className="px-8 py-4 rounded-lg font-semibold transition-all shadow-md flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 sm:px-8 py-4 rounded-lg font-semibold transition-all shadow-md flex items-center justify-center gap-2"
                 style={{
                   backgroundColor: "white",
                   color: "var(--electron-blue)",
@@ -419,7 +501,7 @@ export function PublicAssessment() {
               </Link>
             </div>
             <p className="text-center text-sm text-gray-500 mt-6">
-              💡 Your assessment results will be automatically saved to your account when you log in
+              💡 Your assessment results will be linked to your account when you log in. Retakes are disabled after completion.
             </p>
           </div>
         </div>
@@ -429,13 +511,56 @@ export function PublicAssessment() {
 
   const currentSectionData = sections[currentSection];
   const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
-  const answeredQuestions = Object.keys(answers).length;
+  const answeredQuestions = sections.reduce((sum, section) => {
+    return sum + section.questions.filter((question) => isQuestionAnswered(question)).length;
+  }, 0);
   const progress = (answeredQuestions / totalQuestions) * 100;
+  const remainingQuestions = Math.max(totalQuestions - answeredQuestions, 0);
+  const assessmentHighlights = [
+    {
+      title: "AI-guided track fit",
+      description: "Discover whether the Academic or Technical-Professional path matches your current strengths.",
+      icon: Sparkles,
+      accent: "from-[#1E3A8A] to-[#2563EB]",
+    },
+    {
+      title: "Elective subject matches",
+      description: "See which subjects align with the way you think, solve problems, and learn.",
+      icon: BookOpen,
+      accent: "from-[#2563EB] to-[#0EA5E9]",
+    },
+    {
+      title: "Career direction signals",
+      description: "Preview study and career pathways connected to your recommended strand and electives.",
+      icon: Briefcase,
+      accent: "from-[#B91C1C] to-[#EF4444]",
+    },
+  ];
 
   const handleAnswer = (questionId: number, answerIndex: number) => {
-    setAnswers({
-      ...answers,
+    setAnswers((currentAnswers) => ({
+      ...currentAnswers,
       [questionId]: answerIndex,
+    }));
+  };
+
+  const handleInterestToggle = (questionId: number, optionIndex: number) => {
+    setAnswers((currentAnswers) => {
+      const currentSelections = Array.isArray(currentAnswers[questionId])
+        ? [...(currentAnswers[questionId] as number[])]
+        : [];
+      const nextSelections = currentSelections.includes(optionIndex)
+        ? currentSelections.filter((currentIndex) => currentIndex !== optionIndex)
+        : [...currentSelections, optionIndex].sort((leftIndex, rightIndex) => leftIndex - rightIndex);
+      const nextAnswers = { ...currentAnswers };
+
+      if (nextSelections.length === 0) {
+        delete nextAnswers[questionId];
+      } else {
+        nextAnswers[questionId] = nextSelections;
+      }
+
+      return nextAnswers;
     });
   };
 
@@ -452,139 +577,47 @@ export function PublicAssessment() {
     }
   };
 
-  const handleSubmit = () => {
-    // Calculate scores (same logic as student dashboard assessment)
-    const verbalCorrect = sections[0].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-    const mathCorrect = sections[1].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-    const scienceCorrect = sections[2].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-    const logicalCorrect = sections[3].questions.filter(
-      (q) => answers[q.id] === q.correctAnswer
-    ).length;
-
-    // Calculate domain scores (0-100)
-    const VA = (verbalCorrect / 10) * 100;
-    const MA = (mathCorrect / 10) * 100;
-    const SA = (scienceCorrect / 10) * 100;
-    const LRA = (logicalCorrect / 10) * 100;
-
-    // Calculate interest clusters (scaled to 0-20)
-    const academic = ((answers[41] + answers[42] + answers[43] + answers[52]) / 4) * 4;
-    const tech = ((answers[44] + answers[46] + answers[54]) / 3) * 4;
-    const business = answers[45] * 4;
-    const helping = ((answers[47] + answers[53]) / 2) * 4;
-    const home = answers[48] * 4;
-    const creative = answers[49] * 4;
-    const outdoor = answers[50] * 4;
-    const physical = answers[55] * 4;
-    const practical = answers[51] * 4;
-
-    // Calculate track scores
-    const academicScore =
-      VA * 0.25 + MA * 0.25 + SA * 0.25 + LRA * 0.15 + academic * 0.1;
-
-    const techProScore =
-      tech * 0.3 +
-      practical * 0.2 +
-      home * 0.15 +
-      physical * 0.1 +
-      outdoor * 0.1 +
-      LRA * 0.1 +
-      MA * 0.05;
-
-    // Determine track
-    const track = academicScore >= techProScore ? "Academic" : "Technical-Professional";
-
-    // Calculate electives based on track
-    let electives: string[] = [];
-    
-    if (track === "Academic") {
-      const stemScore = MA * 0.4 + SA * 0.4 + LRA * 0.2;
-      const businessScore = MA * 0.4 + business * 0.4 + VA * 0.2;
-      const humanitiesScore = VA * 0.5 + helping * 0.3 + LRA * 0.2;
-      const creativeScore = creative * 0.6 + VA * 0.2 + LRA * 0.2;
-      const sportsScore = physical * 0.6 + SA * 0.2 + LRA * 0.2;
-
-      const electiveScores = [
-        { name: "STEM", score: stemScore, electives: ["Biology", "Physics"] },
-        { name: "BUSINESS", score: businessScore, electives: ["Entrepreneurship", "Marketing"] },
-        { name: "HUMANITIES", score: humanitiesScore, electives: ["Psychology", "Creative Writing"] },
-        { name: "CREATIVE", score: creativeScore, electives: ["Media Arts", "Visual Arts"] },
-        { name: "SPORTS", score: sportsScore, electives: ["Coaching", "Fitness"] },
-      ];
-
-      electiveScores.sort((a, b) => b.score - a.score);
-      electives = electiveScores[0].electives;
-    } else {
-      const ictScore = tech * 0.5 + LRA * 0.3 + MA * 0.2;
-      const homeScore = home * 0.6 + practical * 0.4;
-      const industrialScore = tech * 0.4 + practical * 0.4 + MA * 0.2;
-      const agriScore = outdoor * 0.6 + practical * 0.4;
-      const physicalScore = physical * 0.7 + practical * 0.3;
-
-      const electiveScores = [
-        { name: "ICT", score: ictScore, electives: ["ICT", "Programming"] },
-        { name: "HOME", score: homeScore, electives: ["Cookery", "Bread & Pastry"] },
-        { name: "INDUSTRIAL", score: industrialScore, electives: ["Automotive", "Electrical"] },
-        { name: "AGRI", score: agriScore, electives: ["Agriculture", "Fishery"] },
-        { name: "PHYSICAL", score: physicalScore, electives: ["Fitness Training", "Coaching"] },
-      ];
-
-      electiveScores.sort((a, b) => b.score - a.score);
-      electives = electiveScores[0].electives;
-    }
-
-    // Determine top domains for explanation
-    const domainScores = [
-      { name: "Verbal", score: VA },
-      { name: "Math", score: MA },
-      { name: "Science", score: SA },
-      { name: "Logical", score: LRA },
-    ];
-    domainScores.sort((a, b) => b.score - a.score);
-    const topDomains = domainScores.slice(0, 2).map(d => d.name);
-
-    // Determine top interest clusters
-    const interestScores = [
-      { name: "academic subjects", score: academic },
-      { name: "technology", score: tech },
-      { name: "business", score: business },
-      { name: "helping others", score: helping },
-      { name: "culinary arts", score: home },
-      { name: "creative work", score: creative },
-      { name: "outdoor activities", score: outdoor },
-      { name: "physical activities", score: physical },
-      { name: "practical work", score: practical },
-    ];
-    interestScores.sort((a, b) => b.score - a.score);
-    const topInterests = interestScores.slice(0, 2).map(i => i.name);
-
-    // Calculate overall score (average of domain scores)
-    const overallScore = Math.round((VA + MA + SA + LRA) / 4);
-
-    const assessmentResult: AssessmentResult = {
-      track,
-      electives,
-      scores: { VA, MA, SA, LRA },
-      topDomains,
-      topInterests,
-      overallScore,
+  const handleSubmit = async () => {
+    const questionsByCategory: Record<string, Question[]> = {
+      Verbal: [],
+      Math: [],
+      Science: [],
+      Logical: [],
+      Interests: [],
     };
 
-    // Save to localStorage as public assessment
+    sections.forEach((section) => {
+      if (questionsByCategory[section.name] !== undefined) {
+        questionsByCategory[section.name] = section.questions;
+      }
+    });
+
+    const formattedResult = await formatAssessmentResult(answers, questionsByCategory as any);
+    if (!formattedResult) {
+      console.error("❌ Error formatting public assessment result");
+      return;
+    }
+
+    const assessmentResult: AssessmentResult = {
+      track: formattedResult.track,
+      electives: formattedResult.electives,
+      scores: {
+        VA: formattedResult.scores.verbal_ability_score,
+        MA: formattedResult.scores.mathematical_ability_score,
+        SA: formattedResult.scores.spatial_ability_score,
+        LRA: formattedResult.scores.logical_reasoning_score,
+      },
+      topDomains: formattedResult.topDomains,
+      topInterests: formattedResult.topInterests,
+      overallScore: formattedResult.scores.overall_score,
+    };
+
     localStorage.setItem("publicAssessmentResults", JSON.stringify(assessmentResult));
     localStorage.setItem("publicAssessmentUserInfo", JSON.stringify(userInfo));
 
-    // Also save by email for potential later linking
     const emailKey = `publicAssessment_${userInfo.email}`;
     localStorage.setItem(emailKey, JSON.stringify({ ...assessmentResult, userInfo, timestamp: new Date().toISOString() }));
 
-    // Show results
     setResults(assessmentResult);
     setAssessmentCompleted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -621,9 +654,8 @@ export function PublicAssessment() {
     }
   };
 
-  const isInterestSection = currentSection === 4;
   const allCurrentQuestionsAnswered = currentSectionData.questions.every(
-    (q) => answers[q.id] !== undefined
+    (question) => isQuestionAnswered(question)
   );
 
   const isLastSection = currentSection === sections.length - 1;
@@ -631,171 +663,290 @@ export function PublicAssessment() {
   // Start Assessment Screen - shown before assessment begins
   if (!assessmentStarted) {
     return (
-      <div className="min-h-screen p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
-        <div className="max-w-3xl mx-auto">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <h1
-              className="text-4xl font-bold mb-3"
-              style={{ color: "var(--electron-dark-gray)" }}
-            >
+      <div>
+        <section
+          className="relative overflow-hidden py-28 text-white"
+          style={{
+            background: "linear-gradient(135deg, #1E3A8A 0%, #1e40af 50%, #2563eb 100%)",
+          }}
+        >
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute left-10 top-20 h-72 w-72 rounded-full bg-white blur-3xl" />
+            <div className="absolute bottom-20 right-10 h-96 w-96 rounded-full bg-white blur-3xl" />
+          </div>
+
+          <div className="relative z-10 mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-sm">
+              <Sparkles className="h-4 w-4 text-yellow-300" />
+              <span className="text-sm font-medium">AI-guided strand discovery</span>
+            </div>
+
+            <h1 className="mb-6 text-5xl font-bold tracking-tight md:text-7xl">
               Track Recommendation Assessment
             </h1>
-            <p className="text-xl" style={{ color: "var(--electron-blue)" }}>
-              Powered by AI
-            </p>
-            <p className="text-gray-600 mt-2">
-              Answer the following to determine your recommended track and electives
+            <p className="mx-auto max-w-3xl text-xl font-light text-blue-100 md:text-2xl">
+              Discover the strand, electives, and learning direction that best fit your strengths before you enroll.
             </p>
           </div>
+        </section>
 
-          {/* Start Assessment Form */}
-          <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-            <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
-              Start Assessment
-            </h2>
-
-            <div className="space-y-6">
-              {/* Full Name */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Full Name <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={userInfo.fullName}
-                  onChange={(e) => {
-                    setUserInfo({ ...userInfo, fullName: e.target.value });
-                    setErrors({ ...errors, fullName: "" });
-                  }}
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                    errors.fullName
-                      ? "border-red-300 focus:ring-red-200"
-                      : "border-gray-300 focus:ring-blue-200"
-                  }`}
-                  placeholder="Enter your full name"
-                />
-                {errors.fullName && (
-                  <p className="text-red-600 text-sm mt-1">{errors.fullName}</p>
-                )}
-              </div>
-
-              {/* Email Address */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Email Address <span className="text-red-600">*</span>
-                </label>
-                <input
-                  type="email"
-                  value={userInfo.email}
-                  onChange={(e) => {
-                    setUserInfo({ ...userInfo, email: e.target.value });
-                    setErrors({ ...errors, email: "" });
-                  }}
-                  className={`w-full px-4 py-3 border-2 rounded-lg focus:outline-none focus:ring-2 ${
-                    errors.email
-                      ? "border-red-300 focus:ring-red-200"
-                      : "border-gray-300 focus:ring-blue-200"
-                  }`}
-                  placeholder="Enter your email address"
-                />
-                {errors.email && (
-                  <p className="text-red-600 text-sm mt-1">{errors.email}</p>
-                )}
-              </div>
-
-              {/* Data Privacy Notice */}
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-gray-700 leading-relaxed">
-                  <strong className="text-gray-900">Data Privacy Notice:</strong> This system collects your name and email address in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173). The information you provide will be used solely for generating your assessment results and linking them to your account. Your data will be kept confidential and will not be shared with unauthorized parties.
-                </p>
-              </div>
-
-              {/* Privacy Consent Checkbox */}
-              <div>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={agreeToPrivacy}
-                    onChange={(e) => {
-                      setAgreeToPrivacy(e.target.checked);
-                      setErrors({ ...errors, privacy: "" });
-                    }}
-                    className="mt-1 w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
-                  />
-                  <span className="text-sm text-gray-700">
-                    I agree to the collection and use of my personal data for assessment purposes. <span className="text-red-600">*</span>
-                  </span>
-                </label>
-                {errors.privacy && (
-                  <p className="text-red-600 text-sm mt-2">{errors.privacy}</p>
-                )}
-              </div>
-
-              {/* Start Button */}
-              <button
-                onClick={handleStartAssessment}
-                className="w-full px-6 py-4 rounded-lg text-white font-bold text-lg transition-all shadow-lg hover:shadow-xl"
-                style={{
-                  backgroundColor: "var(--electron-blue)",
-                }}
+        <section className="bg-white py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-4xl text-center">
+              <h2 className="mb-6 text-4xl font-bold md:text-5xl" style={{ color: "#1E3A8A" }}>
+                Start your AI assessment
+              </h2>
+              <p className="mb-8 text-lg leading-relaxed text-gray-600">
+                This guided assessment evaluates how you think, solve problems, and respond to different learning situations so Electron College can recommend the track that suits you best.
+              </p>
+              <div
+                className="inline-block rounded-lg px-8 py-4 text-lg font-semibold text-white shadow-lg"
+                style={{ backgroundColor: "#B91C1C" }}
               >
-                Start Assessment
-              </button>
+                {totalQuestions} Questions • {sections.length} Focus Areas • No Login Required
+              </div>
             </div>
           </div>
+        </section>
 
-          {/* Back to Home */}
-          <div className="text-center">
-            <Link
-              to="/"
-              className="text-gray-600 hover:text-gray-800 font-medium inline-flex items-center gap-2"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Back to Home
-            </Link>
+        <section className="py-20" style={{ backgroundColor: "#F8FAFC" }}>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.95fr)] lg:items-start">
+              <div>
+                <div className="mb-12">
+                  <h2 className="mb-4 text-4xl font-bold md:text-5xl" style={{ color: "#1E3A8A" }}>
+                    What you will get
+                  </h2>
+                  <p className="text-lg text-gray-600">
+                    The assessment gives you a clearer direction before you submit enrollment requirements.
+                  </p>
+                  <div className="mx-auto mt-4 h-1 w-24 rounded-full lg:mx-0" style={{ backgroundColor: "#B91C1C" }}></div>
+                </div>
+
+                <div className="grid gap-6">
+                  {assessmentHighlights.map((highlight, index) => {
+                    const HighlightIcon = highlight.icon;
+                    const accentColor = index % 2 === 0 ? "#1E3A8A" : "#B91C1C";
+
+                    return (
+                      <div key={highlight.title} className="rounded-2xl bg-white p-8 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                        <div
+                          className="mb-4 flex h-16 w-16 items-center justify-center rounded-full shadow-md"
+                          style={{ backgroundColor: accentColor }}
+                        >
+                          <HighlightIcon className="h-8 w-8 text-white" />
+                        </div>
+                        <h3 className="mb-3 text-2xl font-bold text-gray-900">{highlight.title}</h3>
+                        <p className="leading-relaxed text-gray-600">{highlight.description}</p>
+                      </div>
+                    );
+                  })}
+
+                  <div className="rounded-2xl bg-white p-8 shadow-lg">
+                    <h3 className="mb-4 text-2xl font-bold" style={{ color: "#1E3A8A" }}>
+                      Assessment coverage
+                    </h3>
+                    <div className="flex flex-wrap gap-3">
+                      {sections.map((section) => {
+                        const SectionIcon = section.icon;
+                        return (
+                          <div key={section.name} className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-900">
+                            <SectionIcon className="h-4 w-4" />
+                            {section.name}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Link
+                      to="/"
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 transition-colors hover:text-gray-900"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Back to Home
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-6 shadow-xl sm:p-8 lg:sticky lg:top-24">
+                <div className="mb-6 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-bold tracking-[0.16em] text-red-600 uppercase">Start Here</p>
+                    <h2 className="mt-3 text-3xl font-bold text-gray-900">Begin Assessment</h2>
+                    <p className="mt-2 text-gray-600">
+                      Enter your details so your results can be saved and linked to your account later.
+                    </p>
+                  </div>
+                  <div className="hidden h-14 w-14 items-center justify-center rounded-2xl bg-[#1E3A8A] text-white shadow-lg sm:flex">
+                    <Brain className="h-6 w-6" />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Full Name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={userInfo.fullName}
+                      onChange={(e) => {
+                        setUserInfo({ ...userInfo, fullName: e.target.value });
+                        setErrors({ ...errors, fullName: "" });
+                      }}
+                      className={`w-full rounded-xl border-2 px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
+                        errors.fullName
+                          ? "border-red-300 focus:ring-red-200"
+                          : "border-gray-300 focus:ring-blue-200"
+                      }`}
+                      placeholder="Enter your full name"
+                    />
+                    {errors.fullName && <p className="mt-2 text-sm text-red-600">{errors.fullName}</p>}
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">
+                      Email Address <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={userInfo.email}
+                      onChange={(e) => {
+                        setUserInfo({ ...userInfo, email: e.target.value });
+                        setErrors({ ...errors, email: "" });
+                      }}
+                      className={`w-full rounded-xl border-2 px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
+                        errors.email
+                          ? "border-red-300 focus:ring-red-200"
+                          : "border-gray-300 focus:ring-blue-200"
+                      }`}
+                      placeholder="Enter your email address"
+                    />
+                    {errors.email && <p className="mt-2 text-sm text-red-600">{errors.email}</p>}
+                  </div>
+
+                  <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm leading-relaxed text-gray-700">
+                      <strong className="text-gray-900">Data Privacy Notice:</strong> Your name and email are collected in accordance with the Data Privacy Act of 2012. They are used only to generate your assessment results and associate them with your account. Your data will remain confidential and will not be shared with unauthorized parties.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="flex cursor-pointer items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={agreeToPrivacy}
+                        onChange={(e) => {
+                          setAgreeToPrivacy(e.target.checked);
+                          setErrors({ ...errors, privacy: "" });
+                        }}
+                        className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                      />
+                      <span className="text-sm text-gray-700">
+                        I agree to the collection and use of my personal data for assessment purposes. <span className="text-red-600">*</span>
+                      </span>
+                    </label>
+                    {errors.privacy && <p className="mt-2 text-sm text-red-600">{errors.privacy}</p>}
+                  </div>
+
+                  <button
+                    onClick={handleStartAssessment}
+                    className="w-full rounded-lg px-6 py-4 text-lg font-bold text-white shadow-lg transition-all hover:shadow-xl"
+                    style={{ backgroundColor: "var(--electron-blue)" }}
+                  >
+                    Start Assessment
+                  </button>
+
+                  <p className="text-center text-sm text-gray-500">
+                    Your results appear immediately after the last section and can be linked to your portal later.
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
       </div>
     );
   }
 
   // Main Assessment UI
   return (
-    <div className="min-h-screen p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1
-            className="text-4xl font-bold mb-3"
-            style={{ color: "var(--electron-dark-gray)" }}
-          >
-            Track Recommendation Assessment
-          </h1>
-          <p className="text-xl" style={{ color: "var(--electron-blue)" }}>
-            Powered by AI
-          </p>
-          <p className="text-gray-600 mt-2">
-            Answer the following to determine your recommended track and electives
-          </p>
-          <div className="mt-4 inline-flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
-            <Sparkles className="w-4 h-4" style={{ color: "var(--electron-blue)" }} />
-            <span className="text-sm font-medium text-gray-700">No login required - Take it now!</span>
-          </div>
+    <div>
+      <section
+        className="relative overflow-hidden py-20 text-white"
+        style={{
+          background: "linear-gradient(135deg, #1E3A8A 0%, #1e40af 50%, #2563eb 100%)",
+        }}
+      >
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute left-10 top-16 h-64 w-64 rounded-full bg-white blur-3xl" />
+          <div className="absolute bottom-10 right-10 h-72 w-72 rounded-full bg-white blur-3xl" />
         </div>
 
-        {/* Progress Bar Steps */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start mb-4 relative">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-sm">
+            <Sparkles className="h-4 w-4 text-yellow-300" />
+            <span className="text-sm font-medium">Assessment in progress</span>
+          </div>
+          <h1 className="mb-4 text-4xl font-bold tracking-tight md:text-6xl">
+            Track Recommendation Assessment
+          </h1>
+          <p className="mx-auto max-w-3xl text-lg text-blue-100 md:text-xl">
+            Work through each section in order. Your answers are used to build your final track and elective recommendation.
+          </p>
+        </div>
+      </section>
+
+      <section className="bg-white py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-4xl text-center">
+            <h2 className="mb-4 text-4xl font-bold" style={{ color: "#1E3A8A" }}>
+              {currentSectionData.name} Section
+            </h2>
+            <p className="text-lg text-gray-600">
+              You have answered {answeredQuestions} of {totalQuestions} questions. Keep going to unlock your final recommendation.
+            </p>
+            <div
+              className="mt-8 inline-block rounded-lg px-8 py-4 text-lg font-semibold text-white shadow-lg"
+              style={{ backgroundColor: "#B91C1C" }}
+            >
+              Section {currentSection + 1} of {sections.length} • {remainingQuestions} Questions Remaining
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16" style={{ backgroundColor: "#F8FAFC" }}>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg sm:p-8">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold" style={{ color: "#1E3A8A" }}>
+                    Assessment Progress
+                  </h2>
+                  <p className="mt-2 text-gray-600">Move through each focus area in order.</p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-900">
+                  <TrendingUp className="h-4 w-4" />
+                  {Math.round(progress)}% Complete
+                </div>
+              </div>
+
+              <div className="relative overflow-x-auto pb-2">
+                <div className="relative flex min-w-[720px] justify-between gap-4">
             {sections.map((section, index) => {
               const Icon = section.icon;
               const isActive = index === currentSection;
               const isCompleted = index < currentSection;
 
               return (
-                <div key={index} className="flex flex-col items-center flex-1 relative z-10">
+                <div key={index} className="relative z-10 flex flex-1 flex-col items-center">
                   <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all ${
+                    className={`mb-2 flex h-12 w-12 items-center justify-center rounded-full transition-all ${
                       isActive
                         ? "text-white shadow-lg"
                         : isCompleted
@@ -824,7 +975,7 @@ export function PublicAssessment() {
             })}
             
             {/* Connecting Lines */}
-            <div className="absolute top-6 left-0 right-0 flex items-center px-12 -z-10">
+            <div className="absolute left-0 right-0 top-6 -z-10 flex items-center px-12">
               {sections.slice(0, -1).map((_, index) => (
                 <div
                   key={index}
@@ -834,143 +985,153 @@ export function PublicAssessment() {
                 />
               ))}
             </div>
-          </div>
-
-          {/* Overall Progress */}
-          <div className="mt-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Overall Progress</span>
-              <span>
-                {answeredQuestions} / {totalQuestions} questions
-              </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className="h-3 rounded-full transition-all duration-300"
-                style={{
-                  width: `${progress}%`,
-                  backgroundColor: "var(--electron-blue)",
-                }}
-              />
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* Question Card */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
-          <h2
-            className="text-2xl font-bold mb-6"
-            style={{ color: "var(--electron-dark-gray)" }}
-          >
-            {currentSectionData.name}
-          </h2>
+            <div className="mb-6 rounded-2xl bg-white p-6 shadow-lg sm:p-8">
+              <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2
+                    className="text-2xl font-bold"
+                    style={{ color: "var(--electron-dark-gray)" }}
+                  >
+                    {currentSectionData.name}
+                  </h2>
+                  <p className="mt-2 text-gray-600">
+                    {currentSectionData.name === "Interests"
+                      ? "Use the checklist and select every option that applies to you before moving to the next section."
+                      : "Answer every question carefully before moving to the next section."}
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
+                  <BarChart3 className="h-4 w-4" />
+                  {currentSectionData.questions.length} Questions
+                </div>
+              </div>
 
-          <div className="space-y-8">
-            {currentSectionData.questions.map((question, qIndex) => (
-              <div key={question.id} className="pb-6 border-b border-gray-200 last:border-b-0">
-                <p className="text-lg mb-4 font-medium text-gray-800">
-                  {question.id}. {question.question}
-                </p>
+              <div className="space-y-8">
+                {currentSectionData.questions.map((question, qIndex) => (
+                  <div key={question.id} className="border-b border-gray-200 pb-6 last:border-b-0">
+                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+                      Question {qIndex + 1}
+                    </div>
+                    <p className="mb-4 text-lg font-medium text-gray-800">
+                      {qIndex + 1}. {question.question}
+                    </p>
 
-                {isInterestSection ? (
-                  // Likert scale for interest questions
-                  <div className="grid grid-cols-5 gap-3">
-                    {[1, 2, 3, 4, 5].map((value) => (
-                      <button
-                        key={value}
-                        onClick={() => handleAnswer(question.id, value)}
-                        className={`py-3 px-2 rounded-lg border-2 transition-all text-sm font-medium text-center ${
-                          answers[question.id] === value
-                            ? "text-white shadow-md"
-                            : "border-gray-300 text-gray-700 hover:border-blue-300"
-                        }`}
-                        style={
-                          answers[question.id] === value
-                            ? { backgroundColor: "var(--electron-blue)", borderColor: "var(--electron-blue)" }
-                            : {}
-                        }
-                      >
-                        {value === 1 && "Strongly Disagree"}
-                        {value === 2 && "Disagree"}
-                        {value === 3 && "Neutral"}
-                        {value === 4 && "Agree"}
-                        {value === 5 && "Strongly Agree"}
-                      </button>
-                    ))}
+                    {isInterestQuestion(question) ? (
+                      <div>
+                        <p className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-red-600">
+                          Select all that apply
+                        </p>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                          {question.options.map((option, optIndex) => {
+                            const selectedOptions = getSelectedInterestAnswers(question.id);
+                            const isSelected = selectedOptions.includes(optIndex);
+
+                            return (
+                              <label
+                                key={optIndex}
+                                className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 px-4 py-3.5 transition-all ${
+                                  isSelected
+                                    ? "border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
+                                    : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => handleInterestToggle(question.id, optIndex)}
+                                  className="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                                />
+                                <span className="text-sm font-medium leading-6">{option}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {question.options.map((option, optIndex) => (
+                          <button
+                            key={optIndex}
+                            onClick={() => handleAnswer(question.id, optIndex)}
+                            className={`rounded-xl border-2 px-4 py-3.5 text-left transition-all ${
+                              answers[question.id] === optIndex
+                                ? "text-white shadow-md"
+                                : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
+                            }`}
+                            style={
+                              answers[question.id] === optIndex
+                                ? { backgroundColor: "var(--electron-blue)", borderColor: "var(--electron-blue)" }
+                                : {}
+                            }
+                          >
+                            <span className="font-semibold mr-2">
+                              {String.fromCharCode(97 + optIndex)}.
+                            </span>
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
+                ))}
+              </div>
+
+              <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  onClick={handlePrevious}
+                  disabled={currentSection === 0}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border-2 px-6 py-3 font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{
+                    borderColor: "var(--electron-blue)",
+                    color: "var(--electron-blue)",
+                  }}
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                  Previous
+                </button>
+
+                {!allCurrentQuestionsAnswered && (
+                  <p className="text-center text-sm text-gray-500 sm:text-left">
+                    {currentSectionData.name === "Interests"
+                      ? "Choose at least one checklist item for every interest question to continue."
+                      : "Answer every question in this section to continue."}
+                  </p>
+                )}
+
+                {isLastSection ? (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!allCurrentQuestionsAnswered}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
+                    style={{
+                      backgroundColor: "var(--electron-blue)",
+                    }}
+                  >
+                    Submit Assessment
+                    <CheckCircle className="w-5 h-5" />
+                  </button>
                 ) : (
-                  // Multiple choice for objective questions
-                  <div className="grid grid-cols-2 gap-3">
-                    {question.options.map((option, optIndex) => (
-                      <button
-                        key={optIndex}
-                        onClick={() => handleAnswer(question.id, optIndex)}
-                        className={`py-3 px-4 rounded-lg border-2 transition-all text-left ${
-                          answers[question.id] === optIndex
-                            ? "text-white shadow-md"
-                            : "border-gray-300 text-gray-700 hover:border-blue-300"
-                        }`}
-                        style={
-                          answers[question.id] === optIndex
-                            ? { backgroundColor: "var(--electron-blue)", borderColor: "var(--electron-blue)" }
-                            : {}
-                        }
-                      >
-                        <span className="font-semibold mr-2">
-                          {String.fromCharCode(97 + optIndex)}.
-                        </span>
-                        {option}
-                      </button>
-                    ))}
-                  </div>
+                  <button
+                    onClick={handleNext}
+                    disabled={!allCurrentQuestionsAnswered}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                    style={{
+                      backgroundColor: "var(--electron-blue)",
+                    }}
+                  >
+                    Next
+                    <ChevronRight className="w-5 h-5" />
+                  </button>
                 )}
               </div>
-            ))}
+            </div>
           </div>
         </div>
-
-        {/* Navigation Buttons */}
-        <div className="flex justify-between items-center">
-          <button
-            onClick={handlePrevious}
-            disabled={currentSection === 0}
-            className="px-6 py-3 rounded-lg border-2 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            style={{
-              borderColor: "var(--electron-blue)",
-              color: "var(--electron-blue)",
-            }}
-          >
-            <ChevronLeft className="w-5 h-5" />
-            Previous
-          </button>
-
-          {isLastSection ? (
-            <button
-              onClick={handleSubmit}
-              disabled={!allCurrentQuestionsAnswered}
-              className="px-6 py-3 rounded-lg text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg flex items-center gap-2"
-              style={{
-                backgroundColor: "var(--electron-blue)",
-              }}
-            >
-              Submit Assessment
-              <CheckCircle className="w-5 h-5" />
-            </button>
-          ) : (
-            <button
-              onClick={handleNext}
-              disabled={!allCurrentQuestionsAnswered}
-              className="px-6 py-3 rounded-lg text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              style={{
-                backgroundColor: "var(--electron-blue)",
-              }}
-            >
-              Next
-              <ChevronRight className="w-5 h-5" />
-            </button>
-          )}
-        </div>
-      </div>
+      </section>
     </div>
   );
 }

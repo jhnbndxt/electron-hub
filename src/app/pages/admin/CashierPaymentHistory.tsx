@@ -12,6 +12,7 @@ import {
   FileText,
   Eye,
 } from "lucide-react";
+import { supabase } from "../../../supabase";
 
 interface PaymentRecord {
   id: string;
@@ -40,52 +41,73 @@ export function CashierPaymentHistory() {
     loadPaymentHistory();
   }, []);
 
-  const loadPaymentHistory = () => {
-    const history: PaymentRecord[] = [];
+  const loadPaymentHistory = async () => {
+    try {
+      // Load completed/rejected payments from Supabase
+      const { data: payments, error } = await supabase
+        .from("payments")
+        .select("*")
+        .in("status", ["verified", "approved", "paid", "rejected", "completed"])
+        .order("updated_at", { ascending: false });
 
-    // Load online payments (bank/gcash)
-    const paymentQueue = JSON.parse(localStorage.getItem("payment_queue") || "[]");
-    const completedOnline = paymentQueue
-      .filter((p: any) => p.status === "approved" || p.status === "rejected")
-      .map((p: any) => ({
+      if (error) {
+        console.error("Error loading payment history:", error);
+        setPaymentHistory([]);
+        return;
+      }
+
+      if (!payments || payments.length === 0) {
+        setPaymentHistory([]);
+        return;
+      }
+
+      // Fetch user details for students and payment processors
+      const userIds = [
+        ...new Set(
+          payments
+            .flatMap((payment: any) => [payment.student_id, payment.verified_by])
+            .filter(Boolean)
+        ),
+      ];
+      const { data: users } = await supabase
+        .from("users")
+        .select("id, full_name, email")
+        .in("id", userIds);
+
+      const userMap: Record<string, { name: string; email: string }> = {};
+      users?.forEach((u: any) => {
+        userMap[u.id] = { name: u.full_name, email: u.email };
+      });
+
+      const history: PaymentRecord[] = payments.map((p: any) => ({
         id: p.id,
-        studentEmail: p.studentEmail,
-        studentName: p.studentName,
-        paymentMode: p.paymentMode,
-        referenceNumber: p.referenceNumber,
-        amount: 15000, // Standard enrollment fee
-        status: p.status,
-        processedDate: p.approvedDate || p.submittedDate,
-        processedBy: "Cashier",
-        rejectionComment: p.rejectionComment,
+        studentEmail: userMap[p.student_id]?.email || p.student_id,
+        studentName: userMap[p.student_id]?.name || "Unknown Student",
+        paymentMode: p.payment_method as "bank" | "gcash" | "cash",
+        referenceNumber: p.reference_number || undefined,
+        queueNumber: p.queue_number || undefined,
+        amount: Number(p.amount) || 15000,
+        status: p.status === "completed" || p.status === "verified" || p.status === "approved"
+          ? "approved"
+          : p.status === "paid"
+          ? "paid"
+          : "rejected",
+        processedDate: p.verified_at || p.paid_at || p.updated_at || p.created_at,
+        processedBy: p.verified_by ? userMap[p.verified_by]?.name || "Cashier" : "Cashier",
+        rejectionComment: p.notes || undefined,
       }));
 
-    // Load cash payments
-    const cashQueue = JSON.parse(localStorage.getItem("cash_payment_queue") || "[]");
-    const completedCash = cashQueue
-      .filter((p: any) => p.status === "paid")
-      .map((p: any) => ({
-        id: p.id,
-        studentEmail: p.studentEmail,
-        studentName: p.studentName,
-        paymentMode: "cash" as const,
-        queueNumber: p.queueNumber,
-        amount: 15000,
-        status: "paid" as const,
-        processedDate: p.paidDate || p.generatedDate,
-        processedBy: "Cashier",
-      }));
-
-    const allHistory = [...completedOnline, ...completedCash].sort(
-      (a, b) => new Date(b.processedDate).getTime() - new Date(a.processedDate).getTime()
-    );
-
-    setPaymentHistory(allHistory);
+      setPaymentHistory(history);
+    } catch (err) {
+      console.error("Error loading payment history:", err);
+      setPaymentHistory([]);
+    }
   };
 
   // Filter logic
   let filteredHistory = paymentHistory.filter(
     (payment) =>
+      payment.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
       payment.referenceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -130,8 +152,9 @@ export function CashierPaymentHistory() {
   const rejectedCount = filteredHistory.filter((p) => p.status === "rejected").length;
 
   const handleExportCSV = () => {
-    const csvHeaders = ["Date", "Student Name", "Email", "Payment Method", "Reference/Queue", "Amount", "Status"];
+    const csvHeaders = ["Transaction ID", "Date", "Student Name", "Email", "Payment Method", "Reference/Queue", "Amount", "Status"];
     const csvRows = filteredHistory.map((p) => [
+      p.id,
       p.processedDate,
       p.studentName,
       p.studentEmail,
@@ -151,7 +174,7 @@ export function CashierPaymentHistory() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment History</h1>
@@ -159,7 +182,7 @@ export function CashierPaymentHistory() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
@@ -211,8 +234,8 @@ export function CashierPaymentHistory() {
 
       {/* Filters and Search */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 min-w-[240px]">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
+          <div className="relative w-full md:flex-1 md:min-w-[240px]">
             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -223,12 +246,12 @@ export function CashierPaymentHistory() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Status</option>
               <option value="approved">Approved</option>
@@ -240,7 +263,7 @@ export function CashierPaymentHistory() {
           <select
             value={paymentTypeFilter}
             onChange={(e) => setPaymentTypeFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Payment Methods</option>
             <option value="bank">Bank Transfer</option>
@@ -251,7 +274,7 @@ export function CashierPaymentHistory() {
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Time</option>
             <option value="today">Today</option>
@@ -261,7 +284,7 @@ export function CashierPaymentHistory() {
 
           <button
             onClick={handleExportCSV}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
             Export CSV
@@ -272,11 +295,14 @@ export function CashierPaymentHistory() {
       {/* Payment History Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[980px]">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Transaction ID
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Student
@@ -301,7 +327,7 @@ export function CashierPaymentHistory() {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <FileText className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                     <p className="text-gray-900 font-medium mb-1">No payment history found</p>
                     <p className="text-sm text-gray-500">
@@ -319,6 +345,9 @@ export function CashierPaymentHistory() {
                           {new Date(payment.processedDate).toLocaleDateString()}
                         </span>
                       </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="text-sm font-mono text-gray-900">{payment.id}</span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
@@ -415,6 +444,10 @@ export function CashierPaymentHistory() {
 
               <div className="p-6">
                 <div className="space-y-4">
+                  <div>
+                    <p className="text-sm text-gray-600">Transaction ID</p>
+                    <p className="text-base font-mono font-medium break-all text-gray-900">{selectedPayment.id}</p>
+                  </div>
                   <div>
                     <p className="text-sm text-gray-600">Student Name</p>
                     <p className="text-base font-medium text-gray-900">{selectedPayment.studentName}</p>

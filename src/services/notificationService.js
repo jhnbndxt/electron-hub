@@ -10,11 +10,45 @@
 
 import { supabase } from '../supabase';
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+async function resolveNotificationUserId(userReference) {
+  const normalizedReference = String(userReference || '').trim();
+
+  if (!normalizedReference) {
+    return null;
+  }
+
+  if (UUID_PATTERN.test(normalizedReference)) {
+    return normalizedReference;
+  }
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id')
+    .eq('email', normalizedReference)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error resolving notification user:', error);
+    return null;
+  }
+
+  return data?.id || null;
+}
+
 /**
  * Add a new notification
  */
-export async function addNotification(userId, type, title, message, additionalData = {}) {
+export async function addNotification(userReference, type, title, message, additionalData = {}) {
   try {
+    const userId = await resolveNotificationUserId(userReference);
+
+    if (!userId) {
+      throw new Error(`Unable to resolve notification recipient: ${userReference}`);
+    }
+
     const { data, error } = await supabase
       .from('notifications')
       .insert({
@@ -22,7 +56,7 @@ export async function addNotification(userId, type, title, message, additionalDa
         type,
         title,
         message,
-        read: false,
+        is_read: false,
         data: additionalData,
         created_at: new Date().toISOString(),
       })
@@ -41,8 +75,11 @@ export async function addNotification(userId, type, title, message, additionalDa
 /**
  * Get all notifications for a user
  */
-export async function getUserNotifications(userId) {
+export async function getUserNotifications(userReference) {
   try {
+    const userId = await resolveNotificationUserId(userReference);
+    if (!userId) return [];
+
     const { data, error } = await supabase
       .from('notifications')
       .select('*')
@@ -60,16 +97,19 @@ export async function getUserNotifications(userId) {
 /**
  * Get unread notifications count
  */
-export async function getUnreadNotificationsCount(userId) {
+export async function getUnreadNotificationsCount(userReference) {
   try {
-    const { data, error } = await supabase
+    const userId = await resolveNotificationUserId(userReference);
+    if (!userId) return 0;
+
+    const { count, error } = await supabase
       .from('notifications')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
-      .eq('read', false);
+      .eq('is_read', false);
 
     if (error) throw error;
-    return data?.length || 0;
+    return count || 0;
   } catch (error) {
     console.error('Error fetching unread count:', error);
     return 0;
@@ -83,7 +123,7 @@ export async function markNotificationAsRead(notificationId) {
   try {
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true, read_at: new Date().toISOString() })
+      .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('id', notificationId);
 
     if (error) throw error;
@@ -97,13 +137,16 @@ export async function markNotificationAsRead(notificationId) {
 /**
  * Mark all notifications as read for a user
  */
-export async function markAllNotificationsAsRead(userId) {
+export async function markAllNotificationsAsRead(userReference) {
   try {
+    const userId = await resolveNotificationUserId(userReference);
+    if (!userId) return;
+
     const { error } = await supabase
       .from('notifications')
-      .update({ read: true, read_at: new Date().toISOString() })
+      .update({ is_read: true, read_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .eq('read', false);
+      .eq('is_read', false);
 
     if (error) throw error;
     console.log('✅ All notifications marked as read for user:', userId);
@@ -134,8 +177,11 @@ export async function deleteNotification(notificationId) {
 /**
  * Delete all notifications for a user
  */
-export async function deleteAllNotifications(userId) {
+export async function deleteAllNotifications(userReference) {
   try {
+    const userId = await resolveNotificationUserId(userReference);
+    if (!userId) return;
+
     const { error } = await supabase
       .from('notifications')
       .delete()
@@ -156,47 +202,42 @@ export async function deleteAllNotifications(userId) {
 export async function triggerNotification(userId, trigger, additionalData = {}) {
   const notificationMap = {
     ASSESSMENT_COMPLETED: {
-      type: 'assessment',
       title: 'Assessment Completed',
       message: 'You have successfully completed the career assessment.',
     },
     ENROLLMENT_SUBMITTED: {
-      type: 'enrollment',
       title: 'Enrollment Submitted',
       message: 'Your enrollment form has been submitted successfully.',
     },
     PAYMENT_SUBMITTED: {
-      type: 'payment',
       title: 'Payment Submitted',
       message: 'Your payment has been submitted for verification.',
     },
     PAYMENT_VERIFIED: {
-      type: 'payment',
       title: 'Payment Verified',
       message: 'Your payment has been verified successfully.',
     },
     PAYMENT_REJECTED: {
-      type: 'payment',
       title: 'Payment Rejected',
       message: 'Your payment was rejected. Please try again.',
     },
     DOCUMENTS_VERIFIED: {
-      type: 'document',
       title: 'Documents Verified',
       message: 'All your documents have been verified and approved.',
     },
     ENROLLMENT_APPROVED: {
-      type: 'enrollment',
       title: 'Enrollment Approved',
       message: 'Your enrollment has been approved. Welcome!',
     },
     ENROLLMENT_REJECTED: {
-      type: 'enrollment',
       title: 'Enrollment Rejected',
       message: 'Your enrollment was not approved. Please review the feedback.',
     },
+    DOCUMENTS_REJECTED: {
+      title: 'Documents Rejected',
+      message: additionalData.message || 'One or more enrollment documents were rejected. Please review the feedback.',
+    },
     DOCUMENT_REJECTED: {
-      type: 'document',
       title: 'Document Rejected',
       message: additionalData.message || 'A document was rejected. Please review and reupload.',
     },
@@ -210,7 +251,7 @@ export async function triggerNotification(userId, trigger, additionalData = {}) 
 
   return addNotification(
     userId,
-    notification.type,
+    trigger,
     notification.title,
     notification.message,
     { trigger, ...additionalData }

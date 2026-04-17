@@ -269,6 +269,16 @@ const { data, error } = await supabase.auth.signUp({
 const { data: { user } } = await supabase.auth.getUser();
 ```
 
+### Electron Hub OTP Registration Template
+The current student registration flow in this project uses `signInWithOtp()` to send a 6-digit email code, then calls `verifyOtp({ type: 'email' })`, and only after that inserts the custom `users` record.
+
+Before testing registration, update this Supabase dashboard setting:
+- `Auth > Email Templates > Magic Link`
+- Subject: `Your Electron Hub verification code`
+- Body: use `SUPABASE_EMAIL_OTP_TEMPLATE.html`
+
+Do not leave `{{ .ConfirmationURL }}` in the Magic Link template for this flow. The app expects `{{ .Token }}` so the user receives a numeric code instead of a link.
+
 ---
 
 ## 🎯 Common Tasks

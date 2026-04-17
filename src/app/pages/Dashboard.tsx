@@ -23,23 +23,34 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useState, useEffect } from "react";
+import { supabase } from "../../supabase";
 
 export function Dashboard() {
-  const { userData, enrollmentProgress, updateEnrollmentProgress, hasVisitedPayment } = useAuth();
+  const { userData, enrollmentProgress, hasVisitedPayment } = useAuth();
   const { openChat } = useChat();
   const [rejectedDocuments, setRejectedDocuments] = useState<Array<{ name: string; comment: string }>>([]);
   
   // Get first name from full name
   const firstName = userData?.name ? userData.name.split(" ")[0] : "Student";
 
-  // Check for rejected documents
+  // Check for rejected documents from Supabase
   useEffect(() => {
-    if (userData?.email) {
-      const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-      const userDocs = docVerification[userData.email] || {};
-      
+    const checkRejectedDocs = async () => {
+      if (!userData?.email) return;
+
+      // Get the user's enrollment and documents
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('id, enrollment_documents(*)')
+        .eq('user_id', userData.email)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      const enrollment = enrollments?.[0];
+      if (!enrollment?.enrollment_documents) return;
+
       const documentNames: Record<string, string> = {
-        psaBirthCertificate: "PSA Birth Certificate",
+        birthCertificate: "PSA Birth Certificate",
         form138: "Form 138 (Report Card)",
         form137: "Form 137",
         goodMoral: "Good Moral Certificate",
@@ -47,15 +58,17 @@ export function Dashboard() {
         diploma: "Grade 10 Diploma",
       };
 
-      const rejected = Object.entries(userDocs)
-        .filter(([_, doc]: [string, any]) => doc.status === "rejected")
-        .map(([key, doc]: [string, any]) => ({
-          name: documentNames[key] || key,
-          comment: doc.rejectionComment || "No comment provided",
+      const rejected = enrollment.enrollment_documents
+        .filter((doc: any) => doc.status === 'rejected')
+        .map((doc: any) => ({
+          name: documentNames[doc.document_type] || doc.document_type,
+          comment: doc.rejection_comment || doc.rejection_reason || "No comment provided",
         }));
 
       setRejectedDocuments(rejected);
-    }
+    };
+
+    checkRejectedDocs();
   }, [userData]);
 
   // Define the 7 enrollment steps with icons
@@ -105,9 +118,9 @@ export function Dashboard() {
       estimatedTime: "1-2 business days"
     },
     "Payment Submitted": {
-      title: "Payment Under Review",
-      message: "Your payment has been submitted successfully. Our finance team is verifying your payment details.",
-      estimatedTime: "Processing within 24 hours"
+      title: "Payment Step Unlocked",
+      message: "Your documents have been verified. You can now proceed to the payment page to complete your enrollment.",
+      estimatedTime: "Action required"
     },
     "Payment Verified": {
       title: "Final Verification in Progress",
@@ -137,7 +150,7 @@ export function Dashboard() {
     const documentsSubmitted = enrollmentSteps.find(step => step.name === "Documents Submitted")?.status === "completed";
     
     // Check if payment is completed
-    const paymentCompleted = enrollmentSteps.find(step => step.name === "Payment Completed")?.status === "completed";
+    const paymentCompleted = enrollmentSteps.find(step => step.name === "Payment Verified")?.status === "completed";
     
     // Task 1: Complete Assessment (if not done)
     if (!assessmentCompleted) {
@@ -225,70 +238,252 @@ export function Dashboard() {
   };
 
   const upcomingTasks = getUpcomingTasks();
+  const completedStepsCount = enrollmentSteps.filter((step) => step.status === "completed").length;
+  const progressPercentage = Math.round((completedStepsCount / enrollmentSteps.length) * 100);
+  const nextTask = upcomingTasks[0];
+  const heroMessage = rejectedDocuments.length > 0
+    ? "A few requirements still need your attention. Review the feedback below, update the affected documents, and continue your enrollment with confidence."
+    : isFullyEnrolled
+    ? "Your enrollment is complete. Use your portal to stay organized, review your student details, and keep track of the updates that matter next."
+    : currentStatusInfo?.message || "Let's continue your enrollment journey at Electron College.";
+  const primaryAction = rejectedDocuments.length > 0
+    ? { label: "Review document feedback", link: "/dashboard/enrollment" }
+    : isFullyEnrolled && nextTask
+    ? { label: nextTask.title, link: nextTask.link }
+    : nextTask
+    ? { label: "Continue next step", link: nextTask.link }
+    : { label: "View my results", link: "/dashboard/results" };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Welcome Section */}
-      <div className="mb-8">
-        <h1 className="text-4xl mb-2" style={{ color: "var(--electron-blue)" }}>
-          Welcome back, {firstName}! 👋
-        </h1>
-        <p className="text-gray-600 text-lg">
-          {isFullyEnrolled ? "You're officially an Electron College student!" : "Let's continue your enrollment journey at Electron College"}
-        </p>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      {/* Welcome Hero */}
+      <div className="portal-glass-panel-strong relative mb-8 overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -left-12 top-0 h-36 w-36 rounded-full bg-blue-200/50 blur-3xl" />
+          <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-sky-100/60 blur-3xl" />
+          <div className="absolute bottom-0 left-1/3 h-32 w-32 rounded-full bg-red-100/40 blur-3xl" />
+        </div>
+
+        <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)] lg:items-center">
+          <div>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/85 px-4 py-2 text-sm font-semibold text-blue-900 shadow-sm">
+              <Sparkles className="h-4 w-4" />
+              {isFullyEnrolled ? "Student access unlocked" : "Enrollment in motion"}
+            </div>
+
+            <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-5xl lg:text-[3.65rem]">
+              Welcome back,
+              <span className="bg-gradient-to-r from-[#1E3A8A] via-[#2563EB] to-[#B91C1C] bg-clip-text pl-3 text-transparent">
+                {firstName}
+              </span>
+              <span className="ml-3 inline-block">👋</span>
+            </h1>
+
+            <p className="mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+              {heroMessage}
+            </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700">
+                <TrendingUp className="h-4 w-4 text-blue-700" />
+                {progressPercentage}% journey completed
+              </div>
+
+              {currentStatusInfo?.estimatedTime && (
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700">
+                  <Clock className="h-4 w-4 text-blue-700" />
+                  {currentStatusInfo.estimatedTime}
+                </div>
+              )}
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/80 bg-white/70 px-4 py-2 text-sm font-medium text-slate-700">
+                {rejectedDocuments.length > 0 ? (
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                )}
+                {rejectedDocuments.length > 0
+                  ? `${rejectedDocuments.length} document${rejectedDocuments.length > 1 ? "s" : ""} need attention`
+                  : isFullyEnrolled
+                  ? "Enrollment complete"
+                  : `${Math.max(enrollmentSteps.length - completedStepsCount, 0)} steps remaining`}
+              </div>
+            </div>
+
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Link
+                to={primaryAction.link}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-blue-900/20 transition-all hover:-translate-y-0.5 hover:bg-[#1B357D]"
+              >
+                {primaryAction.label}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+
+              <button
+                type="button"
+                onClick={openChat}
+                className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/80 bg-white/70 px-6 py-3.5 text-sm font-semibold text-slate-800 transition-all hover:-translate-y-0.5 hover:bg-white"
+              >
+                <Sparkles className="h-4 w-4 text-blue-700" />
+                Ask AI Assistant
+              </button>
+            </div>
+          </div>
+
+          <div className="portal-glass-panel rounded-[1.75rem] p-5 sm:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+                  Journey Pulse
+                </p>
+                <h2 className="mt-2 text-3xl font-semibold text-slate-900">
+                  {progressPercentage}% complete
+                </h2>
+                <p className="mt-2 text-sm text-slate-600">
+                  {completedStepsCount} of {enrollmentSteps.length} milestones finished
+                </p>
+              </div>
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1E3A8A] to-[#3B82F6] text-white shadow-lg shadow-blue-900/20">
+                <Sparkles className="h-7 w-7" />
+              </div>
+            </div>
+
+            <div className="h-3 overflow-hidden rounded-full bg-slate-200/70">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#1E3A8A] via-[#2563EB] to-[#10B981]"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-white/70 bg-white/65 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Current Stage
+                </p>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  {isFullyEnrolled ? "Officially enrolled" : currentStep?.name || "Getting started"}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {currentStatusInfo?.title || "Your portal is ready when you are."}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-white/70 bg-white/65 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Next Move
+                </p>
+                <p className="mt-2 text-base font-semibold text-slate-900">
+                  {nextTask ? nextTask.title : "Explore your student portal"}
+                </p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {rejectedDocuments.length > 0
+                    ? "Resolve document feedback to unlock the next step."
+                    : nextTask
+                    ? nextTask.dueDate
+                    : "Everything is currently on track."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Enrolled Student Banner */}
       {isFullyEnrolled && (
-        <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-xl shadow-lg p-8 mb-8 text-white">
-          <div className="flex items-start gap-6">
-            <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="w-10 h-10 text-white" />
+        <div className="mb-8 overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.22),_transparent_28%),linear-gradient(135deg,_#0F9F5E_0%,_#12B76A_45%,_#0E9F6E_100%)] p-6 text-white shadow-[0_30px_70px_-36px_rgba(5,150,105,0.55)] sm:p-8 lg:p-10">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.9fr)] lg:items-center">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/12 px-4 py-2 text-sm font-semibold text-emerald-50">
+                <Sparkles className="h-4 w-4" />
+                After enrollment
+              </div>
+
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:gap-6">
+                <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl bg-white/14 shadow-lg shadow-emerald-950/10 ring-1 ring-white/20">
+                  <GraduationCap className="h-10 w-10 text-white" />
+                </div>
+
+                <div className="flex-1">
+                  <h2 className="text-2xl font-semibold leading-tight sm:text-3xl">
+                    What happens next on campus
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-base leading-7 text-emerald-50/95 sm:text-lg">
+                    You do not need to complete more enrollment steps right now. The next updates you receive will be operational: schedules, orientation details, ID release, and other start-of-term notices.
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap gap-3 text-sm font-medium text-emerald-50/90">
+                    <div className="rounded-full border border-white/20 bg-white/10 px-4 py-2">
+                      No urgent action today
+                    </div>
+                    <div className="rounded-full border border-white/20 bg-white/10 px-4 py-2">
+                      Check dashboard regularly
+                    </div>
+                    <div className="rounded-full border border-white/20 bg-white/10 px-4 py-2">
+                      Watch your email for notices
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold mb-3">
-                🎉 Welcome to Electron College Community!
-              </h2>
-              <p className="text-green-50 mb-4 leading-relaxed">
-                Congratulations! You have successfully completed your enrollment. Your class schedule, section assignment, and orientation details will be announced soon. Please check back regularly for updates and monitor your email for important announcements regarding:
+
+            <div className="rounded-[1.75rem] border border-white/20 bg-white/12 p-5 backdrop-blur-sm">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-50/75">
+                What to Watch For
               </p>
-              <ul className="space-y-2 text-green-50 mb-4">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                  <span>Class schedule and section assignment</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                  <span>Student orientation date and venue</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                  <span>School policies and guidelines</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 flex-shrink-0" />
-                  <span>Student ID distribution schedule</span>
-                </li>
-              </ul>
-              <p className="text-sm text-green-100">
-                <strong>Important:</strong> Keep checking your dashboard and email for further instructions. Welcome aboard!
-              </p>
+
+              <div className="mt-5 grid gap-3">
+                <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/12">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
+                    <div>
+                      <p className="font-semibold text-white">Class schedule and section assignment</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Your official section and timetable will appear once released.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/12">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
+                    <div>
+                      <p className="font-semibold text-white">Orientation details and student guidelines</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Expect reminders about orientation, policies, and next campus steps.</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-white/10 p-4 ring-1 ring-white/12">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
+                    <div>
+                      <p className="font-semibold text-white">Student ID release and onboarding updates</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Keep checking your dashboard and email for release schedules and announcements.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-emerald-950/20 px-4 py-3 text-sm text-emerald-50/95 ring-1 ring-white/10">
+                <span>Stay active here for the latest campus updates.</span>
+                <ArrowRight className="h-4 w-4 shrink-0" />
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Enrollment Progress Tracker */}
-      <div className="bg-white rounded-xl shadow-md p-8 mb-8 border border-gray-200">
+      <div className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-md sm:p-8">
         <div className="flex items-center gap-3 mb-8">
           <TrendingUp className="w-7 h-7" style={{ color: "var(--electron-blue)" }} />
-          <h2 className="text-2xl font-semibold" style={{ color: "var(--electron-blue)" }}>
+          <h2 className="text-xl font-semibold sm:text-2xl" style={{ color: "var(--electron-blue)" }}>
             Your Enrollment Journey
           </h2>
         </div>
 
         {/* 7-Step Linear Progress Stepper */}
-        <div className="relative mb-8 overflow-hidden">
+        <div className="relative mb-8 overflow-x-auto pb-2">
+          <div className="relative min-w-[820px]">
           {/* Connector Line Background */}
           <div 
             className="absolute h-1 bg-gray-200" 
@@ -371,6 +566,7 @@ export function Dashboard() {
               );
             })}
           </div>
+          </div>
         </div>
 
         {/* Current Status Card */}
@@ -437,7 +633,7 @@ export function Dashboard() {
       </div>
 
       {/* Upcoming Tasks and Quick Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
         {upcomingTasks.map((task, index) => (
           <Link
             key={index}
@@ -487,8 +683,8 @@ export function Dashboard() {
       </div>
 
       {/* Help Section */}
-      <div className="bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-6 border border-gray-200">
-        <div className="flex items-center justify-between">
+      <div className="rounded-xl border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-xl font-semibold mb-2" style={{ color: "var(--electron-dark-gray)" }}>
               Need Help? We're Here for You!
@@ -499,7 +695,7 @@ export function Dashboard() {
             </p>
           </div>
           <button
-            className="px-6 py-3 rounded-lg text-white font-semibold hover:opacity-90 transition-opacity shadow-md whitespace-nowrap"
+            className="w-full rounded-lg px-6 py-3 text-white font-semibold whitespace-nowrap shadow-md transition-opacity hover:opacity-90 sm:w-auto"
             style={{ backgroundColor: "var(--electron-blue)" }}
             onClick={openChat}
           >

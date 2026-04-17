@@ -12,7 +12,15 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { getPendingApplications, approveEnrollment, rejectEnrollment, updateDocumentStatus } from "../../../services/adminService";
+import { useAuth } from "../../context/AuthContext";
+import {
+  getPendingApplications,
+  approveEnrollment,
+  rejectEnrollment,
+  resolveUserId,
+  updateDocumentStatus,
+  upsertEnrollmentProgress,
+} from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 
 interface Student {
@@ -29,9 +37,11 @@ interface Student {
   };
   rejectionReason?: string;
   email?: string;
+  enrollmentData?: any;
 }
 
 export function PendingApplications() {
+  const { userData } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
@@ -49,6 +59,7 @@ export function PendingApplications() {
   const [reviewingStudent, setReviewingStudent] = useState<any>(null);
   const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
   const [documentRejectionComment, setDocumentRejectionComment] = useState("");
+  const actorReference = userData?.id || userData?.email || 'registrar';
 
   useEffect(() => {
     loadApplications();
@@ -75,7 +86,7 @@ export function PendingApplications() {
       return {
         id: app.id,
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
-        email: formData.email,
+        email: app.user_id || formData.email,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         aiTestScore: 85,
         status: 'pending',
@@ -103,29 +114,23 @@ export function PendingApplications() {
     diploma: "Grade 10 Diploma",
   };
 
-  const getStudentDocuments = (email: string) => {
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    return docVerification[email] || {};
-  };
+  const getDocumentStatus = (student: Student) => {
+    const docs = student.enrollmentData?.enrollment_documents || [];
+    const uploaded = docs.length;
+    if (uploaded === 0) {
+      return { uploaded: 0, approved: 0, rejected: 0, pending: 0, allApproved: false };
+    }
 
-  const getDocumentStatus = (email: string) => {
-    const docs = getStudentDocuments(email);
-    const docKeys = Object.keys(docs);
-    if (docKeys.length === 0) return { uploaded: 0, approved: 0, rejected: 0, pending: 0, allApproved: false };
-    
-    let approved = 0, rejected = 0, pending = 0;
-    docKeys.forEach(key => {
-      if (docs[key].status === "approved") approved++;
-      else if (docs[key].status === "rejected") rejected++;
-      else if (docs[key].status === "pending") pending++;
-    });
-    
+    const approved = docs.filter((doc: any) => doc.status === "approved" || doc.verified === true).length;
+    const rejected = docs.filter((doc: any) => doc.status === "rejected").length;
+    const pending = uploaded - approved - rejected;
+
     return {
-      uploaded: docKeys.length,
+      uploaded,
       approved,
       rejected,
       pending,
-      allApproved: docKeys.length > 0 && approved === docKeys.length
+      allApproved: approved === uploaded,
     };
   };
 
@@ -160,7 +165,7 @@ export function PendingApplications() {
     if (!reviewingStudent || !selectedDocument) return;
 
     // Find the document in the enrollment
-    const documentId = reviewingStudent.enrollmentData?.enrollment_documents?.find(
+    const documentId = reviewingStudent.enrollment_documents?.find(
       (d: any) => d.document_type === selectedDocument.key
     )?.id;
 
@@ -174,13 +179,6 @@ export function PendingApplications() {
     if (error) {
       alert(`Error approving document: ${error}`);
       return;
-    }
-
-    // Create notification
-    try {
-      await triggerNotification(reviewingStudent.email || "", 'DOCUMENTS_VERIFIED');
-    } catch (error) {
-      console.error('Error creating notification:', error);
     }
 
     alert("✅ Document approved successfully!");
@@ -203,7 +201,7 @@ export function PendingApplications() {
     }
 
     // Find the document in the enrollment
-    const documentId = reviewingStudent.enrollmentData?.enrollment_documents?.find(
+    const documentId = reviewingStudent.enrollment_documents?.find(
       (d: any) => d.document_type === selectedDocument.key
     )?.id;
 
@@ -221,7 +219,11 @@ export function PendingApplications() {
 
     // Create notification
     try {
-      await triggerNotification(reviewingStudent.email || "", 'DOCUMENT_REJECTED');
+      await triggerNotification(
+        reviewingStudent.user_id || reviewingStudent.email || "",
+        'DOCUMENTS_REJECTED',
+        { message: documentRejectionComment.trim() }
+      );
     } catch (error) {
       console.error('Error creating notification:', error);
     }
@@ -303,7 +305,7 @@ export function PendingApplications() {
     const student = students.find(s => s.id === id);
     if (!student) return;
 
-    const docStatus = getDocumentStatus(student.email || "");
+    const docStatus = getDocumentStatus(student);
     if (!docStatus.allApproved) {
       alert("❌ Cannot approve application. All documents must be approved first! Please click 'Review Docs' to verify documents.");
       return;
@@ -325,7 +327,7 @@ export function PendingApplications() {
       
       if (student) {
         // Approve enrollment in Supabase
-        const { error } = await approveEnrollment(actionStudentId);
+        const { error } = await approveEnrollment(actionStudentId, actorReference);
         
         if (error) {
           alert(`❌ Error approving application: ${error}`);
@@ -333,14 +335,23 @@ export function PendingApplications() {
           return;
         }
 
+        const studentUserId = await resolveUserId(student.email || "");
+        if (studentUserId) {
+          await upsertEnrollmentProgress(studentUserId, [
+            { step_name: 'Documents Submitted', status: 'completed' },
+            { step_name: 'Documents Verified', status: 'completed' },
+            { step_name: 'Payment Submitted', status: 'current' },
+          ]);
+        }
+
         // Create notification for student
         try {
-          await triggerNotification(student.email || "", 'ENROLLMENT_APPROVED');
+          await triggerNotification(student.email || "", 'DOCUMENTS_VERIFIED');
         } catch (error) {
           console.error('Error creating notification:', error);
         }
 
-        alert(`✅ ${student.name}'s application has been approved!`);
+        alert(`✅ ${student.name}'s documents are verified. Payment is now unlocked.`);
         setShowApproveModal(false);
         setActionStudentId(null);
         
@@ -356,7 +367,7 @@ export function PendingApplications() {
       
       if (student) {
         // Reject enrollment in Supabase
-        const { error } = await rejectEnrollment(actionStudentId, rejectionReason.trim());
+        const { error } = await rejectEnrollment(actionStudentId, rejectionReason.trim(), actorReference);
         
         if (error) {
           alert(`❌ Error rejecting application: ${error}`);
@@ -420,10 +431,10 @@ export function PendingApplications() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
           Pending Applications
         </h1>
         <p className="text-gray-600">
@@ -433,8 +444,8 @@ export function PendingApplications() {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="relative flex-1 min-w-[240px]">
+        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
+          <div className="relative w-full md:flex-1 md:min-w-[240px]">
             <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -445,12 +456,12 @@ export function PendingApplications() {
             />
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={strandFilter}
               onChange={(e) => setStrandFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               style={{ color: "#374151" }}
             >
               <option value="all">All Strands</option>
@@ -466,7 +477,7 @@ export function PendingApplications() {
           <select
             value={documentFilter}
             onChange={(e) => setDocumentFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             style={{ color: "#374151" }}
           >
             <option value="all">All Documents</option>
@@ -478,7 +489,7 @@ export function PendingApplications() {
 
           <button
             onClick={loadApplications}
-            className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
             <Download className="w-4 h-4" />
@@ -489,9 +500,9 @@ export function PendingApplications() {
 
       {/* Data Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-4">
               <h2 className="text-xl font-semibold text-gray-900">
                 Applications
               </h2>
@@ -504,11 +515,11 @@ export function PendingApplications() {
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 onClick={handleBulkApprove}
                 disabled={selectedStudents.length === 0}
-                className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 style={{ backgroundColor: "#10B981" }}
               >
                 <CheckCircle className="w-4 h-4" />
@@ -517,7 +528,7 @@ export function PendingApplications() {
               <button
                 onClick={handleExportPDF}
                 disabled={selectedStudents.length === 0}
-                className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:bg-gray-100 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all hover:bg-gray-100 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 style={{ color: "#374151" }}
               >
                 <Download className="w-4 h-4" />
@@ -528,7 +539,7 @@ export function PendingApplications() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="px-6 py-4 text-left">
@@ -585,7 +596,7 @@ export function PendingApplications() {
                 filteredStudents.map((student) => {
                   const statusStyle = getStatusStyle(student.status);
                   const missingDocs = getMissingDocuments(student);
-                  const docStatus = getDocumentStatus(student.email || "");
+                  const docStatus = getDocumentStatus(student);
                   
                   return (
                     <tr
@@ -697,7 +708,7 @@ export function PendingApplications() {
                             disabled={student.status === "approved" || student.status === "rejected"}
                             className="px-3 py-1.5 rounded text-xs font-medium text-white transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                             style={{ backgroundColor: "#10B981" }}
-                            title={!getDocumentStatus(student.email || "").allApproved ? "All documents must be approved first" : "Approve Application"}
+                            title={!getDocumentStatus(student).allApproved ? "All documents must be approved first" : "Approve Application"}
                           >
                             Approve
                           </button>
@@ -719,7 +730,7 @@ export function PendingApplications() {
           </table>
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50">
           <p className="text-sm text-gray-600">
             Showing{" "}
             <span className="font-medium">{filteredStudents.length}</span> pending
@@ -834,7 +845,7 @@ export function PendingApplications() {
       {showDocumentModal && reviewingStudent && (
         <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setShowDocumentModal(false)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+          <div className="fixed inset-y-0 right-0 flex max-w-full pl-0 sm:pl-10">
             <div className="w-screen max-w-3xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex h-full flex-col bg-white shadow-xl">
                 {/* Header */}

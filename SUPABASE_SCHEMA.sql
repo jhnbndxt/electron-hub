@@ -14,6 +14,7 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(255) NOT NULL,
+  profile_picture_url TEXT,
   role VARCHAR(50) NOT NULL CHECK (role IN ('student', 'registrar', 'branchcoordinator', 'cashier', 'superadmin')),
   admin_type VARCHAR(50) CHECK (admin_type IN ('registrar', 'branchcoordinator', 'cashier')),
   status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
@@ -299,22 +300,22 @@ VALUES
 ('If today is Monday, what day is it in 10 days?', '["Monday", "Tuesday", "Wednesday", "Thursday"]', 3, 'Logical'),
 ('What is 2^5?', '["16", "32", "64", "128"]', 1, 'Logical'),
 
--- INTERESTS (15 questions)
-('Which subject would you like to study in depth?', '["Physics", "Computer Science", "Biology", "Literature"]', 1, 'Interests'),
-('What motivates you most?', '["Understanding theories", "Creating solutions", "Expressing ideas", "Helping communities"]', 1, 'Interests'),
-('Which environment do you prefer?', '["Laboratory", "Workshop", "Library", "Office"]', 1, 'Interests'),
-('What type of projects interest you?', '["Research projects", "Building prototypes", "Writing essays", "Organizing events"]', 1, 'Interests'),
-('Select your interest', '["STEM", "Humanities", "Business", "Arts"]', 0, 'Interests'),
-('What interests you most?', '["Science discovery", "Technology innovation", "Social services", "Creative expression"]', 0, 'Interests'),
-('Career goal?', '["Researcher", "Engineer", "Doctor", "Entrepreneur"]', 0, 'Interests'),
-('Which skill do you want to improve?', '["Technical", "Leadership", "Communication", "Problem-solving"]', 0, 'Interests'),
-('What is your learning style?', '["Visual", "Auditory", "Kinesthetic", "Reading/writing"]', 0, 'Interests'),
-('Which activity excites you?', '["Coding", "Designing", "Teaching", "Managing"]', 0, 'Interests'),
-('What drives your passion?', '["Innovation", "Impact", "Excellence", "Security"]', 0, 'Interests'),
-('Preferred work environment?', '["Team", "Independent", "Flexible", "Structured"]', 0, 'Interests'),
-('What kind of problems do you enjoy?', '["Mathematical", "Creative", "Practical", "Ethical"]', 0, 'Interests'),
-('Which industry interests you?', '["Technology", "Healthcare", "Education", "Finance"]', 0, 'Interests'),
-('Your ideal role?', '["Specialist", "Generalist", "Leader", "Innovator"]', 0, 'Interests')
+-- Interest questions are checklist-based, so correct_answer stays NULL.
+('Which subjects would you like to study in depth? Select all that apply.', '["Physics", "Computer Science", "Biology", "Literature"]', NULL, 'Interests'),
+('What motivations matter most to you? Select all that apply.', '["Understanding theories", "Creating solutions", "Expressing ideas", "Helping communities"]', NULL, 'Interests'),
+('Which environments do you enjoy most? Select all that apply.', '["Laboratory", "Workshop", "Library", "Office"]', NULL, 'Interests'),
+('What types of projects interest you? Select all that apply.', '["Research projects", "Building prototypes", "Writing essays", "Organizing events"]', NULL, 'Interests'),
+('Which academic areas interest you? Select all that apply.', '["STEM", "Humanities", "Business", "Arts"]', NULL, 'Interests'),
+('Which themes interest you most? Select all that apply.', '["Science discovery", "Technology innovation", "Social services", "Creative expression"]', NULL, 'Interests'),
+('Which career directions appeal to you? Select all that apply.', '["Researcher", "Engineer", "Doctor", "Entrepreneur"]', NULL, 'Interests'),
+('Which skills would you like to strengthen? Select all that apply.', '["Technical", "Leadership", "Communication", "Problem-solving"]', NULL, 'Interests'),
+('Which learning styles work best for you? Select all that apply.', '["Visual", "Auditory", "Kinesthetic", "Reading/writing"]', NULL, 'Interests'),
+('Which activities excite you? Select all that apply.', '["Coding", "Designing", "Teaching", "Managing"]', NULL, 'Interests'),
+('What drives your passion? Select all that apply.', '["Innovation", "Impact", "Excellence", "Security"]', NULL, 'Interests'),
+('Which work environments fit you best? Select all that apply.', '["Team", "Independent", "Flexible", "Structured"]', NULL, 'Interests'),
+('What kinds of problems do you enjoy? Select all that apply.', '["Mathematical", "Creative", "Practical", "Ethical"]', NULL, 'Interests'),
+('Which industries interest you? Select all that apply.', '["Technology", "Healthcare", "Education", "Finance"]', NULL, 'Interests'),
+('Which roles sound most like you? Select all that apply.', '["Specialist", "Generalist", "Leader", "Innovator"]', NULL, 'Interests')
 ON CONFLICT DO NOTHING;
 
 -- Initialize question stats
@@ -553,6 +554,42 @@ ALTER TABLE enrollment_drafts ENABLE ROW LEVEL SECURITY;
 -- Users can view their own profile
 CREATE POLICY users_select_own ON users FOR SELECT
   USING (auth.uid()::uuid = id);
+
+-- Admins can view all users
+CREATE POLICY users_select_admin ON users FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid 
+      AND u.role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+-- Admins can update users
+CREATE POLICY users_update_admin ON users FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid 
+      AND u.role IN ('branchcoordinator', 'superadmin')
+    )
+  );
+
+-- Admins can insert users
+CREATE POLICY users_insert_admin ON users FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid 
+      AND u.role IN ('branchcoordinator', 'superadmin')
+    )
+  );
+
+-- Admins can delete users
+CREATE POLICY users_delete_admin ON users FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid 
+      AND u.role IN ('branchcoordinator', 'superadmin')
+    )
+  );
 
 -- Students can only see their own enrollment
 CREATE POLICY enrollments_select_own ON enrollments FOR SELECT

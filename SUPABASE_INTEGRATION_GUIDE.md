@@ -88,6 +88,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 ```
 
+### Step 4: Update the Magic Link Email Template for OTP Registration
+Electron Hub student registration now sends a 6-digit email code with `supabase.auth.signInWithOtp()` and verifies it with `verifyOtp({ type: 'email' })` before inserting the custom `users` row.
+
+In Supabase dashboard:
+1. Go to `Auth > Email Templates > Magic Link`
+2. Set the subject to `Your Electron Hub verification code`
+3. Replace the template body with the contents of `SUPABASE_EMAIL_OTP_TEMPLATE.html`
+
+Important notes:
+- The template must include `{{ .Token }}` or Supabase will send a magic link instead of the OTP expected by the app.
+- For this flow, update the `Magic Link` template, not `Confirm signup`.
+- If you keep `{{ .ConfirmationURL }}`, the registration modal in the app will wait for a code the user never receives.
+- Optional but recommended: set `Auth > Providers > Email > Email OTP Expiration` to `3600` seconds.
+- Test registration with a new email address after the template is updated.
+
 ---
 
 ## 🔄 Migration from localStorage

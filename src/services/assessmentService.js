@@ -1,9 +1,67 @@
 import { supabase } from '../supabase';
+import { createAuditLog } from './adminService';
 
 /**
  * Assessment Service
  * Handles all assessment question management with Supabase
  */
+
+const INTERESTS_CATEGORY = 'Interests';
+
+const LEGACY_INTEREST_QUESTION_TEXT_REWRITES = {
+  'Which subject would you like to study in depth?': 'Which subjects would you like to study in depth? Select all that apply.',
+  'What motivates you most?': 'What motivations matter most to you? Select all that apply.',
+  'Which environment do you prefer?': 'Which environments do you enjoy most? Select all that apply.',
+  'What type of projects interest you?': 'What types of projects interest you? Select all that apply.',
+  'Select your interest': 'Which academic areas interest you? Select all that apply.',
+  'What interests you most?': 'Which themes interest you most? Select all that apply.',
+  'Career goal?': 'Which career directions appeal to you? Select all that apply.',
+  'Which skill do you want to improve?': 'Which skills would you like to strengthen? Select all that apply.',
+  'What is your learning style?': 'Which learning styles work best for you? Select all that apply.',
+  'Which activity excites you?': 'Which activities excite you? Select all that apply.',
+  'What drives your passion?': 'What drives your passion? Select all that apply.',
+  'Preferred work environment?': 'Which work environments fit you best? Select all that apply.',
+  'What kind of problems do you enjoy?': 'What kinds of problems do you enjoy? Select all that apply.',
+  'Which industry interests you?': 'Which industries interest you? Select all that apply.',
+  'Your ideal role?': 'Which roles sound most like you? Select all that apply.',
+};
+
+const isInterestCategory = (category = '') => String(category || '').trim() === INTERESTS_CATEGORY;
+
+const normalizeQuestionText = (question = '') => String(question || '').trim();
+
+const normalizeQuestionOptions = (options = []) => {
+  const sourceOptions = Array.isArray(options) ? options : [];
+
+  return sourceOptions
+    .map((option) => String(option || '').trim())
+    .filter((option) => option.length > 0);
+};
+
+const normalizeCorrectAnswer = (correctAnswer, options, category) => {
+  if (isInterestCategory(category)) {
+    return null;
+  }
+
+  if (!Number.isInteger(correctAnswer)) {
+    return null;
+  }
+
+  return correctAnswer >= 0 && correctAnswer < options.length ? correctAnswer : null;
+};
+
+const buildQuestionPayload = (questionData = {}) => {
+  const category = String(questionData.category || '').trim();
+  const options = normalizeQuestionOptions(questionData.options);
+
+  return {
+    question: normalizeQuestionText(questionData.question),
+    options,
+    correct_answer: normalizeCorrectAnswer(questionData.correctAnswer, options, category),
+    category,
+    updated_at: new Date().toISOString(),
+  };
+};
 
 // Get all assessment questions
 export const getAssessmentQuestions = async () => {
@@ -70,16 +128,12 @@ export const getQuestion = async (questionId) => {
 // Create new question
 export const createQuestion = async (questionData) => {
   try {
+    const payload = buildQuestionPayload(questionData);
+    payload.created_at = payload.updated_at;
+
     const { data, error } = await supabase
       .from('assessment_questions')
-      .insert({
-        question: questionData.question,
-        options: questionData.options || [],
-        correct_answer: questionData.correctAnswer !== undefined ? questionData.correctAnswer : null,
-        category: questionData.category,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .insert(payload)
       .select()
       .single();
 
@@ -98,15 +152,11 @@ export const createQuestion = async (questionData) => {
 // Update question
 export const updateQuestion = async (questionId, questionData) => {
   try {
+    const payload = buildQuestionPayload(questionData);
+
     const { data, error } = await supabase
       .from('assessment_questions')
-      .update({
-        question: questionData.question,
-        options: questionData.options || [],
-        correct_answer: questionData.correctAnswer !== undefined ? questionData.correctAnswer : null,
-        category: questionData.category,
-        updated_at: new Date().toISOString(),
-      })
+      .update(payload)
       .eq('id', questionId)
       .select()
       .single();
@@ -152,14 +202,16 @@ export const deleteQuestion = async (questionId) => {
 // Bulk create questions (initialize)
 export const initializeQuestions = async (questions) => {
   try {
-    const formattedQuestions = questions.map((q) => ({
-      question: q.question,
-      options: q.options || [],
-      correct_answer: q.correctAnswer !== undefined ? q.correctAnswer : null,
-      category: q.category,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }));
+    const timestamp = new Date().toISOString();
+    const formattedQuestions = questions.map((question) => {
+      const payload = buildQuestionPayload(question);
+
+      return {
+        ...payload,
+        created_at: timestamp,
+        updated_at: timestamp,
+      };
+    });
 
     const { data, error } = await supabase
       .from('assessment_questions')
@@ -178,18 +230,107 @@ export const initializeQuestions = async (questions) => {
   }
 };
 
+export const syncInterestChecklistQuestions = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('assessment_questions')
+      .select('id, question, options, correct_answer, category')
+      .eq('category', INTERESTS_CATEGORY)
+      .order('id', { ascending: true });
+
+    if (error) {
+      console.error('Sync interest checklist error:', error);
+      return { error: error.message, data: null, updatedCount: 0 };
+    }
+
+    if (!data || data.length === 0) {
+      return { error: null, data: [], updatedCount: 0 };
+    }
+
+    const questionsToUpdate = data
+      .map((question) => {
+        const currentQuestionText = normalizeQuestionText(question.question);
+        const rewrittenQuestionText = LEGACY_INTEREST_QUESTION_TEXT_REWRITES[currentQuestionText];
+        const shouldRewriteQuestion = Boolean(rewrittenQuestionText) && rewrittenQuestionText !== currentQuestionText;
+        const shouldClearCorrectAnswer = question.correct_answer !== null && question.correct_answer !== undefined;
+
+        if (!shouldRewriteQuestion && !shouldClearCorrectAnswer) {
+          return null;
+        }
+
+        return {
+          id: question.id,
+          question: rewrittenQuestionText || currentQuestionText,
+          options: normalizeQuestionOptions(question.options),
+          updated_at: new Date().toISOString(),
+        };
+      })
+      .filter(Boolean);
+
+    if (questionsToUpdate.length === 0) {
+      return { error: null, data, updatedCount: 0 };
+    }
+
+    const updatedQuestions = [];
+
+    for (const question of questionsToUpdate) {
+      const { data: updatedQuestion, error: updateError } = await supabase
+        .from('assessment_questions')
+        .update({
+          question: question.question,
+          options: question.options,
+          correct_answer: null,
+          updated_at: question.updated_at,
+        })
+        .eq('id', question.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Sync interest checklist error:', updateError);
+        return { error: updateError.message, data: null, updatedCount: 0 };
+      }
+
+      updatedQuestions.push(updatedQuestion);
+    }
+
+    await createAuditLog(
+      'system',
+      'QUESTION_SYNCED_CHECKLIST',
+      `Synchronized ${updatedQuestions.length} interest questions to checklist format.`,
+      'info',
+      {
+        resourceType: 'assessment_question',
+        changes: {
+          category: INTERESTS_CATEGORY,
+          updated_count: updatedQuestions.length,
+        },
+      }
+    );
+
+    return { error: null, data: updatedQuestions, updatedCount: updatedQuestions.length };
+  } catch (error) {
+    console.error('Sync interest checklist error:', error);
+    return { error: error.message, data: null, updatedCount: 0 };
+  }
+};
+
 // Create question log (audit trail)
 export const createQuestionLog = async (questionId, action, data) => {
   try {
-    const { error } = await supabase
-      .from('audit_logs')
-      .insert({
-        user_id: 'admin',
-        action: `QUESTION_${action}`,
-        details: `Assessment question ${action.toLowerCase()}: ID ${questionId}`,
-        status: 'info',
-        timestamp: new Date().toISOString(),
-      });
+    const { error } = await createAuditLog(
+      'system',
+      `QUESTION_${action}`,
+      `Assessment question ${action.toLowerCase()}: ID ${questionId}`,
+      'info',
+      {
+        resourceType: 'assessment_question',
+        changes: {
+          question_id: questionId,
+          question_data: data || {},
+        },
+      }
+    );
 
     if (error) {
       console.error('Log error:', error);
@@ -204,9 +345,9 @@ export const getQuestionLogs = async (limit = 50) => {
   try {
     const { data, error } = await supabase
       .from('audit_logs')
-      .select('*')
-      .like('action', '%QUESTION%')
-      .order('timestamp', { ascending: false })
+      .select('id, user_id, action, status, error_message, changes, created_at')
+      .like('action', 'QUESTION_%')
+      .order('created_at', { ascending: false })
       .limit(limit);
 
     if (error) {
@@ -214,7 +355,20 @@ export const getQuestionLogs = async (limit = 50) => {
       return { error: error.message, data: null };
     }
 
-    return { error: null, data: data || [] };
+    const logs = (data || []).map((log) => {
+      const changes = log?.changes && typeof log.changes === 'object' && !Array.isArray(log.changes)
+        ? log.changes
+        : {};
+
+      return {
+        ...log,
+        timestamp: log.created_at,
+        details: changes.details || log.error_message || log.action,
+        status: changes.severity || (log.status === 'failure' ? 'failed' : 'success'),
+      };
+    });
+
+    return { error: null, data: logs };
   } catch (error) {
     console.error('Get logs error:', error);
     return { error: error.message, data: null };
@@ -312,20 +466,20 @@ export const getDefaultAssessmentQuestions = () => {
     { question: 'What is 2^5?', options: ['16', '32', '64', '128'], correctAnswer: 1, category: 'Logical' },
 
     // INTERESTS (15 questions)
-    { question: 'Which subject would you like to study in depth?', options: ['Physics', 'Computer Science', 'Biology', 'Literature'], correctAnswer: 1, category: 'Interests' },
-    { question: 'What motivates you most?', options: ['Understanding theories', 'Creating solutions', 'Expressing ideas', 'Helping communities'], correctAnswer: 1, category: 'Interests' },
-    { question: 'Which environment do you prefer?', options: ['Laboratory', 'Workshop', 'Library', 'Office'], correctAnswer: 1, category: 'Interests' },
-    { question: 'What type of projects interest you?', options: ['Research projects', 'Building prototypes', 'Writing essays', 'Organizing events'], correctAnswer: 1, category: 'Interests' },
-    { question: 'Select your interest', options: ['STEM', 'Humanities', 'Business', 'Arts'], correctAnswer: 0, category: 'Interests' },
-    { question: 'What interests you most?', options: ['Science discovery', 'Technology innovation', 'Social services', 'Creative expression'], correctAnswer: 0, category: 'Interests' },
-    { question: 'Career goal?', options: ['Researcher', 'Engineer', 'Doctor', 'Entrepreneur'], correctAnswer: 0, category: 'Interests' },
-    { question: 'Which skill do you want to improve?', options: ['Technical', 'Leadership', 'Communication', 'Problem-solving'], correctAnswer: 0, category: 'Interests' },
-    { question: 'What is your learning style?', options: ['Visual', 'Auditory', 'Kinesthetic', 'Reading/writing'], correctAnswer: 0, category: 'Interests' },
-    { question: 'Which activity excites you?', options: ['Coding', 'Designing', 'Teaching', 'Managing'], correctAnswer: 0, category: 'Interests' },
-    { question: 'What drives your passion?', options: ['Innovation', 'Impact', 'Excellence', 'Security'], correctAnswer: 0, category: 'Interests' },
-    { question: 'Preferred work environment?', options: ['Team', 'Independent', 'Flexible', 'Structured'], correctAnswer: 0, category: 'Interests' },
-    { question: 'What kind of problems do you enjoy?', options: ['Mathematical', 'Creative', 'Practical', 'Ethical'], correctAnswer: 0, category: 'Interests' },
-    { question: 'Which industry interests you?', options: ['Technology', 'Healthcare', 'Education', 'Finance'], correctAnswer: 0, category: 'Interests' },
-    { question: 'Your ideal role?', options: ['Specialist', 'Generalist', 'Leader', 'Innovator'], correctAnswer: 0, category: 'Interests' }
+    { question: 'Which subjects would you like to study in depth? Select all that apply.', options: ['Physics', 'Computer Science', 'Biology', 'Literature'], category: 'Interests' },
+    { question: 'What motivations matter most to you? Select all that apply.', options: ['Understanding theories', 'Creating solutions', 'Expressing ideas', 'Helping communities'], category: 'Interests' },
+    { question: 'Which environments do you enjoy most? Select all that apply.', options: ['Laboratory', 'Workshop', 'Library', 'Office'], category: 'Interests' },
+    { question: 'What types of projects interest you? Select all that apply.', options: ['Research projects', 'Building prototypes', 'Writing essays', 'Organizing events'], category: 'Interests' },
+    { question: 'Which academic areas interest you? Select all that apply.', options: ['STEM', 'Humanities', 'Business', 'Arts'], category: 'Interests' },
+    { question: 'Which themes interest you most? Select all that apply.', options: ['Science discovery', 'Technology innovation', 'Social services', 'Creative expression'], category: 'Interests' },
+    { question: 'Which career directions appeal to you? Select all that apply.', options: ['Researcher', 'Engineer', 'Doctor', 'Entrepreneur'], category: 'Interests' },
+    { question: 'Which skills would you like to strengthen? Select all that apply.', options: ['Technical', 'Leadership', 'Communication', 'Problem-solving'], category: 'Interests' },
+    { question: 'Which learning styles work best for you? Select all that apply.', options: ['Visual', 'Auditory', 'Kinesthetic', 'Reading/writing'], category: 'Interests' },
+    { question: 'Which activities excite you? Select all that apply.', options: ['Coding', 'Designing', 'Teaching', 'Managing'], category: 'Interests' },
+    { question: 'What drives your passion? Select all that apply.', options: ['Innovation', 'Impact', 'Excellence', 'Security'], category: 'Interests' },
+    { question: 'Which work environments fit you best? Select all that apply.', options: ['Team', 'Independent', 'Flexible', 'Structured'], category: 'Interests' },
+    { question: 'What kinds of problems do you enjoy? Select all that apply.', options: ['Mathematical', 'Creative', 'Practical', 'Ethical'], category: 'Interests' },
+    { question: 'Which industries interest you? Select all that apply.', options: ['Technology', 'Healthcare', 'Education', 'Finance'], category: 'Interests' },
+    { question: 'Which roles sound most like you? Select all that apply.', options: ['Specialist', 'Generalist', 'Leader', 'Innovator'], category: 'Interests' }
   ];
 };

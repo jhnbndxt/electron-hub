@@ -2,20 +2,39 @@ import { Link } from "react-router";
 import { ArrowLeft, FileText, Upload, CheckCircle, AlertCircle, Download, XCircle, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { supabase } from "../../supabase";
 
 interface DocumentStatus {
   name: string;
+  documentType: string;
   status: "approved" | "rejected" | "pending" | "not_uploaded";
   uploadDate?: string;
   fileSize?: string;
-  fileData?: string;
+  fileUrl?: string;
   rejectionComment?: string;
 }
+
+const REQUIRED_DOCS = [
+  { key: "form138", name: "Form 138 (Report Card)" },
+  { key: "goodMoral", name: "Good Moral Certificate" },
+  { key: "birthCertificate", name: "PSA Birth Certificate" },
+  { key: "idPicture", name: "2x2 ID Pictures" },
+  { key: "parentGuardianId", name: "Photocopy of Parent's/Guardian ID" },
+];
+
+const DOC_NAME_TO_KEY: Record<string, string> = {
+  "Form 138 (Report Card)": "form138",
+  "Good Moral Certificate": "goodMoral",
+  "PSA Birth Certificate": "birthCertificate",
+  "2x2 ID Pictures": "idPicture",
+  "Photocopy of Parent's/Guardian ID": "parentGuardianId",
+};
 
 export function MyDocuments() {
   const { userData } = useAuth();
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (userData?.email) {
@@ -23,29 +42,72 @@ export function MyDocuments() {
     }
   }, [userData]);
 
-  const loadDocuments = () => {
+  const loadDocuments = async () => {
     if (!userData?.email) return;
 
-    // Get document statuses from localStorage
-    const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-    const userDocs = docVerification[userData.email] || {};
+    // Find the student's enrollment by email
+    const { data: enrollment, error: enrollError } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("user_id", userData.email)
+      .neq("status", "rejected")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    const requiredDocs = [
-      { key: "form138", name: "Form 138 (Report Card)" },
-      { key: "goodMoral", name: "Good Moral Certificate" },
-      { key: "psaBirthCertificate", name: "PSA Birth Certificate" },
-      { key: "idPicture", name: "2x2 ID Pictures" },
-      { key: "parentGuardianId", name: "Photocopy of Parent's/Guardian ID" },
-    ];
+    if (enrollError) {
+      console.error("Error fetching enrollment:", enrollError);
+      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      return;
+    }
 
-    const docStatuses = requiredDocs.map(doc => ({
-      name: doc.name,
-      status: userDocs[doc.key]?.status || "not_uploaded",
-      uploadDate: userDocs[doc.key]?.uploadDate,
-      fileSize: userDocs[doc.key]?.fileSize,
-      fileData: userDocs[doc.key]?.fileData,
-      rejectionComment: userDocs[doc.key]?.rejectionComment,
-    }));
+    if (!enrollment) {
+      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      return;
+    }
+
+    setEnrollmentId(enrollment.id);
+
+    // Load documents for this enrollment
+    const { data: docs, error: docsError } = await supabase
+      .from("enrollment_documents")
+      .select("id, document_type, file_url, file_path, file_name, file_size, uploaded_at, updated_at, rejection_comment, status")
+      .eq("enrollment_id", enrollment.id);
+
+    if (docsError) {
+      console.error("Error fetching documents:", docsError);
+      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      return;
+    }
+
+    const docStatuses: DocumentStatus[] = REQUIRED_DOCS.map(reqDoc => {
+      const uploaded = docs?.find(d => d.document_type === reqDoc.key);
+      if (!uploaded) {
+        return { name: reqDoc.name, documentType: reqDoc.key, status: "not_uploaded" };
+      }
+
+      // Determine status from the live document workflow state.
+      let docStatus: DocumentStatus["status"] = "pending";
+      if (uploaded.status === "approved") {
+        docStatus = "approved";
+      } else if (uploaded.status === "rejected") {
+        docStatus = "rejected";
+      }
+
+      return {
+        name: reqDoc.name,
+        documentType: reqDoc.key,
+        status: docStatus,
+        uploadDate: uploaded.uploaded_at
+          ? new Date(uploaded.uploaded_at).toLocaleDateString()
+          : undefined,
+        fileSize: uploaded.file_size
+          ? `${(uploaded.file_size / 1024 / 1024).toFixed(2)} MB`
+          : undefined,
+        fileUrl: uploaded.file_url || uploaded.file_path || undefined,
+        rejectionComment: uploaded.rejection_comment || undefined,
+      };
+    });
 
     setDocuments(docStatuses);
   };
@@ -55,78 +117,96 @@ export function MyDocuments() {
 
     setUploadingDoc(docName);
 
-    // Convert file to base64 for storage
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64Data = reader.result as string;
+    try {
+      // Make sure we have an enrollment ID
+      let currentEnrollmentId = enrollmentId;
+      if (!currentEnrollmentId) {
+        const { data: enrollment } = await supabase
+          .from("enrollments")
+          .select("id")
+          .eq("user_id", userData.email)
+          .neq("status", "rejected")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      // Get the document key
-      const docKeyMap: Record<string, string> = {
-        "Form 138 (Report Card)": "form138",
-        "Good Moral Certificate": "goodMoral",
-        "PSA Birth Certificate": "psaBirthCertificate",
-        "2x2 ID Pictures": "idPicture",
-        "Photocopy of Parent's/Guardian ID": "parentGuardianId",
-      };
-
-      const docKey = docKeyMap[docName];
-
-      // Update localStorage with file data
-      const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-      if (!docVerification[userData.email]) {
-        docVerification[userData.email] = {};
-      }
-
-      docVerification[userData.email][docKey] = {
-        status: "pending",
-        uploadDate: new Date().toLocaleDateString(),
-        fileSize: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-        fileName: file.name,
-        fileData: base64Data,
-      };
-
-      try {
-        localStorage.setItem("document_verification", JSON.stringify(docVerification));
-      } catch (error) {
-        // Handle quota exceeded error
-        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-          // Remove fileData and try again without it
-          delete docVerification[userData.email][docKey].fileData;
-          try {
-            localStorage.setItem("document_verification", JSON.stringify(docVerification));
-            alert("Document uploaded successfully, but file preview is not available due to storage limitations. The Registrar will still be able to see that you uploaded: " + file.name);
-          } catch (retryError) {
-            alert("Failed to upload document. Storage quota exceeded.");
-            setUploadingDoc(null);
-            return;
-          }
-        } else {
-          alert("Failed to upload document. Please try again.");
+        if (!enrollment) {
+          alert("No enrollment found. Please complete your enrollment form first.");
           setUploadingDoc(null);
           return;
         }
+        currentEnrollmentId = enrollment.id;
+        setEnrollmentId(enrollment.id);
       }
 
-      // Reload documents
-      loadDocuments();
-      setUploadingDoc(null);
-    };
+      const docType = DOC_NAME_TO_KEY[docName];
+      const timestamp = Date.now();
+      const fileExt = file.name.split(".").pop();
+      const storagePath = `${currentEnrollmentId}/${docType}/${timestamp}.${fileExt}`;
 
-    reader.onerror = () => {
-      alert("Failed to read file. Please try again.");
-      setUploadingDoc(null);
-    };
+      // Upload file to Supabase Storage
+      const { error: storageError } = await supabase.storage
+        .from("enrollment_documents")
+        .upload(storagePath, file, { upsert: true });
 
-    reader.readAsDataURL(file);
+      if (storageError) {
+        console.error("Storage upload error:", storageError);
+        alert("Failed to upload file. Please try again.");
+        setUploadingDoc(null);
+        return;
+      }
+
+      // Get the public URL
+      const { data: urlData } = supabase.storage
+        .from("enrollment_documents")
+        .getPublicUrl(storagePath);
+
+      // Check if a record for this document type already exists
+      const { data: existingDoc } = await supabase
+        .from("enrollment_documents")
+        .select("id")
+        .eq("enrollment_id", currentEnrollmentId)
+        .eq("document_type", docType)
+        .maybeSingle();
+
+      if (existingDoc) {
+        // Update the existing record
+        await supabase
+          .from("enrollment_documents")
+          .update({
+            file_url: urlData.publicUrl,
+            file_path: storagePath,
+            file_name: file.name,
+            file_size: file.size,
+            uploaded_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            status: "pending_review",
+            rejection_comment: null,
+          })
+          .eq("id", existingDoc.id);
+      } else {
+        // Insert a new record
+        await supabase.from("enrollment_documents").insert({
+          enrollment_id: currentEnrollmentId,
+          document_type: docType,
+          file_url: urlData.publicUrl,
+          file_path: storagePath,
+          file_name: file.name,
+          file_size: file.size,
+          status: "pending_review",
+          uploaded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+
+      await loadDocuments();
+    } catch (err) {
+      console.error("Upload error:", err);
+      alert("An unexpected error occurred. Please try again.");
+    } finally {
+      setUploadingDoc(null);
+    }
   };
-
-  const requiredDocuments = [
-    "Form 138 (Report Card)",
-    "Good Moral Certificate",
-    "PSA Birth Certificate",
-    "2x2 ID Pictures",
-    "Photocopy of Parent's/Guardian ID",
-  ];
 
   return (
     <div className="p-6">
@@ -197,6 +277,17 @@ export function MyDocuments() {
                       <p className="text-sm text-gray-500">
                         Uploaded on {doc.uploadDate} • {doc.fileSize}
                       </p>
+                      {doc.fileUrl && (
+                        <a
+                          href={doc.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1"
+                        >
+                          <Download className="w-3 h-3" />
+                          View / Download
+                        </a>
+                      )}
                       
                       {/* Rejection Comment */}
                       {doc.status === "rejected" && doc.rejectionComment && (
@@ -252,10 +343,9 @@ export function MyDocuments() {
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Required Documents</h2>
           <ul className="space-y-3">
-            {requiredDocuments.map((docName, index) => {
-              const doc = documents.find(d => d.name === docName);
+            {REQUIRED_DOCS.map((reqDoc, index) => {
+              const doc = documents.find(d => d.documentType === reqDoc.key);
               const isUploaded = doc && doc.status !== "not_uploaded";
-              const needsReupload = doc?.status === "rejected";
               
               return (
                 <li key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
@@ -272,21 +362,22 @@ export function MyDocuments() {
                       {doc?.status === "pending" && <AlertCircle className="w-4 h-4 text-yellow-600" />}
                     </div>
                     <span className={isUploaded ? "text-gray-900 font-medium" : "text-gray-500"}>
-                      {docName}
+                      {reqDoc.name}
                     </span>
                   </div>
                   
                   {!isUploaded && (
                     <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-blue-700 transition-colors">
                       <Upload className="w-4 h-4" />
-                      Upload
+                      {uploadingDoc === reqDoc.name ? "Uploading..." : "Upload"}
                       <input
                         type="file"
                         className="hidden"
                         accept="image/*,.pdf"
+                        disabled={uploadingDoc !== null}
                         onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) handleFileUpload(docName, file);
+                          if (file) handleFileUpload(reqDoc.name, file);
                         }}
                       />
                     </label>

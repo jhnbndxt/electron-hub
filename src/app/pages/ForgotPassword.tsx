@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { Mail, ArrowLeft, CheckCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle, Mail } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
-const logo = "";
+import logo from "../../assets/electronLogo";
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");
@@ -10,146 +10,112 @@ export function ForgotPassword() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate sending reset email
     setIsSubmitted(true);
   };
 
-  if (isSubmitted) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center p-4"
-        style={{
-          background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
-        }}
-      >
-        <div className="max-w-md w-full">
-          {/* Success Card */}
-          <div className="bg-white rounded-2xl shadow-2xl p-8">
-            {/* Success Icon */}
-            <div className="flex justify-center mb-6">
-              <div
-                className="w-20 h-20 rounded-full flex items-center justify-center"
-                style={{ backgroundColor: "#10B981" }}
-              >
-                <CheckCircle className="w-10 h-10 text-white" />
+  return (
+    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+      <div className="relative z-10 w-full max-w-md">
+        <div className="auth-panel rounded-[2rem] p-6 sm:p-8 lg:p-10">
+          <div className="mb-8 text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.5rem] auth-logo-orb">
+              <img src={logo} alt="Electron College Logo" className="h-20 w-20 scale-125 object-contain" />
+            </div>
+          </div>
+
+          {isSubmitted ? (
+            <div className="flex h-full flex-col justify-center">
+              <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-emerald-500 shadow-[0_18px_40px_rgba(16,185,129,0.28)]">
+                <CheckCircle className="h-12 w-12 text-white" />
               </div>
-            </div>
 
-            {/* Success Message */}
-            <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-gray-900 mb-3">
-                Check Your Email
-              </h1>
-              <p className="text-gray-600 mb-2">
-                We've sent a password reset link to:
+              <h2 className="mt-6 text-center text-3xl font-semibold text-slate-900">
+                Check your email
+              </h2>
+              <p className="mt-3 text-center text-base leading-7 text-slate-600">
+                We&apos;ve sent password reset instructions to the address below.
               </p>
-              <p className="font-semibold text-gray-900 mb-4">{email}</p>
-              <p className="text-sm text-gray-500">
-                Click the link in the email to reset your password. If you don't
-                see it, check your spam folder.
+
+              <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Registered email</p>
+                <p className="mt-2 text-lg font-semibold text-slate-900 break-all">{email}</p>
+              </div>
+
+              <p className="mt-4 text-center text-sm leading-6 text-slate-500">
+                Click the link in the email to reset your password. If you don&apos;t see it, check your spam folder.
               </p>
-            </div>
 
-            {/* Back to Login */}
-            <Link
-              to="/login"
-              className="w-full py-3 rounded-lg font-semibold text-white flex items-center justify-center gap-2 transition-all hover:shadow-lg"
-              style={{ backgroundColor: "#1E3A8A" }}
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Back to Login
-            </Link>
+              <Link
+                to="/login"
+                className="auth-primary-button mt-8 flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold text-white"
+              >
+                <ArrowLeft className="h-5 w-5" />
+                Back to Login
+              </Link>
 
-            {/* Resend Link */}
-            <div className="text-center mt-4">
               <button
                 onClick={() => setIsSubmitted(false)}
-                className="text-sm font-medium hover:underline"
-                style={{ color: "#1E3A8A" }}
+                className="mt-4 text-sm font-semibold text-[#1E3A8A] hover:underline"
               >
-                Didn't receive the email? Click to resend
+                Didn&apos;t receive the email? Send another link
               </button>
             </div>
-          </div>
-        </div>
+          ) : (
+            <>
+              <h1 className="text-center text-3xl font-semibold text-slate-900 sm:text-[2.2rem]">
+                Reset your password
+              </h1>
+              <p className="mt-2 text-center text-sm leading-6 text-slate-500 sm:text-base">
+                Enter the email tied to your Electron Hub account and we&apos;ll send instructions to reset your password.
+              </p>
 
-        <ChatAssistant />
-      </div>
-    );
-  }
+              <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+                <div>
+                  <label htmlFor="email" className="sr-only">
+                    Email Address
+                  </label>
+                  <div className="auth-input-surface rounded-2xl px-4 py-3.5">
+                    <Mail className="h-5 w-5 text-slate-400" />
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Email"
+                      required
+                      className="min-w-0 text-sm placeholder:text-slate-400"
+                    />
+                  </div>
+                </div>
 
-  return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
-      }}
-    >
-      <div className="max-w-md w-full">
-        {/* Logo and Title */}
-        <div className="text-center mb-10">
-          <div className="flex justify-center mb-6">
-            <img
-              src={logo}
-              alt="Electron College Logo"
-              className="w-32 h-32 object-contain"
-            />
-          </div>
-          <h1 className="text-3xl font-semibold mb-2 text-white">
-            Forgot Password?
-          </h1>
-          <p className="text-blue-100">
-            Enter your email to receive a reset link
-          </p>
-        </div>
+                <p className="text-sm text-slate-500">
+                  Use the same email address you registered with so the reset link reaches the correct account.
+                </p>
 
-        {/* Form Card */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8 mb-6">
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Input */}
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-semibold text-gray-700 mb-2"
-              >
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail
-                  className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400"
-                />
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
-                />
+                <button
+                  type="submit"
+                  className="auth-primary-button w-full rounded-2xl px-6 py-4 text-base font-semibold text-white"
+                >
+                  Get Reset Link
+                </button>
+              </form>
+
+              <div className="mt-6 space-y-3 text-center">
+                <Link
+                  to="/login"
+                  className="inline-flex items-center gap-2 text-sm font-semibold text-[#1E3A8A] hover:underline"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Login
+                </Link>
+                <div>
+                  <Link to="/register" className="text-sm font-medium text-slate-500 hover:text-slate-900 hover:underline">
+                    Create new account
+                  </Link>
+                </div>
               </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              className="w-full py-3 rounded-lg font-semibold text-white transition-all hover:shadow-lg"
-              style={{ backgroundColor: "#1E3A8A" }}
-            >
-              Send Reset Link
-            </button>
-          </form>
-        </div>
-
-        {/* Back to Login Link */}
-        <div className="text-center">
-          <Link
-            to="/login"
-            className="inline-flex items-center gap-2 text-white font-medium hover:underline"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Login
-          </Link>
+            </>
+          )}
         </div>
       </div>
 

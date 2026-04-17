@@ -45,7 +45,11 @@ const academicElectives = [
   "Psychology",
   "Creative Writing",
   "Entrepreneurship",
+  "Marketing",
   "Media Arts",
+  "Visual Arts",
+  "Coaching",
+  "Fitness",
   "Sports"
 ];
 
@@ -58,7 +62,9 @@ const technicalElectives = [
   "Automotive",
   "Electrical",
   "Agriculture",
-  "Fishery"
+  "Fishery",
+  "Fitness Training",
+  "Coaching"
 ];
 
 interface FormData {
@@ -1007,7 +1013,7 @@ export function EnrollmentForm() {
 
       {/* Advisory if no assessment */}
       {!hasAssessment && (
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
+        <div className="portal-glass-panel-strong rounded-xl border p-4" style={{ borderColor: "var(--electron-blue)" }}>
           <div className="flex items-start gap-3">
             <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -1029,7 +1035,7 @@ export function EnrollmentForm() {
 
       {/* AI Assessment Result Display */}
       {aiRecommendation && (
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-900 rounded-xl p-6">
+        <div className="portal-glass-panel-strong rounded-xl border-2 p-6" style={{ borderColor: "var(--electron-blue)" }}>
           <div className="flex items-start gap-3 mb-4">
             <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
               <Sparkles className="w-6 h-6 text-white" />
@@ -1069,7 +1075,7 @@ export function EnrollmentForm() {
       )}
 
       {/* Student Choice */}
-      <div className="bg-gray-50 border border-gray-300 rounded-xl p-6">
+      <div className="portal-glass-panel rounded-xl p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">Your Choice</h3>
 
         {renderSelect("Preferred Track", "preferredTrack", ["Academic", "Technical-Professional"])}
@@ -1183,10 +1189,10 @@ export function EnrollmentForm() {
         <h2 className="text-2xl font-bold text-gray-800">Review & Submit</h2>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+      <div className="portal-glass-panel rounded-xl p-6 space-y-6">
         <div>
           <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Basic Information</h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div><span className="text-gray-600">Admission Type:</span> <span className="font-medium">{formData.admissionType}</span></div>
             <div><span className="text-gray-600">LRN:</span> <span className="font-medium">{formData.lrn}</span></div>
             <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.firstName} {formData.middleName} {formData.lastName}</span></div>
@@ -1196,7 +1202,7 @@ export function EnrollmentForm() {
 
         <div>
           <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Enrollment</h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div><span className="text-gray-600">Track:</span> <span className="font-medium">{formData.preferredTrack}</span></div>
             <div><span className="text-gray-600">Year Level:</span> <span className="font-medium">{formData.yearLevel}</span></div>
             <div><span className="text-gray-600">Elective 1:</span> <span className="font-medium">{formData.elective1}</span></div>
@@ -1218,7 +1224,7 @@ export function EnrollmentForm() {
         </div>
       </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <div className="portal-glass-panel-strong rounded-xl border p-4" style={{ borderColor: "var(--electron-blue)" }}>
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -1243,11 +1249,11 @@ export function EnrollmentForm() {
   );
 
   return (
-    <div className="min-h-screen p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
             Enrollment Form
           </h1>
           <p className="text-gray-600">
@@ -1259,7 +1265,7 @@ export function EnrollmentForm() {
         {renderPageIndicator()}
 
         {/* Form Content */}
-        <div className="bg-white rounded-xl shadow-lg p-8 mb-6">
+        <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
           {currentPage === 1 && renderPage1()}
           {currentPage === 2 && renderPage2()}
           {currentPage === 3 && renderPage3()}
@@ -1271,11 +1277,11 @@ export function EnrollmentForm() {
 
         {/* Navigation Buttons */}
         {currentPage < 7 && (
-          <div className="flex justify-between">
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
             {currentPage > 1 && (
               <button
                 onClick={handlePrevious}
-                className="px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors flex items-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
               >
                 <ArrowLeft className="w-5 h-5" />
                 Previous
@@ -1283,7 +1289,7 @@ export function EnrollmentForm() {
             )}
             <button
               onClick={handleNext}
-              className="ml-auto px-6 py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-2"
+              className="w-full sm:w-auto sm:ml-auto px-6 py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
             >
               Next
               <ArrowRight className="w-5 h-5" />
@@ -1301,14 +1307,7 @@ export function EnrollmentForm() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <div
-            className="bg-white w-full max-w-md"
-            style={{
-              borderRadius: "12px",
-              boxShadow:
-                "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-            }}
-          >
+          <div className="portal-glass-modal w-full max-w-md rounded-xl">
             {/* Success Icon */}
             <div className="p-6 text-center border-b border-gray-200">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">

@@ -2,3 +2,23 @@
 @import './tailwind.css';
 @import './theme.css';
 @import './print.css';
+
+html {
+	-webkit-text-size-adjust: 100%;
+}
+
+body {
+	overflow-x: hidden;
+}
+
+#root {
+	min-height: 100vh;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+	max-width: 100%;
+}

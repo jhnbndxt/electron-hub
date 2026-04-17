@@ -19,7 +19,18 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
-import { getPendingApplications, getAuditLogs } from "../../../services/adminService";
+import { useAuth } from "../../context/AuthContext";
+import {
+  getPendingApplications,
+  getAuditLogs,
+  updateDocumentStatus,
+  updateEnrollmentStatus,
+  createAuditLog,
+  approveEnrollment,
+  resolveUserId,
+  upsertEnrollmentProgress,
+} from "../../../services/adminService";
+import { supabase } from "../../../supabase";
 
 interface Student {
   id: number | string;
@@ -65,6 +76,7 @@ interface AuditLog {
 }
 
 export function AdminDashboard() {
+  const { userData } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState(
@@ -98,6 +110,7 @@ export function AdminDashboard() {
   });
   const [expandedDocument, setExpandedDocument] = useState<string | null>(null);
   const [viewingDocument, setViewingDocument] = useState<{type: string, url: string, fileUrl?: string | null} | null>(null);
+  const actorReference = userData?.id || userData?.email || 'registrar';
 
   // Load real data from Supabase
   useEffect(() => {
@@ -167,6 +180,7 @@ export function AdminDashboard() {
         id: log.id,
         message: log.details,
         timestamp: timeAgo,
+        user: log.user_name || log.user || 'System',
         type: log.action.includes('SUBMIT') ? 'submission' : log.action.includes('APPROVE') ? 'verification' : 'payment',
       };
     });
@@ -265,7 +279,7 @@ export function AdminDashboard() {
   };
 
   // Submit final review
-  const handleSubmitFinalReview = () => {
+  const handleSubmitFinalReview = async () => {
     if (!selectedStudent) return;
 
     // Check if all documents are accepted
@@ -305,109 +319,51 @@ export function AdminDashboard() {
         reasons.push(`Parent's/Guardian's ID: ${rejectionReasons.parentGuardianId}`);
       }
 
-      // Update application status
-      const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-      const updatedApps = applications.map((app: any) =>
-        app.id === selectedStudent.id
-          ? { ...app, status: "incomplete", rejectionReason: reasons.join("; ") }
-          : app
+      // Update application status in Supabase
+      await updateEnrollmentStatus(selectedStudent.id, 'rejected', reasons.join("; "));
+
+      // Update document statuses in Supabase - reject/approve each document
+      const docs = selectedStudent.formData?.enrollment_documents as any[] | undefined;
+      if (docs) {
+        const docTypeMap: Record<string, string> = {
+          psaBirthCertificate: 'birthCertificate',
+          form138: 'form138',
+          goodMoralCertificate: 'goodMoral',
+          idPicture: 'idPicture',
+        };
+        for (const [reviewKey, dbType] of Object.entries(docTypeMap)) {
+          const doc = docs.find((d: any) => d.document_type === dbType);
+          if (doc) {
+            const reviewStatus = documentReview[reviewKey as keyof DocumentReviewState];
+            if (reviewStatus === 'rejected') {
+              await updateDocumentStatus(doc.id, 'rejected', rejectionReasons[reviewKey as keyof DocumentRejectionReasons]);
+            } else if (reviewStatus === 'accepted') {
+              await updateDocumentStatus(doc.id, 'approved');
+            }
+          }
+        }
+      }
+
+      // Send notification to student via Supabase
+      const studentUserId = await resolveUserId(selectedStudent.formData?.user_id || selectedStudent.email);
+      if (studentUserId) {
+        const detailedMessage = reasons.join(". ");
+        await supabase.from('notifications').insert({
+          user_id: studentUserId,
+          type: 'DOCUMENTS_REJECTED',
+          title: 'Action Required: Document Rejected',
+          message: detailedMessage.trim(),
+          is_read: false,
+        });
+      }
+
+      // Add to audit log via Supabase
+      await createAuditLog(
+        actorReference,
+        'DOCUMENTS_REJECTED',
+        `Documents rejected for ${selectedStudent.name} - ${rejectedDocs.join(", ")}`,
+        'warning'
       );
-      localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
-
-      // Update document_verification localStorage with rejection statuses
-      const studentEmail = selectedStudent.formData?.studentId || selectedStudent.email;
-      const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-
-      if (!docVerification[studentEmail]) {
-        docVerification[studentEmail] = {};
-      }
-
-      // Update each document status with rejection reason or approval
-      if (documentReview.psaBirthCertificate === "rejected") {
-        if (docVerification[studentEmail].psaBirthCertificate) {
-          docVerification[studentEmail].psaBirthCertificate.status = "rejected";
-          docVerification[studentEmail].psaBirthCertificate.rejectionComment = rejectionReasons.psaBirthCertificate;
-        }
-      } else if (documentReview.psaBirthCertificate === "accepted") {
-        if (docVerification[studentEmail].psaBirthCertificate) {
-          docVerification[studentEmail].psaBirthCertificate.status = "approved";
-        }
-      }
-
-      if (documentReview.form138 === "rejected") {
-        if (docVerification[studentEmail].form138) {
-          docVerification[studentEmail].form138.status = "rejected";
-          docVerification[studentEmail].form138.rejectionComment = rejectionReasons.form138;
-        }
-      } else if (documentReview.form138 === "accepted") {
-        if (docVerification[studentEmail].form138) {
-          docVerification[studentEmail].form138.status = "approved";
-        }
-      }
-
-      if (documentReview.goodMoralCertificate === "rejected") {
-        if (docVerification[studentEmail].goodMoral) {
-          docVerification[studentEmail].goodMoral.status = "rejected";
-          docVerification[studentEmail].goodMoral.rejectionComment = rejectionReasons.goodMoralCertificate;
-        }
-      } else if (documentReview.goodMoralCertificate === "accepted") {
-        if (docVerification[studentEmail].goodMoral) {
-          docVerification[studentEmail].goodMoral.status = "approved";
-        }
-      }
-
-      if (documentReview.idPicture === "rejected") {
-        if (docVerification[studentEmail].idPicture) {
-          docVerification[studentEmail].idPicture.status = "rejected";
-          docVerification[studentEmail].idPicture.rejectionComment = rejectionReasons.idPicture;
-        }
-      } else if (documentReview.idPicture === "accepted") {
-        if (docVerification[studentEmail].idPicture) {
-          docVerification[studentEmail].idPicture.status = "approved";
-        }
-      }
-
-      if (documentReview.parentGuardianId === "rejected") {
-        if (docVerification[studentEmail].parentGuardianId) {
-          docVerification[studentEmail].parentGuardianId.status = "rejected";
-          docVerification[studentEmail].parentGuardianId.rejectionComment = rejectionReasons.parentGuardianId;
-        }
-      } else if (documentReview.parentGuardianId === "accepted") {
-        if (docVerification[studentEmail].parentGuardianId) {
-          docVerification[studentEmail].parentGuardianId.status = "approved";
-        }
-      }
-
-      localStorage.setItem("document_verification", JSON.stringify(docVerification));
-
-      // Send notification to student
-      const notificationsKey = `notifications_${studentEmail}`;
-      const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
-
-      // Format detailed rejection message
-      const detailedMessage = reasons.join(". ");
-
-      notifications.unshift({
-        id: `notif-${Date.now()}`,
-        type: "DOCUMENTS_REJECTED",
-        title: "Action Required: Document Rejected",
-        message: detailedMessage.trim(),
-        timestamp: new Date().toISOString(),
-        read: false,
-      });
-      localStorage.setItem(notificationsKey, JSON.stringify(notifications));
-
-      // Add to audit log
-      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-      auditLogs.unshift({
-        id: `log-${Date.now()}`,
-        action: "Documents Rejected",
-        user: "Registrar",
-        email: "registrar@electroncollege.edu.ph",
-        timestamp: new Date().toISOString(),
-        details: `Documents rejected for ${selectedStudent.name} - ${rejectedDocs.join(", ")}`,
-      });
-      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
 
       // Reload data
       loadApplications();
@@ -419,72 +375,43 @@ export function AdminDashboard() {
     }
   };
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (selectedStudent) {
-      // Use studentId (authenticated email) instead of form email field
-      const studentEmail = selectedStudent.formData?.studentId || selectedStudent.email;
-
-      // Update application status to "Documents Verified"
-      const applications = JSON.parse(localStorage.getItem("pending_applications") || "[]");
-      const updatedApps = applications.map((app: any) =>
-        app.id === selectedStudent.id ? { ...app, status: "Documents Verified" } : app
-      );
-      localStorage.setItem("pending_applications", JSON.stringify(updatedApps));
-
-      // Update document_verification localStorage - mark all documents as approved
-      const docVerification = JSON.parse(localStorage.getItem("document_verification") || "{}");
-      if (docVerification[studentEmail]) {
-        // Mark all 5 required documents as approved
-        const docKeys = ["psaBirthCertificate", "form138", "goodMoral", "idPicture", "parentGuardianId"];
-        docKeys.forEach(key => {
-          if (docVerification[studentEmail][key]) {
-            docVerification[studentEmail][key].status = "approved";
-            // Remove rejection comment if it exists
-            delete docVerification[studentEmail][key].rejectionComment;
-          }
-        });
-        localStorage.setItem("document_verification", JSON.stringify(docVerification));
+      // Approve enrollment in Supabase (sets status to documents_verified)
+      const { error } = await approveEnrollment(selectedStudent.id, actorReference);
+      if (error) {
+        alert(`❌ Error approving enrollment: ${error}`);
+        return;
       }
 
-      // Update student's enrollment progress
-      const enrollmentKey = `enrollment_progress_${studentEmail}`;
-      const currentProgress = JSON.parse(localStorage.getItem(enrollmentKey) || "[]");
-
-      if (currentProgress.length > 0) {
-        // Mark "Documents Verified" as completed and "Payment Submitted" as current
-        const updatedProgress = currentProgress.map((step: any) => {
-          if (step.name === "Documents Submitted") return { ...step, status: "completed" };
-          if (step.name === "Documents Verified") return { ...step, status: "completed" };
-          if (step.name === "Payment Submitted") return { ...step, status: "current" };
-          return step;
-        });
-        localStorage.setItem(enrollmentKey, JSON.stringify(updatedProgress));
+      // Update all document statuses to approved in Supabase
+      const docs = selectedStudent.formData?.enrollment_documents as any[] | undefined;
+      if (docs) {
+        for (const doc of docs) {
+          await updateDocumentStatus(doc.id, 'approved');
+        }
       }
 
-      // Add notification for student
-      const notificationsKey = `notifications_${studentEmail}`;
-      const notifications = JSON.parse(localStorage.getItem(notificationsKey) || "[]");
-      notifications.unshift({
-        id: `notif-${Date.now()}`,
-        type: "DOCUMENTS_VERIFIED",
-        title: "Documents Verified",
-        message: "Your enrollment documents have been verified by the Registrar. You can now proceed to payment.",
-        timestamp: new Date().toISOString(),
-        read: false,
-      });
-      localStorage.setItem(notificationsKey, JSON.stringify(notifications));
+      // Update enrollment progress in Supabase
+      const studentUserId = await resolveUserId(selectedStudent.formData?.user_id || selectedStudent.email);
+      if (studentUserId) {
+        await upsertEnrollmentProgress(studentUserId, [
+          { step_name: 'Documents Submitted', status: 'completed' },
+          { step_name: 'Documents Verified', status: 'completed' },
+          { step_name: 'Payment Submitted', status: 'current' },
+        ]);
 
-      // Add to audit log
-      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-      auditLogs.unshift({
-        id: `log-${Date.now()}`,
-        action: "Documents Verified",
-        user: "Registrar",
-        email: "registrar@electroncollege.edu.ph",
-        timestamp: new Date().toISOString(),
-        details: `Documents verified for ${selectedStudent.name} - Payment section unlocked`,
-      });
-      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
+        // Send notification via Supabase
+        await supabase.from('notifications').insert({
+          user_id: studentUserId,
+          type: 'DOCUMENTS_VERIFIED',
+          title: 'Documents Verified',
+          message: 'Your enrollment documents have been verified by the Registrar. You can now proceed to payment.',
+          is_read: false,
+        });
+      }
+
+      // Audit log is already created by approveEnrollment()
 
       // Reload data
       loadApplications();
@@ -496,19 +423,15 @@ export function AdminDashboard() {
     }
   };
 
-  const handleCorrection = () => {
+  const handleCorrection = async () => {
     if (selectedStudent) {
-      // Add to audit log
-      const auditLogs = JSON.parse(localStorage.getItem("audit_logs") || "[]");
-      auditLogs.unshift({
-        id: `log-${Date.now()}`,
-        action: "Correction Requested",
-        user: "System Admin",
-        email: "electronadmin@gmail.com",
-        timestamp: new Date().toISOString(),
-        details: `Correction requested for ${selectedStudent.name}`,
-      });
-      localStorage.setItem("audit_logs", JSON.stringify(auditLogs));
+      // Add to audit log via Supabase
+      await createAuditLog(
+        actorReference,
+        'CORRECTION_REQUESTED',
+        `Correction requested for ${selectedStudent.name}`,
+        'info'
+      );
 
       loadAuditLogs();
       
@@ -547,11 +470,11 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="flex gap-6 p-8 bg-gray-50">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row">
       {/* Main Content */}
       <div className="flex-1">
         {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Welcome, Registrar
@@ -560,7 +483,7 @@ export function AdminDashboard() {
               Manage student applications and enrollment records
             </p>
           </div>
-          <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
+          <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
             <Calendar className="w-5 h-5 text-gray-500" />
             <input
               type="date"
@@ -783,7 +706,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Recent Activity Sidebar */}
-      <div className="w-80 flex-shrink-0">
+      <div className="w-full flex-shrink-0 xl:w-80">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm sticky top-8">
           <div className="p-6 border-b border-gray-200" style={{ backgroundColor: "#F0FDF4" }}>
             <div className="flex items-center gap-2">

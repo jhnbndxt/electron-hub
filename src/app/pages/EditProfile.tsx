@@ -3,43 +3,44 @@ import { useNavigate, Link } from "react-router";
 import { ArrowLeft, User, Mail, Phone, Calendar, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import toast, { Toaster } from "react-hot-toast";
+import { supabase } from "../../supabase";
 
 export function EditProfile() {
   const { userData, user } = useAuth();
   const navigate = useNavigate();
   
-  // Load profile data from localStorage
-  const loadProfileData = () => {
-    const userEmail = userData?.email || user?.email || "";
-    const profileKey = `profile_${userEmail}`;
-    const savedProfile = localStorage.getItem(profileKey);
-    
-    if (savedProfile) {
-      return JSON.parse(savedProfile);
-    }
-    
-    // Default data for joshua@gmail.com and other users
-    if (userEmail === "joshua@gmail.com") {
-      return {
-        fullName: "Joshua",
-        email: userEmail,
-        contactNumber: "09175432189",
-        dateOfBirth: "2005-06-15",
-        gender: "male",
-      };
-    }
-    
-    // Default for other users
-    return {
-      fullName: userData?.name || user?.name || "",
-      email: userEmail,
-      contactNumber: "",
-      dateOfBirth: "",
-      gender: "",
-    };
-  };
+  // Load profile data from Supabase
+  const [formData, setFormData] = useState({
+    fullName: userData?.name || user?.name || "",
+    email: userData?.email || user?.email || "",
+    contactNumber: "",
+    dateOfBirth: "",
+    gender: "",
+  });
 
-  const [formData, setFormData] = useState(loadProfileData());
+  useEffect(() => {
+    const loadProfile = async () => {
+      const userId = userData?.id;
+      if (!userId) return;
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (!error && data) {
+        setFormData({
+          fullName: data.full_name || '',
+          email: data.email || '',
+          contactNumber: data.contact_number || '',
+          dateOfBirth: data.birth_date || '',
+          gender: data.gender || '',
+        });
+      }
+    };
+    loadProfile();
+  }, [userData]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -48,29 +49,29 @@ export function EditProfile() {
     });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Save to localStorage
-    const userEmail = userData?.email || user?.email || "";
-    const profileKey = `profile_${userEmail}`;
-    localStorage.setItem(profileKey, JSON.stringify(formData));
-    
-    // Also update the registered_users array if this user exists there
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    const updatedUsers = registeredUsers.map((u: any) => {
-      if (u.email === userEmail) {
-        return {
-          ...u,
-          name: formData.fullName,
-          phone: formData.contactNumber,
-          birthDate: formData.dateOfBirth,
-          gender: formData.gender,
-        };
-      }
-      return u;
-    });
-    localStorage.setItem("registered_users", JSON.stringify(updatedUsers));
+    const userId = userData?.id;
+    if (!userId) return;
+
+    // Save to Supabase users table
+    const { error } = await supabase
+      .from('users')
+      .update({
+        full_name: formData.fullName,
+        contact_number: formData.contactNumber,
+        birth_date: formData.dateOfBirth || null,
+        gender: formData.gender || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', userId);
+
+    if (error) {
+      console.error('Error updating profile:', error);
+      toast.error("Failed to update profile");
+      return;
+    }
     
     // Show success toast
     toast.success("Profile updated successfully!", {

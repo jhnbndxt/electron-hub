@@ -33,6 +33,7 @@
                                   │ email (UNIQUE)  │
                                   │ password_hash   │
                                   │ full_name       │
+                                  │ profile_picture_url │
                                   │ role            │
                                   │ admin_type      │
                                   │ created_at      │
@@ -228,6 +229,15 @@ idx_enrollment_progress_student_id -- Get student's progress
 ### Row Level Security (Enabled)
 
 Users can only see/modify their own data by default.
+
+### Recent Users Table Addition
+
+```sql
+ALTER TABLE users
+ADD COLUMN IF NOT EXISTS profile_picture_url TEXT;
+```
+
+Use this column to store the public Supabase Storage URL for each user's profile photo so student avatars sync across sessions and devices.
 
 ---
 

@@ -2,14 +2,13 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { ChatAssistant } from "../components/ChatAssistant";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { loginUser } from "../../services/authService";
-const logo = "";
+import logo from "../../assets/electronLogo";
 
 export function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isEmailValid, setIsEmailValid] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +74,7 @@ export function Login() {
           id: user.id,
           name: user.full_name,
           email: user.email,
+          profilePictureUrl: user.profile_picture_url || undefined,
           adminType: "registrar"
         });
         navigate("/registrar", { replace: true });
@@ -83,6 +83,7 @@ export function Login() {
           id: user.id,
           name: user.full_name,
           email: user.email,
+          profilePictureUrl: user.profile_picture_url || undefined,
           adminType: "branchcoordinator"
         });
         navigate("/branchcoordinator", { replace: true });
@@ -91,6 +92,7 @@ export function Login() {
           id: user.id,
           name: user.full_name,
           email: user.email,
+          profilePictureUrl: user.profile_picture_url || undefined,
           adminType: "cashier"
         });
         navigate("/cashier", { replace: true });
@@ -99,7 +101,8 @@ export function Login() {
         login("student", {
           id: user.id,
           name: user.full_name,
-          email: user.email
+          email: user.email,
+          profilePictureUrl: user.profile_picture_url || undefined,
         });
         navigate("/dashboard", { replace: true });
       }
@@ -110,121 +113,84 @@ export function Login() {
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center py-6 px-4"
-      style={{ backgroundColor: "#F8FAFC" }}
-    >
+    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
       {/* Assessment Banner */}
-      {showBanner && (
-        <div
-          className="fixed top-0 left-0 right-0 z-50 shadow-lg border-b-4 animate-slide-down"
-          style={{
-            backgroundColor: "#EFF6FF",
-            borderColor: "#1E3A8A"
-          }}
-        >
-          <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
+      <div className="relative z-10 w-full max-w-md">
+        {showBanner && (
+          <div
+            className="mb-5 rounded-[1.5rem] border border-blue-200/80 bg-white/92 px-4 py-4 shadow-lg backdrop-blur-md animate-slide-down"
+          >
+            <div className="flex items-start gap-3">
               <div
-                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
                 style={{ backgroundColor: "#1E3A8A" }}
               >
-                <svg
-                  className="w-5 h-5 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm sm:text-base" style={{ color: "#1E3A8A" }}>
+                  Please log in or create an account to take the assessment.
+                </p>
+                <p className="mt-1 text-sm text-gray-600">
+                  New here? Register first, then come back to continue.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowBanner(false)}
+                className="flex-shrink-0 text-gray-400 transition-colors hover:text-gray-600"
+                aria-label="Close banner"
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                   <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
                   />
                 </svg>
-              </div>
-              <div>
-                <p
-                  className="font-semibold text-base"
-                  style={{ color: "#1E3A8A" }}
-                >
-                  Please log in or create an account to take the Assessment.
-                </p>
-                <p className="text-sm text-gray-600 mt-0.5">
-                  New here? Click "Register" below to create your account first.
-                </p>
-              </div>
+              </button>
             </div>
-            <button
-              onClick={() => setShowBanner(false)}
-              className="text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
-              aria-label="Close banner"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                  clipRule="evenodd"
-                />
-              </svg>
-            </button>
           </div>
-        </div>
-      )}
+        )}
 
-      <div className="max-w-md w-full">
-        {/* Logo and Title */}
-        <div className="text-center mb-6">
-          <div className="flex justify-center mb-4">
-            <img 
-              src={logo} 
-              alt="Electron College Logo" 
-              className="w-24 h-24 object-contain"
-            />
+        <div className="auth-panel rounded-[2rem] p-6 sm:p-8">
+          <div className="mb-8 text-center">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.5rem] auth-logo-orb">
+              <img src={logo} alt="Electron College Logo" className="h-20 w-20 scale-125 object-contain" />
+            </div>
+            <h1 className="mt-5 text-3xl font-semibold text-slate-900 sm:text-[2.2rem]">
+              Sign In
+            </h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">
+              Use your Electron Hub account to continue your application, assessment, and student updates.
+            </p>
           </div>
-          <h1 
-            className="text-2xl font-semibold mb-1"
-            style={{ color: "#1E3A8A" }}
-          >
-            Electron Hub
-          </h1>
-          <p className="text-gray-600 text-sm">
-            Sign in to continue
-          </p>
-        </div>
 
-        {/* Login Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             <div>
-              <label
-                htmlFor="email"
-                className="block mb-1.5 text-sm font-medium text-gray-700"
-              >
+              <label htmlFor="email" className="sr-only">
                 Email Address
               </label>
-              <input
-                type="email"
-                id="email"
-                name="email"
-                value={email}
-                onChange={handleEmailChange}
-                required
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                placeholder="example@gmail.com"
-                style={{ color: "#1F2937" }}
-              />
+              <div className="auth-input-surface rounded-2xl px-4 py-3.5">
+                <Mail className="h-5 w-5 text-slate-400" />
+                <input
+                  type="email"
+                  id="email"
+                  name="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  required
+                  className="min-w-0 text-sm placeholder:text-slate-400"
+                  placeholder="Email"
+                />
+              </div>
             </div>
 
             <div>
-              <label
-                htmlFor="password"
-                className="block mb-1.5 text-sm font-medium text-gray-700"
-              >
+              <label htmlFor="password" className="sr-only">
                 Password
               </label>
-              <div className="relative">
+              <div className="auth-input-surface rounded-2xl px-4 py-3.5">
+                <LockKeyhole className="h-5 w-5 text-slate-400" />
                 <input
                   type={showPassword ? "text" : "password"}
                   id="password"
@@ -232,94 +198,52 @@ export function Login() {
                   value={password}
                   onChange={handlePasswordChange}
                   required
-                  className="w-full px-3 py-2.5 pr-12 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all password-input"
-                  placeholder="Enter your password"
-                  style={{ 
-                    color: "#1F2937",
-                    borderColor: "#03045E",
-                  }}
+                  className="min-w-0 password-input pr-2 text-sm placeholder:text-slate-400"
+                  placeholder="Password"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 transition-opacity"
-                  style={{ 
-                    color: "#6B7280",
-                    opacity: password ? 0.8 : 0.5,
-                  }}
+                  className="text-slate-400 transition-colors hover:text-slate-700"
                   aria-label="Toggle password visibility"
                   data-testid="toggle-password-visibility"
                 >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" strokeWidth={2} />
-                  ) : (
-                    <Eye className="w-5 h-5" strokeWidth={2} />
-                  )}
+                  {showPassword ? <EyeOff className="h-5 w-5" strokeWidth={2} /> : <Eye className="h-5 w-5" strokeWidth={2} />}
                 </button>
               </div>
-              {/* Error Message */}
-              {error && (
-                <p className="mt-2 text-sm flex items-center gap-1.5" style={{ color: "#B91C1C" }}>
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </p>
-              )}
+              <div className="mt-2 flex justify-end">
+                <Link to="/forgot-password" className="text-xs font-medium text-slate-500 hover:text-[#1E3A8A] hover:underline sm:text-sm">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input 
-                  type="checkbox" 
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300"
-                  style={{ accentColor: "#1E3A8A" }}
-                />
-                <span className="text-sm text-gray-600">Remember me</span>
-              </label>
-              <Link
-                to="/forgot-password"
-                className="text-sm font-medium hover:underline"
-                style={{ color: "#1E3A8A" }}
-              >
-                Forgot password?
-              </Link>
-            </div>
+            {error && (
+              <div className="rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <span className="font-semibold">Sign in failed.</span> {error}
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={isLoading || !isEmailValid || !password}
-              className="w-full px-6 py-2.5 text-white rounded-md font-medium transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ backgroundColor: "#1E3A8A" }}
+              className="auth-primary-button w-full rounded-2xl px-6 py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Signing in..." : "Get Started"}
             </button>
           </form>
 
-          {/* Register Link */}
-          <p className="mt-6 text-center text-sm text-gray-600">
-            Don't have an account?{" "}
-            <Link 
-              to="/register" 
-              className="font-medium hover:underline"
-              style={{ color: "#1E3A8A" }}
-            >
-              Register
+          <div className="mt-6 space-y-3 text-center">
+            <p className="text-sm text-slate-600">
+              Don&apos;t have an account?{" "}
+              <Link to="/register" className="font-semibold text-[#1E3A8A] hover:underline">
+                Register
+              </Link>
+            </p>
+            <Link to="/" className="text-sm font-medium text-slate-500 hover:text-slate-900 hover:underline">
+              Back to home
             </Link>
-          </p>
-        </div>
-
-        {/* Back to Home */}
-        <div className="text-center mt-4">
-          <Link 
-            to="/" 
-            className="text-sm font-medium hover:underline"
-            style={{ color: "#64748B" }}
-          >
-            ← Back to home
-          </Link>
+          </div>
         </div>
       </div>
 

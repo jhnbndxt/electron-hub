@@ -9,6 +9,113 @@
 
 import { supabase } from '../supabase';
 
+function normalizeScores(assessmentData = {}) {
+  const scoreSource = assessmentData.scores || {};
+
+  return {
+    verbal_ability_score:
+      scoreSource.verbal_ability_score ??
+      scoreSource.VA ??
+      assessmentData.verbal_ability_score ??
+      assessmentData.VA ??
+      0,
+    mathematical_ability_score:
+      scoreSource.mathematical_ability_score ??
+      scoreSource.MA ??
+      assessmentData.mathematical_ability_score ??
+      assessmentData.MA ??
+      0,
+    spatial_ability_score:
+      scoreSource.spatial_ability_score ??
+      scoreSource.SA ??
+      assessmentData.spatial_ability_score ??
+      assessmentData.SA ??
+      0,
+    logical_reasoning_score:
+      scoreSource.logical_reasoning_score ??
+      scoreSource.LRA ??
+      assessmentData.logical_reasoning_score ??
+      assessmentData.LRA ??
+      0,
+    overall_score:
+      scoreSource.overall_score ??
+      assessmentData.overall_score ??
+      Math.round(
+        ((scoreSource.verbal_ability_score ?? scoreSource.VA ?? assessmentData.verbal_ability_score ?? assessmentData.VA ?? 0) +
+          (scoreSource.mathematical_ability_score ?? scoreSource.MA ?? assessmentData.mathematical_ability_score ?? assessmentData.MA ?? 0) +
+          (scoreSource.spatial_ability_score ?? scoreSource.SA ?? assessmentData.spatial_ability_score ?? assessmentData.SA ?? 0) +
+          (scoreSource.logical_reasoning_score ?? scoreSource.LRA ?? assessmentData.logical_reasoning_score ?? assessmentData.LRA ?? 0)) / 4
+      ),
+  };
+}
+
+function normalizeArray(value) {
+  if (!value) return [];
+
+  if (Array.isArray(value)) {
+    return value.filter((item) => typeof item === 'string' && item.trim() && item !== 'undefined');
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return Array.isArray(parsed)
+          ? parsed.filter((item) => typeof item === 'string' && item.trim() && item !== 'undefined')
+          : [];
+      } catch {
+        return [];
+      }
+    }
+
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      return trimmed
+        .slice(1, -1)
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item && item !== 'undefined');
+    }
+
+    return [trimmed].filter((item) => item !== 'undefined');
+  }
+
+  return [];
+}
+
+function mapAssessmentResult(result) {
+  if (!result) return null;
+
+  const scores = {
+    VA: result.verbal_ability_score ?? 0,
+    MA: result.mathematical_ability_score ?? 0,
+    SA: result.spatial_ability_score ?? 0,
+    LRA: result.logical_reasoning_score ?? 0,
+  };
+
+  const electives = [result.elective_1, result.elective_2].filter(Boolean);
+  const overallScore =
+    result.overall_score ??
+    Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
+
+  return {
+    id: result.id,
+    date: result.assessment_date || result.created_at || new Date().toISOString(),
+    track: result.recommended_track || result.track || 'General',
+    electives,
+    scores,
+    topDomains: normalizeArray(result.top_domains ?? result.topDomains),
+    topInterests: normalizeArray(result.top_interests ?? result.topInterests),
+    overallScore,
+    recommended_track: result.recommended_track || result.track || 'General',
+    elective_1: electives[0] || null,
+    elective_2: electives[1] || null,
+  };
+}
+
 /**
  * Get student user ID by email
  */
@@ -33,7 +140,13 @@ async function getStudentIdByEmail(email) {
  */
 export async function saveAssessmentResult(userEmail, assessmentData) {
   try {
-    const { track, electives, scores, topDomains, topInterests } = assessmentData;
+    const scores = normalizeScores(assessmentData);
+    const track = assessmentData.recommended_track || assessmentData.track || 'General';
+    const electives = Array.isArray(assessmentData.electives)
+      ? assessmentData.electives.filter(Boolean)
+      : [assessmentData.elective_1, assessmentData.elective_2].filter(Boolean);
+    const topDomains = normalizeArray(assessmentData.topDomains ?? assessmentData.top_domains);
+    const topInterests = normalizeArray(assessmentData.topInterests ?? assessmentData.top_interests);
 
     // Get student ID from email
     const student_id = await getStudentIdByEmail(userEmail);
@@ -41,14 +154,19 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
       throw new Error('Student not found');
     }
 
-    // Ensure scores is an object with individual scores
-    const scoreData = scores || {
-      verbal_ability_score: assessmentData.verbal_ability_score || 0,
-      mathematical_ability_score: assessmentData.mathematical_ability_score || 0,
-      spatial_ability_score: assessmentData.spatial_ability_score || 0,
-      logical_reasoning_score: assessmentData.logical_reasoning_score || 0,
-      overall_score: assessmentData.overall_score || 0
-    };
+    const { data: existingResults, error: existingError } = await supabase
+      .from('assessment_results')
+      .select('id')
+      .eq('student_id', student_id)
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (existingError) throw existingError;
+
+    if (existingResults && existingResults.length > 0) {
+      console.log('Assessment result already exists, skipping duplicate save:', userEmail);
+      return existingResults[0];
+    }
 
     const { data, error } = await supabase
       .from('assessment_results')
@@ -56,15 +174,15 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
         student_id,
         assessment_date: new Date().toISOString().split('T')[0],
         recommended_track: track,
-        elective_1: electives?.[0],
-        elective_2: electives?.[1],
-        verbal_ability_score: scoreData.verbal_ability_score,
-        mathematical_ability_score: scoreData.mathematical_ability_score,
-        spatial_ability_score: scoreData.spatial_ability_score,
-        logical_reasoning_score: scoreData.logical_reasoning_score,
-        overall_score: scoreData.overall_score,
-        top_domains: topDomains || [],
-        top_interests: topInterests || []
+        elective_1: electives[0] || null,
+        elective_2: electives[1] || null,
+        verbal_ability_score: scores.verbal_ability_score,
+        mathematical_ability_score: scores.mathematical_ability_score,
+        spatial_ability_score: scores.spatial_ability_score,
+        logical_reasoning_score: scores.logical_reasoning_score,
+        overall_score: scores.overall_score,
+        top_domains: topDomains,
+        top_interests: topInterests,
       })
       .select();
 
@@ -85,19 +203,19 @@ export async function getAssessmentHistory(userEmail) {
   try {
     const student_id = await getStudentIdByEmail(userEmail);
     if (!student_id) {
-      return { data: [], error: null };
+      return { results: [], count: 0 };
     }
 
     const { data, error } = await supabase
       .from('assessment_results')
       .select('*')
       .eq('student_id', student_id)
-      .order('assessment_date', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
 
     return {
-      results: data || [],
+      results: (data || []).map(mapAssessmentResult).filter(Boolean),
       count: data?.length || 0,
     };
   } catch (error) {
@@ -118,12 +236,12 @@ export async function getLatestAssessmentResult(userEmail) {
       .from('assessment_results')
       .select('*')
       .eq('student_id', student_id)
-      .order('assessment_date', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
     if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-    return data || null;
+    return mapAssessmentResult(data);
   } catch (error) {
     console.error('Error fetching latest assessment result:', error);
     return null;
@@ -142,10 +260,10 @@ export async function getAllUserAssessmentResults(userEmail) {
       .from('assessment_results')
       .select('*')
       .eq('student_id', student_id)
-      .order('assessment_date', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []).map(mapAssessmentResult).filter(Boolean);
   } catch (error) {
     console.error('Error fetching user assessment results:', error);
     return [];
@@ -239,17 +357,17 @@ export async function getAssessmentStatistics() {
     if (data && data.length > 0) {
       // Group by track
       data.forEach((result) => {
-        if (!stats.byTrack[result.track]) {
-          stats.byTrack[result.track] = 0;
+        const track = result.recommended_track || result.track || 'General';
+
+        if (!stats.byTrack[track]) {
+          stats.byTrack[track] = 0;
         }
-        stats.byTrack[result.track]++;
+        stats.byTrack[track]++;
 
         // Aggregate top domains
-        if (result.top_domains) {
-          result.top_domains.forEach((domain) => {
+        normalizeArray(result.top_domains).forEach((domain) => {
             stats.topDomains[domain] = (stats.topDomains[domain] || 0) + 1;
-          });
-        }
+        });
       });
 
       // Calculate average score

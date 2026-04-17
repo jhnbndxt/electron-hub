@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Plus, Edit2, Trash2, X, Shield, User, Users, AlertTriangle, CheckCircle, RefreshCw } from "lucide-react";
+import { Search, Filter, Plus, Edit2, Trash2, X, Shield, User, Users, CheckCircle, RefreshCw } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation } from "react-router";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { supabase } from "../../../supabase";
 
 interface UserAccount {
   id: string;
@@ -16,12 +18,12 @@ export function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
-  const [selectedRole, setSelectedRole] = useState<"student" | "admin" | "superadmin">("student");
+  const [selectedRole, setSelectedRole] = useState<"student" | "registrar" | "branchcoordinator" | "cashier" | "superadmin">("student");
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const { userRole } = useAuth();
+  const { userRole, userData } = useAuth();
   const location = useLocation();
 
   // Form state for adding new user
@@ -35,121 +37,41 @@ export function UserManagement() {
   // Determine if we're in super admin context
   const isSuperAdmin = userRole === "superadmin" || location.pathname.startsWith("/superadmin");
 
-  // Load users from localStorage and combine with hardcoded system users
+  // Load users from Supabase
   const [users, setUsers] = useState<UserAccount[]>([]);
 
-  const loadUsers = () => {
-    // Load registered users from localStorage
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    
-    console.log("Loading users from localStorage:", registeredUsers);
-    
-    // Ensure all registered users have unique IDs and proper role
-    const uniqueRegisteredUsers = registeredUsers.map((user: any, index: number) => {
-      const userId = user.id && !user.id.startsWith("user-001") 
-        ? user.id 
-        : `user-${user.email.split('@')[0]}-${Date.now()}-${index}`;
-      
-      return {
-        ...user,
-        id: userId,
-        role: user.role || "student", // Default to student if no role
-        status: user.status || "Active",
-        dateCreated: user.dateCreated || new Date().toISOString(),
-      };
-    });
-    
-    console.log("Processed registered users:", uniqueRegisteredUsers);
-    
-    // Update localStorage with unique IDs
-    localStorage.setItem("registered_users", JSON.stringify(uniqueRegisteredUsers));
-    
-    // System administrators (always present)
-    const systemUsers: UserAccount[] = [
-      {
-        id: "sys-001",
-        name: "Super Administrator",
-        email: "electronsuperadmin@gmail.com",
-        role: "superadmin",
-        status: "Active",
-        dateCreated: "December 1, 2025",
-      },
-      {
-        id: "sys-002",
-        name: "System Admin",
-        email: "electronadmin@gmail.com",
-        role: "admin",
-        status: "Active",
-        dateCreated: "December 15, 2025",
-      },
-      {
-        id: "sys-003",
-        name: "Joshua",
-        email: "joshua@gmail.com",
-        role: "student",
-        status: "Active",
-        dateCreated: "December 1, 2025",
-      },
-    ];
+  const loadUsers = async () => {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, email, full_name, role, status, created_at')
+      .order('created_at', { ascending: false });
 
-    // Combine system users and registered users
-    const allUsers = [...systemUsers, ...uniqueRegisteredUsers];
-    console.log("All users combined:", allUsers);
-    setUsers(allUsers);
+    if (error) {
+      console.error('Error loading users:', error);
+      setUsers([]);
+      return;
+    }
+
+    const formattedUsers = (data || []).map((user: any) => ({
+      id: user.id,
+      name: user.full_name || user.email,
+      email: user.email,
+      role: user.role || 'student',
+      status: user.status || 'active',
+      dateCreated: new Date(user.created_at).toLocaleDateString(),
+    }));
+
+    setUsers(formattedUsers);
   };
 
   useEffect(() => {
     loadUsers();
-
-    // Listen for storage changes (when a new user registers)
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === 'registered_users') {
-        loadUsers();
-
-        // Show toast notification when new user registers
-        const newUsers = JSON.parse(e.newValue || '[]');
-        const oldUsers = JSON.parse(e.oldValue || '[]');
-        if (newUsers.length > oldUsers.length) {
-          const addedCount = newUsers.length - oldUsers.length;
-          setSuccessMessage(`${addedCount} New User${addedCount > 1 ? 's' : ''} Registered`);
-          setShowSuccessToast(true);
-          setTimeout(() => setShowSuccessToast(false), 5000);
-        }
-      }
-    };
-
-    // Listen for custom storage events (same window)
-    const handleCustomStorageChange = (e: Event) => {
-      if (e instanceof StorageEvent && e.key === 'registered_users') {
-        loadUsers();
-
-        // Show toast notification
-        const newUsers = JSON.parse(e.newValue || '[]');
-        const oldUsers = JSON.parse(localStorage.getItem('registered_users_prev') || '[]');
-        if (newUsers.length > oldUsers.length) {
-          const addedCount = newUsers.length - oldUsers.length;
-          setSuccessMessage(`${addedCount} New User${addedCount > 1 ? 's' : ''} Registered`);
-          setShowSuccessToast(true);
-          setTimeout(() => setShowSuccessToast(false), 5000);
-        }
-        localStorage.setItem('registered_users_prev', e.newValue || '[]');
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('storage', handleCustomStorageChange);
-
-    // Store initial state for comparison
-    localStorage.setItem('registered_users_prev', localStorage.getItem('registered_users') || '[]');
-
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('storage', handleCustomStorageChange);
-    };
   }, []);
 
+  const visibleUsers = users.filter((user) => user.status !== "inactive");
+
   // Filter users
-  let filteredUsers = users.filter(
+  let filteredUsers = visibleUsers.filter(
     (user) =>
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -164,18 +86,21 @@ export function UserManagement() {
 
   const handleEditClick = (user: UserAccount) => {
     setEditingUser(user);
-    setSelectedRole(user.role as "student" | "admin" | "superadmin");
+    setSelectedRole(user.role as "student" | "registrar" | "branchcoordinator" | "cashier" | "superadmin");
   };
 
-  const handleSaveChanges = () => {
+  const handleSaveChanges = async () => {
     if (editingUser) {
-      // Update localStorage for non-system users
-      if (!editingUser.id.startsWith('sys-')) {
-        const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-        const updatedRegisteredUsers = registeredUsers.map((user: any) =>
-          user.id === editingUser.id ? { ...user, role: selectedRole } : user
-        );
-        localStorage.setItem("registered_users", JSON.stringify(updatedRegisteredUsers));
+      // Update role in Supabase
+      const { error } = await supabase
+        .from('users')
+        .update({ role: selectedRole, updated_at: new Date().toISOString() })
+        .eq('id', editingUser.id);
+
+      if (error) {
+        console.error('Error updating user role:', error);
+        alert('Failed to update user role');
+        return;
       }
 
       // Update UI
@@ -194,21 +119,33 @@ export function UserManagement() {
     setDeletingUser(user);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (deletingUser) {
-      const updatedUsers = users.filter((user) => user.id !== deletingUser.id);
-      setUsers(updatedUsers);
-      
-      // Also remove from localStorage if it's a registered user (not system admin)
-      if (!deletingUser.id.startsWith('sys-')) {
-        const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-        const updatedRegisteredUsers = registeredUsers.filter((user: any) => user.id !== deletingUser.id);
-        localStorage.setItem("registered_users", JSON.stringify(updatedRegisteredUsers));
+      if (deletingUser.id === userData?.id) {
+        alert('You cannot deactivate your own account while logged in.');
+        return;
       }
+
+      // Deactivate in Supabase instead of deleting the record
+      const { error } = await supabase
+        .from('users')
+        .update({ status: 'inactive', updated_at: new Date().toISOString() })
+        .eq('id', deletingUser.id);
+
+      if (error) {
+        console.error('Error deactivating user:', error);
+        alert('Failed to deactivate user');
+        return;
+      }
+
+      const updatedUsers = users.map((user) =>
+        user.id === deletingUser.id ? { ...user, status: 'inactive' } : user
+      );
+      setUsers(updatedUsers);
       
       setDeletingUser(null);
       setShowSuccessToast(true);
-      setSuccessMessage("User deleted successfully!");
+      setSuccessMessage("User deactivated successfully!");
       setTimeout(() => setShowSuccessToast(false), 3000);
     }
   };
@@ -223,7 +160,7 @@ export function UserManagement() {
     });
   };
 
-  const handleCreateUser = (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validate form
@@ -233,58 +170,34 @@ export function UserManagement() {
     }
 
     // Check if user already exists
-    const registeredUsers = JSON.parse(localStorage.getItem("registered_users") || "[]");
-    const existingUser = registeredUsers.find((u: any) => u.email.toLowerCase() === newUserForm.email.toLowerCase());
+    const existingUser = users.find((u) => u.email.toLowerCase() === newUserForm.email.toLowerCase());
     
     if (existingUser) {
       alert("A user with this email already exists");
       return;
     }
 
-    // Create new user
-    const newUser = {
-      id: `user-${Date.now()}`,
-      name: newUserForm.name,
-      email: newUserForm.email,
-      role: newUserForm.role,
-      password: newUserForm.password,
-      status: "Active",
-      dateCreated: new Date().toISOString(),
-    };
+    // Create new user in Supabase
+    const { data, error } = await supabase
+      .from('users')
+      .insert({
+        email: newUserForm.email,
+        full_name: newUserForm.name,
+        role: newUserForm.role,
+        password_hash: newUserForm.password, // Note: In production, hash this server-side
+        status: 'active',
+      })
+      .select()
+      .single();
 
-    // Add to localStorage
-    registeredUsers.push(newUser);
-    localStorage.setItem("registered_users", JSON.stringify(registeredUsers));
+    if (error) {
+      console.error('Error creating user:', error);
+      alert('Failed to create user: ' + error.message);
+      return;
+    }
 
-    // Update UI
-    const systemUsers: UserAccount[] = [
-      {
-        id: "sys-001",
-        name: "Super Administrator",
-        email: "electronsuperadmin@gmail.com",
-        role: "superadmin",
-        status: "Active",
-        dateCreated: "December 1, 2025",
-      },
-      {
-        id: "sys-002",
-        name: "System Admin",
-        email: "electronadmin@gmail.com",
-        role: "admin",
-        status: "Active",
-        dateCreated: "December 15, 2025",
-      },
-      {
-        id: "sys-003",
-        name: "Joshua",
-        email: "joshua@gmail.com",
-        role: "student",
-        status: "Active",
-        dateCreated: "December 1, 2025",
-      },
-    ];
-
-    setUsers([...systemUsers, ...registeredUsers]);
+    // Reload users from Supabase
+    await loadUsers();
     setShowAddModal(false);
     setSuccessMessage("User created successfully!");
     setShowSuccessToast(true);
@@ -309,15 +222,28 @@ export function UserManagement() {
           border: "#93C5FD",
           icon: User,
         };
-      case "admin":
+      case "registrar":
         return {
           bg: "#FEF3C7",
           text: "#92400E",
           border: "#FCD34D",
           icon: Shield,
         };
+      case "branchcoordinator":
+        return {
+          bg: "#E0E7FF",
+          text: "#3730A3",
+          border: "#A5B4FC",
+          icon: Users,
+        };
+      case "cashier":
+        return {
+          bg: "#D1FAE5",
+          text: "#065F46",
+          border: "#6EE7B7",
+          icon: Shield,
+        };
       case "superadmin":
-      case "super admin":
         return {
           bg: "#FEE2E2",
           text: "#991B1B",
@@ -338,8 +264,12 @@ export function UserManagement() {
     switch (role.toLowerCase()) {
       case "student":
         return "Student";
-      case "admin":
-        return "Admin";
+      case "registrar":
+        return "Registrar";
+      case "branchcoordinator":
+        return "Branch Coordinator";
+      case "cashier":
+        return "Cashier";
       case "superadmin":
         return "Super Admin";
       default:
@@ -348,35 +278,35 @@ export function UserManagement() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
+          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
             User Management
           </h1>
           <p className="text-gray-600">
             Manage user accounts and access permissions
           </p>
-          <div className="flex items-center gap-4 mt-3">
+          <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-4">
             <div className="px-3 py-1.5 rounded-md bg-blue-50 border border-blue-200">
               <span className="text-xs font-medium text-blue-700">
-                Total Users: {users.length}
+                Total Users: {visibleUsers.length}
               </span>
             </div>
             <div className="px-3 py-1.5 rounded-md bg-green-50 border border-green-200">
               <span className="text-xs font-medium text-green-700">
-                Registered: {users.filter(u => !u.id.startsWith('sys-')).length}
+                Students: {visibleUsers.filter(u => u.role === 'student').length}
               </span>
             </div>
             <div className="px-3 py-1.5 rounded-md bg-purple-50 border border-purple-200">
               <span className="text-xs font-medium text-purple-700">
-                System: {users.filter(u => u.id.startsWith('sys-')).length}
+                Staff: {visibleUsers.filter(u => u.role !== 'student').length}
               </span>
             </div>
           </div>
         </div>
-        <div className="flex gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <button
             onClick={() => {
               loadUsers();
@@ -384,14 +314,14 @@ export function UserManagement() {
               setShowSuccessToast(true);
               setTimeout(() => setShowSuccessToast(false), 2000);
             }}
-            className="px-4 py-3 rounded-lg border-2 border-gray-300 font-medium transition-all hover:bg-gray-50 flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-3 rounded-lg border-2 border-gray-300 font-medium transition-all hover:bg-gray-50 flex items-center gap-2"
           >
             <RefreshCw className="w-5 h-5" />
             Refresh
           </button>
           <button
             onClick={handleAddUser}
-            className="px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2 shadow-md"
+            className="w-full sm:w-auto justify-center px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2 shadow-md"
             style={{ backgroundColor: "#1E3A8A" }}
           >
             <Plus className="w-5 h-5" />
@@ -400,136 +330,121 @@ export function UserManagement() {
         </div>
       </div>
 
-      {/* Search & Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Search */}
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+      <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-col gap-4 border-b border-gray-200 bg-gray-50/70 p-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="relative flex-1 max-w-xl">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by name or email..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search by name or email"
+              className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
           </div>
 
-          {/* Role Filter */}
-          <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-gray-500" />
+          <div className="flex w-full items-center gap-3 lg:w-auto">
+            <Filter className="h-4 w-4 text-gray-400" />
             <select
               value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{ color: "#374151" }}
+              onChange={(event) => setRoleFilter(event.target.value)}
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100 lg:w-auto"
             >
               <option value="all">All Roles</option>
               <option value="student">Student</option>
-              <option value="admin">Admin</option>
-              <option value="superadmin">Superadmin</option>
+              <option value="registrar">Registrar</option>
+              <option value="branchcoordinator">Branch Coordinator</option>
+              <option value="cashier">Cashier</option>
+              {isSuperAdmin && <option value="superadmin">Super Admin</option>}
             </select>
           </div>
         </div>
-      </div>
 
-      {/* User Table */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        {/* Table Header */}
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            User Accounts
-          </h2>
-        </div>
-
-        {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Email
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Date Created
-                </th>
-                <th className="text-left px-6 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Actions
-                </th>
+          <table className="w-full min-w-[760px] divide-y divide-gray-200">
+            <thead className="bg-white">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Name</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Email</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Role</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Created</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredUsers.map((user) => {
-                const roleStyle = getRoleStyle(user.role);
-                const RoleIcon = roleStyle.icon;
-                return (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">
-                        {user.name}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-600">{user.email}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border"
-                        style={{
-                          backgroundColor: roleStyle.bg,
-                          color: roleStyle.text,
-                          borderColor: roleStyle.border,
-                        }}
-                      >
-                        <RoleIcon className="w-3 h-3" />
-                        {getRoleLabel(user.role)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-600">
-                        {new Date(user.dateCreated).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditClick(user)}
-                          className="p-2 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit user"
+            <tbody className="divide-y divide-gray-100">
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                    No users match the current search and role filters.
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user) => {
+                  const roleStyle = getRoleStyle(user.role);
+                  const RoleIcon = roleStyle.icon;
+                  return (
+                    <tr
+                      key={user.id}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-gray-900">
+                          {user.name}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-gray-600">{user.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold"
+                          style={{
+                            backgroundColor: roleStyle.bg,
+                            color: roleStyle.text,
+                            borderColor: roleStyle.border,
+                          }}
                         >
-                          <Edit2
-                            className="w-4 h-4"
-                            style={{ color: "#1E3A8A" }}
-                          />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user)}
-                          className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Delete user"
-                        >
-                          <Trash2
-                            className="w-4 h-4"
-                            style={{ color: "#B91C1C" }}
-                          />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                          <RoleIcon className="w-3 h-3" />
+                          {getRoleLabel(user.role)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-gray-600">
+                          {new Date(user.dateCreated).toLocaleDateString("en-US", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleEditClick(user)}
+                            className="rounded-lg p-2 transition-colors hover:bg-blue-50"
+                            title="Edit user"
+                          >
+                            <Edit2
+                              className="w-4 h-4"
+                              style={{ color: "#1E3A8A" }}
+                            />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user)}
+                            className="rounded-lg p-2 transition-colors hover:bg-red-50"
+                            title="Delete user"
+                          >
+                            <Trash2
+                              className="w-4 h-4"
+                              style={{ color: "#B91C1C" }}
+                            />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -539,7 +454,7 @@ export function UserManagement() {
           <p className="text-sm text-gray-600">
             Showing{" "}
             <span className="font-medium">{filteredUsers.length}</span> of{" "}
-            <span className="font-medium">{users.length}</span> users
+            <span className="font-medium">{visibleUsers.length}</span> users
           </p>
         </div>
       </div>
@@ -582,7 +497,7 @@ export function UserManagement() {
                 </button>
               </div>
             </div>
-
+                          title="Deactivate user"
             {/* Modal Body */}
             <div className="p-6">
               {/* User Info */}
@@ -607,7 +522,7 @@ export function UserManagement() {
                       value="student"
                       checked={selectedRole === "student"}
                       onChange={(e) =>
-                        setSelectedRole(e.target.value as "student" | "admin" | "superadmin")
+                        setSelectedRole(e.target.value as any)
                       }
                       className="w-4 h-4"
                       style={{ accentColor: "#1E3A8A" }}
@@ -625,15 +540,15 @@ export function UserManagement() {
                     </div>
                   </label>
 
-                  {/* Admin Option */}
+                  {/* Registrar Option */}
                   <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
                     <input
                       type="radio"
                       name="role"
-                      value="admin"
-                      checked={selectedRole === "admin"}
+                      value="registrar"
+                      checked={selectedRole === "registrar"}
                       onChange={(e) =>
-                        setSelectedRole(e.target.value as "student" | "admin" | "superadmin")
+                        setSelectedRole(e.target.value as any)
                       }
                       className="w-4 h-4"
                       style={{ accentColor: "#1E3A8A" }}
@@ -642,11 +557,63 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <Shield className="w-4 h-4 text-yellow-600" />
                         <span className="text-sm font-medium text-gray-900">
-                          Admin
+                          Registrar
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Manage applications and view reports
+                        Manage applications and verify documents
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Branch Coordinator Option */}
+                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="branchcoordinator"
+                      checked={selectedRole === "branchcoordinator"}
+                      onChange={(e) =>
+                        setSelectedRole(e.target.value as any)
+                      }
+                      className="w-4 h-4"
+                      style={{ accentColor: "#1E3A8A" }}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-indigo-600" />
+                        <span className="text-sm font-medium text-gray-900">
+                          Branch Coordinator
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Full branch access and user management
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Cashier Option */}
+                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
+                    <input
+                      type="radio"
+                      name="role"
+                      value="cashier"
+                      checked={selectedRole === "cashier"}
+                      onChange={(e) =>
+                        setSelectedRole(e.target.value as any)
+                      }
+                      className="w-4 h-4"
+                      style={{ accentColor: "#1E3A8A" }}
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-gray-900">
+                          Cashier
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Process payments and manage transactions
                       </p>
                     </div>
                   </label>
@@ -659,7 +626,7 @@ export function UserManagement() {
                       value="superadmin"
                       checked={selectedRole === "superadmin"}
                       onChange={(e) =>
-                        setSelectedRole(e.target.value as "student" | "admin" | "superadmin")
+                        setSelectedRole(e.target.value as any)
                       }
                       className="w-4 h-4"
                       style={{ accentColor: "#1E3A8A" }}
@@ -668,11 +635,11 @@ export function UserManagement() {
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-red-600" />
                         <span className="text-sm font-medium text-gray-900">
-                          Superadmin
+                          Super Admin
                         </span>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Full system access and user management
+                        Full system access across all branches
                       </p>
                     </div>
                   </label>
@@ -774,11 +741,13 @@ export function UserManagement() {
                   <select
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     value={newUserForm.role}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value as "student" | "admin" | "superadmin" })}
+                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
                   >
                     <option value="student">Student</option>
-                    <option value="admin">Admin</option>
-                    <option value="superadmin">Superadmin</option>
+                    <option value="registrar">Registrar</option>
+                    <option value="branchcoordinator">Branch Coordinator</option>
+                    <option value="cashier">Cashier</option>
+                    <option value="superadmin">Super Admin</option>
                   </select>
                 </div>
 
@@ -820,74 +789,6 @@ export function UserManagement() {
         </div>
       )}
 
-      {/* Delete User Confirmation Modal */}
-      {deletingUser && (
-        <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)"
-          }}
-          onClick={() => setDeletingUser(null)}
-        >
-          <div
-            className="bg-white shadow-2xl max-w-md w-full"
-            style={{ borderRadius: "12px" }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div
-              className="p-6 border-b border-gray-200"
-              style={{ backgroundColor: "#F8FAFC" }}
-            >
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold text-gray-900">
-                  Delete User
-                </h2>
-                <button
-                  onClick={() => setDeletingUser(null)}
-                  className="w-10 h-10 rounded-lg hover:bg-gray-200 flex items-center justify-center transition-colors"
-                >
-                  <X className="w-5 h-5 text-gray-500" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6">
-              <div className="flex items-center gap-4">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-                <p className="text-sm text-gray-600">
-                  Are you sure you want to delete the user{" "}
-                  <span className="font-medium">{deletingUser.name}</span>?
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setDeletingUser(null)}
-                  className="flex-1 px-6 py-3 rounded-lg font-medium transition-all hover:bg-gray-100 border border-gray-300"
-                  style={{ color: "#475569" }}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 shadow-md"
-                  style={{ backgroundColor: "#B91C1C" }}
-                  onClick={handleConfirmDelete}
-                >
-                  Delete User
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Success Toast */}
       {showSuccessToast && (
         <div
@@ -915,6 +816,21 @@ export function UserManagement() {
           </button>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={Boolean(deletingUser)}
+        title="Deactivate User"
+        message={
+          deletingUser
+            ? `Deactivate ${deletingUser.name}? Their record will stay in the system, but they will no longer be able to sign in.`
+            : ""
+        }
+        confirmText="Deactivate User"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeletingUser(null)}
+      />
 
       <style>{`
         @keyframes slideInDown {

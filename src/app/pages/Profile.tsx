@@ -1,8 +1,12 @@
-import { User, Mail, Phone, MapPin, Calendar, Award, FileText, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation } from "react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
+import { supabase } from "../../supabase";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { loadProfileImageUrl, uploadProfileImage } from "../utils/profileImage";
 
 interface AssessmentResult {
   id: string;
@@ -22,38 +26,16 @@ function formatAssessmentDate(isoDate: string): string {
 }
 
 export function Profile() {
-  const { userData, enrollmentProgress } = useAuth();
+  const { userData, enrollmentProgress, updateUserData } = useAuth();
   const location = useLocation();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   
-  // Load profile data from localStorage
-  const [profileData, setProfileData] = useState(() => {
-    const userEmail = userData?.email || "student@gmail.com";
-    const profileKey = `profile_${userEmail}`;
-    const savedProfile = localStorage.getItem(profileKey);
-    
-    if (savedProfile) {
-      return JSON.parse(savedProfile);
-    }
-    
-    // Default data for joshua@gmail.com
-    if (userEmail === "joshua@gmail.com") {
-      return {
-        fullName: "Joshua",
-        email: userEmail,
-        contactNumber: "09175432189",
-        dateOfBirth: "2005-06-15",
-        gender: "male",
-      };
-    }
-    
-    // Default for other users
-    return {
-      fullName: userData?.name || "Student",
-      email: userEmail,
-      contactNumber: "",
-      dateOfBirth: "",
-      gender: "",
-    };
+  const [profileData, setProfileData] = useState({
+    fullName: userData?.name || "Student",
+    email: userData?.email || "",
+    contactNumber: "",
+    dateOfBirth: "",
+    gender: "",
   });
 
   // Check if enrollment has been submitted
@@ -64,66 +46,161 @@ export function Profile() {
   
   // Payment history state
   const [paymentData, setPaymentData] = useState<any>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState(userData?.profilePictureUrl || "");
+  const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
+
+  useEffect(() => {
+    if (!userData?.email && !userData?.name) {
+      return;
+    }
+
+    setProfileData((current) => ({
+      ...current,
+      fullName:
+        current.fullName && current.fullName !== "Student"
+          ? current.fullName
+          : userData?.name || current.fullName || "Student",
+      email: userData?.email || current.email || "",
+    }));
+  }, [userData?.email, userData?.name]);
+
+  useEffect(() => {
+    if (userData?.profilePictureUrl) {
+      setProfileImageUrl(userData.profilePictureUrl);
+    }
+  }, [userData?.profilePictureUrl]);
+
+  const formatAddress = (data: any) => {
+    const addressParts = [data?.homeAddress, data?.barangay, data?.city]
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter(Boolean);
+
+    return addressParts.length > 0 ? addressParts.join(", ") : "Not specified";
+  };
 
   // Function to check enrollment and assessment status
   const checkStatus = async () => {
-    const userEmail = userData?.email || "student@gmail.com";
+    const userId = userData?.id;
+    const userEmail = userData?.email || "";
     
-    // Check enrollment data from pending_applications
-    const pendingApplications = JSON.parse(localStorage.getItem('pending_applications') || '[]');
-    const userEnrollment = pendingApplications.find((app: any) => app.studentId === userEmail || app.email === userEmail);
-    setEnrollmentData(userEnrollment);
+    // Check enrollment data from Supabase
+    if (userEmail) {
+      const { data: enrollments } = await supabase
+        .from('enrollments')
+        .select('*, enrollment_documents(*)')
+        .eq('user_id', userEmail)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      setEnrollmentData(enrollments?.[0]?.form_data || enrollments?.[0] || null);
+    }
 
     // Check assessment history from Supabase
     try {
-      const history = await getAssessmentHistory(userEmail);
-      setAssessmentHistory(history.results);
+      if (!userEmail) {
+        setAssessmentHistory([]);
+      } else {
+        const history = await getAssessmentHistory(userEmail);
+        setAssessmentHistory(history.results);
+      }
     } catch (error) {
       console.error('Error fetching assessment history:', error);
       setAssessmentHistory([]);
     }
     
-    // Check payment data
-    const paymentQueue = JSON.parse(localStorage.getItem('payment_queue') || '[]');
-    const cashQueue = JSON.parse(localStorage.getItem('cash_payment_queue') || '[]');
-    
-    const onlinePayment = paymentQueue.find((p: any) => p.studentEmail === userEmail);
-    const cashPayment = cashQueue.find((p: any) => p.studentEmail === userEmail);
-    
-    if (onlinePayment) {
-      setPaymentData(onlinePayment);
-    } else if (cashPayment) {
-      setPaymentData(cashPayment);
-    } else {
-      setPaymentData(null);
+    // Check payment data from Supabase
+    if (userId) {
+      const { data: payments } = await supabase
+        .from('payments')
+        .select('*')
+        .eq('student_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      setPaymentData(payments?.[0] || null);
     }
     
-    // Load registration data for personal information
-    const registeredUsers = JSON.parse(localStorage.getItem('registered_users') || '[]');
-    const registrationData = registeredUsers.find((user: any) => user.email === userEmail);
-    
-    if (registrationData) {
-      setProfileData({
-        fullName: registrationData.name,
-        email: registrationData.email,
-        contactNumber: registrationData.contactNumber,
-        dateOfBirth: registrationData.dateOfBirth,
-        gender: registrationData.gender,
+    // Load registration data from Supabase users table.
+    if (userId || userEmail) {
+      const profileLookup = userId
+        ? supabase
+            .from('users')
+            .select('id, email, full_name, contact_number, birth_date, gender')
+            .eq('id', userId)
+            .maybeSingle()
+        : supabase
+            .from('users')
+            .select('id, email, full_name, contact_number, birth_date, gender')
+            .eq('email', userEmail)
+            .maybeSingle();
+
+      const { data: userRecord, error: userError } = await profileLookup;
+
+      if (userError) {
+        console.error('Error loading profile data:', userError);
+      } else if (userRecord) {
+        setProfileData({
+          fullName: userRecord.full_name || userData?.name || 'Student',
+          email: userRecord.email || userEmail,
+          contactNumber: userRecord.contact_number || '',
+          dateOfBirth: userRecord.birth_date || '',
+          gender: userRecord.gender || '',
+        });
+      }
+
+      const imageUrl = await loadProfileImageUrl(userId, userEmail);
+
+      if (imageUrl) {
+        setProfileImageUrl(imageUrl);
+
+        if (imageUrl !== userData?.profilePictureUrl) {
+          updateUserData({ profilePictureUrl: imageUrl });
+        }
+      }
+    }
+  };
+
+  const handleProfileImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!selectedFile) {
+      return;
+    }
+
+    if (!userData?.id) {
+      toast.error("Please sign in again before updating your profile photo.");
+      return;
+    }
+
+    try {
+      setIsUploadingProfileImage(true);
+
+      const { imageUrl, usedStorageFallback } = await uploadProfileImage({
+        userId: userData.id,
+        email: userData.email,
+        file: selectedFile,
       });
+
+      setProfileImageUrl(imageUrl);
+      updateUserData({ profilePictureUrl: imageUrl });
+
+      if (usedStorageFallback) {
+        toast.success("Profile photo uploaded to Supabase Storage. Cross-device loading now uses the storage fallback until the users.profile_picture_url column is added.");
+      } else {
+        toast.success("Profile photo updated successfully.");
+      }
+    } catch (error) {
+      console.error("Error uploading profile photo:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to upload profile photo.");
+    } finally {
+      setIsUploadingProfileImage(false);
     }
   };
 
   // Reload profile data when component mounts or when returning from edit
   useEffect(() => {
-    const userEmail = userData?.email || "student@gmail.com";
-    const profileKey = `profile_${userEmail}`;
-    const savedProfile = localStorage.getItem(profileKey);
-    
-    if (savedProfile) {
-      setProfileData(JSON.parse(savedProfile));
-    }
-
-    // Check status on mount
+    // Check status on mount (loads from Supabase)
     checkStatus();
 
     // Add event listener for window focus (when user returns to tab)
@@ -165,9 +242,9 @@ export function Profile() {
   // Use registration data for personal info, enrollment data only for address
   const studentInfo = {
     name: profileData.fullName || userData?.name || "Student",
-    email: profileData.email || userData?.email || "student@gmail.com",
+    email: profileData.email || userData?.email || "Not specified",
     phone: profileData.contactNumber || "Not specified",
-    address: enrollmentData ? `${enrollmentData.homeAddress}, ${enrollmentData.barangay}, ${enrollmentData.city}` : "Not specified",
+    address: formatAddress(enrollmentData),
     birthDate: formatDate(profileData.dateOfBirth),
     gender: formatGender(profileData.gender),
     studentId: "2026-00001",
@@ -202,14 +279,21 @@ export function Profile() {
   const enrollmentStatus = getEnrollmentStatus();
 
   // Get user initial
-  const userInitial = studentInfo.name.charAt(0).toUpperCase();
+  const userInitial =
+    studentInfo.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((namePart) => namePart[0]?.toUpperCase())
+      .join("") || "S";
 
   return (
-    <div className="p-8">
+    <div className="p-4 sm:p-6 lg:p-8">
+      <Toaster position="top-center" />
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>
+          <h1 className="text-2xl sm:text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>
             My Profile
           </h1>
           <p className="text-gray-600">Manage your personal information and track your progress</p>
@@ -221,23 +305,68 @@ export function Profile() {
             {/* Profile Card */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex flex-col items-center">
-                <div
-                  className="w-24 h-24 rounded-full flex items-center justify-center mb-4 text-white font-semibold text-4xl"
-                  style={{ backgroundColor: "var(--electron-blue)" }}
-                >
-                  {userInitial}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={handleProfileImageUpload}
+                />
+                <div className="relative mb-4">
+                  <Avatar className="w-24 h-24 shadow-md ring-4 ring-blue-50">
+                    {profileImageUrl ? (
+                      <AvatarImage
+                        src={profileImageUrl}
+                        alt={`${studentInfo.name} profile photo`}
+                        className="object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback
+                      className="text-white font-semibold text-2xl"
+                      style={{ backgroundColor: "var(--electron-blue)" }}
+                    >
+                      {userInitial}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingProfileImage}
+                    className="absolute -right-1 -bottom-1 w-9 h-9 rounded-full flex items-center justify-center text-white shadow-lg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70"
+                    style={{ backgroundColor: "var(--electron-red)" }}
+                    aria-label="Upload profile photo"
+                  >
+                    {isUploadingProfileImage ? (
+                      <LoaderCircle className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
+                  </button>
                 </div>
                 <h2 className="text-xl mb-1" style={{ color: "var(--electron-dark-gray)" }}>
                   {studentInfo.name}
                 </h2>
                 <p className="text-sm text-gray-500 mb-4">Student ID: {studentInfo.studentId}</p>
-                <Link
-                  to="/dashboard/edit-profile"
-                  className="px-6 py-2 rounded-md text-white transition-colors hover:opacity-90"
-                  style={{ backgroundColor: "var(--electron-blue)" }}
-                >
-                  Edit Profile
-                </Link>
+                <p className="text-xs text-gray-500 text-center mb-4">
+                  JPG, PNG, or WebP up to 2 MB
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 w-full">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingProfileImage}
+                    className="flex-1 px-4 py-2 rounded-md border border-gray-200 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isUploadingProfileImage ? "Uploading..." : "Upload Photo"}
+                  </button>
+                  <Link
+                    to="/dashboard/edit-profile"
+                    className="flex-1 px-4 py-2 rounded-md text-center text-white text-sm transition-colors hover:opacity-90"
+                    style={{ backgroundColor: "var(--electron-blue)" }}
+                  >
+                    Edit Profile
+                  </Link>
+                </div>
               </div>
             </div>
 

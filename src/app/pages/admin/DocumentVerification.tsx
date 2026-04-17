@@ -13,6 +13,8 @@ import {
   Loader,
 } from "lucide-react";
 import { supabase } from "../../../supabase";
+import { useAuth } from "../../context/AuthContext";
+import { createAuditLog, resolveUserId } from "../../../services/adminService";
 
 interface StudentDocument {
   studentId: string;
@@ -32,6 +34,7 @@ interface StudentDocument {
 }
 
 export function DocumentVerification() {
+  const { userData } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [students, setStudents] = useState<StudentDocument[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentDocument | null>(null);
@@ -44,6 +47,7 @@ export function DocumentVerification() {
   const [rejectionComment, setRejectionComment] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const actorReference = userData?.id || userData?.email || "registrar";
 
   useEffect(() => {
     loadStudentDocuments();
@@ -72,7 +76,7 @@ export function DocumentVerification() {
       for (const enrollment of enrollments) {
         const { data: documents, error: docError } = await supabase
           .from("enrollment_documents")
-          .select("id, document_type, file_url, status, rejection_reason, created_at")
+          .select("id, document_type, file_url, file_path, status, rejection_comment, uploaded_at, updated_at")
           .eq("enrollment_id", enrollment.id);
 
         if (docError) throw docError;
@@ -84,11 +88,11 @@ export function DocumentVerification() {
             documentsMap[doc.document_type] = {
               id: doc.id,
               status: doc.status,
-              uploadDate: new Date(doc.created_at).toLocaleDateString(),
-              fileName: doc.file_url.split("/").pop() || "document",
-              fileUrl: doc.file_url,
+              uploadDate: new Date(doc.uploaded_at || doc.updated_at).toLocaleDateString(),
+              fileName: (doc.file_path || doc.file_url || "document").split("/").pop() || "document",
+              fileUrl: doc.file_path || doc.file_url,
               documentType: doc.document_type,
-              rejectionComment: doc.rejection_reason || undefined,
+              rejectionComment: doc.rejection_comment || undefined,
             };
           });
 
@@ -159,24 +163,30 @@ export function DocumentVerification() {
       // Update document status in database
       const { error } = await supabase
         .from("enrollment_documents")
-        .update({ status: "approved", rejection_reason: null })
+        .update({
+          status: "approved",
+          rejection_comment: null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", docId);
 
       if (error) throw error;
 
-      // Create audit log
-      const { data: user } = await supabase.auth.getUser();
-      if (user?.user?.email) {
-        await supabase.from("audit_logs").insert({
-          admin_id: user.user.email,
-          action: "document_approved",
-          details: {
+      await createAuditLog(
+        actorReference,
+        "DOCUMENT_APPROVED",
+        `Approved ${selectedDocument.name} for ${selectedStudent.studentName}`,
+        "success",
+        {
+          resourceType: "enrollment_document",
+          changes: {
             enrollment_id: selectedStudent.studentId,
+            document_id: docId,
             document_type: selectedDocument.key,
             document_name: selectedDocument.name,
           },
-        });
-      }
+        }
+      );
 
       // Check if all documents for this enrollment are approved
       const { data: allDocs } = await supabase
@@ -230,35 +240,41 @@ export function DocumentVerification() {
         .from("enrollment_documents")
         .update({
           status: "rejected",
-          rejection_reason: rejectionComment.trim(),
+          rejection_comment: rejectionComment.trim(),
+          updated_at: new Date().toISOString(),
         })
         .eq("id", docId);
 
       if (error) throw error;
 
-      // Create audit log
-      const { data: user } = await supabase.auth.getUser();
-      if (user?.user?.email) {
-        await supabase.from("audit_logs").insert({
-          admin_id: user.user.email,
-          action: "document_rejected",
-          details: {
+      await createAuditLog(
+        actorReference,
+        "DOCUMENT_REJECTED",
+        `Rejected ${selectedDocument.name} for ${selectedStudent.studentName}: ${rejectionComment.trim()}`,
+        "warning",
+        {
+          resourceType: "enrollment_document",
+          changes: {
             enrollment_id: selectedStudent.studentId,
+            document_id: docId,
             document_type: selectedDocument.key,
             document_name: selectedDocument.name,
-            rejection_reason: rejectionComment.trim(),
+            rejection_comment: rejectionComment.trim(),
           },
-        });
-      }
+        }
+      );
 
       // Create notification for student
+      const studentUserId = await resolveUserId(selectedStudent.email);
+      if (studentUserId) {
       await supabase.from("notifications").insert({
-        user_id: selectedStudent.email,
+        user_id: studentUserId,
         type: "document_rejected",
         title: "Document Rejected",
         message: `Your ${selectedDocument.name} has been rejected. Reason: ${rejectionComment.trim()}`,
-        read: false,
+        is_read: false,
       });
+      }
 
       // Reload and close
       await loadStudentDocuments();

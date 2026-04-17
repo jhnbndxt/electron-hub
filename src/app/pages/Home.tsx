@@ -1,7 +1,121 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { ArrowRight, CheckCircle, BookOpen, Award, Users, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle, BookOpen, Award, Users, Sparkles, Megaphone, Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
+import { ConfirmationModal } from "../components/ConfirmationModal";
+import { createAnnouncement, deleteAnnouncement, getAnnouncements, hasCustomAnnouncements, syncAnnouncementsToRemote, updateAnnouncement } from "../../services/announcementService";
+
+type AnnouncementAccent = "blue" | "red";
+
+interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  postedAt: string;
+  accentColor: AnnouncementAccent;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+  createdBy?: string | null;
+  updatedBy?: string | null;
+}
+
+interface AnnouncementFormState {
+  title: string;
+  content: string;
+  postedAt: string;
+  accentColor: AnnouncementAccent;
+}
+
+const buildInitialAnnouncementFormState = (): AnnouncementFormState => ({
+  title: "",
+  content: "",
+  postedAt: new Date().toISOString().split("T")[0],
+  accentColor: "blue",
+});
+
+const formatAnnouncementDate = (value: string) => {
+  const parsedDate = new Date(value);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "Recently posted";
+  }
+
+  return parsedDate.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+};
+
+const getAnnouncementAccentStyles = (accentColor: AnnouncementAccent) => {
+  if (accentColor === "red") {
+    return {
+      iconBackground: "rgba(185, 28, 28, 0.1)",
+      iconColor: "var(--electron-red)",
+      hoverClassName: "hover:bg-red-50/40",
+      badgeClassName: "border-red-200 bg-red-50 text-red-700",
+    };
+  }
+
+  return {
+    iconBackground: "rgba(30, 58, 138, 0.1)",
+    iconColor: "var(--electron-blue)",
+    hoverClassName: "hover:bg-blue-50/50",
+    badgeClassName: "border-blue-200 bg-blue-50 text-blue-700",
+  };
+};
+
+const validateAnnouncementForm = (formState: AnnouncementFormState) => {
+  const trimmedTitle = formState.title.trim();
+  const trimmedContent = formState.content.trim();
+
+  if (!trimmedTitle) {
+    return "Enter an announcement title.";
+  }
+
+  if (trimmedTitle.length < 6) {
+    return "Announcement title must be at least 6 characters long.";
+  }
+
+  if (!trimmedContent) {
+    return "Enter the announcement details.";
+  }
+
+  if (trimmedContent.length < 20) {
+    return "Announcement details must be at least 20 characters long.";
+  }
+
+  if (!formState.postedAt) {
+    return "Select a posted date.";
+  }
+
+  const postedDate = new Date(formState.postedAt);
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+
+  if (Number.isNaN(postedDate.getTime())) {
+    return "Use a valid posted date.";
+  }
+
+  if (postedDate > today) {
+    return "Posted date cannot be in the future.";
+  }
+
+  return "";
+};
 
 export function Home() {
+  const { userRole, userData } = useAuth();
+  const canManageAnnouncements = userRole === "branchcoordinator" || userData?.adminType === "branchcoordinator";
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [isLoadingAnnouncements, setIsLoadingAnnouncements] = useState(true);
+  const [announcementError, setAnnouncementError] = useState("");
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editingAnnouncementId, setEditingAnnouncementId] = useState<string | null>(null);
+  const [announcementForm, setAnnouncementForm] = useState<AnnouncementFormState>(buildInitialAnnouncementFormState);
+  const [isSavingAnnouncement, setIsSavingAnnouncement] = useState(false);
+  const [announcementToDelete, setAnnouncementToDelete] = useState<Announcement | null>(null);
+
   const strands = [
     {
       name: "GA",
@@ -34,6 +148,149 @@ export function Home() {
       description: "Complete your enrollment form and submit required documents online.",
     },
   ];
+
+  const maxAnnouncementDate = new Date().toISOString().split("T")[0];
+  const announcementFormError = validateAnnouncementForm(announcementForm);
+
+  const loadAnnouncements = async (showLoadingState = true) => {
+    if (showLoadingState) {
+      setIsLoadingAnnouncements(true);
+    }
+
+    const { data, error, source } = await getAnnouncements();
+
+    if (error) {
+      setAnnouncementError(error);
+    }
+
+    let nextAnnouncements = Array.isArray(data) ? data : [];
+
+    if (canManageAnnouncements && source === "local" && hasCustomAnnouncements(nextAnnouncements)) {
+      const actorReference = userData?.id || userData?.email || null;
+      const { error: syncError } = await syncAnnouncementsToRemote(nextAnnouncements, actorReference);
+
+      if (syncError) {
+        setAnnouncementError(typeof syncError === "string" ? syncError : "Unable to sync announcements to shared storage.");
+      } else {
+        const refreshedAnnouncements = await getAnnouncements();
+        nextAnnouncements = Array.isArray(refreshedAnnouncements.data) ? refreshedAnnouncements.data : nextAnnouncements;
+      }
+    }
+
+    setAnnouncements(nextAnnouncements);
+
+    if (showLoadingState) {
+      setIsLoadingAnnouncements(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAnnouncements();
+  }, [canManageAnnouncements, userData?.email, userData?.id]);
+
+  const closeAnnouncementEditor = () => {
+    setIsEditorOpen(false);
+    setEditingAnnouncementId(null);
+    setAnnouncementForm(buildInitialAnnouncementFormState());
+  };
+
+  const openCreateAnnouncementEditor = () => {
+    setAnnouncementError("");
+    setEditingAnnouncementId(null);
+    setAnnouncementForm(buildInitialAnnouncementFormState());
+    setIsEditorOpen(true);
+  };
+
+  const openEditAnnouncementEditor = (announcement: Announcement) => {
+    setAnnouncementError("");
+    setEditingAnnouncementId(announcement.id);
+    setAnnouncementForm({
+      title: announcement.title,
+      content: announcement.content,
+      postedAt: announcement.postedAt,
+      accentColor: announcement.accentColor,
+    });
+    setIsEditorOpen(true);
+  };
+
+  const handleAnnouncementFieldChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = event.target;
+
+    if (announcementError) {
+      setAnnouncementError("");
+    }
+
+    setAnnouncementForm((currentFormState) => ({
+      ...currentFormState,
+      [name]: value,
+    }));
+  };
+
+  const handleSaveAnnouncement = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAnnouncementError("");
+
+    if (announcementFormError) {
+      setAnnouncementError(announcementFormError);
+      return;
+    }
+
+    setIsSavingAnnouncement(true);
+
+    const payload = {
+      title: announcementForm.title.trim(),
+      content: announcementForm.content.trim(),
+      postedAt: announcementForm.postedAt,
+      accentColor: announcementForm.accentColor,
+      updatedBy: userData?.id || userData?.email || null,
+      createdBy: userData?.id || userData?.email || null,
+      actorReference: userData?.id || userData?.email || null,
+    };
+
+    try {
+      if (editingAnnouncementId) {
+        const { error } = await updateAnnouncement(editingAnnouncementId, payload);
+
+        if (error) {
+          setAnnouncementError(error);
+          setIsSavingAnnouncement(false);
+          return;
+        }
+      } else {
+        const { error } = await createAnnouncement(payload);
+
+        if (error) {
+          setAnnouncementError(error);
+          setIsSavingAnnouncement(false);
+          return;
+        }
+      }
+
+      await loadAnnouncements(false);
+      closeAnnouncementEditor();
+    } finally {
+      setIsSavingAnnouncement(false);
+    }
+  };
+
+  const handleDeleteAnnouncement = async () => {
+    if (!announcementToDelete) {
+      return;
+    }
+
+    setAnnouncementError("");
+    const targetAnnouncement = announcementToDelete;
+    const { error } = await deleteAnnouncement(targetAnnouncement.id, userData?.id || userData?.email || null);
+
+    if (error) {
+      setAnnouncementError(error);
+      return;
+    }
+
+    await loadAnnouncements(false);
+  };
 
   return (
     <div>
@@ -244,50 +501,239 @@ export function Home() {
       {/* Announcements */}
       <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
               Announcements
             </h2>
+            <p className="mx-auto max-w-3xl text-lg text-gray-600">
+              Stay updated with the latest enrollment schedules, system notices, and campus-wide announcements.
+            </p>
           </div>
 
           <div className="max-w-5xl mx-auto">
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-              <div className="divide-y divide-gray-200">
-                <div className="p-8 hover:bg-blue-50/50 transition-colors">
-                  <div className="flex items-start gap-6">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(185, 28, 28, 0.1)" }}>
-                      <CheckCircle className="w-7 h-7" style={{ color: "var(--electron-red)" }} />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--electron-dark-gray)" }}>
-                        Enrollment Period for SY 2026-2027 Now Open
-                      </h3>
-                      <p className="text-gray-600 mb-3 leading-relaxed">
-                        Online enrollment for incoming Senior High School students is now active.
-                        Complete your assessment and submit your application before April 30, 2026.
+            {canManageAnnouncements && (
+              <div className="mb-6 overflow-hidden rounded-3xl border border-blue-100 bg-white shadow-lg">
+                <div className="border-b border-blue-100 bg-gradient-to-r from-blue-50 via-white to-red-50 px-6 py-6 sm:px-8">
+                  <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="max-w-2xl">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-blue-700">
+                        <Megaphone className="h-3.5 w-3.5" />
+                        Coordinator Controls
+                      </div>
+                      <h3 className="mt-4 text-2xl font-bold text-slate-900">Manage public announcements</h3>
+                      <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">
+                        Branch Coordinators can publish, edit, and remove announcements that appear on the public home page.
                       </p>
-                      <p className="text-sm text-gray-500 font-medium">Posted on March 1, 2026</p>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={openCreateAnnouncementEditor}
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:bg-[#1e40af]"
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Announcement
+                    </button>
                   </div>
                 </div>
-                <div className="p-8 hover:bg-blue-50/50 transition-colors">
-                  <div className="flex items-start gap-6">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center" style={{ backgroundColor: "rgba(30, 58, 138, 0.1)" }}>
-                      <CheckCircle className="w-7 h-7" style={{ color: "var(--electron-blue)" }} />
+
+                {isEditorOpen && (
+                  <form onSubmit={handleSaveAnnouncement} className="space-y-5 px-6 py-6 sm:px-8">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h4 className="text-xl font-semibold text-slate-900">
+                          {editingAnnouncementId ? "Edit announcement" : "Create announcement"}
+                        </h4>
+                        <p className="mt-1 text-sm text-slate-500">
+                          Changes are reflected in the announcement feed immediately after saving.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={closeAnnouncementEditor}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition-colors hover:text-slate-700"
+                        aria-label="Close announcement editor"
+                      >
+                        <X className="h-5 w-5" />
+                      </button>
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--electron-dark-gray)" }}>
-                        New AI Assessment System Launched
-                      </h3>
-                      <p className="text-gray-600 mb-3 leading-relaxed">
-                        Experience our enhanced AI-powered strand recommendation system designed to
-                        provide more accurate and personalized academic guidance.
+
+                    <div className="grid gap-5 sm:grid-cols-2">
+                      <div className="sm:col-span-2">
+                        <label htmlFor="announcement-title" className="mb-2 block text-sm font-semibold text-slate-700">
+                          Title
+                        </label>
+                        <input
+                          id="announcement-title"
+                          name="title"
+                          type="text"
+                          value={announcementForm.title}
+                          onChange={handleAnnouncementFieldChange}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                          placeholder="Enter announcement title"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="announcement-postedAt" className="mb-2 block text-sm font-semibold text-slate-700">
+                          Posted date
+                        </label>
+                        <input
+                          id="announcement-postedAt"
+                          name="postedAt"
+                          type="date"
+                          max={maxAnnouncementDate}
+                          value={announcementForm.postedAt}
+                          onChange={handleAnnouncementFieldChange}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                        />
+                      </div>
+
+                      <div>
+                        <label htmlFor="announcement-accentColor" className="mb-2 block text-sm font-semibold text-slate-700">
+                          Accent color
+                        </label>
+                        <select
+                          id="announcement-accentColor"
+                          name="accentColor"
+                          value={announcementForm.accentColor}
+                          onChange={handleAnnouncementFieldChange}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                        >
+                          <option value="blue">Electron Blue</option>
+                          <option value="red">Electron Red</option>
+                        </select>
+                      </div>
+
+                      <div className="sm:col-span-2">
+                        <label htmlFor="announcement-content" className="mb-2 block text-sm font-semibold text-slate-700">
+                          Details
+                        </label>
+                        <textarea
+                          id="announcement-content"
+                          name="content"
+                          rows={5}
+                          value={announcementForm.content}
+                          onChange={handleAnnouncementFieldChange}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 shadow-sm outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                          placeholder="Write the announcement details shown to students and applicants."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-sm text-slate-500">
+                        Use clear, public-facing language. The announcement card will show the selected date and accent color.
                       </p>
-                      <p className="text-sm text-gray-500 font-medium">Posted on February 15, 2026</p>
+                      <div className="flex flex-col-reverse gap-3 sm:flex-row">
+                        <button
+                          type="button"
+                          onClick={closeAnnouncementEditor}
+                          className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={isSavingAnnouncement}
+                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {isSavingAnnouncement && <Loader2 className="h-4 w-4 animate-spin" />}
+                          {editingAnnouncementId ? "Save Changes" : "Publish Announcement"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
+
+                    {announcementFormError && (
+                      <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                        {announcementFormError}
+                      </div>
+                    )}
+                  </form>
+                )}
               </div>
+            )}
+
+            {announcementError && (
+              <div className="mb-6 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {announcementError}
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+              {isLoadingAnnouncements ? (
+                <div className="flex items-center justify-center gap-3 px-8 py-16 text-slate-500">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Loading announcements...
+                </div>
+              ) : announcements.length === 0 ? (
+                <div className="px-8 py-16 text-center">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
+                    <Megaphone className="h-8 w-8" />
+                  </div>
+                  <h3 className="mt-5 text-2xl font-semibold text-slate-900">No announcements yet</h3>
+                  <p className="mt-2 text-base text-slate-500">
+                    Public announcements will appear here as soon as the Branch Coordinator publishes one.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200">
+                  {announcements.map((announcement) => {
+                    const accentStyles = getAnnouncementAccentStyles(announcement.accentColor);
+
+                    return (
+                      <div key={announcement.id} className={`p-8 transition-colors ${accentStyles.hoverClassName}`}>
+                        <div className="flex items-start gap-6">
+                          <div
+                            className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center"
+                            style={{ backgroundColor: accentStyles.iconBackground }}
+                          >
+                            <CheckCircle className="w-7 h-7" style={{ color: accentStyles.iconColor }} />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                              <div className="min-w-0 flex-1">
+                                <div className="mb-3 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-center ${accentStyles.badgeClassName}">
+                                  {announcement.accentColor === "red" ? "Priority Update" : "System Update"}
+                                </div>
+                                <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--electron-dark-gray)" }}>
+                                  {announcement.title}
+                                </h3>
+                                <p className="text-gray-600 mb-3 leading-relaxed whitespace-pre-line">
+                                  {announcement.content}
+                                </p>
+                                <p className="text-sm text-gray-500 font-medium">Posted on {formatAnnouncementDate(announcement.postedAt)}</p>
+                              </div>
+
+                              {canManageAnnouncements && (
+                                <div className="flex shrink-0 flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditAnnouncementEditor(announcement)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-800"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAnnouncementToDelete(announcement)}
+                                    className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -330,6 +776,21 @@ export function Home() {
           </div>
         </div>
       </section>
+
+      <ConfirmationModal
+        isOpen={Boolean(announcementToDelete)}
+        onClose={() => setAnnouncementToDelete(null)}
+        onConfirm={handleDeleteAnnouncement}
+        title="Delete announcement?"
+        message={
+          announcementToDelete
+            ? `This will remove \"${announcementToDelete.title}\" from the public home page announcement feed.`
+            : ""
+        }
+        confirmText="Delete Announcement"
+        cancelText="Keep Announcement"
+        type="danger"
+      />
     </div>
   );
 }

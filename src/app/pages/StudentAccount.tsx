@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ChatAssistant } from "../components/ChatAssistant";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 
 export function StudentAccount() {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
@@ -193,63 +194,27 @@ export function StudentAccount() {
         ))}
       </div>
 
-      {/* Logout Confirmation Modal */}
-      {showLogoutModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Confirm Logout
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to log out of your account?
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowLogoutModal(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-md font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogout}
-                className="flex-1 px-4 py-2.5 text-white rounded-md font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#B91C1C" }}
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showLogoutModal}
+        title="Confirm Logout"
+        message="Are you sure you want to log out of your account?"
+        confirmText="Logout"
+        cancelText="Stay Signed In"
+        type="warning"
+        onConfirm={handleLogout}
+        onClose={() => setShowLogoutModal(false)}
+      />
 
-      {/* Reset Enrollment Progress Confirmation Modal */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-sm w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              Confirm Reset Enrollment Progress
-            </h3>
-            <p className="text-gray-600 mb-6">
-              Are you sure you want to reset your enrollment progress? This action cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowResetModal(false)}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-md font-medium hover:bg-gray-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleResetProgress}
-                className="flex-1 px-4 py-2.5 text-white rounded-md font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#B91C1C" }}
-              >
-                Reset Progress
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={showResetModal}
+        title="Reset Enrollment Progress"
+        message="This will reset your enrollment progress and cannot be undone. Use this only if you need to start the process over."
+        confirmText="Reset Progress"
+        cancelText="Keep Progress"
+        type="danger"
+        onConfirm={handleResetProgress}
+        onClose={() => setShowResetModal(false)}
+      />
 
       {/* Chat Assistant */}
       <ChatAssistant />
