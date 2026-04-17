@@ -157,7 +157,7 @@ export function AdminDashboard() {
   };
 
   const loadAuditLogs = async () => {
-    const { data: logs, error } = await getAuditLogs(3);
+    const { data: logs, error } = await getAuditLogs(5);
     
     if (error) {
       console.error('Error loading audit logs:', error);
