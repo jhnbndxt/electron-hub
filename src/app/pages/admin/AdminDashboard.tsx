@@ -470,11 +470,11 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row w-full">
       {/* Main Content */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Welcome, Registrar
@@ -499,7 +499,7 @@ export function AdminDashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Dashboard Overview</h2>
 
         {/* Overview Stats - 4 Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Students */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-4">
@@ -575,7 +575,7 @@ export function AdminDashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Pending Applications</h2>
 
         {/* Pending Applications Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-x-auto">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">
@@ -706,8 +706,8 @@ export function AdminDashboard() {
       </div>
 
       {/* Recent Activity Sidebar */}
-      <div className="w-full flex-shrink-0 xl:w-80">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm sticky top-8">
+      <div className="w-full flex-shrink-0 xl:w-80 mt-8 xl:mt-0">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm xl:sticky xl:top-8">
           <div className="p-6 border-b border-gray-200" style={{ backgroundColor: "#F0FDF4" }}>
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5" style={{ color: "#10B981" }} />

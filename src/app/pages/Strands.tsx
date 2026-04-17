@@ -108,8 +108,8 @@ export function Strands() {
   ];
 
   return (
-    <div className="p-8">
-      <div className="max-w-6xl mx-auto">
+    <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <div className="w-full max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>
@@ -139,7 +139,7 @@ export function Strands() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-6">
             {shsStrands.map((strand, index) => (
               <div
                 key={strand.name}
@@ -245,7 +245,7 @@ export function Strands() {
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-6">
             {Object.entries(seniorHighPrograms).map(([strand, programs], sIndex) => (
               <div key={strand} className="space-y-4">
                 <h3
@@ -288,7 +288,7 @@ export function Strands() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {externalInstitutions.map((institution, index) => (
               <div
                 key={index}

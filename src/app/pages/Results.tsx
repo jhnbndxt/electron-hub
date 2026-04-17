@@ -65,7 +65,7 @@ export function Results() {
 
   if (loading) {
     return (
-      <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8 w-full">
         <div className="portal-glass-panel w-full max-w-xl rounded-2xl p-8 text-center">
           <p className="text-xl text-gray-600">Loading assessment results...</p>
         </div>
@@ -75,7 +75,7 @@ export function Results() {
 
   if (!results) {
     return (
-      <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8">
+      <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8 w-full">
         <div className="portal-glass-panel w-full max-w-xl rounded-2xl p-8 text-center">
           <p className="text-xl text-gray-600 mb-4">No assessment results found.</p>
           <Link
@@ -680,7 +680,7 @@ export function Results() {
   };
 
   return (
-    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       {/* Print-only Header */}
       <div className="print-only print-header" style={{ display: 'none' }}>
         <div className="print-logo">

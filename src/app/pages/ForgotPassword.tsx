@@ -14,7 +14,7 @@ export function ForgotPassword() {
   };
 
   return (
-    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
+    <div className="auth-shell-bg flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 sm:p-6 lg:p-8 w-full">
       <div className="relative z-10 w-full max-w-md">
         <div className="auth-panel rounded-[2rem] p-6 sm:p-8 lg:p-10">
           <div className="mb-8 text-center">

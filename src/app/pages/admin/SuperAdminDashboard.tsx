@@ -134,11 +134,11 @@ export function SuperAdminDashboard() {
   ];
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row" style={{ maxWidth: "none" }}>
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row w-full" style={{ maxWidth: "none" }}>
       {/* Main Content */}
       <div className="min-w-0 flex-1">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Welcome, Branch Coordinator
@@ -193,7 +193,7 @@ export function SuperAdminDashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6 mb-8">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6 mb-8 overflow-x-auto">
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <Link
               to="/branchcoordinator/pending"
@@ -231,7 +231,7 @@ export function SuperAdminDashboard() {
         {/* Management Tools Grid */}
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Management Tools</h2>
         
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
           {/* Student Management */}
           <Link
             to="/branchcoordinator/students"
@@ -326,7 +326,7 @@ export function SuperAdminDashboard() {
       </div>
 
       {/* Recent Activity Sidebar */}
-      <div className="w-full xl:w-80 flex-shrink-0">
+      <div className="w-full flex-shrink-0 xl:w-80 mt-8 xl:mt-0">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm xl:sticky xl:top-8">
           <div className="p-6 border-b border-gray-200" style={{ backgroundColor: "#EFF6FF" }}>
             <div className="flex items-center gap-2">

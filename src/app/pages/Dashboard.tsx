@@ -255,7 +255,7 @@ export function Dashboard() {
     : { label: "View my results", link: "/dashboard/results" };
 
   return (
-    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       {/* Welcome Hero */}
       <div className="portal-glass-panel-strong relative mb-8 overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">

@@ -38,7 +38,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <div className="space-y-8">
+      <div className="space-y-8 w-full">
         {/* Welcome Section */}
         <div>
           <h1 className="text-4xl mb-2">Welcome back, {userName}!</h1>
@@ -60,7 +60,7 @@ export function DashboardPage() {
             <Progress value={completionPercentage} className="h-3" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mt-6">
             <div className="flex items-start gap-3 p-4 bg-green-50 rounded-lg border-2 border-green-200">
               <CheckCircle className="h-6 w-6 text-green-600 flex-shrink-0 mt-1" />
               <div>
@@ -88,7 +88,7 @@ export function DashboardPage() {
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
           <Card className="p-6 border-2 hover:border-[#1E3A8A] transition-colors">
             <div className="bg-[#1E3A8A] text-white w-12 h-12 rounded-full flex items-center justify-center mb-4">
               <FileText className="h-6 w-6" />

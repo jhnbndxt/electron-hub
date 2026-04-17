@@ -409,8 +409,8 @@ export function TracksAndPrograms() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="min-h-screen bg-gray-50 flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <div className="w-full max-w-4xl mx-auto">
         {/* Page Header */}
         <div className="mb-10">
           <h1 className="text-4xl font-bold mb-3" style={{ color: "#1E3A8A" }}>

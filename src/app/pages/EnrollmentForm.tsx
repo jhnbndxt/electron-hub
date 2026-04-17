@@ -1249,8 +1249,8 @@ export function EnrollmentForm() {
   );
 
   return (
-    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
-      <div className="max-w-4xl mx-auto">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+      <div className="w-full max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
@@ -1265,7 +1265,7 @@ export function EnrollmentForm() {
         {renderPageIndicator()}
 
         {/* Form Content */}
-        <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
+        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8 mb-6">
           {currentPage === 1 && renderPage1()}
           {currentPage === 2 && renderPage2()}
           {currentPage === 3 && renderPage3()}

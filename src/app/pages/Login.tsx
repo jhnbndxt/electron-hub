@@ -231,7 +231,7 @@ export function Login() {
             >
               {isLoading ? "Signing in..." : "Get Started"}
             </button>
-          </form>
+              <div className="auth-shell-bg flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4 sm:p-6 lg:p-8 w-full">
 
           <div className="mt-6 space-y-3 text-center">
             <p className="text-sm text-slate-600">

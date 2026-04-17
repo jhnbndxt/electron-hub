@@ -91,7 +91,7 @@ export function StudentAccount() {
         className="sticky top-0 z-10 border-b"
         style={{ backgroundColor: "#1E3A8A", borderColor: "#1E40AF" }}
       >
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center">
+          <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
           <Link
             to="/dashboard"
             className="flex items-center gap-2 text-white hover:opacity-80 transition-opacity"

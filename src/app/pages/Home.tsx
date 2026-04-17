@@ -296,8 +296,8 @@ export function Home() {
     <div>
       {/* Hero Section */}
       <section
-        className="relative text-white py-24 overflow-hidden"
-        style={{ 
+        className="relative text-white py-16 sm:py-20 md:py-24 overflow-hidden"
+        style={{
           background: "linear-gradient(135deg, #1E3A8A 0%, #1e40af 50%, #2563eb 100%)"
         }}
       >
@@ -315,20 +315,20 @@ export function Home() {
                 <span className="text-sm font-medium">AI-Powered Strand Recommendation</span>
               </div>
               
-              <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight">
                 Electron Hub
               </h1>
-              <p className="text-xl md:text-2xl text-blue-100 mb-4 font-light">
+              <p className="text-lg sm:text-xl md:text-2xl text-blue-100 mb-4 font-light">
                 Senior High School Online Enrollment and Assessment Portal
               </p>
               <p className="text-lg text-blue-50 mb-8 leading-relaxed">
                 Discover your path to success with our AI-assisted strand recommendation system.
                 Make informed decisions about your academic future.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex flex-col sm:flex-row gap-4 w-full">
                 <Link
                   to="/assessment"
-                  className="px-8 py-4 rounded-lg text-white transition-all hover:scale-105 hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold"
+                  className="px-8 py-4 rounded-lg text-white transition-all hover:scale-105 hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold w-full sm:w-auto"
                   style={{ backgroundColor: "rgba(255, 255, 255, 0.15)", backdropFilter: "blur(10px)", border: "2px solid white" }}
                 >
                   Start Assessment
@@ -336,7 +336,7 @@ export function Home() {
                 </Link>
                 <Link
                   to="/enrollment-info"
-                  className="px-8 py-4 rounded-lg text-white transition-all hover:scale-105 hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold"
+                  className="px-8 py-4 rounded-lg text-white transition-all hover:scale-105 hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold w-full sm:w-auto"
                   style={{ backgroundColor: "var(--electron-red)" }}
                 >
                   Enroll Now
@@ -359,9 +359,9 @@ export function Home() {
       </section>
 
       {/* System Overview */}
-      <section className="py-20 bg-white">
+      <section className="py-12 sm:py-16 md:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
               Welcome to Electron College
             </h2>
@@ -373,7 +373,7 @@ export function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             <div className="text-center p-8 rounded-xl bg-gradient-to-br from-blue-50 to-white border border-blue-100 hover:shadow-xl transition-all hover:-translate-y-1">
               <div
                 className="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg"
@@ -421,9 +421,9 @@ export function Home() {
       </section>
 
       {/* Process Flow */}
-      <section className="py-20 bg-gradient-to-b from-gray-50 to-white">
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
               Enrollment Process
             </h2>
@@ -432,7 +432,7 @@ export function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {processSteps.map((step, index) => (
               <div key={step.number} className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all hover:-translate-y-2 border border-gray-100 relative">
                 <div
@@ -460,9 +460,9 @@ export function Home() {
       </section>
 
       {/* Academic Strands */}
-      <section className="py-20 bg-white">
+      <section className="py-12 sm:py-16 md:py-20 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
               Academic Tracks
             </h2>
@@ -471,7 +471,7 @@ export function Home() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-5xl mx-auto">
             {strands.map((strand) => (
               <div
                 key={strand.name}
