@@ -158,7 +158,7 @@ export default function App() {
           Component: SuperAdminLayout,
           ErrorBoundary: ErrorBoundary,
           children: [
-            { index: true, Component: CashierDashboard },
+            { index: true, Component: SuperAdminDashboard },
             { path: "payment-queue", Component: CashierDashboard },
             { path: "payment-history", Component: CashierPaymentHistory },
             { path: "student-lookup", Component: StudentPaymentLookup },
