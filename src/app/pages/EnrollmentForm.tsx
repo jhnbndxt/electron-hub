@@ -511,8 +511,6 @@ export function EnrollmentForm() {
 
     if (page === 6) {
       if (!formData.form138) newErrors.form138 = "This document is required";
-      if (!formData.form137) newErrors.form137 = "This document is required";
-      if (!formData.goodMoral) newErrors.goodMoral = "This document is required";
       if (!formData.birthCertificate) newErrors.birthCertificate = "This document is required";
       if (!formData.idPicture) newErrors.idPicture = "This document is required";
       if (!formData.diploma) newErrors.diploma = "This document is required";
@@ -1173,8 +1171,8 @@ export function EnrollmentForm() {
       <p className="text-gray-600">Please upload clear and readable copies of the following documents:</p>
 
       {renderFileUpload("Form 138 (Report Card)", "form138")}
-      {renderFileUpload("Form 137", "form137")}
-      {renderFileUpload("Certificate of Good Moral", "goodMoral")}
+      {renderFileUpload("Form 137", "form137", false)}
+      {renderFileUpload("Certificate of Good Moral", "goodMoral", false)}
       {renderFileUpload("PSA Authenticated Birth Certificate (2 copies)", "birthCertificate")}
       {renderFileUpload("2\"x2\" ID Picture (White Background, 2 copies)", "idPicture")}
       {renderFileUpload("Photocopy of Grade 10 Diploma", "diploma")}
@@ -1211,9 +1209,58 @@ export function EnrollmentForm() {
           <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Basic Information</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div><span className="text-gray-600">Admission Type:</span> <span className="font-medium">{formData.admissionType}</span></div>
+            <div><span className="text-gray-600">Previous Student ID:</span> <span className="font-medium">{formData.previousStudentId || "N/A"}</span></div>
             <div><span className="text-gray-600">LRN:</span> <span className="font-medium">{formData.lrn}</span></div>
+            <div><span className="text-gray-600">Working Student:</span> <span className="font-medium">{formData.isWorkingStudent ? "Yes" : "No"}</span></div>
             <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.firstName} {formData.middleName} {formData.lastName}</span></div>
+            <div><span className="text-gray-600">Suffix:</span> <span className="font-medium">{formData.suffix}</span></div>
             <div><span className="text-gray-600">Sex:</span> <span className="font-medium">{formData.sex}</span></div>
+            <div><span className="text-gray-600">Civil Status:</span> <span className="font-medium">{formData.civilStatus}</span></div>
+            <div><span className="text-gray-600">Religion:</span> <span className="font-medium">{formData.religion}</span></div>
+            <div><span className="text-gray-600">Nationality:</span> <span className="font-medium">{formData.nationality}</span></div>
+            <div><span className="text-gray-600">Disability:</span> <span className="font-medium">{formData.disability}</span></div>
+            <div><span className="text-gray-600">Disability (Other):</span> <span className="font-medium">{formData.disabilityOther || "N/A"}</span></div>
+            <div><span className="text-gray-600">Indigenous Group:</span> <span className="font-medium">{formData.indigenousGroup}</span></div>
+            <div><span className="text-gray-600">Indigenous Group (Other):</span> <span className="font-medium">{formData.indigenousGroupOther || "N/A"}</span></div>
+            <div><span className="text-gray-600">Birthday:</span> <span className="font-medium">{formData.birthday}</span></div>
+            <div><span className="text-gray-600">Email:</span> <span className="font-medium">{formData.email}</span></div>
+            <div><span className="text-gray-600">Contact Number:</span> <span className="font-medium">{formData.contactNumber}</span></div>
+            <div><span className="text-gray-600">Facebook/Messenger:</span> <span className="font-medium">{formData.facebookName}</span></div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Address</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div><span className="text-gray-600">Region:</span> <span className="font-medium">{formData.region}</span></div>
+            <div><span className="text-gray-600">Province:</span> <span className="font-medium">{formData.province || "N/A"}</span></div>
+            <div><span className="text-gray-600">City/Municipality:</span> <span className="font-medium">{formData.city}</span></div>
+            <div><span className="text-gray-600">Barangay:</span> <span className="font-medium">{formData.barangay}</span></div>
+            <div className="sm:col-span-2"><span className="text-gray-600">Home Address:</span> <span className="font-medium">{formData.homeAddress}</span></div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Parents / Guardian</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div><span className="text-gray-600">Father Last Name:</span> <span className="font-medium">{formData.fatherLastName}</span></div>
+            <div><span className="text-gray-600">Father First Name:</span> <span className="font-medium">{formData.fatherFirstName}</span></div>
+            <div><span className="text-gray-600">Father Middle Name:</span> <span className="font-medium">{formData.fatherMiddleName}</span></div>
+            <div><span className="text-gray-600">Father Occupation:</span> <span className="font-medium">{formData.fatherOccupation}</span></div>
+            <div><span className="text-gray-600">Father Contact:</span> <span className="font-medium">{formData.fatherContact}</span></div>
+            <div><span className="text-gray-600">Mother Maiden Name:</span> <span className="font-medium">{formData.motherMaidenName}</span></div>
+            <div><span className="text-gray-600">Mother Last Name:</span> <span className="font-medium">{formData.motherLastName}</span></div>
+            <div><span className="text-gray-600">Mother First Name:</span> <span className="font-medium">{formData.motherFirstName}</span></div>
+            <div><span className="text-gray-600">Mother Middle Name:</span> <span className="font-medium">{formData.motherMiddleName}</span></div>
+            <div><span className="text-gray-600">Mother Occupation:</span> <span className="font-medium">{formData.motherOccupation}</span></div>
+            <div><span className="text-gray-600">Mother Contact:</span> <span className="font-medium">{formData.motherContact}</span></div>
+            <div><span className="text-gray-600">Guardian Source:</span> <span className="font-medium">{formData.guardianSource || "Custom guardian"}</span></div>
+            <div><span className="text-gray-600">Guardian Last Name:</span> <span className="font-medium">{formData.guardianLastName || "N/A"}</span></div>
+            <div><span className="text-gray-600">Guardian First Name:</span> <span className="font-medium">{formData.guardianFirstName || "N/A"}</span></div>
+            <div><span className="text-gray-600">Guardian Middle Name:</span> <span className="font-medium">{formData.guardianMiddleName || "N/A"}</span></div>
+            <div><span className="text-gray-600">Guardian Occupation:</span> <span className="font-medium">{formData.guardianOccupation || "N/A"}</span></div>
+            <div><span className="text-gray-600">Guardian Contact:</span> <span className="font-medium">{formData.guardianContact || "N/A"}</span></div>
+            <div><span className="text-gray-600">4Ps Member:</span> <span className="font-medium">{formData.is4PsMember ? "Yes" : "No"}</span></div>
           </div>
         </div>
 
@@ -1228,15 +1275,47 @@ export function EnrollmentForm() {
         </div>
 
         <div>
+          <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Educational Background</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            <div><span className="text-gray-600">Primary School:</span> <span className="font-medium">{formData.primarySchool}</span></div>
+            <div><span className="text-gray-600">Primary Year Graduated:</span> <span className="font-medium">{formData.primaryYearGraduated}</span></div>
+            <div><span className="text-gray-600">Secondary School:</span> <span className="font-medium">{formData.secondarySchool}</span></div>
+            <div><span className="text-gray-600">Secondary Year Graduated:</span> <span className="font-medium">{formData.secondaryYearGraduated}</span></div>
+            <div><span className="text-gray-600">Grade 10 Adviser:</span> <span className="font-medium">{formData.grade10Adviser || "N/A"}</span></div>
+          </div>
+        </div>
+
+        <div>
           <h3 className="font-bold text-gray-800 mb-3 pb-2 border-b">Uploaded Documents</h3>
           <div className="space-y-2 text-sm">
-            {formData.form138 && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> Form 138</div>}
-            {formData.form137 && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> Form 137</div>}
-            {formData.goodMoral && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> Good Moral Certificate</div>}
-            {formData.birthCertificate && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> Birth Certificate</div>}
-            {formData.idPicture && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> ID Picture</div>}
-            {formData.diploma && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> Grade 10 Diploma</div>}
-            {formData.escCertificate && <div className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-green-600" /> ESC Certificate</div>}
+            <div className="flex items-center gap-2">
+              {formData.form138 ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-red-600" />}
+              Form 138: {formData.form138 ? formData.form138.name : "Not uploaded"}
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.form137 ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-gray-500" />}
+              Form 137 (Optional): {formData.form137 ? formData.form137.name : "Not uploaded"}
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.goodMoral ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-gray-500" />}
+              Good Moral (Optional): {formData.goodMoral ? formData.goodMoral.name : "Not uploaded"}
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.birthCertificate ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-red-600" />}
+              Birth Certificate: {formData.birthCertificate ? formData.birthCertificate.name : "Not uploaded"}
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.idPicture ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-red-600" />}
+              ID Picture: {formData.idPicture ? formData.idPicture.name : "Not uploaded"}
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.diploma ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-red-600" />}
+              Grade 10 Diploma: {formData.diploma ? formData.diploma.name : "Not uploaded"}
+            </div>
+            <div className="flex items-center gap-2">
+              {formData.escCertificate ? <CheckCircle2 className="w-4 h-4 text-green-600" /> : <X className="w-4 h-4 text-gray-500" />}
+              ESC Certificate (Optional): {formData.escCertificate ? formData.escCertificate.name : "Not uploaded"}
+            </div>
           </div>
         </div>
       </div>
@@ -1255,13 +1334,22 @@ export function EnrollmentForm() {
         </label>
       </div>
 
-      <button
-        onClick={handleSubmit}
-        className="w-full py-4 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
-      >
-        <CheckCircle2 className="w-5 h-5" />
-        Submit Enrollment Form
-      </button>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <button
+          onClick={handlePrevious}
+          className="w-full sm:w-auto px-6 py-4 bg-gray-200 text-gray-700 font-bold rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back
+        </button>
+        <button
+          onClick={handleSubmit}
+          className="w-full py-4 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
+        >
+          <CheckCircle2 className="w-5 h-5" />
+          Submit Enrollment Form
+        </button>
+      </div>
     </motion.div>
   );
 

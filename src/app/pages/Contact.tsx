@@ -253,22 +253,22 @@ export function Contact() {
           </h2>
           <div className="bg-white rounded-lg shadow-lg overflow-hidden" style={{ height: "450px" }}>
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.0347837276986!2d120.98!3d14.7!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTTCsDQyJzAwLjAiTiAxMjDCsDU4JzQ4LjAiRQ!5e0!3m2!1sen!2sph!4v1234567890"
+              src="https://www.google.com/maps?q=PX85%2BJ2%20Valenzuela%2C%20Metro%20Manila&output=embed"
               width="100%"
               height="100%"
               style={{ border: 0 }}
               allowFullScreen
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
-              title="Electron College Location - Valenzuela City"
+              title="Electron College Location - PX85+J2 Valenzuela, Metro Manila"
             />
           </div>
           <div className="mt-6 text-center">
             <p className="text-gray-600" style={{ fontSize: "14px" }}>
-              <strong>596 McArthur Highway, Malanday, Valenzuela City, 1444, Metro Manila</strong>
+              <strong>PX85+J2 Valenzuela, Metro Manila</strong>
             </p>
             <p className="text-gray-500 text-sm mt-2">
-              Located in Malanday, Valenzuela City - Easily accessible via McArthur Highway
+              Located in Valenzuela, Metro Manila
             </p>
           </div>
         </div>

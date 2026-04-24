@@ -143,7 +143,7 @@ export function DashboardPage() {
           <h2 className="text-2xl mb-4 text-[#1E3A8A]">
             Notifications & Updates
           </h2>
-          <div className="space-y-4">
+          <div className="max-h-[420px] space-y-4 overflow-y-auto pr-2">
             <Card className="p-4 border-l-4 border-[#B91C1C]">
               <div className="flex items-start gap-3">
                 <AlertCircle className="h-5 w-5 text-[#B91C1C] flex-shrink-0 mt-0.5" />

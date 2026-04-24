@@ -280,19 +280,6 @@ export function PendingApplications() {
     }
   };
 
-  const handleBulkApprove = () => {
-    if (selectedStudents.length === 0) {
-      alert("Please select at least one student to approve.");
-      return;
-    }
-    const selectedNames = filteredStudents
-      .filter((s) => selectedStudents.includes(s.id as number))
-      .map((s) => s.name)
-      .join(", ");
-    alert(`Bulk approved ${selectedStudents.length} student(s): ${selectedNames}`);
-    setSelectedStudents([]);
-  };
-
   const handleExportPDF = () => {
     if (selectedStudents.length === 0) {
       alert("Please select at least one student to export.");
@@ -516,15 +503,6 @@ export function PendingApplications() {
               )}
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                onClick={handleBulkApprove}
-                disabled={selectedStudents.length === 0}
-                className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: "#10B981" }}
-              >
-                <CheckCircle className="w-4 h-4" />
-                Bulk Approve
-              </button>
               <button
                 onClick={handleExportPDF}
                 disabled={selectedStudents.length === 0}

@@ -158,7 +158,10 @@ export default function App() {
           Component: SuperAdminLayout,
           ErrorBoundary: ErrorBoundary,
           children: [
-            { index: true, Component: SuperAdminDashboard },
+            { index: true, Component: CashierDashboard },
+            { path: "payment-queue", Component: CashierDashboard },
+            { path: "payment-history", Component: CashierPaymentHistory },
+            { path: "student-lookup", Component: StudentPaymentLookup },
             { path: "pending", Component: PendingApplications },
             { path: "enrollment", element: <Navigate to="/branchcoordinator" replace /> },
             { path: "students", Component: StudentRecords },

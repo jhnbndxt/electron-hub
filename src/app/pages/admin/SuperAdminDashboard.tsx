@@ -14,6 +14,7 @@ import {
   FileText,
   ClipboardCheck,
   BarChart3,
+  CreditCard,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
@@ -99,14 +100,6 @@ export function SuperAdminDashboard() {
   };
 
   const statCards = [
-    {
-      label: "Total Students",
-      value: stats.totalStudents.toString(),
-      icon: Users,
-      color: "#7C3AED",
-      bgColor: "#F3E8FF",
-      link: "/branchcoordinator/students"
-    },
     {
       label: "Pending Applications",
       value: stats.pendingApplications.toString(),
@@ -213,6 +206,16 @@ export function SuperAdminDashboard() {
               <div>
                 <p className="font-medium text-gray-900">Assessment Management</p>
                 <p className="text-xs text-gray-500">Edit assessment questions</p>
+              </div>
+            </Link>
+            <Link
+              to="/cashier"
+              className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-emerald-500 transition-colors"
+            >
+              <CreditCard className="w-5 h-5 text-emerald-600" />
+              <div>
+                <p className="font-medium text-gray-900">Payment Queue</p>
+                <p className="text-xs text-gray-500">Monitor payment processing</p>
               </div>
             </Link>
             <Link

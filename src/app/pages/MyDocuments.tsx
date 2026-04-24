@@ -16,18 +16,22 @@ interface DocumentStatus {
 
 const REQUIRED_DOCS = [
   { key: "form138", name: "Form 138 (Report Card)" },
+  { key: "form137", name: "Form 137" },
   { key: "goodMoral", name: "Good Moral Certificate" },
   { key: "birthCertificate", name: "PSA Birth Certificate" },
-  { key: "idPicture", name: "2x2 ID Pictures" },
-  { key: "parentGuardianId", name: "Photocopy of Parent's/Guardian ID" },
+  { key: "idPicture", name: "2x2 ID Picture" },
+  { key: "diploma", name: "Grade 10 Diploma" },
+  { key: "escCertificate", name: "ESC Certificate (Optional)" },
 ];
 
 const DOC_NAME_TO_KEY: Record<string, string> = {
   "Form 138 (Report Card)": "form138",
+  "Form 137": "form137",
   "Good Moral Certificate": "goodMoral",
   "PSA Birth Certificate": "birthCertificate",
-  "2x2 ID Pictures": "idPicture",
-  "Photocopy of Parent's/Guardian ID": "parentGuardianId",
+  "2x2 ID Picture": "idPicture",
+  "Grade 10 Diploma": "diploma",
+  "ESC Certificate (Optional)": "escCertificate",
 };
 
 export function MyDocuments() {
@@ -35,34 +39,43 @@ export function MyDocuments() {
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (userData?.email) {
-      loadDocuments();
-    }
-  }, [userData]);
+  const resetToDefaultDocuments = () => {
+    setDocuments(
+      REQUIRED_DOCS.map((doc) => ({
+        name: doc.name,
+        documentType: doc.key,
+        status: "not_uploaded",
+      }))
+    );
+  };
 
   const loadDocuments = async () => {
     if (!userData?.email) return;
+    setIsLoading(true);
 
     // Find the student's enrollment by email
     const { data: enrollment, error: enrollError } = await supabase
       .from("enrollments")
       .select("id")
       .eq("user_id", userData.email)
-      .neq("status", "rejected")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (enrollError) {
       console.error("Error fetching enrollment:", enrollError);
-      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      resetToDefaultDocuments();
+      setEnrollmentId(null);
+      setIsLoading(false);
       return;
     }
 
     if (!enrollment) {
-      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      resetToDefaultDocuments();
+      setEnrollmentId(null);
+      setIsLoading(false);
       return;
     }
 
@@ -76,12 +89,13 @@ export function MyDocuments() {
 
     if (docsError) {
       console.error("Error fetching documents:", docsError);
-      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      resetToDefaultDocuments();
+      setIsLoading(false);
       return;
     }
 
-    const docStatuses: DocumentStatus[] = REQUIRED_DOCS.map(reqDoc => {
-      const uploaded = docs?.find(d => d.document_type === reqDoc.key);
+    const docStatuses: DocumentStatus[] = REQUIRED_DOCS.map((reqDoc) => {
+      const uploaded = docs?.find((d) => d.document_type === reqDoc.key);
       if (!uploaded) {
         return { name: reqDoc.name, documentType: reqDoc.key, status: "not_uploaded" };
       }
@@ -110,7 +124,71 @@ export function MyDocuments() {
     });
 
     setDocuments(docStatuses);
+    setIsLoading(false);
   };
+
+  useEffect(() => {
+    if (!userData?.email) {
+      resetToDefaultDocuments();
+      setEnrollmentId(null);
+      setIsLoading(false);
+      return;
+    }
+
+    void loadDocuments();
+  }, [userData?.email]);
+
+  useEffect(() => {
+    if (!userData?.email) {
+      return;
+    }
+
+    const enrollmentChannel = supabase
+      .channel(`my-docs-enrollment-${userData.email}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "enrollments",
+          filter: `user_id=eq.${userData.email}`,
+        },
+        () => {
+          void loadDocuments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(enrollmentChannel);
+    };
+  }, [userData?.email]);
+
+  useEffect(() => {
+    if (!enrollmentId) {
+      return;
+    }
+
+    const docsChannel = supabase
+      .channel(`my-docs-files-${enrollmentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "enrollment_documents",
+          filter: `enrollment_id=eq.${enrollmentId}`,
+        },
+        () => {
+          void loadDocuments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(docsChannel);
+    };
+  }, [enrollmentId, userData?.email]);
 
   const handleFileUpload = async (docName: string, file: File) => {
     if (!userData?.email) return;
@@ -125,7 +203,6 @@ export function MyDocuments() {
           .from("enrollments")
           .select("id")
           .eq("user_id", userData.email)
-          .neq("status", "rejected")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -264,7 +341,7 @@ export function MyDocuments() {
           <div className="divide-y divide-gray-200">
             {documents.filter(doc => doc.status !== "not_uploaded").length === 0 ? (
               <div className="px-6 py-8 text-center text-gray-500">
-                No documents uploaded yet
+                {isLoading ? "Loading documents..." : "No documents uploaded yet"}
               </div>
             ) : (
               documents.filter(doc => doc.status !== "not_uploaded").map((doc, index) => (
@@ -296,7 +373,7 @@ export function MyDocuments() {
                           <p className="text-sm text-red-700">{doc.rejectionComment}</p>
                           <label className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded cursor-pointer hover:bg-red-700 transition-colors">
                             <Upload className="w-3 h-3" />
-                            Re-upload Document
+                            Upload Replacement & Resubmit
                             <input
                               type="file"
                               className="hidden"

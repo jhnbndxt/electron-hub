@@ -60,14 +60,9 @@ const getFieldError = (field: RegisterField, formData: RegisterFormData) => {
       const value = formData.birthDate.trim();
       if (!value) return "Enter your date of birth.";
       const birthDate = new Date(value);
+      if (Number.isNaN(birthDate.getTime())) return "Please enter a valid date of birth.";
       const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        return "You must be at least 13 years old.";
-      }
-      if (age < 13) return "You must be at least 13 years old.";
-      if (age > 120) return "Please enter a valid date of birth.";
+      if (birthDate > today) return "Date of birth cannot be in the future.";
       return "";
     }
     case "lastName": {
