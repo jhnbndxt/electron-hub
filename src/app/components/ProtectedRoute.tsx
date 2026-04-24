@@ -1,11 +1,12 @@
 import { Navigate, Outlet } from "react-router";
 import { useAuth } from "../context/AuthContext";
 
-interface ProtectedRouteProps {
+interface ProtectedLayoutProps {
+  LayoutComponent: React.ComponentType<any>;
   allowedRoles: Array<"registrar" | "branchcoordinator" | "cashier">;
 }
 
-export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
+export function ProtectedLayout({ LayoutComponent, allowedRoles }: ProtectedLayoutProps) {
   const { userRole, isAdminAuthenticated } = useAuth();
 
   // If user is not authenticated as an admin, redirect to login
@@ -18,32 +19,6 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to="/" replace />;
   }
 
-  // User is authenticated and has the correct role
-  return <Outlet />;
+  // User is authenticated and has the correct role - render the layout
+  return <LayoutComponent />;
 }
-
-// Helper function to create a protected layout
-export function createProtectedLayout(
-  LayoutComponent: React.ComponentType<any>,
-  allowedRoles: Array<"registrar" | "branchcoordinator" | "cashier">
-) {
-  return function ProtectedLayoutWrapper(props: any) {
-    const { userRole, isAdminAuthenticated } = useAuth();
-
-    // If user is not authenticated as an admin, redirect to login
-    if (!isAdminAuthenticated || !userRole) {
-      return <Navigate to="/login" replace />;
-    }
-
-    // If user's role is not in the allowed roles, redirect to home
-    if (!allowedRoles.includes(userRole as any)) {
-      return <Navigate to="/" replace />;
-    }
-
-    // User is authenticated and has the correct role
-    return <LayoutComponent {...props} />;
-  };
-}
-
-// Add useAuth import at top for createProtectedLayout
-import { useAuth } from "../context/AuthContext";
