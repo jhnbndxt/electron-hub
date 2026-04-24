@@ -127,12 +127,12 @@ export function Profile() {
       const profileLookup = userId
         ? supabase
             .from('users')
-            .select('id, email, full_name, contact_number, birth_date, gender')
+            .select('id, email, full_name, contact_number, birth_date, sex')
             .eq('id', userId)
             .maybeSingle()
         : supabase
             .from('users')
-            .select('id, email, full_name, contact_number, birth_date, gender')
+            .select('id, email, full_name, contact_number, birth_date, sex')
             .eq('email', userEmail)
             .maybeSingle();
 
@@ -146,7 +146,7 @@ export function Profile() {
           email: userRecord.email || userEmail,
           contactNumber: userRecord.contact_number || '',
           dateOfBirth: userRecord.birth_date || '',
-          gender: userRecord.gender || '',
+          gender: userRecord.sex || '',
         });
       }
 

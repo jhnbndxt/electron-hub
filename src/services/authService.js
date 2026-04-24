@@ -54,6 +54,7 @@ async function createUserRecord(email, passwordHash, profile = {}) {
     last_name: profile.lastName || null,
     middle_name: profile.middleName || null,
     sex: profile.sex || null,
+    birth_date: profile.birthDate || null,
     role: 'student',
     contact_number: profile.contactNumber || null,
   };

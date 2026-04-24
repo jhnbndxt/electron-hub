@@ -282,6 +282,7 @@ export function EnrollmentForm() {
         lastName: userData.lastName || "",
         middleName: userData.middleName || "",
         sex: userData.sex || "",
+        birthday: userData.birthDate || "",
         email: userData.email || "",
         contactNumber: userData.contactNumber || "",
       }));

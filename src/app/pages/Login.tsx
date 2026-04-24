@@ -77,6 +77,7 @@ export function Login() {
         lastName: user.last_name,
         middleName: user.middle_name,
         sex: user.sex,
+        birthDate: user.birth_date,
         contactNumber: user.contact_number,
         profilePictureUrl: user.profile_picture_url || undefined,
       };

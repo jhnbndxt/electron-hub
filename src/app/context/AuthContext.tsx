@@ -8,6 +8,7 @@ interface UserData {
   lastName?: string;
   middleName?: string;
   sex?: string;
+  birthDate?: string;
   email: string;
   contactNumber?: string;
   profilePictureUrl?: string;
@@ -326,7 +327,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const { data, error } = await supabase
         .from("users")
-        .select("id, email, full_name, first_name, last_name, middle_name, sex, contact_number")
+        .select("id, email, full_name, first_name, last_name, middle_name, sex, birth_date, contact_number")
         .eq("email", userData.email)
         .maybeSingle();
 
@@ -351,6 +352,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastName: data.last_name || userData.lastName,
         middleName: data.middle_name || userData.middleName,
         sex: data.sex || userData.sex,
+        birthDate: data.birth_date || userData.birthDate,
         contactNumber: data.contact_number || userData.contactNumber,
       };
 

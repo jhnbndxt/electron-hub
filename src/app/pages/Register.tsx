@@ -12,6 +12,7 @@ const initialFormData = {
   firstName: "",
   middleName: "",
   sex: "",
+  birthDate: "",
   email: "",
   contactNumber: "",
   password: "",
@@ -23,6 +24,7 @@ const initialTouchedFields = {
   firstName: false,
   middleName: false,
   sex: false,
+  birthDate: false,
   email: false,
   contactNumber: false,
   password: false,
@@ -54,6 +56,20 @@ const formatRequirementList = (requirements: string[]) => {
 
 const getFieldError = (field: RegisterField, formData: RegisterFormData) => {
   switch (field) {
+    case "birthDate": {
+      const value = formData.birthDate.trim();
+      if (!value) return "Enter your date of birth.";
+      const birthDate = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        return "You must be at least 13 years old.";
+      }
+      if (age < 13) return "You must be at least 13 years old.";
+      if (age > 120) return "Please enter a valid date of birth.";
+      return "";
+    }
     case "lastName": {
       const value = formData.lastName.trim();
       if (!value) return "Enter your last name.";
@@ -179,6 +195,7 @@ export function Register() {
           lastName: formData.lastName.trim(),
           middleName: formData.middleName.trim() || null,
           sex: formData.sex,
+          birthDate: formData.birthDate.trim(),
           contactNumber: formData.contactNumber.trim(),
         }
       );
@@ -345,6 +362,30 @@ export function Register() {
               </div>
               {getVisibleFieldError("sex") && (
                 <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("sex")}</p>
+              )}
+            </div>
+
+            {/* Date of Birth */}
+            <div>
+              <label htmlFor="birthDate" className="mb-2 block text-sm font-semibold text-slate-700">
+                Date of Birth *
+              </label>
+              <div className={getFieldSurfaceClassName("birthDate")}>
+                <User className="h-5 w-5 text-slate-400" />
+                <input
+                  type="date"
+                  id="birthDate"
+                  name="birthDate"
+                  value={formData.birthDate}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  required
+                  aria-invalid={Boolean(getVisibleFieldError("birthDate"))}
+                  className="min-w-0 text-sm text-slate-700"
+                />
+              </div>
+              {getVisibleFieldError("birthDate") && (
+                <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("birthDate")}</p>
               )}
             </div>
 
