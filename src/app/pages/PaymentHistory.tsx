@@ -3,6 +3,7 @@ import { ArrowLeft, CreditCard, Calendar, CheckCircle, Clock, Download, X } from
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
+import { exportToCSV, formatDateForCSV } from "../../utils/csvExport";
 
 interface PaymentRecord {
   id: string;
@@ -357,18 +358,55 @@ export function PaymentHistory() {
     }
   };
 
+  const handleExportPaymentHistoryCSV = () => {
+    if (payments.length === 0) {
+      alert("No payment history to export.");
+      return;
+    }
+
+    const headers = ["Date", "Description", "Amount", "Payment Method", "Reference Number", "Status"];
+    const rows = payments.map((payment) => [
+      payment.date,
+      payment.description,
+      payment.amount,
+      payment.paymentMethod,
+      payment.referenceNo || "N/A",
+      payment.status.charAt(0).toUpperCase() + payment.status.slice(1),
+    ]);
+
+    exportToCSV({
+      filename: `payment-history-${new Date().toISOString().split("T")[0]}`,
+      title: "Payment History Report",
+      subtitle: `${userData?.name || "Student"} - Electron Hub`,
+      headers,
+      rows,
+    });
+  };
+
   return (
     <div className="p-6">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
+          <div className="flex items-center justify-between mb-4">
+            <Link
+              to="/dashboard"
+              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back to Dashboard
+            </Link>
+            <button
+              onClick={handleExportPaymentHistoryCSV}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors"
+              style={{ backgroundColor: "#1E3A8A" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1B357D")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900">Payment History</h1>
           <p className="text-gray-600 mt-1">View your payment transactions and balance</p>
         </div>

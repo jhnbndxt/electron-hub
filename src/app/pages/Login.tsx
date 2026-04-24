@@ -68,42 +68,41 @@ export function Login() {
       // Successful login - determine role and navigate
       const userRole = user.role?.toLowerCase() || "student";
       
+      // Prepare user data with all fields from database
+      const userData = {
+        id: user.id,
+        email: user.email,
+        name: user.full_name,
+        firstName: user.first_name,
+        lastName: user.last_name,
+        middleName: user.middle_name,
+        sex: user.sex,
+        contactNumber: user.contact_number,
+        profilePictureUrl: user.profile_picture_url || undefined,
+      };
+      
       // Login user based on their role
       if (userRole === "registrar") {
         login("registrar", {
-          id: user.id,
-          name: user.full_name,
-          email: user.email,
-          profilePictureUrl: user.profile_picture_url || undefined,
+          ...userData,
           adminType: "registrar"
         });
         navigate("/registrar", { replace: true });
       } else if (userRole === "branchcoordinator") {
         login("branchcoordinator", {
-          id: user.id,
-          name: user.full_name,
-          email: user.email,
-          profilePictureUrl: user.profile_picture_url || undefined,
+          ...userData,
           adminType: "branchcoordinator"
         });
         navigate("/branchcoordinator", { replace: true });
       } else if (userRole === "cashier") {
         login("cashier", {
-          id: user.id,
-          name: user.full_name,
-          email: user.email,
-          profilePictureUrl: user.profile_picture_url || undefined,
+          ...userData,
           adminType: "cashier"
         });
         navigate("/cashier", { replace: true });
       } else {
         // Default to student role
-        login("student", {
-          id: user.id,
-          name: user.full_name,
-          email: user.email,
-          profilePictureUrl: user.profile_picture_url || undefined,
-        });
+        login("student", userData);
         navigate("/dashboard", { replace: true });
       }
     } catch (error: any) {

@@ -13,11 +13,16 @@ CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  full_name VARCHAR(255) NOT NULL,
+  full_name VARCHAR(255),
+  first_name VARCHAR(100),
+  last_name VARCHAR(100),
+  middle_name VARCHAR(100),
+  sex VARCHAR(20),
   profile_picture_url TEXT,
   role VARCHAR(50) NOT NULL CHECK (role IN ('student', 'registrar', 'branchcoordinator', 'cashier', 'superadmin')),
   admin_type VARCHAR(50) CHECK (admin_type IN ('registrar', 'branchcoordinator', 'cashier')),
   status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+  contact_number VARCHAR(20),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   last_login TIMESTAMP WITH TIME ZONE
@@ -534,6 +539,54 @@ CREATE TABLE system_settings (
 );
 
 CREATE INDEX idx_system_settings_key ON system_settings(setting_key);
+
+-- Disable RLS for system_settings (unrestricted access)
+ALTER TABLE system_settings DISABLE ROW LEVEL SECURITY;
+
+-- Optionally, drop all policies if any exist (run in SQL editor):
+-- DROP POLICY IF EXISTS system_settings_select_admin ON system_settings;
+-- DROP POLICY IF EXISTS system_settings_insert_admin ON system_settings;
+-- DROP POLICY IF EXISTS system_settings_update_admin ON system_settings;
+-- DROP POLICY IF EXISTS system_settings_delete_admin ON system_settings;
+
+-- Enable RLS for system_settings
+ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+
+-- Admins can select system settings
+CREATE POLICY system_settings_select_admin ON system_settings FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM users WHERE id = auth.uid()::uuid 
+      AND role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+-- Admins can insert system settings
+CREATE POLICY system_settings_insert_admin ON system_settings FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users WHERE id = auth.uid()::uuid 
+      AND role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+-- Admins can update system settings
+CREATE POLICY system_settings_update_admin ON system_settings FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users WHERE id = auth.uid()::uuid 
+      AND role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+-- Admins can delete system settings
+CREATE POLICY system_settings_delete_admin ON system_settings FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users WHERE id = auth.uid()::uuid 
+      AND role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES

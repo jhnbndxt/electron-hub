@@ -25,7 +25,7 @@ async function findUserByEmail(email) {
   return { error: null, user };
 }
 
-async function createUserRecord(email, passwordHash, fullName, profile = {}) {
+async function createUserRecord(email, passwordHash, profile = {}) {
   const normalizedEmail = normalizeEmailAddress(email);
 
   if (!normalizedEmail) {
@@ -43,14 +43,19 @@ async function createUserRecord(email, passwordHash, fullName, profile = {}) {
     return { error: 'Email already registered', user: null };
   }
 
+  // Build full name from first and last name
+  const fullName = [profile.firstName, profile.middleName, profile.lastName].filter(Boolean).join(' ');
+
   const payload = {
     email: normalizedEmail,
     password_hash: passwordHash,
     full_name: fullName,
+    first_name: profile.firstName || null,
+    last_name: profile.lastName || null,
+    middle_name: profile.middleName || null,
+    sex: profile.sex || null,
     role: 'student',
     contact_number: profile.contactNumber || null,
-    birth_date: profile.dateOfBirth || null,
-    gender: profile.gender || null,
   };
 
   const { data: newUser, error: insertError } = await supabase
@@ -144,11 +149,10 @@ export async function loginUser(email, password) {
  * Register new user
  * @param {string} email - User email
  * @param {string} password - User password (plain text)
- * @param {string} fullName - User full name
- * @param {Object} profile - Optional profile fields collected during registration
+ * @param {Object} profile - Profile fields collected during registration (firstName, lastName, middleName, sex, contactNumber)
  * @returns {Promise} - New user data or error
  */
-export async function registerUser(email, password, fullName, profile = {}) {
+export async function registerUser(email, password, profile = {}) {
   try {
     const normalizedEmail = normalizeEmailAddress(email);
 
@@ -158,7 +162,7 @@ export async function registerUser(email, password, fullName, profile = {}) {
 
     const saltRounds = 10;
     const password_hash = await bcrypt.hash(password, saltRounds);
-    return await createUserRecord(normalizedEmail, password_hash, fullName, profile);
+    return await createUserRecord(normalizedEmail, password_hash, profile);
   } catch (error) {
     console.error('Register error:', error);
     return { error: error.message, user: null };
@@ -169,17 +173,16 @@ export async function registerUser(email, password, fullName, profile = {}) {
  * Create a verified custom user row using a precomputed password hash
  * @param {string} email - Verified email address
  * @param {string} passwordHash - Precomputed password hash
- * @param {string} fullName - User full name
- * @param {Object} profile - Optional profile fields collected during registration
+ * @param {Object} profile - Profile fields (firstName, lastName, middleName, sex, contactNumber)
  * @returns {Promise} - New user data or error
  */
-export async function registerVerifiedUser(email, passwordHash, fullName, profile = {}) {
+export async function registerVerifiedUser(email, passwordHash, profile = {}) {
   try {
     if (!passwordHash) {
       return { error: 'Password is required', user: null };
     }
 
-    return await createUserRecord(email, passwordHash, fullName, profile);
+    return await createUserRecord(email, passwordHash, profile);
   } catch (error) {
     console.error('Verified register error:', error);
     return { error: error.message, user: null };

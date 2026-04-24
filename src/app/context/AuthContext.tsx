@@ -3,8 +3,13 @@ import { supabase } from "../../supabase";
 
 interface UserData {
   id?: string;
-  name: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  sex?: string;
   email: string;
+  contactNumber?: string;
   profilePictureUrl?: string;
   adminType?: "branchcoordinator" | "registrar" | "cashier"; // Updated role types
 }
@@ -313,38 +318,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const hydrateUserData = async () => {
       if (!userData?.email) {
+        console.log("[AuthContext] No user email found. Skipping data hydration.");
         return;
       }
 
+      console.log("[AuthContext] Fetching user data for email:", userData.email);
+
       const { data, error } = await supabase
         .from("users")
-        .select("id, email, full_name")
+        .select("id, email, full_name, first_name, last_name, middle_name, sex, contact_number")
         .eq("email", userData.email)
         .maybeSingle();
 
       if (error) {
-        console.error("Error hydrating user session:", error);
+        console.error("[AuthContext] Error hydrating user session:", error);
         return;
       }
 
       if (!data) {
+        console.log("[AuthContext] No user data found for email:", userData.email);
         return;
       }
+
+      console.log("[AuthContext] Fetched user data:", data);
 
       const nextUserData: UserData = {
         ...userData,
         id: data.id || userData.id,
         email: data.email || userData.email,
         name: data.full_name || userData.name,
+        firstName: data.first_name || userData.firstName,
+        lastName: data.last_name || userData.lastName,
+        middleName: data.middle_name || userData.middleName,
+        sex: data.sex || userData.sex,
+        contactNumber: data.contact_number || userData.contactNumber,
       };
 
-      if (
-        nextUserData.id === userData.id &&
-        nextUserData.email === userData.email &&
-        nextUserData.name === userData.name
-      ) {
-        return;
-      }
+      console.log("[AuthContext] Updated user data:", nextUserData);
 
       if (isActive) {
         setUserData(nextUserData);
@@ -548,3 +558,37 @@ export function useAuth() {
   }
   return context;
 }
+
+const registerUser = async (userDetails) => {
+  const { email, password, firstName, lastName, middleName, sex, contactNumber } = userDetails;
+
+  console.log("[AuthContext] Registering user with details:", userDetails);
+
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  });
+
+  if (error) {
+    console.error("[AuthContext] Error during user registration:", error);
+    return { success: false, error };
+  }
+
+  console.log("[AuthContext] User registered successfully:", data);
+
+  const userData = {
+    email,
+    firstName,
+    lastName,
+    middleName,
+    sex,
+    contactNumber,
+  };
+
+  setUserData(userData);
+  localStorage.setItem("userData", JSON.stringify(userData));
+
+  console.log("[AuthContext] User data stored in context:", userData);
+
+  return { success: true, data };
+};

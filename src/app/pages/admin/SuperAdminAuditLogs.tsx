@@ -1,4 +1,5 @@
 import { Search, Filter, Download, Shield, User, Settings, FileText, Calendar } from "lucide-react";
+import { exportToCSV } from "../../../utils/csvExport";
 import { useState, useEffect } from "react";
 import { getAuditLogs } from "../../../services/adminService";
 
@@ -177,6 +178,37 @@ export function SuperAdminAuditLogs() {
     }
   };
 
+  // CSV Export Handler
+  const handleExportAuditLogsCSV = () => {
+    const headers = [
+      "Timestamp",
+      "User",
+      "User Role",
+      "Action",
+      "Category",
+      "IP Address",
+      "Status",
+      "Details"
+    ];
+    const rows = filteredLogs.map(log => [
+      formatTimestamp(log.timestamp),
+      log.user,
+      log.userRole || "",
+      log.action,
+      log.category,
+      log.ipAddress,
+      (log.status || "success").charAt(0).toUpperCase() + (log.status || "success").slice(1),
+      log.details
+    ]);
+    exportToCSV({
+      filename: `superadmin-audit-logs-${selectedDate}`,
+      title: "Super Admin Audit Logs Export",
+      subtitle: "Electron Hub - System Activity Logs",
+      headers,
+      rows,
+    });
+  };
+
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Header */}
@@ -249,9 +281,11 @@ export function SuperAdminAuditLogs() {
 
           {/* Export Button */}
           <button
-            onClick={() => alert("Exporting audit logs...")}
+            onClick={handleExportAuditLogsCSV}
             className="w-full sm:w-auto sm:ml-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
-            style={{ backgroundColor: "#7C3AED" }}
+            style={{ backgroundColor: "#1E3A8A" }}
+            onMouseEnter={e => (e.currentTarget.style.backgroundColor = "#1B357D")}
+            onMouseLeave={e => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
           >
             <Download className="w-4 h-4" />
             Export Logs

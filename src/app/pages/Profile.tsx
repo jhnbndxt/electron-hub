@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Download } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -7,6 +7,7 @@ import { getAssessmentHistory } from "../../services/assessmentResultService";
 import { supabase } from "../../supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { loadProfileImageUrl, uploadProfileImage } from "../utils/profileImage";
+import { exportToCSV, formatDateForCSV } from "../../utils/csvExport";
 
 interface AssessmentResult {
   id: string;
@@ -50,19 +51,20 @@ export function Profile() {
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
 
   useEffect(() => {
-    if (!userData?.email && !userData?.name) {
-      return;
+    if (userData) {
+      console.log("[Profile] Displaying user data:", userData);
+      setProfileData((current) => ({
+        ...current,
+        fullName: userData.name || `${userData.firstName || ''} ${userData.middleName || ''} ${userData.lastName || ''}`.trim(),
+        email: userData.email || current.email || "",
+        contactNumber: userData.contactNumber || current.contactNumber || "",
+        dateOfBirth: userData.birthDate || current.dateOfBirth || "",
+        gender: userData.sex || current.gender || "",
+      }));
+    } else {
+      console.log("[Profile] No user data available to display.");
     }
-
-    setProfileData((current) => ({
-      ...current,
-      fullName:
-        current.fullName && current.fullName !== "Student"
-          ? current.fullName
-          : userData?.name || current.fullName || "Student",
-      email: userData?.email || current.email || "",
-    }));
-  }, [userData?.email, userData?.name]);
+  }, [userData]);
 
   useEffect(() => {
     if (userData?.profilePictureUrl) {
@@ -287,15 +289,69 @@ export function Profile() {
       .map((namePart) => namePart[0]?.toUpperCase())
       .join("") || "S";
 
+  // CSV Export for Student Record
+  const handleExportStudentRecordCSV = () => {
+    const headers = [
+      "Student ID",
+      "Full Name",
+      "Email",
+      "Phone",
+      "Date of Birth",
+      "Gender",
+      "Address",
+      "Enrollment Status",
+      "Progress",
+      "Documents Submitted",
+      "Assessment Status",
+      "Export Date"
+    ];
+    const assessmentStatus = assessmentHistory.length > 0 ? "Completed" : "Not Started";
+    const rows = [[
+      studentInfo.studentId,
+      studentInfo.name,
+      studentInfo.email,
+      studentInfo.phone,
+      studentInfo.birthDate,
+      studentInfo.gender,
+      studentInfo.address,
+      enrollmentStatus.label,
+      `${completedSteps}/${totalSteps} steps`,
+      `${documentsSubmitted}/${totalDocuments}`,
+      assessmentStatus,
+      new Date().toLocaleDateString('en-US')
+    ]];
+    exportToCSV({
+      filename: `student-record-${studentInfo.studentId}-${new Date().toISOString().split('T')[0]}`,
+      title: "Student Record Export",
+      subtitle: `Electron Hub - Student Management System`,
+      headers,
+      rows,
+    });
+  };
+
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       <Toaster position="top-center" />
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>
-            My Profile
-          </h1>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl" style={{ color: "var(--electron-blue)" }}>
+                My Profile
+              </h1>
+            </div>
+            <button
+              onClick={handleExportStudentRecordCSV}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors"
+              style={{ backgroundColor: "#1E3A8A" }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1B357D")}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
+            >
+              <Download className="w-4 h-4" />
+              Export Record
+            </button>
+          </div>
           <p className="text-gray-600">Manage your personal information and track your progress</p>
         </div>
 

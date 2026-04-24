@@ -272,6 +272,22 @@ export function EnrollmentForm() {
     initializeForm();
   }, [userData]);
 
+  // Auto-fill form with user data from AuthContext
+  useEffect(() => {
+    if (userData && userData.firstName) {
+      console.log("[EnrollmentForm] Auto-filling form with user data:", userData);
+      setFormData(prev => ({
+        ...prev,
+        firstName: userData.firstName || "",
+        lastName: userData.lastName || "",
+        middleName: userData.middleName || "",
+        sex: userData.sex || "",
+        email: userData.email || "",
+        contactNumber: userData.contactNumber || "",
+      }));
+    }
+  }, [userData?.email, userData?.firstName]);
+
   // Autosave effect - save draft on every form data change
   useEffect(() => {
     const userEmail = userData?.email;

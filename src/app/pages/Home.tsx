@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import campusPreview from "../../assets/electron_malanday_campus.jpg";
 import { Link } from "react-router";
 import { ArrowRight, CheckCircle, BookOpen, Award, Users, Sparkles, Megaphone, Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -346,10 +347,15 @@ export function Home() {
             <div className="hidden lg:block">
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl backdrop-blur-sm"></div>
-                <div className="relative rounded-2xl w-full h-96 bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-2xl">
-                  <div className="text-center">
-                    <BookOpen className="w-20 h-20 text-white/60 mx-auto mb-4" />
-                    <p className="text-white/60 text-lg font-light">Campus Preview</p>
+                <div className="relative rounded-2xl w-full h-96 bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-2xl overflow-hidden">
+                  <img
+                    src={campusPreview}
+                    alt="Electron College Campus Preview"
+                    className="object-cover w-full h-full rounded-2xl border border-white/10 shadow-lg"
+                    style={{ maxHeight: '24rem' }}
+                  />
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 px-4 py-2 rounded-full shadow text-blue-900 font-semibold text-base">
+                    Campus Preview
                   </div>
                 </div>
               </div>
