@@ -72,7 +72,7 @@ export function SuperAdminDashboard() {
   };
 
   const loadRecentActivity = async () => {
-    const { data: logs, error } = await getAuditLogs(5);
+    const { data: logs, error } = await getAuditLogs(10);
     
     if (error) {
       console.error('Error loading activity logs:', error);
@@ -90,7 +90,7 @@ export function SuperAdminDashboard() {
         return {
           id: log.id,
           action: log.details,
-          user: log.user_name || log.user || 'System',
+          user: log.user_id || 'System',
           timestamp: timeAgo,
           type: log.action.includes('SUBMIT') ? 'submission' : log.action.includes('APPROVE') ? 'approval' : 'system',
         };
@@ -127,11 +127,11 @@ export function SuperAdminDashboard() {
   ];
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row w-full" style={{ maxWidth: "none" }}>
+    <div className="flex gap-6 p-8 bg-gray-50">
       {/* Main Content */}
-      <div className="min-w-0 flex-1">
+      <div className="flex-1">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
+        <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               Welcome, Branch Coordinator
@@ -140,7 +140,7 @@ export function SuperAdminDashboard() {
               System overview and administrative controls
             </p>
           </div>
-          <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
+          <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
             <Calendar className="w-5 h-5 text-gray-500" />
             <input
               type="date"
@@ -156,7 +156,7 @@ export function SuperAdminDashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">System Overview</h2>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {statCards.map((stat, index) => {
             const Icon = stat.icon;
             return (
@@ -186,8 +186,8 @@ export function SuperAdminDashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6 mb-8 overflow-x-auto">
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Link
               to="/branchcoordinator/pending"
               className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-colors"
@@ -219,7 +219,7 @@ export function SuperAdminDashboard() {
               </div>
             </Link>
             <Link
-              to="/branchcoordinator/system-configuration"
+              to="/branchcoordinator/system-config"
               className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-green-500 transition-colors"
             >
               <Settings className="w-5 h-5 text-green-600" />
@@ -234,7 +234,7 @@ export function SuperAdminDashboard() {
         {/* Management Tools Grid */}
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Management Tools</h2>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           {/* Student Management */}
           <Link
             to="/branchcoordinator/students"
@@ -317,7 +317,7 @@ export function SuperAdminDashboard() {
         </div>
 
         {/* System Status Banner */}
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded flex flex-col sm:flex-row items-start gap-3">
+        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold text-green-900 mb-1">All Systems Operational</p>
@@ -329,8 +329,8 @@ export function SuperAdminDashboard() {
       </div>
 
       {/* Recent Activity Sidebar */}
-      <div className="w-full flex-shrink-0 xl:w-80 mt-8 xl:mt-0">
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm xl:sticky xl:top-8">
+      <div className="w-80 flex-shrink-0">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm sticky top-8">
           <div className="p-6 border-b border-gray-200" style={{ backgroundColor: "#EFF6FF" }}>
             <div className="flex items-center gap-2">
               <Activity className="w-5 h-5" style={{ color: "#1E3A8A" }} />
