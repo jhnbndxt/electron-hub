@@ -38,7 +38,7 @@ export function SuperAdminDashboard() {
     totalStudents: 0,
     pendingApplications: 0,
     enrolledStudents: 0,
-    securityAlerts: 0,
+    activeAdmins: 0,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
@@ -56,7 +56,7 @@ export function SuperAdminDashboard() {
         totalStudents: 0,
         pendingApplications: 0,
         enrolledStudents: 0,
-        securityAlerts: 0,
+        activeAdmins: 0,
       });
       return;
     }
@@ -66,7 +66,7 @@ export function SuperAdminDashboard() {
         totalStudents: analytics.enrolledStudents || 0,
         pendingApplications: analytics.pendingEnrollments || 0,
         enrolledStudents: analytics.enrolledStudents || 0,
-        securityAlerts: 0,
+        activeAdmins: 0,
       });
     }
   };
@@ -117,12 +117,12 @@ export function SuperAdminDashboard() {
       link: "/branchcoordinator/students"
     },
     {
-      label: "Security Alerts",
-      value: stats.securityAlerts.toString(),
-      icon: Shield,
-      color: "#EF4444",
-      bgColor: "#FEE2E2",
-      link: "/branchcoordinator/security"
+      label: "Active Admin Users",
+      value: stats.activeAdmins.toString(),
+      icon: Users,
+      color: "#6366F1",
+      bgColor: "#E0E7FF",
+      link: "/branchcoordinator/users"
     },
   ];
 
@@ -137,7 +137,7 @@ export function SuperAdminDashboard() {
               Welcome, Branch Coordinator
             </h1>
             <p className="text-gray-600">
-              System overview and administrative controls
+              Manage system settings, users, sections, and assessments
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-4 py-2 shadow-sm">
@@ -183,50 +183,52 @@ export function SuperAdminDashboard() {
         </div>
 
         {/* Section Header */}
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Actions</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Quick Access</h2>
 
-        {/* Quick Actions */}
+        {/* Quick Actions - 6 items */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <Link
               to="/branchcoordinator/pending"
-              className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-colors text-center"
             >
-              <FileCheck className="w-5 h-5 text-blue-600" />
-              <div>
-                <p className="font-medium text-gray-900">Review Applications</p>
-                <p className="text-xs text-gray-500">Manage pending enrollments</p>
-              </div>
-            </Link>
-            <Link
-              to="/branchcoordinator/assessment-management"
-              className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-purple-500 transition-colors"
-            >
-              <Award className="w-5 h-5 text-purple-600" />
-              <div>
-                <p className="font-medium text-gray-900">Assessment Management</p>
-                <p className="text-xs text-gray-500">Edit assessment questions</p>
-              </div>
+              <FileCheck className="w-6 h-6 text-blue-600" />
+              <p className="font-medium text-gray-900 text-sm">Applications</p>
             </Link>
             <Link
               to="/cashier"
-              className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-emerald-500 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-emerald-500 hover:bg-emerald-50 transition-colors text-center"
             >
-              <CreditCard className="w-5 h-5 text-emerald-600" />
-              <div>
-                <p className="font-medium text-gray-900">Payment Queue</p>
-                <p className="text-xs text-gray-500">Monitor payment processing</p>
-              </div>
+              <CreditCard className="w-6 h-6 text-emerald-600" />
+              <p className="font-medium text-gray-900 text-sm">Payment Queue</p>
             </Link>
             <Link
-              to="/branchcoordinator/system-config"
-              className="flex items-center gap-3 p-4 rounded-lg border-2 border-gray-200 hover:border-green-500 transition-colors"
+              to="/cashier"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-purple-500 hover:bg-purple-50 transition-colors text-center"
             >
-              <Settings className="w-5 h-5 text-green-600" />
-              <div>
-                <p className="font-medium text-gray-900">System Configuration</p>
-                <p className="text-xs text-gray-500">Manage system settings</p>
-              </div>
+              <Clock className="w-6 h-6 text-purple-600" />
+              <p className="font-medium text-gray-900 text-sm">Payment History</p>
+            </Link>
+            <Link
+              to="/branchcoordinator/students"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-indigo-500 hover:bg-indigo-50 transition-colors text-center"
+            >
+              <Search className="w-6 h-6 text-indigo-600" />
+              <p className="font-medium text-gray-900 text-sm">Student Lookup</p>
+            </Link>
+            <Link
+              to="/branchcoordinator/section-management"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-orange-500 hover:bg-orange-50 transition-colors text-center"
+            >
+              <BookOpen className="w-6 h-6 text-orange-600" />
+              <p className="font-medium text-gray-900 text-sm">Sections</p>
+            </Link>
+            <Link
+              to="/branchcoordinator/assessment-management"
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-pink-500 hover:bg-pink-50 transition-colors text-center"
+            >
+              <Award className="w-6 h-6 text-pink-600" />
+              <p className="font-medium text-gray-900 text-sm">Assessments</p>
             </Link>
           </div>
         </div>
@@ -234,8 +236,8 @@ export function SuperAdminDashboard() {
         {/* Management Tools Grid */}
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Management Tools</h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Student Management */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* Student Records */}
           <Link
             to="/branchcoordinator/students"
             className="bg-white rounded-xl border border-gray-200 shadow-md hover:shadow-lg transition-all p-6"
@@ -246,30 +248,50 @@ export function SuperAdminDashboard() {
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Student Management
+                  Student Records
                 </h3>
                 <p className="text-sm text-gray-600">
-                  View all students, manage enrollments, and track academic records
+                  View and manage all enrolled students, track academic progress, and manage enrollments
                 </p>
               </div>
             </div>
           </Link>
 
-          {/* Reports & Analytics */}
+          {/* Section Management */}
           <Link
-            to="/branchcoordinator/students"
+            to="/branchcoordinator/section-management"
             className="bg-white rounded-xl border border-gray-200 shadow-md hover:shadow-lg transition-all p-6"
           >
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
-                <BarChart3 className="w-6 h-6 text-purple-600" />
+              <div className="w-12 h-12 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <BookOpen className="w-6 h-6 text-indigo-600" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  Student Records
+                  Section Management
                 </h3>
                 <p className="text-sm text-gray-600">
-                  View all students, manage enrollments, and track academic records
+                  Create and manage course sections, assign students, and organize classes by school year
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          {/* Assessment Management */}
+          <Link
+            to="/branchcoordinator/assessment-management"
+            className="bg-white rounded-xl border border-gray-200 shadow-md hover:shadow-lg transition-all p-6"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-lg bg-pink-100 flex items-center justify-center flex-shrink-0">
+                <Award className="w-6 h-6 text-pink-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  Assessment Management
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Create and manage assessments, edit questions, and configure scoring rules
                 </p>
               </div>
             </div>
@@ -289,7 +311,27 @@ export function SuperAdminDashboard() {
                   User Management
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Manage admin accounts, roles, and permissions
+                  Create and manage admin accounts, assign roles, and control system access permissions
+                </p>
+              </div>
+            </div>
+          </Link>
+
+          {/* System Configuration */}
+          <Link
+            to="/branchcoordinator/system-configuration"
+            className="bg-white rounded-xl border border-gray-200 shadow-md hover:shadow-lg transition-all p-6"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-lg bg-teal-100 flex items-center justify-center flex-shrink-0">
+                <Settings className="w-6 h-6 text-teal-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                  System Configuration
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Configure system settings, defaults, enrollment rules, and platform preferences
                 </p>
               </div>
             </div>
@@ -309,7 +351,7 @@ export function SuperAdminDashboard() {
                   Audit Logs
                 </h3>
                 <p className="text-sm text-gray-600">
-                  Review system activity logs and security events
+                  Review system activity logs, track user actions, and monitor administrative changes
                 </p>
               </div>
             </div>
@@ -317,12 +359,12 @@ export function SuperAdminDashboard() {
         </div>
 
         {/* System Status Banner */}
-        <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
+        <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-green-900 mb-1">All Systems Operational</p>
-            <p className="text-sm text-green-800">
-              All services are running smoothly. Last backup completed successfully.
+            <p className="font-semibold text-blue-900 mb-1">Branch Coordinator Portal Ready</p>
+            <p className="text-sm text-blue-800">
+              All administrative functions are operational. You have full access to manage users, sections, assessments, and system configuration.
             </p>
           </div>
         </div>
