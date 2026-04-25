@@ -100,14 +100,6 @@ export function SuperAdminDashboard() {
 
   const statCards = [
     {
-      label: "Total Students",
-      value: stats.totalStudents.toString(),
-      icon: Users,
-      color: "#7C3AED",
-      bgColor: "#F3E8FF",
-      link: "/branchcoordinator/students"
-    },
-    {
       label: "Pending Applications",
       value: stats.pendingApplications.toString(),
       icon: FileCheck,
