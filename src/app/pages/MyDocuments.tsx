@@ -103,7 +103,7 @@ export function MyDocuments() {
     // Load documents for this enrollment
     const { data: docs, error: docsError } = await supabase
       .from("enrollment_documents")
-      .select("id, document_type, file_url, file_path, file_name, file_size, uploaded_at, updated_at, rejection_comment, status")
+      .select("id, document_type, file_url, file_path, file_name, uploaded_at, updated_at, rejection_comment, status")
       .eq("enrollment_id", enrollment.id);
 
     if (docsError) {
@@ -210,7 +210,6 @@ export function MyDocuments() {
             file_url: urlData.publicUrl,
             file_path: storagePath,
             file_name: file.name,
-            file_size: file.size,
             uploaded_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             status: "pending_review",
@@ -225,7 +224,6 @@ export function MyDocuments() {
           file_url: urlData.publicUrl,
           file_path: storagePath,
           file_name: file.name,
-          file_size: file.size,
           status: "pending_review",
           uploaded_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
