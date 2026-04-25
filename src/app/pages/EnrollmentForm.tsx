@@ -420,7 +420,6 @@ export function EnrollmentForm() {
       if (formData.lrn && formData.lrn.length > 12) newErrors.lrn = "LRN must not exceed 12 digits";
       if (!formData.lastName) newErrors.lastName = "This field is required";
       if (!formData.firstName) newErrors.firstName = "This field is required";
-      if (!formData.middleName) newErrors.middleName = "This field is required";
       if (!formData.sex) newErrors.sex = "This field is required";
       if (!formData.civilStatus) newErrors.civilStatus = "This field is required";
       if (!formData.religion) newErrors.religion = "This field is required";
@@ -458,7 +457,6 @@ export function EnrollmentForm() {
     if (page === 3) {
       if (!formData.fatherLastName) newErrors.fatherLastName = "This field is required";
       if (!formData.fatherFirstName) newErrors.fatherFirstName = "This field is required";
-      if (!formData.fatherMiddleName) newErrors.fatherMiddleName = "This field is required";
       if (!formData.fatherOccupation) newErrors.fatherOccupation = "This field is required";
       if (!formData.fatherContact) {
         newErrors.fatherContact = "This field is required";
@@ -468,7 +466,6 @@ export function EnrollmentForm() {
       if (!formData.motherMaidenName) newErrors.motherMaidenName = "This field is required";
       if (!formData.motherLastName) newErrors.motherLastName = "This field is required";
       if (!formData.motherFirstName) newErrors.motherFirstName = "This field is required";
-      if (!formData.motherMiddleName) newErrors.motherMiddleName = "This field is required";
       if (!formData.motherOccupation) newErrors.motherOccupation = "This field is required";
       if (!formData.motherContact) {
         newErrors.motherContact = "This field is required";
@@ -479,7 +476,6 @@ export function EnrollmentForm() {
       if (!formData.guardianSource) {
         if (!formData.guardianLastName) newErrors.guardianLastName = "This field is required";
         if (!formData.guardianFirstName) newErrors.guardianFirstName = "This field is required";
-        if (!formData.guardianMiddleName) newErrors.guardianMiddleName = "This field is required";
         if (!formData.guardianOccupation) newErrors.guardianOccupation = "This field is required";
         if (!formData.guardianContact) {
           newErrors.guardianContact = "This field is required";
@@ -825,7 +821,7 @@ export function EnrollmentForm() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {renderInput("Middle Name", "middleName")}
+        {renderInput("Middle Name", "middleName", "text", false)}
         {renderSelect("Suffix", "suffix", ["None", "Jr.", "Sr.", "II", "III", "IV"])}
       </div>
 
@@ -931,7 +927,7 @@ export function EnrollmentForm() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {renderInput("Last Name", "fatherLastName")}
         {renderInput("First Name", "fatherFirstName")}
-        {renderInput("Middle Name", "fatherMiddleName")}
+        {renderInput("Middle Name", "fatherMiddleName", "text", false)}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -948,7 +944,7 @@ export function EnrollmentForm() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {renderInput("Last Name", "motherLastName")}
         {renderInput("First Name", "motherFirstName")}
-        {renderInput("Middle Name", "motherMiddleName")}
+        {renderInput("Middle Name", "motherMiddleName", "text", false)}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -989,7 +985,7 @@ export function EnrollmentForm() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {renderInput("Last Name", "guardianLastName")}
             {renderInput("First Name", "guardianFirstName")}
-            {renderInput("Middle Name", "guardianMiddleName")}
+            {renderInput("Middle Name", "guardianMiddleName", "text", false)}
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderInput("Occupation", "guardianOccupation")}
@@ -1211,7 +1207,7 @@ export function EnrollmentForm() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             <div><span className="text-gray-600">Admission Type:</span> <span className="font-medium">{formData.admissionType}</span></div>
             <div><span className="text-gray-600">LRN:</span> <span className="font-medium">{formData.lrn || "N/A"}</span></div>
-            <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.firstName} {formData.middleName} {formData.lastName} {formData.suffix && formData.suffix !== "None" ? formData.suffix : ""}</span></div>
+            <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.firstName} {formData.middleName && `${formData.middleName} `}{formData.lastName} {formData.suffix && formData.suffix !== "None" ? formData.suffix : ""}</span></div>
             <div><span className="text-gray-600">Sex:</span> <span className="font-medium">{formData.sex}</span></div>
             <div><span className="text-gray-600">Civil Status:</span> <span className="font-medium">{formData.civilStatus}</span></div>
             <div><span className="text-gray-600">Birthday:</span> <span className="font-medium">{formData.birthday}</span></div>
@@ -1252,7 +1248,7 @@ export function EnrollmentForm() {
             <div>
               <h4 className="font-semibold text-gray-700 mb-2">Father</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm ml-4">
-                <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.fatherLastName}, {formData.fatherFirstName} {formData.fatherMiddleName}</span></div>
+                <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.fatherLastName}, {formData.fatherFirstName} {formData.fatherMiddleName && `${formData.fatherMiddleName}`}</span></div>
                 <div><span className="text-gray-600">Occupation:</span> <span className="font-medium">{formData.fatherOccupation}</span></div>
                 <div><span className="text-gray-600">Contact:</span> <span className="font-medium">{formData.fatherContact}</span></div>
               </div>
@@ -1263,7 +1259,7 @@ export function EnrollmentForm() {
               <h4 className="font-semibold text-gray-700 mb-2">Mother</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm ml-4">
                 <div><span className="text-gray-600">Maiden Name:</span> <span className="font-medium">{formData.motherMaidenName}</span></div>
-                <div><span className="text-gray-600">Current Name:</span> <span className="font-medium">{formData.motherLastName}, {formData.motherFirstName} {formData.motherMiddleName}</span></div>
+                <div><span className="text-gray-600">Current Name:</span> <span className="font-medium">{formData.motherLastName}, {formData.motherFirstName} {formData.motherMiddleName && `${formData.motherMiddleName}`}</span></div>
                 <div><span className="text-gray-600">Occupation:</span> <span className="font-medium">{formData.motherOccupation}</span></div>
                 <div><span className="text-gray-600">Contact:</span> <span className="font-medium">{formData.motherContact}</span></div>
               </div>
@@ -1275,7 +1271,7 @@ export function EnrollmentForm() {
                 <h4 className="font-semibold text-gray-700 mb-2">Guardian</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm ml-4">
                   <div><span className="text-gray-600">Relationship:</span> <span className="font-medium">{formData.guardianSource}</span></div>
-                  <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.guardianLastName}, {formData.guardianFirstName} {formData.guardianMiddleName}</span></div>
+                  <div><span className="text-gray-600">Name:</span> <span className="font-medium">{formData.guardianLastName}, {formData.guardianFirstName} {formData.guardianMiddleName && `${formData.guardianMiddleName}`}</span></div>
                   <div><span className="text-gray-600">Occupation:</span> <span className="font-medium">{formData.guardianOccupation}</span></div>
                   <div><span className="text-gray-600">Contact:</span> <span className="font-medium">{formData.guardianContact}</span></div>
                 </div>
