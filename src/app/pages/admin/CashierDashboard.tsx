@@ -285,7 +285,7 @@ export function CashierDashboard() {
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-0 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+    <div className="flex flex-col gap-0 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       {/* Header */}
       <div className="mb-8 px-4 sm:px-6 lg:px-8 pt-6">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
