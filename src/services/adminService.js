@@ -930,6 +930,7 @@ export const getDashboardAnalytics = async () => {
           (e) => e.status === 'pending_documents' || e.status === 'pending_review'
         ).length || 0,
       enrolledStudents: enrollmentsRes.data?.filter((e) => e.status === 'enrolled').length || 0,
+      rejectedEnrollments: enrollmentsRes.data?.filter((e) => e.status === 'rejected').length || 0,
       paymentsPending: paymentsRes.data?.filter((p) => p.status === 'pending').length || 0,
       totalVerifiedPayments: paymentsRes.data?.filter((p) => FINALIZED_PAYMENT_STATUSES.has(p.status)).length || 0,
       approvedToday: approvedTodayRes.data?.length || 0,
@@ -940,6 +941,51 @@ export const getDashboardAnalytics = async () => {
     return { error: null, data: stats };
   } catch (error) {
     console.error('Get dashboard analytics error:', error);
+    return { error: error.message, data: null };
+  }
+};
+
+export const getPaymentCollectionData = async () => {
+  try {
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const isoSevenDaysAgo = sevenDaysAgo.toISOString();
+
+    const { data: payments, error } = await supabase
+      .from('payments')
+      .select('amount, created_at')
+      .in('status', Array.from(FINALIZED_PAYMENT_STATUSES))
+      .gte('created_at', isoSevenDaysAgo);
+
+    if (error) throw error;
+
+    const dailyTotals = {};
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+    // Initialize last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayKey = date.toISOString().split('T')[0];
+      dailyTotals[dayKey] = 0;
+    }
+
+    payments?.forEach(payment => {
+      const date = new Date(payment.created_at).toISOString().split('T')[0];
+      if (dailyTotals[date] !== undefined) {
+        dailyTotals[date] += payment.amount || 0;
+      }
+    });
+
+    const data = Object.keys(dailyTotals).map(dateKey => {
+      const date = new Date(dateKey);
+      const dayName = days[date.getDay()];
+      return { day: dayName, amount: dailyTotals[dateKey] };
+    });
+
+    return { error: null, data };
+  } catch (error) {
+    console.error('Get payment collection data error:', error);
     return { error: error.message, data: null };
   }
 };

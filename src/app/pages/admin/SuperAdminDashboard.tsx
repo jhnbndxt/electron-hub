@@ -20,7 +20,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
-import { getDashboardAnalytics, getAuditLogs } from "../../../services/adminService";
+import { getDashboardAnalytics, getAuditLogs, getPaymentCollectionData } from "../../../services/adminService";
 import {
   BarChart,
   Bar,
@@ -58,12 +58,23 @@ export function SuperAdminDashboard() {
     paymentsPending: 0,
     paymentsApproved: 0,
     activeUsersAdmins: 0,
+    rejectedEnrollments: 0,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [paymentCollectionData, setPaymentCollectionData] = useState([
+    { day: "Mon", amount: 4200 },
+    { day: "Tue", amount: 5100 },
+    { day: "Wed", amount: 3900 },
+    { day: "Thu", amount: 6200 },
+    { day: "Fri", amount: 7000 },
+    { day: "Sat", amount: 5600 },
+    { day: "Sun", amount: 4500 },
+  ]);
 
   useEffect(() => {
     loadStats();
     loadRecentActivity();
+    loadPaymentData();
   }, []);
 
   const loadStats = async () => {
@@ -79,6 +90,7 @@ export function SuperAdminDashboard() {
         paymentsPending: 0,
         paymentsApproved: 0,
         activeUsersAdmins: 0,
+        rejectedEnrollments: 0,
       });
       return;
     }
@@ -92,6 +104,7 @@ export function SuperAdminDashboard() {
         paymentsPending: analytics.paymentsPending || 0,
         paymentsApproved: analytics.totalVerifiedPayments || 0,
         activeUsersAdmins: analytics.activeUsersAdmins || 0,
+        rejectedEnrollments: analytics.rejectedEnrollments || 0,
       });
     }
   };
@@ -125,6 +138,19 @@ export function SuperAdminDashboard() {
         };
       });
       setRecentActivity(recentLogs);
+    }
+  };
+
+  const loadPaymentData = async () => {
+    const { data: paymentData, error } = await getPaymentCollectionData();
+
+    if (error) {
+      console.error("Error loading payment data:", error);
+      return;
+    }
+
+    if (paymentData) {
+      setPaymentCollectionData(paymentData);
     }
   };
 
@@ -232,20 +258,10 @@ export function SuperAdminDashboard() {
     },
   ];
 
-  const paymentCollectionData = [
-    { day: "Mon", amount: 4200 },
-    { day: "Tue", amount: 5100 },
-    { day: "Wed", amount: 3900 },
-    { day: "Thu", amount: 6200 },
-    { day: "Fri", amount: 7000 },
-    { day: "Sat", amount: 5600 },
-    { day: "Sun", amount: 4500 },
-  ];
-
   const applicationStatusData = [
     { status: "Pending", count: stats.pendingApplications, color: "#F59E0B" },
-    { status: "Approved", count: stats.paymentsApproved, color: "#10B981" },
-    { status: "Rejected", count: Math.max(0, stats.totalStudents - stats.pendingApplications - stats.paymentsApproved), color: "#EF4444" },
+    { status: "Approved", count: stats.totalEnrolled, color: "#10B981" },
+    { status: "Rejected", count: stats.rejectedEnrollments, color: "#EF4444" },
   ];
 
   const dailyActivityData = [
