@@ -511,8 +511,6 @@ export function EnrollmentForm() {
 
     if (page === 6) {
       if (!formData.form138) newErrors.form138 = "This document is required";
-      if (!formData.form137) newErrors.form137 = "This document is required";
-      if (!formData.goodMoral) newErrors.goodMoral = "This document is required";
       if (!formData.birthCertificate) newErrors.birthCertificate = "This document is required";
       if (!formData.idPicture) newErrors.idPicture = "This document is required";
       if (!formData.diploma) newErrors.diploma = "This document is required";
@@ -1173,8 +1171,8 @@ export function EnrollmentForm() {
       <p className="text-gray-600">Please upload clear and readable copies of the following documents:</p>
 
       {renderFileUpload("Form 138 (Report Card)", "form138")}
-      {renderFileUpload("Form 137", "form137")}
-      {renderFileUpload("Certificate of Good Moral", "goodMoral")}
+      {renderFileUpload("Form 137", "form137", false)}
+      {renderFileUpload("Certificate of Good Moral", "goodMoral", false)}
       {renderFileUpload("PSA Authenticated Birth Certificate (2 copies)", "birthCertificate")}
       {renderFileUpload("2\"x2\" ID Picture (White Background, 2 copies)", "idPicture")}
       {renderFileUpload("Photocopy of Grade 10 Diploma", "diploma")}
