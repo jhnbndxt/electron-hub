@@ -236,14 +236,6 @@ export function Dashboard() {
           priority: "low",
           link: "/dashboard/profile",
           icon: "user"
-        },
-        {
-          title: "Explore Academic Tracks",
-          description: "Learn more about your chosen track and available subjects",
-          dueDate: "Informational",
-          priority: "low",
-          link: "/tracks",
-          icon: "book"
         }
       ];
     }

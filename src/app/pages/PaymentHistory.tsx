@@ -1,5 +1,4 @@
-import { Link } from "react-router";
-import { ArrowLeft, CreditCard, Calendar, CheckCircle, Clock, Download, X } from "lucide-react";
+import { CreditCard, Calendar, CheckCircle, Clock, Download, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
@@ -388,26 +387,7 @@ export function PaymentHistory() {
       <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Dashboard
-            </Link>
-            <button
-              onClick={handleExportPaymentHistoryCSV}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors"
-              style={{ backgroundColor: "#1E3A8A" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1B357D")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </button>
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Payment History</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Payment History</h1>
           <p className="text-gray-600 mt-1">View your payment transactions and balance</p>
         </div>
 

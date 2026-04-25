@@ -256,9 +256,13 @@ export function Profile() {
   const completedSteps = enrollmentProgress.filter(step => step.status === "completed").length;
   const totalSteps = enrollmentProgress.length;
   
-  // Count documents (from enrollmentData)
-  const documentsSubmitted = enrollmentData?.documents ? Object.values(enrollmentData.documents).filter(doc => doc !== null).length : 0;
-  const totalDocuments = 7; // Total required documents
+  // Count documents for quick stats and export
+  const enrollmentDocuments =
+    enrollmentData?.enrollment_documents ||
+    (enrollmentData?.documents ? Object.values(enrollmentData.documents) : []);
+  const documentsVerified = enrollmentDocuments.filter((doc: any) => doc?.status === "approved").length;
+  const documentsSubmitted = enrollmentDocuments.filter((doc: any) => doc != null).length;
+  const totalDocuments = 5; // Total required documents
   
   // Get enrollment status from progress
   const getEnrollmentStatus = () => {
@@ -341,16 +345,6 @@ export function Profile() {
                 My Profile
               </h1>
             </div>
-            <button
-              onClick={handleExportStudentRecordCSV}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-white transition-colors"
-              style={{ backgroundColor: "#1E3A8A" }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1B357D")}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
-            >
-              <Download className="w-4 h-4" />
-              Export Record
-            </button>
           </div>
           <p className="text-gray-600">Manage your personal information and track your progress</p>
         </div>
@@ -464,7 +458,7 @@ export function Profile() {
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Documents Verified</span>
                     <span className="font-semibold" style={{ color: "var(--electron-blue)" }}>
-                      {documentsSubmitted}/{totalDocuments}
+                      {documentsVerified}/{totalDocuments}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

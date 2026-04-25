@@ -196,10 +196,10 @@ export function StudentAccount() {
 
       <ConfirmationModal
         isOpen={showLogoutModal}
-        title="Confirm Logout"
-        message="Are you sure you want to log out of your account?"
-        confirmText="Logout"
-        cancelText="Stay Signed In"
+        title="Log Out?"
+        message="Are you sure you want to log out? You’ll need to sign in again to access your account."
+        confirmText="Yes"
+        cancelText="No"
         type="warning"
         onConfirm={handleLogout}
         onClose={() => setShowLogoutModal(false)}

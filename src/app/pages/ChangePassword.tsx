@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router";
-import { ArrowLeft, Lock, Eye, EyeOff, Shield } from "lucide-react";
+import { useNavigate } from "react-router";
+import { Lock, Eye, EyeOff, Shield } from "lucide-react";
 
 export function ChangePassword() {
   const navigate = useNavigate();
@@ -43,13 +43,6 @@ export function ChangePassword() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
           <h1 className="text-3xl font-bold text-gray-900">Change Password</h1>
           <p className="text-gray-600 mt-1">Update your account password</p>
         </div>

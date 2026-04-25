@@ -195,7 +195,13 @@ export function PortalShell({
         >
           <div className="portal-glass-modal w-full max-w-sm rounded-xl">
             <div className="p-6 text-center sm:p-8">
-              <h3 className="text-xl font-bold text-gray-900 sm:text-2xl">Log out of Electron Hub?</h3>
+              <h3 className="text-xl font-bold text-gray-900 sm:text-2xl">Log Out?</h3>
+              <p className="text-sm text-gray-700 mt-3 font-medium">
+                Are you sure you want to log out?
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                You’ll need to sign in again to access your account.
+              </p>
             </div>
 
             <div className="flex gap-3 p-4 pt-0 sm:p-6 sm:pt-0">

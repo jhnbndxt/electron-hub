@@ -229,7 +229,7 @@ export function Login() {
               disabled={isLoading || !isEmailValid || !password}
               className="auth-primary-button w-full rounded-2xl px-6 py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {isLoading ? "Signing in..." : "Get Started"}
+              {isLoading ? "Signing in..." : "Log In"}
             </button>
           </form>
 

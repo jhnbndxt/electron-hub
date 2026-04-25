@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router";
-import { ArrowLeft, User, Mail, Phone, Calendar, Save } from "lucide-react";
+import { useNavigate } from "react-router";
+import { User, Mail, Phone, Calendar, Save } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import toast, { Toaster } from "react-hot-toast";
 import { supabase } from "../../supabase";
@@ -101,14 +101,6 @@ export function EditProfile() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 mb-4 hover:opacity-70 transition-opacity"
-            style={{ color: "var(--electron-blue)" }}
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
           <h1 className="text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>
             Edit Profile
           </h1>

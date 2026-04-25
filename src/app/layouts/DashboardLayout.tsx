@@ -745,10 +745,13 @@ function DashboardLayoutContent() {
             {/* Question */}
             <div className="p-8 text-center">
               <h3 className="text-2xl font-bold text-gray-900">
-                Return to Home Page?
+                Log Out?
               </h3>
-              <p className="text-sm text-gray-600 mt-2">
-                You'll be redirected to the Electron Hub home page
+              <p className="text-sm text-gray-700 mt-3 font-medium">
+                Are you sure you want to log out?
+              </p>
+              <p className="text-sm text-gray-500 mt-2">
+                You’ll need to sign in again to access your account.
               </p>
             </div>
 

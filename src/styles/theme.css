@@ -189,6 +189,11 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
+    cursor: pointer;
+  }
+
+  button:hover {
+    cursor: pointer;
   }
 
   input {

@@ -1,5 +1,4 @@
-import { Link } from "react-router";
-import { ArrowLeft, FileText, Upload, CheckCircle, AlertCircle, Download, XCircle, Bell } from "lucide-react";
+import { FileText, Upload, CheckCircle, AlertCircle, Download, XCircle, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
@@ -244,13 +243,6 @@ export function MyDocuments() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            to="/dashboard"
-            className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
-          </Link>
           <h1 className="text-3xl font-bold text-gray-900">My Documents</h1>
           <p className="text-gray-600 mt-1">Manage your enrollment documents</p>
         </div>
