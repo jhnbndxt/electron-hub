@@ -23,7 +23,7 @@ import {
   upsertEnrollmentProgress,
   getAssessmentResultByStudentId,
 } from "../../../services/adminService";
-import { triggerNotification } from "../../../services/notificationService";
+import { supabase } from "../../../supabase";
 
 interface Student {
   id: number | string;
@@ -138,10 +138,33 @@ export function PendingApplications() {
     };
   };
 
-  const handleReviewDocuments = (student: Student) => {
-    setReviewingStudent(student.enrollmentData);
-    setShowDocumentModal(true);
-    setSelectedDocument(null);
+  const handleReviewDocuments = async (student: Student) => {
+    try {
+      // Fetch full enrollment data including form_data
+      const { data: enrollmentData, error } = await supabase
+        .from('enrollments')
+        .select(`
+          *,
+          enrollment_documents (*),
+          form_data
+        `)
+        .eq('id', student.id)
+        .single();
+
+      if (error) throw error;
+
+      setReviewingStudent({
+        ...student,
+        enrollmentData,
+        formData: enrollmentData?.form_data,
+        enrollment_documents: enrollmentData?.enrollment_documents || [],
+      });
+      setShowDocumentModal(true);
+      setSelectedDocument(null);
+    } catch (error) {
+      console.error('Error loading student data:', error);
+      alert('Failed to load student data');
+    }
   };
 
   const handleViewDocument = (docKey: string) => {
@@ -626,7 +649,7 @@ export function PendingApplications() {
                       <td className="px-6 py-4 text-center">
                         <button
                           onClick={() => handleReviewDocuments(student)}
-                          className="mx-auto inline-flex items-center justify-center rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+                          className="mx-auto inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                           title="Review Application"
                         >
                           Review
