@@ -368,10 +368,20 @@ export function Assessment() {
     });
   };
 
+  const scrollAssessmentTop = () => {
+    const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
+    if (shellMain) {
+      shellMain.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      scrollAssessmentTop();
     }
   };
 

@@ -46,6 +46,7 @@ function DashboardLayoutContent() {
   const [showPaymentTooltip, setShowPaymentTooltip] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(true);
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const paymentTooltipRef = useRef<HTMLDivElement>(null);
@@ -92,9 +93,66 @@ function DashboardLayoutContent() {
   }, [userData?.id, userData?.email, userData?.profilePictureUrl]);
 
   // Load notifications from Supabase
+  const getNotificationVariant = (notificationType: string) => {
+    switch (notificationType) {
+      case 'ASSESSMENT_COMPLETED':
+      case 'PAYMENT_VERIFIED':
+      case 'DOCUMENTS_VERIFIED':
+      case 'ENROLLMENT_APPROVED':
+        return 'success';
+
+      case 'PAYMENT_SUBMITTED':
+      case 'ENROLLMENT_SUBMITTED':
+      case 'DOCUMENTS_REJECTED':
+        return 'warning';
+
+      case 'PAYMENT_REJECTED':
+      case 'ENROLLMENT_REJECTED':
+        return 'error';
+
+      default:
+        return 'info';
+    }
+  };
+
+  const getVariantStyles = (variant: string) => {
+    switch (variant) {
+      case 'success':
+        return {
+          wrapper: 'rounded-3xl border border-emerald-200 bg-emerald-50/80 text-slate-900',
+          iconBg: 'bg-emerald-100 text-emerald-700',
+          actionColor: 'text-emerald-700',
+        };
+      case 'warning':
+        return {
+          wrapper: 'rounded-3xl border border-amber-200 bg-amber-50/80 text-slate-900',
+          iconBg: 'bg-amber-100 text-amber-700',
+          actionColor: 'text-amber-700',
+        };
+      case 'error':
+        return {
+          wrapper: 'rounded-3xl border border-rose-200 bg-rose-50/80 text-slate-900',
+          iconBg: 'bg-rose-100 text-rose-700',
+          actionColor: 'text-rose-700',
+        };
+      default:
+        return {
+          wrapper: 'rounded-3xl border border-slate-200 bg-slate-50/90 text-slate-900',
+          iconBg: 'bg-slate-100 text-slate-700',
+          actionColor: 'text-slate-700',
+        };
+    }
+  };
+
   useEffect(() => {
     const loadNotifications = async () => {
-      if (!userData?.id) return;
+      if (!userData?.id) {
+        setLoadingNotifications(false);
+        return;
+      }
+
+      setLoadingNotifications(true);
+
       const { data, error } = await supabase
         .from('notifications')
         .select('*')
@@ -112,6 +170,8 @@ function DashboardLayoutContent() {
         }));
         setNotifications(formatted);
       }
+
+      setLoadingNotifications(false);
     };
     loadNotifications();
   }, [userData?.id]);
@@ -442,130 +502,124 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Notification List */}
-                    <div className="relative z-10 bg-white/60">
-                      {notifications.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-gray-500 text-sm">
+                    <div className="relative z-10 bg-white/60 p-4">
+                      {loadingNotifications ? (
+                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                          <div className="flex items-center gap-3">
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                            <span>Loading notifications...</span>
+                          </div>
+                        </div>
+                      ) : notifications.length === 0 ? (
+                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
                           No notifications yet
                         </div>
                       ) : (
-                        notifications.map((notification) => {
-                          // Render DOCUMENTS_VERIFIED notification
-                          if (notification.type === "DOCUMENTS_VERIFIED") {
+                        <div className="space-y-3">
+                          {notifications.map((notification) => {
+                            const variant = getNotificationVariant(notification.type);
+                            const variantStyles = getVariantStyles(variant);
+
+                            if (notification.type === "DOCUMENTS_VERIFIED") {
+                              return (
+                                <button
+                                  key={notification.id}
+                                  onClick={() =>
+                                    handleNotificationClick(notification.id, notification)
+                                  }
+                                  className={`w-full text-left transition-all hover:shadow-lg ${variantStyles.wrapper}`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div
+                                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variantStyles.iconBg}`}
+                                    >
+                                      <CheckCircle className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-semibold text-slate-900 mb-1">
+                                        Enrollment Form Accepted
+                                      </p>
+                                      <p className="text-xs leading-relaxed mb-2 text-slate-700">
+                                        {notification.message}
+                                      </p>
+                                      <p className={`text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
+                                        Go to Payment Tab →
+                                      </p>
+                                      <p className="text-xs text-slate-400 mt-1">
+                                        {new Date(notification.timestamp).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            }
+
+                            if (notification.type === "DOCUMENTS_REJECTED") {
+                              return (
+                                <button
+                                  key={notification.id}
+                                  onClick={() =>
+                                    handleNotificationClick(notification.id, notification)
+                                  }
+                                  className={`w-full text-left transition-all hover:shadow-lg ${variantStyles.wrapper}`}
+                                >
+                                  <div className="flex items-start gap-3">
+                                    <div
+                                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variantStyles.iconBg}`}
+                                    >
+                                      <AlertTriangle className="w-5 h-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                      <p className="text-sm font-semibold text-slate-900 mb-1">
+                                        Action Required: Document Rejected
+                                      </p>
+                                      <p className="text-xs leading-relaxed mb-2 text-slate-700 whitespace-pre-line">
+                                        {notification.message}
+                                      </p>
+                                      <p className={`text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
+                                        Click here to review and re-upload your document →
+                                      </p>
+                                      <p className="text-xs text-slate-400 mt-1">
+                                        {new Date(notification.timestamp).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            }
+
                             return (
                               <button
                                 key={notification.id}
                                 onClick={() =>
                                   handleNotificationClick(notification.id, notification)
                                 }
-                                className="w-full border-b border-slate-200/70 px-4 py-4 text-left transition-colors hover:bg-slate-50/95 last:border-b-0"
+                                className={`w-full text-left transition-all hover:shadow-lg ${variantStyles.wrapper}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <div
-                                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: "#D1FAE5" }}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variantStyles.iconBg}`}
                                   >
-                                    <CheckCircle
-                                      className="w-5 h-5"
-                                      style={{ color: "#10B981" }}
-                                    />
+                                    <span className="text-sm font-semibold">
+                                      {notification.read ? '•' : '!'}
+                                    </span>
                                   </div>
                                   <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-900 mb-1">
-                                      Enrollment Form Accepted
+                                    <p className="text-sm font-semibold text-slate-900 mb-1">
+                                      {notification.title || 'Notification'}
                                     </p>
-                                    <p className="text-xs text-gray-600 leading-relaxed mb-2">
+                                    <p className="text-xs leading-relaxed text-slate-700">
                                       {notification.message}
                                     </p>
-                                    <p
-                                      className="text-xs font-medium hover:underline"
-                                      style={{ color: "#10B981" }}
-                                    >
-                                      Go to Payment Tab →
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-1">
+                                    <p className="text-xs text-slate-400 mt-1">
                                       {new Date(notification.timestamp).toLocaleDateString()}
                                     </p>
                                   </div>
                                 </div>
                               </button>
                             );
-                          }
-
-                          // Render DOCUMENTS_REJECTED notification
-                          if (notification.type === "DOCUMENTS_REJECTED") {
-                            return (
-                              <button
-                                key={notification.id}
-                                onClick={() =>
-                                  handleNotificationClick(notification.id, notification)
-                                }
-                                className="w-full border-b border-slate-200/70 px-4 py-4 text-left transition-colors hover:bg-slate-50/95 last:border-b-0"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div
-                                    className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: "#FEE2E2" }}
-                                  >
-                                    <AlertTriangle
-                                      className="w-5 h-5"
-                                      style={{ color: "#DC2626" }}
-                                    />
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-900 mb-1">
-                                      Action Required: Document Rejected
-                                    </p>
-                                    <p className="text-xs text-gray-600 leading-relaxed mb-2 whitespace-pre-line">
-                                      {notification.message}
-                                    </p>
-                                    <p
-                                      className="text-xs font-medium hover:underline"
-                                      style={{ color: "#DC2626" }}
-                                    >
-                                      Click here to review and re-upload your document →
-                                    </p>
-                                    <p className="text-xs text-gray-400 mt-1">
-                                      {new Date(notification.timestamp).toLocaleDateString()}
-                                    </p>
-                                  </div>
-                                </div>
-                              </button>
-                            );
-                          }
-
-                          // Render default/generic notification for other types
-                          return (
-                            <button
-                              key={notification.id}
-                              onClick={() =>
-                                handleNotificationClick(notification.id, notification)
-                              }
-                              className="w-full border-b border-slate-200/70 px-4 py-3 text-left transition-colors hover:bg-slate-50/95 last:border-b-0"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div
-                                  className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
-                                  style={{
-                                    backgroundColor: notification.read
-                                      ? "#D1D5DB"
-                                      : "#B91C1C",
-                                  }}
-                                />
-                                <div className="flex-1">
-                                  <p className="text-sm font-semibold text-gray-900 mb-1">
-                                    {notification.title || "Notification"}
-                                  </p>
-                                  <p className="text-xs text-gray-600 leading-relaxed">
-                                    {notification.message}
-                                  </p>
-                                  <p className="text-xs text-gray-400 mt-1">
-                                    {new Date(notification.timestamp).toLocaleDateString()}
-                                  </p>
-                                </div>
-                              </div>
-                            </button>
-                          );
-                        })
+                          })}
+                        </div>
                       )}
                     </div>
 
