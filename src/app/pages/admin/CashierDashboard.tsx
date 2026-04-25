@@ -285,9 +285,9 @@ export function CashierDashboard() {
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+    <div className="portal-dashboard-page flex flex-col gap-0 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-8 px-4 sm:px-6 lg:px-8 pt-6">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
           <DollarSign className="h-4 w-4" />
           Payment Processing System
@@ -297,7 +297,7 @@ export function CashierDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 px-4 sm:px-6 lg:px-8 mb-6">
         <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
           <div className="flex items-center justify-between">
             <div>
@@ -348,7 +348,7 @@ export function CashierDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg overflow-hidden mb-6">
+      <div className="backdrop-blur-xl bg-white/60 border border-white/50 shadow-lg overflow-hidden mb-0 flex-1">
         <div className="flex flex-col sm:flex-row border-b border-white/30">
           <button
             onClick={() => setActiveTab("online")}
@@ -381,7 +381,7 @@ export function CashierDashboard() {
         </div>
 
         {/* Search Bar */}
-        <div className="p-4 sm:p-6 border-b border-white/30 bg-white/30 backdrop-blur-sm">
+        <div className="px-4 sm:px-6 py-4 border-b border-white/30 bg-white/30 backdrop-blur-sm">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: "var(--electron-blue)" }} />
             <input
@@ -398,25 +398,25 @@ export function CashierDashboard() {
         {/* Online Payments Tab */}
         {activeTab === "online" && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px]">
+            <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Student
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Payment Method
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Reference Number
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -424,42 +424,42 @@ export function CashierDashboard() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredOnlinePayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
                           <User className="w-5 h-5 text-blue-600" />
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{payment.studentName}</div>
-                          <div className="text-sm text-gray-500">{payment.studentEmail}</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{payment.studentName}</div>
+                          <div className="text-sm text-gray-500 truncate">{payment.studentEmail}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         {payment.paymentMode === "bank" ? (
                           <>
-                            <CreditCard className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm text-gray-900">Bank Transfer</span>
+                            <CreditCard className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                            <span className="text-sm text-gray-900">Bank</span>
                           </>
                         ) : (
                           <>
-                            <Wallet className="w-4 h-4 text-blue-600" />
+                            <Wallet className="w-4 h-4 text-blue-600 flex-shrink-0" />
                             <span className="text-sm text-gray-900">GCash</span>
                           </>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="text-sm text-gray-900 font-mono">{payment.referenceNumber}</span>
+                    <td className="px-4 sm:px-6 py-4">
+                      <span className="text-sm text-gray-900 font-mono truncate">{payment.referenceNumber}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-500">{payment.submittedDate}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       {payment.status === "pending" && (
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
-                          Pending Review
+                          Pending
                         </span>
                       )}
                       {payment.status === "approved" && (
@@ -473,7 +473,7 @@ export function CashierDashboard() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                       <button
                         onClick={() => {
                           setSelectedPayment(payment);
@@ -489,7 +489,7 @@ export function CashierDashboard() {
                 ))}
                 {filteredOnlinePayments.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 sm:px-6 py-8 text-center text-gray-500">
                       No online payments found
                     </td>
                   </tr>
@@ -502,25 +502,25 @@ export function CashierDashboard() {
         {/* Cash Payments Tab */}
         {activeTab === "cash" && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px]">
+            <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Queue #
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Student
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Scheduled Date
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Generated
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -528,36 +528,36 @@ export function CashierDashboard() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredCashPayments.map((payment) => (
                   <tr key={payment.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <span className="text-lg font-bold text-blue-600">{payment.queueNumber}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
                           <User className="w-5 h-5 text-green-600" />
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">{payment.studentName}</div>
-                          <div className="text-sm text-gray-500">{payment.studentEmail}</div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-gray-900 truncate">{payment.studentName}</div>
+                          <div className="text-sm text-gray-500 truncate">{payment.studentEmail}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <div>
+                        <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <div className="min-w-0">
                           <div className="text-sm font-medium text-gray-900">{payment.schedule.date}</div>
                           <div className="text-xs text-gray-500">{payment.schedule.time}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <span className="text-sm text-gray-500">{payment.generatedDate}</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       {payment.status === "pending" && (
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          Awaiting Payment
+                          Awaiting
                         </span>
                       )}
                       {payment.status === "paid" && (
@@ -566,7 +566,7 @@ export function CashierDashboard() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
                       <button
                         onClick={() => {
                           setSelectedCashPayment(payment);
@@ -575,14 +575,14 @@ export function CashierDashboard() {
                         className="inline-flex items-center gap-2 px-3 py-1.5 text-green-600 hover:text-green-800 font-medium transition-colors"
                       >
                         <Eye className="w-4 h-4" />
-                        {payment.status === "pending" ? "Process Payment" : "View Details"}
+                        {payment.status === "pending" ? "Process" : "View"}
                       </button>
                     </td>
                   </tr>
                 ))}
                 {filteredCashPayments.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 sm:px-6 py-8 text-center text-gray-500">
                       No cash payments found
                     </td>
                   </tr>
