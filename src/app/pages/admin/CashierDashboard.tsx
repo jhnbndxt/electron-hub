@@ -285,9 +285,9 @@ export function CashierDashboard() {
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
 
   return (
-    <div className="flex flex-col gap-0 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+    <div className="flex flex-col gap-6 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen px-4 sm:px-6 lg:px-8 py-6">
       {/* Header */}
-      <div className="mb-8 px-4 sm:px-6 lg:px-8 pt-6">
+      <div className="mb-2">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
           <DollarSign className="h-4 w-4" />
           Payment Processing System
@@ -297,7 +297,7 @@ export function CashierDashboard() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 px-4 sm:px-6 lg:px-8 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
           <div className="flex items-center justify-between">
             <div>
@@ -348,8 +348,8 @@ export function CashierDashboard() {
       </div>
 
       {/* Tabs */}
-      <div className="backdrop-blur-xl bg-white/60 border border-white/50 shadow-lg overflow-hidden mb-0 flex-1">
-        <div className="flex border-b border-white/30">
+      <div className="bg-white rounded-2xl shadow-md overflow-hidden flex flex-col flex-1">
+        <div className="flex border-b border-gray-200">
           <button
             onClick={() => setActiveTab("online")}
             className={`px-6 py-4 font-bold transition-all flex-1 ${
@@ -357,7 +357,7 @@ export function CashierDashboard() {
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
             }`}
-            style={activeTab === "online" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(255,255,255,0.3)" }}
+            style={activeTab === "online" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(248, 250, 252, 0.5)" }}
           >
             <div className="flex items-center justify-center gap-2">
               <CreditCard className="w-5 h-5" />
@@ -371,7 +371,7 @@ export function CashierDashboard() {
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
             }`}
-            style={activeTab === "cash" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(255,255,255,0.3)" }}
+            style={activeTab === "cash" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(248, 250, 252, 0.5)" }}
           >
             <div className="flex items-center justify-center gap-2">
               <Banknote className="w-5 h-5" />
@@ -381,7 +381,7 @@ export function CashierDashboard() {
         </div>
 
         {/* Search Bar */}
-        <div className="px-4 sm:px-6 py-4 border-b border-white/30 bg-white/30 backdrop-blur-sm">
+        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: "var(--electron-blue)" }} />
             <input
@@ -389,7 +389,7 @@ export function CashierDashboard() {
               placeholder="Search by name, reference, queue number, or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-3 border-0 rounded-lg w-full focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              className="pl-10 pr-4 py-3 border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 bg-white transition-all"
               style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
             />
           </div>
@@ -397,7 +397,7 @@ export function CashierDashboard() {
 
         {/* Online Payments Tab */}
         {activeTab === "online" && (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -501,7 +501,7 @@ export function CashierDashboard() {
 
         {/* Cash Payments Tab */}
         {activeTab === "cash" && (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto flex-1">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
