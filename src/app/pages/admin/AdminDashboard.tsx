@@ -92,8 +92,24 @@ export function AdminDashboard() {
     verifiedDocuments: 0,
     pendingPayments: 0,
   });
-  const [showFullDetails, setShowFullDetails] = useState(false);
   const [showFormData, setShowFormData] = useState(false);
+
+  // Document review state for new modal
+  const [reviewingStudent, setReviewingStudent] = useState<any>(null);
+  const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
+  const [documentRejectionComment, setDocumentRejectionComment] = useState("");
+
+  const documentNames: Record<string, string> = {
+    psaBirthCertificate: "PSA Birth Certificate",
+    form138: "Form 138 (Report Card)",
+    form137: "Form 137",
+    goodMoral: "Good Moral Certificate",
+    idPicture: "2x2 ID Picture",
+    diploma: "Grade 10 Diploma",
+    birthCertificate: "PSA Birth Certificate",
+    goodMoralCertificate: "Good Moral Certificate",
+    parentGuardianId: "Parent/Guardian ID",
+  };
 
   // Document review state
   const [documentReview, setDocumentReview] = useState<DocumentReviewState>({
@@ -210,23 +226,31 @@ export function AdminDashboard() {
   );
 
   // Reset document review state when modal opens
-  const openReviewModal = (student: Student) => {
-    setSelectedStudent(student);
-    setDocumentReview({
-      psaBirthCertificate: "pending",
-      form138: "pending",
-      goodMoralCertificate: "pending",
-      idPicture: "pending",
-      parentGuardianId: "pending",
-    });
-    setRejectionReasons({
-      psaBirthCertificate: "",
-      form138: "",
-      goodMoralCertificate: "",
-      idPicture: "",
-      parentGuardianId: "",
-    });
-    setExpandedDocument(null);
+  const openReviewModal = async (student: Student) => {
+    try {
+      // Fetch full enrollment data including documents
+      const { data: enrollmentData, error } = await supabase
+        .from('enrollments')
+        .select(`
+          *,
+          enrollment_documents (*),
+          form_data
+        `)
+        .eq('id', student.id)
+        .single();
+
+      if (error) throw error;
+
+      setReviewingStudent({
+        ...student,
+        enrollmentData,
+        formData: enrollmentData?.form_data,
+        enrollment_documents: enrollmentData?.enrollment_documents || [],
+      });
+    } catch (error) {
+      console.error('Error loading student data:', error);
+      alert('Failed to load student data');
+    }
   };
 
   // Check if all documents have been reviewed
@@ -237,47 +261,91 @@ export function AdminDashboard() {
     documentReview.idPicture !== "pending" &&
     documentReview.parentGuardianId !== "pending";
 
-  // Handle document accept
-  const handleAcceptDocument = (docType: keyof DocumentReviewState) => {
-    setDocumentReview((prev) => ({
-      ...prev,
-      [docType]: "accepted",
-    }));
-    setExpandedDocument(null);
-  };
+  // Handle document view (for new modal)
+  const handleViewDocument = (key: string) => {
+    if (!reviewingStudent) return;
 
-  // Handle document reject
-  const handleRejectDocument = (docType: keyof DocumentReviewState) => {
-    setDocumentReview((prev) => ({
-      ...prev,
-      [docType]: "rejected",
-    }));
-    setExpandedDocument(docType);
-  };
-
-  // Handle rejection reason submission
-  const handleSubmitRejection = (docType: keyof DocumentRejectionReasons) => {
-    if (!rejectionReasons[docType].trim()) {
-      alert("Please provide a reason for rejection");
-      return;
-    }
-    setExpandedDocument(null);
-  };
-
-  // View document
-  const handleViewDocument = (docType: string, student: Student) => {
-    const docs = student.formData?.enrollment_documents as any[] | undefined;
-    const doc = docs?.find((d: any) => d.document_type === docType);
-    const fileUrl = doc?.file_url || doc?.file_path || null;
+    const docs = reviewingStudent.enrollment_documents || [];
+    const doc = docs.find((d: any) => d.document_type === key);
 
     if (doc) {
-      setViewingDocument({
-        type: docType,
-        url: doc.file_name || docType,
-        fileUrl,
+      setSelectedDocument({
+        key,
+        name: documentNames[key] || key,
+        data: {
+          id: doc.id,
+          status: doc.status || "pending",
+          uploadDate: doc.uploaded_at ? new Date(doc.uploaded_at).toLocaleDateString() : "—",
+          fileName: (doc.file_path || doc.file_url || "").split("/").pop() || "document",
+          fileUrl: doc.file_path || doc.file_url || null,
+          rejectionComment: doc.rejection_comment || doc.rejection_reason || "",
+        },
       });
-    } else {
-      alert("Document not available");
+    }
+  };
+
+  // Handle document approve (for new modal)
+  const handleApproveDocument = async () => {
+    if (!selectedDocument || !reviewingStudent) return;
+
+    try {
+      await updateDocumentStatus(selectedDocument.key, "approved", reviewingStudent.id, actorReference);
+      await createAuditLog(
+        'DOCUMENT_APPROVED',
+        `Approved ${selectedDocument.name} for student ${reviewingStudent.name || reviewingStudent.studentName}`,
+        actorReference,
+        reviewingStudent.id
+      );
+
+      // Update local state
+      setReviewingStudent((prev: any) => ({
+        ...prev,
+        enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+          doc.document_type === selectedDocument.key
+            ? { ...doc, status: "approved" }
+            : doc
+        ),
+      }));
+
+      setSelectedDocument(null);
+      setDocumentRejectionComment("");
+    } catch (error) {
+      console.error("Error approving document:", error);
+      alert("Failed to approve document");
+    }
+  };
+
+  // Handle document reject (for new modal)
+  const handleRejectDocument = async () => {
+    if (!selectedDocument || !reviewingStudent || !documentRejectionComment.trim()) {
+      alert("Please provide a rejection reason");
+      return;
+    }
+
+    try {
+      await updateDocumentStatus(selectedDocument.key, "rejected", reviewingStudent.id, actorReference, documentRejectionComment);
+      await createAuditLog(
+        'DOCUMENT_REJECTED',
+        `Rejected ${selectedDocument.name} for student ${reviewingStudent.name || reviewingStudent.studentName}: ${documentRejectionComment}`,
+        actorReference,
+        reviewingStudent.id
+      );
+
+      // Update local state
+      setReviewingStudent((prev: any) => ({
+        ...prev,
+        enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+          doc.document_type === selectedDocument.key
+            ? { ...doc, status: "rejected", rejection_comment: documentRejectionComment }
+            : doc
+        ),
+      }));
+
+      setSelectedDocument(null);
+      setDocumentRejectionComment("");
+    } catch (error) {
+      console.error("Error rejecting document:", error);
+      alert("Failed to reject document");
     }
   };
 
@@ -770,23 +838,25 @@ export function AdminDashboard() {
 
       {/* Review Modal */}
       <ReviewApplicationModal
-        isOpen={!!selectedStudent}
-        onClose={() => setSelectedStudent(null)}
-        student={selectedStudent}
-        documentReview={documentReview}
-        setDocumentReview={setDocumentReview}
-        rejectionReasons={rejectionReasons}
-        setRejectionReasons={setRejectionReasons}
-        expandedDocument={expandedDocument}
-        setExpandedDocument={setExpandedDocument}
+        isOpen={!!reviewingStudent}
+        onClose={() => {
+          setReviewingStudent(null);
+          setSelectedDocument(null);
+        }}
+        reviewingStudent={reviewingStudent}
+        selectedDocument={selectedDocument}
+        documentRejectionComment={documentRejectionComment}
+        setDocumentRejectionComment={setDocumentRejectionComment}
+        handleViewDocument={handleViewDocument}
+        handleApproveDocument={handleApproveDocument}
+        handleRejectDocument={handleRejectDocument}
+        handleBackToDocuments={() => {
+          setSelectedDocument(null);
+          setDocumentRejectionComment("");
+        }}
+        documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}
-        handleAcceptDocument={handleAcceptDocument}
-        handleRejectDocument={handleRejectDocument}
-        handleSubmitRejection={handleSubmitRejection}
-        handleSubmitFinalReview={handleSubmitFinalReview}
-        handleViewDocument={handleViewDocument}
-        allDocumentsReviewed={allDocumentsReviewed}
       />
 
       {/* Document View Modal */}

@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import ReviewApplicationModalPending from "../../components/ReviewApplicationModalPending";
+import ReviewApplicationModal from "../../components/ReviewApplicationModal";
 import {
   getPendingApplications,
   approveEnrollment,
@@ -60,6 +60,7 @@ export function PendingApplications() {
   const [reviewingStudent, setReviewingStudent] = useState<any>(null);
   const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
   const [documentRejectionComment, setDocumentRejectionComment] = useState("");
+  const [showFormData, setShowFormData] = useState(false);
   const actorReference = userData?.id || userData?.email || 'registrar';
 
   useEffect(() => {
@@ -741,7 +742,7 @@ export function PendingApplications() {
       )}
 
       {/* Document Review Modal */}
-      <ReviewApplicationModalPending
+      <ReviewApplicationModal
         isOpen={showDocumentModal}
         onClose={() => {
           setShowDocumentModal(false);
@@ -759,6 +760,8 @@ export function PendingApplications() {
           setDocumentRejectionComment("");
         }}
         documentNames={documentNames}
+        showFormData={showFormData}
+        setShowFormData={setShowFormData}
       />
     </div>
   );
