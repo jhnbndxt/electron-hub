@@ -104,15 +104,13 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   const formData = getFormData();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50"
         onClick={onClose}
       />
 
-      {/* Modal */}
-      <div className="relative w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">
+      <div className="relative flex w-full max-w-[min(1100px,92vw)] max-h-[90vh] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-5">
           <div className="min-w-0">
@@ -130,7 +128,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="max-h-[calc(90vh-120px)] overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="px-6 py-5">
             {/* Stats Cards */}
             <div className="mb-6 grid gap-4 sm:grid-cols-3">
@@ -390,23 +388,22 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
             )}
           </div>
         </div>
-      </div>
-
-      <div className="border-t border-gray-200 bg-white px-6 py-4">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className={`text-sm font-medium ${allDocumentsApproved ? 'text-green-700' : 'text-gray-500'}`}>
-            {allDocumentsApproved
-              ? 'All documents approved. Ready for final approval.'
-              : 'Approve all documents first to continue.'}
-          </p>
-          <button
-            type="button"
-            onClick={handleFinalApprove}
-            disabled={!allDocumentsApproved}
-            className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
-          >
-            Approve Application
-          </button>
+        <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className={`text-sm font-medium ${allDocumentsApproved ? 'text-green-700' : 'text-gray-500'}`}>
+              {allDocumentsApproved
+                ? 'All documents approved. Ready for final approval.'
+                : 'Approve all documents first to continue.'}
+            </p>
+            <button
+              type="button"
+              onClick={handleFinalApprove}
+              disabled={!allDocumentsApproved}
+              className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
+            >
+              Approve Application
+            </button>
+          </div>
         </div>
       </div>
     </div>
