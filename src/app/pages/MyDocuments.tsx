@@ -42,6 +42,35 @@ export function MyDocuments() {
     }
   }, [userData]);
 
+  useEffect(() => {
+    if (!enrollmentId) return;
+
+    const channel = supabase
+      .channel(`documents-${enrollmentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "enrollment_documents",
+          filter: `enrollment_id=eq.${enrollmentId}`,
+        },
+        () => {
+          void loadDocuments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [enrollmentId]);
+
+  const resolvePublicUrl = (filePath: string | null | undefined) => {
+    if (!filePath) return undefined;
+    return supabase.storage.from("enrollment_documents").getPublicUrl(filePath).data?.publicUrl || undefined;
+  };
+
   const loadDocuments = async () => {
     if (!userData?.email) return;
 
@@ -104,7 +133,8 @@ export function MyDocuments() {
         fileSize: uploaded.file_size
           ? `${(uploaded.file_size / 1024 / 1024).toFixed(2)} MB`
           : undefined,
-        fileUrl: uploaded.file_url || uploaded.file_path || undefined,
+        fileUrl:
+          uploaded.file_url || resolvePublicUrl(uploaded.file_path) || undefined,
         rejectionComment: uploaded.rejection_comment || undefined,
       };
     });
