@@ -167,7 +167,7 @@ export function CashierDashboard() {
     if (!selectedPayment) return;
 
     // Update payment status in Supabase
-    const { error } = await updatePaymentStatus(selectedPayment.id, 'completed', actorReference);
+    const { error } = await updatePaymentStatus(selectedPayment.id, 'approved', actorReference);
 
     if (error) {
       alert(`Error approving payment: ${error}`);
