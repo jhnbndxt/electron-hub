@@ -7,7 +7,6 @@ export function CashierLayout() {
   const navItems: PortalNavItem[] = [
     { path: "/cashier", label: "Payment Queue", icon: LayoutDashboard, exact: true },
     { path: "/cashier/history", label: "Payment History", icon: History },
-    { path: "/cashier/lookup", label: "Student Lookup", icon: Search },
   ];
 
   return (

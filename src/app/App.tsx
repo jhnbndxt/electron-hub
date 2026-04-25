@@ -44,7 +44,6 @@ import { SuperAdminDashboard } from "./pages/admin/SuperAdminDashboard";
 import { SuperAdminAuditLogs } from "./pages/admin/SuperAdminAuditLogs";
 import { CashierDashboard } from "./pages/admin/CashierDashboard";
 import { CashierPaymentHistory } from "./pages/admin/CashierPaymentHistory";
-import { StudentPaymentLookup } from "./pages/admin/StudentPaymentLookup";
 import { AssessmentManagement } from "./pages/admin/AssessmentManagement";
 import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -182,7 +181,6 @@ export default function App() {
           children: [
             { index: true, Component: CashierDashboard },
             { path: "history", Component: CashierPaymentHistory },
-            { path: "lookup", Component: StudentPaymentLookup },
           ],
         },
         // Legacy admin/superadmin redirects
