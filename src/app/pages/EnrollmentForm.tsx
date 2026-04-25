@@ -230,6 +230,7 @@ export function EnrollmentForm() {
         const { data: enrollmentData } = await getUserEnrollment(userEmail);
         if (enrollmentData) {
           setIsSubmittedEnrollment(true);
+          setCurrentPage(7);
           // Map database columns to form fields
           setFormData(prev => ({
             ...prev,
@@ -857,7 +858,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -951,7 +952,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -983,7 +984,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -1088,7 +1089,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -1196,7 +1197,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -1230,7 +1231,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -1266,7 +1267,7 @@ export function EnrollmentForm() {
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
-      className="space-y-6"
+      className="space-y-6 bg-white/95 border border-slate-200 shadow-sm rounded-3xl p-6"
     >
       <div className="flex items-center gap-3 mb-6">
         <div className="w-10 h-10 rounded-full bg-blue-900 flex items-center justify-center">
@@ -1418,37 +1419,41 @@ export function EnrollmentForm() {
         </div>
       </div>
 
-      <div className="portal-glass-panel-strong rounded-xl border p-4" style={{ borderColor: "var(--electron-blue)" }}>
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={certificationChecked}
-            onChange={(e) => setCertificationChecked(e.target.checked)}
-            className="w-5 h-5 text-blue-600 mt-0.5 cursor-pointer"
-          />
-          <span className="text-sm text-gray-700">
-            <strong>I hereby certify</strong> that all information and uploaded documents are true and correct. I understand that providing false information may result in disqualification.
-          </span>
-        </label>
-      </div>
+      {!isSubmittedEnrollment && (
+        <>
+          <div className="portal-glass-panel-strong rounded-xl border p-4" style={{ borderColor: "var(--electron-blue)" }}>
+            <label className="flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={certificationChecked}
+                onChange={(e) => setCertificationChecked(e.target.checked)}
+                className="w-5 h-5 text-blue-600 mt-0.5 cursor-pointer"
+              />
+              <span className="text-sm text-gray-700">
+                <strong>I hereby certify</strong> that all information and uploaded documents are true and correct. I understand that providing false information may result in disqualification.
+              </span>
+            </label>
+          </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-        <button
-          onClick={handlePrevious}
-          className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Previous
-        </button>
-        <button
-          onClick={handleSubmit}
-          className="w-full sm:w-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
-          style={{ backgroundColor: "var(--electron-blue)" }}
-        >
-          <CheckCircle2 className="w-5 h-5" />
-          Submit Enrollment Form
-        </button>
-      </div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button
+              onClick={handlePrevious}
+              className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Previous
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="w-full sm:w-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+              style={{ backgroundColor: "var(--electron-blue)" }}
+            >
+              <CheckCircle2 className="w-5 h-5" />
+              Submit Enrollment Form
+            </button>
+          </div>
+        </>
+      )}
     </motion.div>
   );
 
@@ -1467,11 +1472,27 @@ export function EnrollmentForm() {
           </p>
         </div>
 
-        {/* Page Indicator */}
-        {renderPageIndicator()}
+        {isSubmittedEnrollment && (
+          <div className="mb-6 rounded-3xl border border-orange-200 bg-orange-50 p-6 text-sm text-orange-900 shadow-sm">
+            <div className="mb-4">
+              <p className="font-semibold">You have already submitted your enrollment form.</p>
+              <p className="mt-2 text-sm text-orange-900/90">
+                Submitted information can no longer be edited. Please contact the administrator for any changes.
+              </p>
+            </div>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="inline-flex items-center justify-center rounded-full bg-orange-600 px-5 py-3 text-white font-semibold hover:bg-orange-700 transition-colors"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        )}
+
+        {!isSubmittedEnrollment && renderPageIndicator()}
 
         {/* Form Content */}
-        <div className="backdrop-blur-xl bg-white/80 border border-white/50 rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 mb-6">
+        <div className="mb-6">
           {currentPage === 1 && renderPage1()}
           {currentPage === 2 && renderPage2()}
           {currentPage === 3 && renderPage3()}
@@ -1505,26 +1526,6 @@ export function EnrollmentForm() {
         )}
       </div>
 
-      {/* View-Only Message for Submitted Enrollment */}
-      {isSubmittedEnrollment && (
-        <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 flex items-start gap-3">
-          <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-green-900">
-              You already submitted this form
-            </p>
-            <p className="text-xs text-green-700 mt-1">
-              Your application is under review. All fields are now read-only.
-            </p>
-          </div>
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="text-xs font-semibold text-green-700 hover:text-green-900 whitespace-nowrap ml-2"
-          >
-            Go to Dashboard
-          </button>
-        </div>
-      )}
     </div>
   );
 }
