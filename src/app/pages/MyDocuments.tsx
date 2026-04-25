@@ -68,6 +68,9 @@ export function MyDocuments() {
 
   const resolvePublicUrl = (filePath: string | null | undefined) => {
     if (!filePath) return undefined;
+    if (filePath.startsWith("http://") || filePath.startsWith("https://")) {
+      return filePath;
+    }
     return supabase.storage.from("enrollment_documents").getPublicUrl(filePath).data?.publicUrl || undefined;
   };
 
