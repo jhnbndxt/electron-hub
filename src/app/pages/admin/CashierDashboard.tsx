@@ -288,10 +288,6 @@ export function CashierDashboard() {
     <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-          <DollarSign className="h-4 w-4" />
-          Payment Processing System
-        </div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Management</h1>
         <p className="text-gray-600">Review and approve student payment submissions</p>
       </div>
