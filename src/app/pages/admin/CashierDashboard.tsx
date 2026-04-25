@@ -285,70 +285,70 @@ export function CashierDashboard() {
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
 
   return (
-    <div className="flex flex-col gap-6 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen px-4 sm:px-6 lg:px-8 py-6">
+    <div className="p-4 sm:p-6 lg:p-8">
       {/* Header */}
-      <div className="mb-2">
+      <div className="mb-8">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
           <DollarSign className="h-4 w-4" />
           Payment Processing System
         </div>
-        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Payment Management</h1>
-        <p className="text-gray-600 text-lg">Review and approve student payment submissions</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Management</h1>
+        <p className="text-gray-600">Review and approve student payment submissions</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Online Pending</p>
-              <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>{onlinePending}</p>
+              <p className="text-3xl font-bold text-gray-900">{onlinePending}</p>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-orange-100/80 flex items-center justify-center backdrop-blur-sm">
-              <Clock className="w-7 h-7 text-orange-600" />
+            <div className="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-orange-600" />
             </div>
           </div>
         </div>
 
-        <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Online Approved</p>
-              <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>{onlineApproved}</p>
+              <p className="text-3xl font-bold text-gray-900">{onlineApproved}</p>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-green-100/80 flex items-center justify-center backdrop-blur-sm">
-              <CheckCircle2 className="w-7 h-7 text-green-600" />
+            <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-green-600" />
             </div>
           </div>
         </div>
 
-        <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Cash Queue Pending</p>
-              <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>{cashPending}</p>
+              <p className="text-3xl font-bold text-gray-900">{cashPending}</p>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-blue-100/80 flex items-center justify-center backdrop-blur-sm">
-              <Banknote className="w-7 h-7" style={{ color: "var(--electron-blue)" }} />
+            <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Banknote className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
             </div>
           </div>
         </div>
 
-        <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
+        <div className="bg-white rounded-lg p-6 border border-gray-200">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600 mb-1">Cash Confirmed</p>
-              <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>{cashPaid}</p>
+              <p className="text-3xl font-bold text-gray-900">{cashPaid}</p>
             </div>
-            <div className="w-14 h-14 rounded-xl bg-purple-100/80 flex items-center justify-center backdrop-blur-sm">
-              <DollarSign className="w-7 h-7 text-purple-600" />
+            <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
+              <DollarSign className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-2xl shadow-md overflow-hidden flex flex-col flex-1">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
         <div className="flex border-b border-gray-200">
           <button
             onClick={() => setActiveTab("online")}
@@ -357,7 +357,7 @@ export function CashierDashboard() {
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
             }`}
-            style={activeTab === "online" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(248, 250, 252, 0.5)" }}
+            style={activeTab === "online" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "transparent" }}
           >
             <div className="flex items-center justify-center gap-2">
               <CreditCard className="w-5 h-5" />
@@ -371,7 +371,7 @@ export function CashierDashboard() {
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
             }`}
-            style={activeTab === "cash" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(248, 250, 252, 0.5)" }}
+            style={activeTab === "cash" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "transparent" }}
           >
             <div className="flex items-center justify-center gap-2">
               <Banknote className="w-5 h-5" />
@@ -381,23 +381,22 @@ export function CashierDashboard() {
         </div>
 
         {/* Search Bar */}
-        <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
+        <div className="px-4 py-4 border-b border-gray-200 bg-gray-50">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: "var(--electron-blue)" }} />
+            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               placeholder="Search by name, reference, queue number, or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-4 py-3 border border-gray-200 rounded-lg w-full focus:outline-none focus:ring-2 bg-white transition-all"
-              style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
         </div>
 
         {/* Online Payments Tab */}
         {activeTab === "online" && (
-          <div className="overflow-x-auto flex-1">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -501,7 +500,7 @@ export function CashierDashboard() {
 
         {/* Cash Payments Tab */}
         {activeTab === "cash" && (
-          <div className="overflow-x-auto flex-1">
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
