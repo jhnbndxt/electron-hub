@@ -208,6 +208,16 @@ export function PendingApplications() {
       return;
     }
 
+    // Update local state immediately
+    setReviewingStudent((prev: any) => ({
+      ...prev,
+      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+        doc.document_type === selectedDocument.key
+          ? { ...doc, status: "approved" }
+          : doc
+      ),
+    }));
+
     alert("✅ Document approved successfully!");
     setSelectedDocument(null);
     setDocumentRejectionComment("");
@@ -243,6 +253,16 @@ export function PendingApplications() {
       alert(`Error rejecting document: ${error}`);
       return;
     }
+
+    // Update local state immediately
+    setReviewingStudent((prev: any) => ({
+      ...prev,
+      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+        doc.document_type === selectedDocument.key
+          ? { ...doc, status: "rejected", rejection_comment: documentRejectionComment.trim() }
+          : doc
+      ),
+    }));
 
     // Create notification
     try {
