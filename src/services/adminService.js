@@ -908,21 +908,33 @@ export const updatePaymentStatus = async (paymentId, status, verifiedBy) => {
 // Get analytics dashboard data
 export const getDashboardAnalytics = async () => {
   try {
-    const [enrollmentsRes, paymentsRes, auditRes] = await Promise.all([
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const isoToday = todayStart.toISOString();
+
+    const [enrollmentsRes, paymentsRes, usersRes, approvedTodayRes] = await Promise.all([
       supabase.from('enrollments').select('id, status'),
       supabase.from('payments').select('id, status'),
-      supabase.from('audit_logs').select('id, action', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .limit(50),
+      supabase.from('users').select('id, role').neq('role', 'student'),
+      supabase
+        .from('payments')
+        .select('id, status')
+        .in('status', Array.from(FINALIZED_PAYMENT_STATUSES))
+        .gte('updated_at', isoToday),
     ]);
 
     const stats = {
       totalEnrollments: enrollmentsRes.data?.length || 0,
-      pendingEnrollments: enrollmentsRes.data?.filter(e => e.status === 'pending_documents' || e.status === 'pending_review').length || 0,
-      enrolledStudents: enrollmentsRes.data?.filter(e => e.status === 'enrolled').length || 0,
-      pendingPayments: paymentsRes.data?.filter(p => p.status === 'pending').length || 0,
-      totalVerifiedPayments: paymentsRes.data?.filter(p => p.status === 'completed').length || 0,
-      recentActivities: auditRes.data?.length || 0,
+      pendingEnrollments:
+        enrollmentsRes.data?.filter(
+          (e) => e.status === 'pending_documents' || e.status === 'pending_review'
+        ).length || 0,
+      enrolledStudents: enrollmentsRes.data?.filter((e) => e.status === 'enrolled').length || 0,
+      paymentsPending: paymentsRes.data?.filter((p) => p.status === 'pending').length || 0,
+      totalVerifiedPayments: paymentsRes.data?.filter((p) => FINALIZED_PAYMENT_STATUSES.has(p.status)).length || 0,
+      approvedToday: approvedTodayRes.data?.length || 0,
+      activeUsersAdmins: usersRes.data?.length || 0,
+      recentActivities: 0,
     };
 
     return { error: null, data: stats };
