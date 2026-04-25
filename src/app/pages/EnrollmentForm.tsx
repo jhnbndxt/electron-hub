@@ -1435,14 +1435,15 @@ export function EnrollmentForm() {
       <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
         <button
           onClick={handlePrevious}
-          className="w-full sm:w-auto px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+          className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
         >
           <ArrowLeft className="w-5 h-5" />
           Previous
         </button>
         <button
           onClick={handleSubmit}
-          className="w-full sm:w-auto px-6 py-3 bg-blue-900 text-white font-bold rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
+          className="w-full sm:w-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+          style={{ backgroundColor: "var(--electron-blue)" }}
         >
           <CheckCircle2 className="w-5 h-5" />
           Submit Enrollment Form
@@ -1452,14 +1453,16 @@ export function EnrollmentForm() {
   );
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       <div className="w-full max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
-            Enrollment Form
-          </h1>
-          <p className="text-gray-600">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+            <FileText className="h-4 w-4" />
+            Student Enrollment System
+          </div>
+          <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Enrollment Form</h1>
+          <p className="text-gray-600 text-lg">
             Please complete all required fields to proceed with your enrollment
           </p>
         </div>
@@ -1468,7 +1471,7 @@ export function EnrollmentForm() {
         {renderPageIndicator()}
 
         {/* Form Content */}
-        <div className="bg-white rounded-xl shadow-lg p-4 sm:p-6 md:p-8 mb-6">
+        <div className="backdrop-blur-xl bg-white/80 border border-white/50 rounded-2xl shadow-lg p-4 sm:p-6 md:p-8 mb-6">
           {currentPage === 1 && renderPage1()}
           {currentPage === 2 && renderPage2()}
           {currentPage === 3 && renderPage3()}
@@ -1484,7 +1487,7 @@ export function EnrollmentForm() {
             {currentPage > 1 && (
               <button
                 onClick={handlePrevious}
-                className="w-full sm:w-auto px-6 py-3 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
+                className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
               >
                 <ArrowLeft className="w-5 h-5" />
                 Previous
@@ -1492,7 +1495,8 @@ export function EnrollmentForm() {
             )}
             <button
               onClick={handleNext}
-              className="w-full sm:w-auto sm:ml-auto px-6 py-3 bg-blue-900 text-white font-semibold rounded-lg hover:bg-blue-800 transition-colors flex items-center justify-center gap-2"
+              className="w-full sm:w-auto sm:ml-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+              style={{ backgroundColor: "var(--electron-blue)" }}
             >
               Next
               <ArrowRight className="w-5 h-5" />

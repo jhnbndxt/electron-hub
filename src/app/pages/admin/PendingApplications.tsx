@@ -411,28 +411,29 @@ export function PendingApplications() {
   };
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
-          Pending Applications
-        </h1>
-        <p className="text-gray-600">
-          Review and process student applications requiring action
-        </p>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+          <FileCheck className="h-4 w-4" />
+          Application Review System
+        </div>
+        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Pending Applications</h1>
+        <p className="text-gray-600 text-lg">Review and process student applications requiring action</p>
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
+      <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg p-5 mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
           <div className="relative w-full md:flex-1 md:min-w-[240px]">
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--electron-blue)" }} />
             <input
               type="text"
               placeholder="Search students..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
             />
           </div>
 
@@ -441,8 +442,8 @@ export function PendingApplications() {
             <select
               value={strandFilter}
               onChange={(e) => setStrandFilter(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              style={{ color: "#374151" }}
+              className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
             >
               <option value="all">All Strands</option>
               <option value="STEM">STEM</option>
@@ -678,27 +679,21 @@ export function PendingApplications() {
           }}
         >
           <div
-            className="bg-white w-full max-w-sm"
-            style={{
-              borderRadius: "12px",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-            }}
+            className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden"
           >
-            <div className="p-8 text-center">
+            <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 text-center">
               <h3 className="text-2xl font-bold text-gray-900">
                 Application Approved
               </h3>
-              <p className="text-gray-600 mt-4">
+              <p className="text-gray-600 mt-2 text-sm">
                 The student has been notified and added to enrolled students.
               </p>
             </div>
             <div className="p-6 pt-0">
               <button
                 onClick={confirmApprove}
-                className="w-full py-4 rounded-xl text-white font-semibold transition-all"
-                style={{ backgroundColor: "#1E3A8A" }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#1E40AF"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#1E3A8A"}
+                className="w-full py-3 rounded-lg text-white font-bold transition-all hover:opacity-90"
+                style={{ backgroundColor: "#10B981" }}
               >
                 OK
               </button>
@@ -717,35 +712,33 @@ export function PendingApplications() {
           }}
         >
           <div
-            className="bg-white w-full max-w-md"
-            style={{
-              borderRadius: "12px",
-              boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)",
-            }}
+            className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
           >
-            <div className="p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                Application Rejected
+            <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100">
+              <h3 className="text-2xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
+                Reject Application
               </h3>
-              <p className="text-gray-600 mb-4">
-                Please provide a reason.
+              <p className="text-gray-600">
+                Please provide a reason for rejection.
               </p>
+            </div>
+            <div className="p-6 pt-4">
               <textarea
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Enter rejection reason..."
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent resize-none"
+                style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
                 rows={4}
-                style={{ color: "#374151" }}
               />
             </div>
-            <div className="p-6 pt-0 flex gap-3">
+            <div className="p-6 pt-2 flex gap-3 border-t border-gray-200">
               <button
                 onClick={() => {
                   setShowRejectModal(false);
                   setRejectionReason("");
                 }}
-                className="flex-1 py-4 rounded-xl font-semibold transition-all"
+                className="flex-1 py-3 rounded-lg font-bold transition-all"
                 style={{
                   backgroundColor: "#E5E7EB",
                   color: "#374151",
@@ -758,10 +751,8 @@ export function PendingApplications() {
               <button
                 onClick={confirmReject}
                 disabled={!rejectionReason.trim()}
-                className="flex-1 py-4 rounded-xl text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: "#B91C1C" }}
-                onMouseEnter={(e) => !rejectionReason.trim() ? null : e.currentTarget.style.backgroundColor = "#DC2626"}
-                onMouseLeave={(e) => !rejectionReason.trim() ? null : e.currentTarget.style.backgroundColor = "#B91C1C"}
+                className="flex-1 py-3 rounded-lg text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+                style={{ backgroundColor: "var(--electron-red)" }}
               >
                 Confirm Reject
               </button>
@@ -778,20 +769,20 @@ export function PendingApplications() {
             <div className="w-screen max-w-3xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex h-full flex-col bg-white shadow-xl">
                 {/* Header */}
-                <div className="px-6 py-6 bg-blue-600">
+                <div className="px-6 py-6" style={{ background: "linear-gradient(135deg, var(--electron-blue) 0%, #1e40af 100%)" }}>
                   <div className="flex items-center justify-between">
                     <div>
-                      <h2 className="text-xl font-semibold text-white">
+                      <h2 className="text-2xl font-bold text-white">
                         Document Verification
                       </h2>
-                      <p className="text-sm text-blue-100 mt-1">{reviewingStudent.studentName}</p>
+                      <p className="text-blue-100 mt-1 text-sm">{reviewingStudent.studentName}</p>
                     </div>
                     <button
                       onClick={() => {
                         setShowDocumentModal(false);
                         setSelectedDocument(null);
                       }}
-                      className="text-white hover:text-blue-100"
+                      className="text-white hover:text-blue-100 hover:bg-white/20 p-2 rounded-lg transition-colors"
                     >
                       <XCircle className="w-6 h-6" />
                     </button>

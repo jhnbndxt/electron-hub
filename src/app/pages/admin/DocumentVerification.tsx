@@ -292,11 +292,15 @@ export function DocumentVerification() {
   };
 
   return (
-    <div className="p-8">
+    <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Document Verification</h1>
-        <p className="text-gray-600">Review and approve student document submissions from Supabase</p>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+          <FileText className="h-4 w-4" />
+          Document Verification System
+        </div>
+        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Document Verification</h1>
+        <p className="text-gray-600 text-lg">Review and approve student document submissions. Verify all required documents before proceeding.</p>
       </div>
 
       {isLoading && (
@@ -312,59 +316,60 @@ export function DocumentVerification() {
         <>
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
+            <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Pending Documents</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Pending Documents</p>
+                  <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>
                     {students.reduce((sum, student) => {
                       return sum + Object.values(student.documents).filter((doc: any) => doc.status === "pending").length;
                     }, 0)}
                   </p>
                 </div>
-                <div className="w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
-                  <AlertCircle className="w-6 h-6 text-yellow-600" />
+                <div className="w-14 h-14 rounded-xl bg-yellow-100/80 flex items-center justify-center backdrop-blur-sm">
+                  <AlertCircle className="w-7 h-7" style={{ color: "var(--electron-red)" }} />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
+            <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Students with Documents</p>
-                  <p className="text-3xl font-bold text-gray-900">{students.length}</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Students to Review</p>
+                  <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>{students.length}</p>
                 </div>
-                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <User className="w-6 h-6 text-blue-600" />
+                <div className="w-14 h-14 rounded-xl bg-blue-100/80 flex items-center justify-center backdrop-blur-sm">
+                  <User className="w-7 h-7" style={{ color: "var(--electron-blue)" }} />
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-6 border border-gray-200">
+            <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-6 shadow-lg hover:shadow-xl transition-all hover:bg-white/50">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Documents</p>
-                  <p className="text-3xl font-bold text-gray-900">
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total Documents</p>
+                  <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>
                     {students.reduce((sum, s) => sum + Object.keys(s.documents).length, 0)}
                   </p>
                 </div>
-                <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-purple-600" />
+                <div className="w-14 h-14 rounded-xl bg-purple-100/80 flex items-center justify-center backdrop-blur-sm">
+                  <FileText className="w-7 h-7 text-purple-600" />
                 </div>
               </div>
             </div>
           </div>
 
           {/* Search Bar */}
-          <div className="bg-white rounded-lg border border-gray-200 mb-6 p-4">
+          <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl mb-6 p-4 shadow-lg">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5" style={{ color: "var(--electron-blue)" }} />
               <input
                 type="text"
                 placeholder="Search by student name or email..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="pl-10 pr-4 py-3 border-0 rounded-lg w-full focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+                style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
               />
             </div>
           </div>
@@ -372,26 +377,25 @@ export function DocumentVerification() {
           {/* Students List */}
           <div className="space-y-4">
             {filteredStudents.length === 0 && students.length > 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+              <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-12 text-center shadow-lg">
                 <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">No students match your search</p>
+                <p className="text-gray-600 font-medium">No students match your search</p>
               </div>
             ) : filteredStudents.length === 0 ? (
-              <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+              <div className="backdrop-blur-xl bg-white/40 border border-white/50 rounded-xl p-12 text-center shadow-lg">
                 <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500 mb-2">No student documents found</p>
-                <p className="text-sm text-gray-400">Students will appear here once they upload their enrollment documents</p>
+                <p className="text-gray-600 font-medium mb-2">No student documents found</p>
+                <p className="text-sm text-gray-500">Students will appear here once they upload their enrollment documents</p>
               </div>
             ) : (
               filteredStudents.map((student) => {
                 const counts = getDocumentCounts(student.documents);
                 return (
-                  <div key={student.email} className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                  <div key={student.email} className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl overflow-hidden shadow-lg hover:shadow-xl hover:bg-white/80 transition-all">
                     {/* Student Header */}
                     <div 
-                      className="bg-gray-50 px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="px-6 py-5 border-b border-white/30 cursor-pointer hover:bg-white/30 transition-colors"
                       onClick={() => {
-                        // Open first document when clicking student row
                         const firstDocKey = Object.keys(student.documents)[0];
                         if (firstDocKey) {
                           handleViewDocument(student, firstDocKey);
@@ -399,29 +403,29 @@ export function DocumentVerification() {
                       }}
                     >
                       <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
-                        <User className="w-5 h-5 text-blue-600" />
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-md">
+                        <User className="w-6 h-6 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-gray-900">{student.studentName}</h3>
+                        <h3 className="font-bold text-gray-900 text-lg">{student.studentName}</h3>
                         <p className="text-sm text-gray-500">{student.email}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-yellow-400"></span>
-                        <span className="text-gray-600">{counts.pending} Pending</span>
+                    <div className="flex items-center gap-6 text-sm">
+                      <div className="flex items-center gap-2 px-3 py-1 bg-yellow-100/60 rounded-full backdrop-blur-sm">
+                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                        <span className="font-medium text-yellow-700">{counts.pending} Pending</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                        <span className="text-gray-600">{counts.approved} Approved</span>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-green-100/60 rounded-full backdrop-blur-sm">
+                        <span className="w-2 h-2 rounded-full bg-green-600"></span>
+                        <span className="font-medium text-green-700">{counts.approved} Approved</span>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                        <span className="text-gray-600">{counts.rejected} Rejected</span>
+                      <div className="flex items-center gap-2 px-3 py-1 bg-red-100/60 rounded-full backdrop-blur-sm">
+                        <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                        <span className="font-medium text-red-700">{counts.rejected} Rejected</span>
                       </div>
-                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
+                      <span className="text-xs font-bold px-3 py-1.5 rounded-full" style={{ backgroundColor: "var(--electron-blue)", color: "white" }}>
                         Click to Review
                       </span>
                     </div>
@@ -435,18 +439,18 @@ export function DocumentVerification() {
                       <div
                         key={key}
                         onClick={() => handleViewDocument(student, key)}
-                        className={`border-2 rounded-lg p-4 transition-all cursor-pointer hover:shadow-md ${
+                        className={`border-2 rounded-xl p-5 transition-all cursor-pointer hover:shadow-lg backdrop-blur-sm ${
                           doc.status === "approved"
-                            ? "border-green-200 bg-green-50 hover:border-green-300"
+                            ? "border-green-300/60 bg-green-50/40 hover:border-green-400 hover:bg-green-100/50"
                             : doc.status === "rejected"
-                            ? "border-red-200 bg-red-50 hover:border-red-300"
-                            : "border-yellow-200 bg-yellow-50 hover:border-yellow-300"
+                            ? "border-red-300/60 bg-red-50/40 hover:border-red-400 hover:bg-red-100/50"
+                            : "border-yellow-300/60 bg-yellow-50/40 hover:border-yellow-400 hover:bg-yellow-100/50"
                         }`}
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-2">
-                            <FileText className="w-5 h-5 text-gray-600" />
-                            <h4 className="font-medium text-sm text-gray-900">
+                            <FileText className="w-5 h-5" style={{ color: doc.status === "approved" ? "#16a34a" : doc.status === "rejected" ? "#dc2626" : "#ca8a04" }} />
+                            <h4 className="font-bold text-sm text-gray-900">
                               {documentNames[key] || key}
                             </h4>
                           </div>
@@ -460,20 +464,21 @@ export function DocumentVerification() {
                             <AlertCircle className="w-5 h-5 text-yellow-600" />
                           )}
                         </div>
-                        <p className="text-xs text-gray-500 mb-3">
-                          Uploaded: {doc.uploadDate}
+                        <p className="text-xs text-gray-500 mb-3 font-medium">
+                          📅 {doc.uploadDate}
                         </p>
                         {doc.rejectionComment && (
-                          <p className="text-xs text-red-600 mb-2 line-clamp-2">
+                          <p className="text-xs text-red-600 mb-2 line-clamp-2 italic bg-red-50/60 p-2 rounded">
                             "{doc.rejectionComment}"
                           </p>
                         )}
                         <div
-                          className={`w-full py-2 px-3 rounded-lg text-sm font-medium text-center transition-colors ${
+                          className={`w-full py-2.5 px-3 rounded-lg text-sm font-bold text-center transition-all ${
                             doc.status === "pending"
-                              ? "bg-blue-600 text-white"
+                              ? "text-white"
                               : "bg-gray-200 text-gray-700"
                           }`}
+                          style={doc.status === "pending" ? { backgroundColor: "var(--electron-blue)", color: "white" } : {}}
                         >
                           <Eye className="w-4 h-4 inline mr-1" />
                           {doc.status === "pending" ? "Review Document" : "View Document"}
@@ -494,21 +499,23 @@ export function DocumentVerification() {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="w-screen max-w-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex h-full flex-col bg-white shadow-xl">
+              <div className="flex h-full flex-col bg-white shadow-2xl">
                 {/* Header */}
-                <div className="px-6 py-6 bg-blue-600">
+                <div className="px-6 py-6" style={{ background: "linear-gradient(135deg, var(--electron-blue) 0%, #1e40af 100%)" }}>
                   <div className="flex items-center justify-between">
-                    <h2 className="text-xl font-semibold text-white">
-                      Document Review
-                    </h2>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white">
+                        Document Review
+                      </h2>
+                      <p className="text-blue-100 mt-1 text-sm">{selectedDocument.name}</p>
+                    </div>
                     <button
                       onClick={() => setShowReviewModal(false)}
-                      className="text-white hover:text-blue-100"
+                      className="text-white hover:text-blue-100 hover:bg-white/20 p-2 rounded-lg transition-colors"
                     >
                       <XCircle className="w-6 h-6" />
                     </button>
                   </div>
-                  <p className="text-sm text-blue-100 mt-2">{selectedDocument.name}</p>
                 </div>
 
                 {/* Content */}
@@ -637,12 +644,13 @@ export function DocumentVerification() {
 
                 {/* Footer Actions */}
                 {selectedDocument.data.status === "pending" && (
-                  <div className="border-t border-gray-200 p-6">
+                  <div className="border-t border-gray-200 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
                     <div className="flex gap-3">
                       <button
                         onClick={handleRejectDocument}
                         disabled={isSaving}
-                        className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="flex-1 py-3 px-4 text-white rounded-lg font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                        style={{ backgroundColor: "var(--electron-red)" }}
                       >
                         {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                         Reject Document
@@ -650,7 +658,7 @@ export function DocumentVerification() {
                       <button
                         onClick={handleApproveDocument}
                         disabled={isSaving}
-                        className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                       >
                         {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                         Approve Document
@@ -661,13 +669,14 @@ export function DocumentVerification() {
                 
                 {/* Footer Actions for Approved/Rejected Documents */}
                 {selectedDocument.data.status !== "pending" && (
-                  <div className="border-t border-gray-200 p-6">
+                  <div className="border-t border-gray-200 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
                     <div className="flex gap-3">
                       {selectedDocument.data.status === "approved" && (
                         <button
                           onClick={handleRejectDocument}
                           disabled={isSaving}
-                          className="flex-1 py-3 px-4 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 transition-colors disabled:bg-red-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          className="flex-1 py-3 px-4 text-white rounded-lg font-bold hover:opacity-90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+                          style={{ backgroundColor: "var(--electron-red)" }}
                         >
                           {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                           Change to Rejected
@@ -677,7 +686,7 @@ export function DocumentVerification() {
                         <button
                           onClick={handleApproveDocument}
                           disabled={isSaving}
-                          className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                          className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all disabled:bg-green-400 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
                         >
                           {isSaving && <Loader className="w-4 h-4 animate-spin" />}
                           Change to Approved
@@ -686,7 +695,7 @@ export function DocumentVerification() {
                       <button
                         onClick={() => setShowReviewModal(false)}
                         disabled={isSaving}
-                        className="flex-1 py-3 px-4 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition-colors disabled:bg-gray-100 disabled:cursor-not-allowed"
+                        className="flex-1 py-3 px-4 bg-gray-300 text-gray-800 rounded-lg font-bold hover:bg-gray-400 transition-all disabled:bg-gray-200 disabled:cursor-not-allowed"
                       >
                         Close
                       </button>
