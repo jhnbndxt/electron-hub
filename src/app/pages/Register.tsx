@@ -64,10 +64,9 @@ const getFieldError = (field: RegisterField, formData: RegisterFormData) => {
       const age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        return "You must be at least 13 years old.";
+        // Age is one year less if birthday hasn't occurred yet this year
       }
-      if (age < 13) return "You must be at least 13 years old.";
-      if (age > 120) return "Please enter a valid date of birth.";
+      if (age < 0 || age > 120) return "Please enter a valid date of birth.";
       return "";
     }
     case "lastName": {
