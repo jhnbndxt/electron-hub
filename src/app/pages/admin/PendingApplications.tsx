@@ -281,6 +281,35 @@ export function PendingApplications() {
     loadApplications();
   };
 
+  const handleFinalApproveApplication = async () => {
+    if (!reviewingStudent) return;
+
+    const { error } = await approveEnrollment(reviewingStudent.id, actorReference);
+    if (error) {
+      alert(`❌ Error approving application: ${error}`);
+      return;
+    }
+
+    const studentUserId = await resolveUserId(
+      reviewingStudent.email || reviewingStudent.enrollmentData?.user_id || ""
+    );
+
+    if (studentUserId) {
+      await upsertEnrollmentProgress(studentUserId, [
+        { step_name: 'Documents Submitted', status: 'completed' },
+        { step_name: 'Documents Verified', status: 'completed' },
+        { step_name: 'Payment Submitted', status: 'current' },
+      ]);
+    }
+
+    alert(`✅ Documents verified. Student can now proceed to payment.`);
+    setShowDocumentModal(false);
+    setSelectedDocument(null);
+    setReviewingStudent(null);
+    setShowFormData(false);
+    loadApplications();
+  };
+
   const getMissingDocuments = (student: Student): string[] => {
     const missing: string[] = [];
     if (!student.documents.psaBirthCertificate) missing.push("PSA Birth Certificate");
@@ -802,6 +831,7 @@ export function PendingApplications() {
           setSelectedDocument(null);
           setDocumentRejectionComment("");
         }}
+        handleFinalApprove={handleFinalApproveApplication}
         documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}

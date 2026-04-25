@@ -47,6 +47,7 @@ interface ReviewApplicationModalProps {
   handleApproveDocument: () => void;
   handleRejectDocument: () => void;
   handleBackToDocuments: () => void;
+  handleFinalApprove: () => void;
   documentNames: Record<string, string>;
   showFormData: boolean;
   setShowFormData: React.Dispatch<React.SetStateAction<boolean>>;
@@ -63,6 +64,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   handleApproveDocument,
   handleRejectDocument,
   handleBackToDocuments,
+  handleFinalApprove,
   documentNames,
   showFormData,
   setShowFormData,
@@ -90,6 +92,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
 
   const docKeys = Object.keys(docs);
   const approved = docKeys.filter((k) => docs[k].status === "approved").length;
+  const allDocumentsApproved = docKeys.length > 0 && docKeys.every((key) => docs[key].status === "approved");
 
   // Get form data for enrollment form display
   const getFormData = () => {
@@ -386,6 +389,24 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-200 bg-white px-6 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className={`text-sm font-medium ${allDocumentsApproved ? 'text-green-700' : 'text-gray-500'}`}>
+            {allDocumentsApproved
+              ? 'All documents approved. Ready for final approval.'
+              : 'Approve all documents first to continue.'}
+          </p>
+          <button
+            type="button"
+            onClick={handleFinalApprove}
+            disabled={!allDocumentsApproved}
+            className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
+          >
+            Approve Application
+          </button>
         </div>
       </div>
     </div>

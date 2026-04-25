@@ -854,6 +854,7 @@ export function AdminDashboard() {
           setSelectedDocument(null);
           setDocumentRejectionComment("");
         }}
+        handleFinalApprove={handleApprove}
         documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}
