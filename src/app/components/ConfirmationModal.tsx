@@ -56,9 +56,8 @@ export function ConfirmationModal({
       case "danger":
         return {
           badge: "Destructive action",
-          panel: "from-red-50 via-white to-red-100/70",
           iconWrap: "border-red-200 bg-red-100/90 text-red-700 shadow-red-100",
-          messageBox: "border-red-100 bg-red-50/80 text-red-900",
+          messageBox: "border-red-100 bg-red-50 text-red-900",
           titleColor: "text-slate-950",
           confirmClassName: "bg-red-700 text-white shadow-lg shadow-red-200 hover:bg-red-800 focus-visible:ring-red-300",
           cancelClassName: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -67,9 +66,8 @@ export function ConfirmationModal({
       case "warning":
         return {
           badge: "Please review",
-          panel: "from-amber-50 via-white to-orange-100/70",
           iconWrap: "border-amber-200 bg-amber-100/90 text-amber-700 shadow-amber-100",
-          messageBox: "border-amber-100 bg-amber-50/80 text-amber-950",
+          messageBox: "border-amber-100 bg-amber-50 text-amber-950",
           titleColor: "text-slate-950",
           confirmClassName: "bg-amber-500 text-slate-950 shadow-lg shadow-amber-200 hover:bg-amber-400 focus-visible:ring-amber-300",
           cancelClassName: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -78,9 +76,8 @@ export function ConfirmationModal({
       case "success":
         return {
           badge: "Ready to continue",
-          panel: "from-emerald-50 via-white to-emerald-100/70",
           iconWrap: "border-emerald-200 bg-emerald-100/90 text-emerald-700 shadow-emerald-100",
-          messageBox: "border-emerald-100 bg-emerald-50/80 text-emerald-950",
+          messageBox: "border-emerald-100 bg-emerald-50 text-emerald-950",
           titleColor: "text-slate-950",
           confirmClassName: "bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 focus-visible:ring-emerald-300",
           cancelClassName: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -89,9 +86,8 @@ export function ConfirmationModal({
       default:
         return {
           badge: "Confirmation required",
-          panel: "from-blue-50 via-white to-sky-100/70",
           iconWrap: "border-blue-200 bg-blue-100/90 text-blue-700 shadow-blue-100",
-          messageBox: "border-blue-100 bg-blue-50/80 text-blue-950",
+          messageBox: "border-blue-100 bg-blue-50 text-blue-950",
           titleColor: "text-slate-950",
           confirmClassName: "bg-blue-900 text-white shadow-lg shadow-blue-200 hover:bg-blue-800 focus-visible:ring-blue-300",
           cancelClassName: "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50",
@@ -143,48 +139,45 @@ export function ConfirmationModal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96, y: 18 }}
               transition={{ type: "spring", stiffness: 320, damping: 28 }}
-              className="pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[28px] border border-white/70 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.24)]"
+              className="pointer-events-auto relative w-full max-w-lg overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.18)]"
               role="dialog"
               aria-modal="true"
               aria-labelledby="confirmation-modal-title"
             >
-              <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${styles.panel}`} />
-
               <button
                 onClick={onClose}
                 disabled={isConfirming}
-                className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white/90 text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="absolute right-5 top-5 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-200/70 bg-white text-slate-400 transition-colors hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
                 aria-label="Close confirmation dialog"
               >
                 <X className="w-5 h-5" />
               </button>
 
-              <div className={`bg-gradient-to-br ${styles.panel} px-6 pb-6 pt-7 sm:px-8 sm:pb-7 sm:pt-8`}>
-                <div className="mb-5 inline-flex rounded-full border border-white/80 bg-white/75 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-600">
-                  {styles.badge}
-                </div>
+              <div className="px-6 pb-6 pt-6 sm:px-8 sm:pb-7 sm:pt-7">
+                <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-6 shadow-sm">
+                  <div className="flex items-start gap-4">
+                    <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl border ${styles.iconWrap}`}>
+                      {icon || styles.defaultIcon}
+                    </div>
 
-                <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                  <div
-                    className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border shadow-lg ${styles.iconWrap}`}
-                  >
-                    {icon || styles.defaultIcon}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <h3
-                      id="confirmation-modal-title"
-                      className={`pr-10 text-2xl font-semibold tracking-tight ${styles.titleColor}`}
-                    >
-                      {title}
-                    </h3>
-
-                    {message && (
-                      <div className={`mt-4 rounded-2xl border px-4 py-3.5 text-left text-sm leading-6 ${styles.messageBox}`}>
-                        {message}
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-600">
+                        {styles.badge}
                       </div>
-                    )}
+                      <h3
+                        id="confirmation-modal-title"
+                        className={`text-2xl font-semibold tracking-tight ${styles.titleColor}`}
+                      >
+                        {title}
+                      </h3>
+                    </div>
                   </div>
+
+                  {message && (
+                    <div className={`mt-5 rounded-3xl border px-5 py-4 text-left text-sm leading-6 ${styles.messageBox}`}>
+                      {message}
+                    </div>
+                  )}
                 </div>
               </div>
 
