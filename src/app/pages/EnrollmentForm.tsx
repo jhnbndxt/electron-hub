@@ -1459,7 +1459,7 @@ export function EnrollmentForm() {
   };
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full min-h-screen bg-transparent">
       <div className="w-full max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
