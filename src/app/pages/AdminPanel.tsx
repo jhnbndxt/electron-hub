@@ -7,6 +7,14 @@ import {
   BarChart3,
   GraduationCap,
   ArrowLeft,
+  CheckCircle,
+  Clock,
+  DollarSign,
+  ClipboardList,
+  Shield,
+  LogBook,
+  Sliders,
+  Activity,
 } from "lucide-react";
 import {
   BarChart,
@@ -20,89 +28,83 @@ import {
   PieChart,
   Pie,
   Cell,
+  LineChart,
+  Line,
 } from "recharts";
 
 export function AdminPanel() {
-  const stats = [
-    { label: "Total Applicants", value: "245", color: "var(--electron-blue)", icon: Users },
-    { label: "Pending Reviews", value: "32", color: "var(--electron-red)", icon: FileText },
-    { label: "Approved", value: "198", color: "#10B981", icon: TrendingUp },
-    { label: "Assessments Taken", value: "312", color: "var(--electron-blue)", icon: BarChart3 },
+  // Summary Cards Data
+  const summaryCards = [
+    { label: "Total Students", value: "1,245", icon: Users, color: "var(--electron-blue)" },
+    { label: "Pending Applications", value: "32", icon: Clock, color: "#F59E0B" },
+    { label: "Approved Today", value: "8", icon: CheckCircle, color: "#10B981" },
+    { label: "Total Enrolled", value: "892", icon: GraduationCap, color: "var(--electron-blue)" },
+    { label: "Payments Pending", value: "24", icon: DollarSign, color: "var(--electron-red)" },
+    { label: "Payments Approved", value: "156", icon: TrendingUp, color: "#10B981" },
+    { label: "Active Users/Admins", value: "12", icon: Activity, color: "#8B5CF6" },
   ];
 
-  const strandDistribution = [
-    { strand: "STEM", count: 98, color: "#B91C1C" },
-    { strand: "ABM", count: 67, color: "#1E3A8A" },
-    { strand: "GAS", count: 45, color: "#10B981" },
-    { strand: "TVL", count: 35, color: "#F59E0B" },
+  // Quick Actions
+  const quickActions = [
+    { label: "Review Applications", icon: FileText, color: "var(--electron-blue)" },
+    { label: "Approve Payments", icon: DollarSign, color: "var(--electron-red)" },
+    { label: "Student Records", icon: Users, color: "#10B981" },
+    { label: "Section Management", icon: ClipboardList, color: "#F59E0B" },
+    { label: "Assessment Management", icon: BarChart3, color: "var(--electron-blue)" },
+    { label: "User Management", icon: Shield, color: "#8B5CF6" },
+    { label: "Audit Logs", icon: LogBook, color: "#EC4899" },
+    { label: "System Configuration", icon: Settings, color: "var(--electron-blue)" },
   ];
 
-  const monthlyEnrollments = [
-    { month: "Jan", count: 45 },
-    { month: "Feb", count: 78 },
-    { month: "Mar", count: 122 },
+  // Charts Data
+  const paymentCollectionData = [
+    { day: "Mon", amount: 4500 },
+    { day: "Tue", amount: 5200 },
+    { day: "Wed", amount: 3800 },
+    { day: "Thu", amount: 6100 },
+    { day: "Fri", amount: 7200 },
+    { day: "Sat", amount: 5900 },
+    { day: "Sun", amount: 4200 },
   ];
 
-  const recentApplicants = [
-    {
-      name: "Maria Santos",
-      strand: "STEM",
-      status: "Pending",
-      date: "March 18, 2026",
-      confidence: 95,
-    },
-    {
-      name: "Pedro Garcia",
-      strand: "ABM",
-      status: "Approved",
-      date: "March 17, 2026",
-      confidence: 88,
-    },
-    {
-      name: "Ana Reyes",
-      strand: "STEM",
-      status: "Pending",
-      date: "March 17, 2026",
-      confidence: 92,
-    },
-    {
-      name: "Carlos Lopez",
-      strand: "TVL",
-      status: "Approved",
-      date: "March 16, 2026",
-      confidence: 85,
-    },
-    {
-      name: "Lisa Cruz",
-      strand: "GAS",
-      status: "Pending",
-      date: "March 16, 2026",
-      confidence: 78,
-    },
+  const applicationStatusData = [
+    { status: "Pending", count: 32, color: "#F59E0B" },
+    { status: "Approved", count: 156, color: "#10B981" },
+    { status: "Rejected", count: 28, color: "var(--electron-red)" },
+  ];
+
+  const dailyActivityData = [
+    { time: "12 AM", users: 45 },
+    { time: "4 AM", users: 32 },
+    { time: "8 AM", users: 120 },
+    { time: "12 PM", users: 280 },
+    { time: "4 PM", users: 350 },
+    { time: "8 PM", users: 220 },
+    { time: "11 PM", users: 85 },
   ];
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "#f8fafc" }}>
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
+      <div className="bg-white/80 backdrop-blur-xl border-b border-white/50 px-8 py-6 sticky top-0 z-50">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-4">
             <div
-              className="w-12 h-12 rounded-full flex items-center justify-center"
+              className="w-12 h-12 rounded-full flex items-center justify-center shadow-lg"
               style={{ backgroundColor: "var(--electron-blue)" }}
             >
               <GraduationCap className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl" style={{ color: "var(--electron-blue)" }}>
-                Admin Dashboard
+              <h1 className="text-3xl font-bold" style={{ color: "var(--electron-blue)" }}>
+                Branch Coordinator
               </h1>
-              <p className="text-sm text-gray-600">Electron Hub Management System</p>
+              <p className="text-sm text-gray-600">System Overview & Management</p>
             </div>
           </div>
           <Link
             to="/"
-            className="px-4 py-2 rounded-md border-2 transition-colors hover:bg-gray-50 flex items-center gap-2"
+            className="px-4 py-2 rounded-md border-2 transition-all hover:bg-gray-50 flex items-center gap-2 shadow-md"
             style={{ borderColor: "var(--electron-blue)", color: "var(--electron-blue)" }}
           >
             <ArrowLeft className="w-4 h-4" />
@@ -113,205 +115,191 @@ export function AdminPanel() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-8">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat, index) => {
-            const Icon = stat.icon;
-            return (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: stat.color }}
-                  >
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                </div>
-                <p className="text-3xl mb-1" style={{ color: stat.color }}>
-                  {stat.value}
-                </p>
-                <p className="text-sm text-gray-600">{stat.label}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {/* Strand Distribution */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl mb-6" style={{ color: "var(--electron-blue)" }}>
-              Strand Distribution
-            </h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={strandDistribution}
-                  dataKey="count"
-                  nameKey="strand"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label
+        {/* Top Summary Cards */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
+            Summary Cards
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {summaryCards.map((card, index) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={index}
+                  className="rounded-2xl shadow-lg hover:shadow-xl transition-all p-6 border border-white/50"
+                  style={{
+                    backgroundColor: "rgba(255, 255, 255, 0.4)",
+                    backdropFilter: "blur(10px)",
+                  }}
                 >
-                  {strandDistribution.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              {strandDistribution.map((item, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <div
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: item.color }}
-                  ></div>
-                  <span className="text-sm text-gray-600">
-                    {item.strand}: {item.count}
-                  </span>
+                  <div className="flex items-center justify-between mb-4">
+                    <div
+                      className="w-12 h-12 rounded-lg flex items-center justify-center shadow-md"
+                      style={{
+                        backgroundColor: card.color,
+                        opacity: 0.1,
+                      }}
+                    >
+                      <Icon className="w-6 h-6" style={{ color: card.color }} />
+                    </div>
+                  </div>
+                  <p className="text-3xl font-bold mb-2" style={{ color: card.color }}>
+                    {card.value}
+                  </p>
+                  <p className="text-sm text-gray-700 font-medium">{card.label}</p>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Quick Actions Section */}
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
+            Quick Actions
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {quickActions.map((action, index) => {
+              const Icon = action.icon;
+              return (
+                <button
+                  key={index}
+                  className="rounded-xl shadow-md hover:shadow-lg transition-all p-4 text-left border border-white/50 group"
+                  style={{
+                    backgroundColor: "rgba(255, 255, 255, 0.5)",
+                    backdropFilter: "blur(10px)",
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center mb-3 group-hover:scale-110 transition-transform"
+                    style={{
+                      backgroundColor: action.color,
+                      opacity: 0.15,
+                    }}
+                  >
+                    <Icon className="w-5 h-5" style={{ color: action.color }} />
+                  </div>
+                  <p className="text-sm font-semibold text-gray-800 group-hover:font-bold transition-all">
+                    {action.label}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Charts / Reports Section */}
+        <section>
+          <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
+            Charts & Reports
+          </h2>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            {/* Payment Collection Summary */}
+            <div
+              className="lg:col-span-2 rounded-2xl shadow-lg p-6 border border-white/50"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.4)",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              <h3 className="text-lg font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
+                Payment Collection Summary
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={paymentCollectionData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                  <XAxis dataKey="day" stroke="#6B7280" />
+                  <YAxis stroke="#6B7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      border: "1px solid rgba(0, 0, 0, 0.1)",
+                      borderRadius: "8px",
+                    }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="amount"
+                    stroke="var(--electron-blue)"
+                    strokeWidth={3}
+                    dot={{ fill: "var(--electron-blue)", r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Application Status */}
+            <div
+              className="rounded-2xl shadow-lg p-6 border border-white/50"
+              style={{
+                backgroundColor: "rgba(255, 255, 255, 0.4)",
+                backdropFilter: "blur(10px)",
+              }}
+            >
+              <h3 className="text-lg font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
+                Application Status
+              </h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={applicationStatusData}
+                    dataKey="count"
+                    nameKey="status"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label
+                  >
+                    {applicationStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      border: "1px solid rgba(0, 0, 0, 0.1)",
+                      borderRadius: "8px",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
 
-          {/* Monthly Enrollments */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h2 className="text-xl mb-6" style={{ color: "var(--electron-blue)" }}>
-              Monthly Enrollments
-            </h2>
+          {/* Daily Activity Count */}
+          <div
+            className="rounded-2xl shadow-lg p-6 border border-white/50"
+            style={{
+              backgroundColor: "rgba(255, 255, 255, 0.4)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <h3 className="text-lg font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
+              Daily Activity Count
+            </h3>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={monthlyEnrollments}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
+              <BarChart data={dailyActivityData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.1)" />
+                <XAxis dataKey="time" stroke="#6B7280" />
+                <YAxis stroke="#6B7280" />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: "rgba(255, 255, 255, 0.9)",
+                    border: "1px solid rgba(0, 0, 0, 0.1)",
+                    borderRadius: "8px",
+                  }}
+                />
                 <Legend />
-                <Bar dataKey="count" fill="#1E3A8A" name="Applicants" />
+                <Bar
+                  dataKey="users"
+                  fill="var(--electron-blue)"
+                  name="Active Users"
+                  radius={[8, 8, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
-        </div>
-
-        {/* Recent Applicants Table */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl" style={{ color: "var(--electron-blue)" }}>
-              Recent Applicants
-            </h2>
-            <button
-              className="px-4 py-2 rounded-md text-white transition-colors hover:opacity-90"
-              style={{ backgroundColor: "var(--electron-blue)" }}
-            >
-              View All
-            </button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b-2" style={{ borderColor: "var(--electron-blue)" }}>
-                  <th className="text-left py-3 px-4 text-sm" style={{ color: "var(--electron-dark-gray)" }}>
-                    Name
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm" style={{ color: "var(--electron-dark-gray)" }}>
-                    Recommended Strand
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm" style={{ color: "var(--electron-dark-gray)" }}>
-                    Confidence
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm" style={{ color: "var(--electron-dark-gray)" }}>
-                    Date
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm" style={{ color: "var(--electron-dark-gray)" }}>
-                    Status
-                  </th>
-                  <th className="text-left py-3 px-4 text-sm" style={{ color: "var(--electron-dark-gray)" }}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentApplicants.map((applicant, index) => (
-                  <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                    <td className="py-3 px-4" style={{ color: "var(--electron-dark-gray)" }}>
-                      {applicant.name}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span
-                        className="px-2 py-1 rounded-md text-sm text-white"
-                        style={{ backgroundColor: "var(--electron-blue)" }}
-                      >
-                        {applicant.strand}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div
-                            className="h-2 rounded-full"
-                            style={{
-                              width: `${applicant.confidence}%`,
-                              backgroundColor: "var(--electron-red)",
-                            }}
-                          ></div>
-                        </div>
-                        <span className="text-sm text-gray-600">{applicant.confidence}%</span>
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600">{applicant.date}</td>
-                    <td className="py-3 px-4">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          applicant.status === "Approved"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {applicant.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4">
-                      <button
-                        className="px-3 py-1 rounded-md text-sm text-white transition-colors hover:opacity-90"
-                        style={{ backgroundColor: "var(--electron-red)" }}
-                      >
-                        Review
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Management Options */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <button className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left">
-            <Users className="w-8 h-8 mb-3" style={{ color: "var(--electron-blue)" }} />
-            <h3 className="text-lg mb-2" style={{ color: "var(--electron-dark-gray)" }}>
-              Manage Students
-            </h3>
-            <p className="text-sm text-gray-600">View and manage student applications</p>
-          </button>
-
-          <button className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left">
-            <FileText className="w-8 h-8 mb-3" style={{ color: "var(--electron-red)" }} />
-            <h3 className="text-lg mb-2" style={{ color: "var(--electron-dark-gray)" }}>
-              Manage Questions
-            </h3>
-            <p className="text-sm text-gray-600">Edit assessment questions and categories</p>
-          </button>
-
-          <button className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left">
-            <Settings className="w-8 h-8 mb-3" style={{ color: "var(--electron-blue)" }} />
-            <h3 className="text-lg mb-2" style={{ color: "var(--electron-dark-gray)" }}>
-              System Settings
-            </h3>
-            <p className="text-sm text-gray-600">Configure system preferences</p>
-          </button>
-        </div>
+        </section>
       </div>
     </div>
   );
