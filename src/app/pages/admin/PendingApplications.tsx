@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import ReviewApplicationModalPending from "../../components/ReviewApplicationModalPending";
 import {
   getPendingApplications,
   approveEnrollment,
@@ -740,275 +741,25 @@ export function PendingApplications() {
       )}
 
       {/* Document Review Modal */}
-      {showDocumentModal && reviewingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-6xl max-h-[calc(100vh-3rem)] overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
-            <div className="flex flex-col gap-4 border-b border-slate-200 bg-slate-50 px-6 py-5 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Review application</p>
-                <h2 className="mt-2 text-2xl font-semibold text-slate-900">Document Verification</h2>
-                <p className="mt-1 text-sm text-slate-600">{reviewingStudent.studentName}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowDocumentModal(false);
-                  setSelectedDocument(null);
-                }}
-                className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 text-slate-700 transition hover:bg-slate-100"
-                aria-label="Close document review modal"
-              >
-                <XCircle className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="grid gap-4 px-6 py-5 sm:grid-cols-3">
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Total documents</p>
-                <p className="mt-3 text-2xl font-semibold text-slate-900">{reviewingStudent.enrollment_documents?.length || 0}</p>
-              </div>
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Approved</p>
-                <p className="mt-3 text-2xl font-semibold text-slate-900">
-                  {(() => {
-                    const docs: any[] = reviewingStudent.enrollment_documents || [];
-                    return docs.filter((d) => d.status === "approved").length;
-                  })()}
-                </p>
-              </div>
-              <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Pending / rejected</p>
-                <p className="mt-3 text-2xl font-semibold text-slate-900">
-                  {(() => {
-                    const docs: any[] = reviewingStudent.enrollment_documents || [];
-                    return docs.filter((d) => d.status !== "approved").length;
-                  })()}
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-y-auto px-6 pb-6 pt-1" style={{ maxHeight: 'calc(100vh - 15rem)' }}>
-              {(() => {
-                const enrollmentDocs: any[] = reviewingStudent.enrollment_documents || [];
-                const docs: Record<string, any> = {};
-                enrollmentDocs.forEach((d: any) => {
-                  docs[d.document_type] = {
-                    id: d.id,
-                    status: d.status || "pending",
-                    uploadDate: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—",
-                    fileName: (d.file_path || d.file_url || "").split("/").pop() || "document",
-                    fileUrl: d.file_path || d.file_url || null,
-                    rejectionComment: d.rejection_comment || d.rejection_reason || "",
-                  };
-                });
-                const docKeys = Object.keys(docs);
-
-                if (docKeys.length === 0) {
-                  return (
-                    <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm">
-                      <AlertCircle className="mx-auto mb-4 h-12 w-12 text-slate-400" />
-                      <p className="text-base font-semibold text-slate-900">No documents uploaded yet</p>
-                      <p className="mt-2 text-sm text-slate-500">This application has not submitted any files at this time.</p>
-                    </div>
-                  );
-                }
-
-                const approved = docKeys.filter((k) => docs[k].status === "approved").length;
-
-                return (
-                  <>
-                    <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">Enrollment form</p>
-                          <p className="mt-1 text-sm text-slate-500">Review the student’s submitted enrollment details.</p>
-                        </div>
-                        <button
-                          type="button"
-                          className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800"
-                        >
-                          <Eye className="h-4 w-4" />
-                          View enrollment form
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mb-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm text-slate-500">Overall progress</p>
-                          <p className="mt-1 text-base font-semibold text-slate-900">
-                            {approved} of {docKeys.length} documents approved
-                          </p>
-                        </div>
-                        {approved === docKeys.length && (
-                          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-100 px-3 py-2 text-sm font-semibold text-emerald-800">
-                            <CheckCircle className="h-4 w-4" />
-                            All documents approved
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {!selectedDocument && (
-                      <div className="grid gap-4 md:grid-cols-2">
-                        {docKeys.map((key) => {
-                          const doc = docs[key];
-                          return (
-                            <div key={key} className="flex h-full flex-col justify-between rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-                              <div className="space-y-4">
-                                <div className="flex items-start justify-between gap-4">
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-semibold text-slate-900 truncate">{documentNames[key] || key}</p>
-                                    <p className="mt-2 text-xs text-slate-500">Uploaded {doc.uploadDate}</p>
-                                  </div>
-                                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                    doc.status === "approved"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : doc.status === "rejected"
-                                      ? "bg-rose-100 text-rose-800"
-                                      : "bg-amber-100 text-amber-800"
-                                  }`}>
-                                    {doc.status.toUpperCase()}
-                                  </span>
-                                </div>
-                                {doc.rejectionComment && (
-                                  <p className="text-sm text-rose-700">{doc.rejectionComment}</p>
-                                )}
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => handleViewDocument(key)}
-                                className="mt-4 inline-flex items-center justify-center rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                              >
-                                Review document
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {selectedDocument && (
-                      <div className="space-y-6">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div>
-                            <p className="text-sm text-slate-500">Document detail</p>
-                            <h3 className="mt-1 text-xl font-semibold text-slate-900">{selectedDocument.name}</h3>
-                          </div>
-                          <span className={`inline-flex rounded-full px-3 py-2 text-sm font-semibold ${
-                            selectedDocument.data.status === "approved"
-                              ? "bg-emerald-100 text-emerald-800"
-                              : selectedDocument.data.status === "rejected"
-                              ? "bg-rose-100 text-rose-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}>
-                            {selectedDocument.data.status.toUpperCase()}
-                          </span>
-                        </div>
-
-                        <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                            <div className="mb-4">
-                              <p className="text-sm font-medium text-slate-700">Document preview</p>
-                              <p className="mt-1 text-xs text-slate-500">Review the file before making a decision.</p>
-                            </div>
-                            <div className="rounded-[24px] border border-slate-200 bg-slate-950 p-4">
-                              <div className="aspect-[4/5] overflow-hidden rounded-[24px] bg-slate-950 flex items-center justify-center">
-                                {selectedDocument.data.fileUrl ? (
-                                  selectedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                                    <img
-                                      src={selectedDocument.data.fileUrl}
-                                      alt={selectedDocument.name}
-                                      className="h-full w-full object-contain"
-                                    />
-                                  ) : (
-                                    <div className="text-center p-6">
-                                      <FileText className="mx-auto mb-4 h-12 w-12 text-slate-400" />
-                                      <p className="text-sm text-slate-400">Document preview not available.</p>
-                                    </div>
-                                  )
-                                ) : (
-                                  <p className="text-sm text-slate-400">No preview available</p>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-5">
-                            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                              <p className="text-sm font-semibold text-slate-900 mb-4">Document information</p>
-                              <div className="space-y-3 text-sm text-slate-600">
-                                <div className="flex justify-between gap-4">
-                                  <span className="font-medium text-slate-700">File name</span>
-                                  <span className="truncate text-right text-slate-900">{selectedDocument.data.fileName}</span>
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                  <span className="font-medium text-slate-700">Uploaded</span>
-                                  <span className="text-slate-900">{selectedDocument.data.uploadDate}</span>
-                                </div>
-                                <div className="flex justify-between gap-4">
-                                  <span className="font-medium text-slate-700">Status</span>
-                                  <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                                    selectedDocument.data.status === "approved"
-                                      ? "bg-emerald-100 text-emerald-800"
-                                      : selectedDocument.data.status === "rejected"
-                                      ? "bg-rose-100 text-rose-800"
-                                      : "bg-amber-100 text-amber-800"
-                                  }`}>
-                                    {selectedDocument.data.status.toUpperCase()}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-                              <p className="text-sm font-semibold text-slate-900 mb-3">Rejection reason</p>
-                              <textarea
-                                value={documentRejectionComment}
-                                onChange={(e) => setDocumentRejectionComment(e.target.value)}
-                                placeholder="Explain why this document is being rejected..."
-                                rows={4}
-                                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedDocument(null);
-                              setDocumentRejectionComment("");
-                            }}
-                            className="rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-                          >
-                            Back to documents
-                          </button>
-                          <div className="flex flex-col gap-3 sm:flex-row">
-                            <button
-                              onClick={handleRejectDocument}
-                              className="min-w-[120px] rounded-full bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
-                            >
-                              Reject
-                            </button>
-                            <button
-                              onClick={handleApproveDocument}
-                              className="min-w-[120px] rounded-full bg-emerald-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                            >
-                              Approve
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
+      <ReviewApplicationModalPending
+        isOpen={showDocumentModal}
+        onClose={() => {
+          setShowDocumentModal(false);
+          setSelectedDocument(null);
+        }}
+        reviewingStudent={reviewingStudent}
+        selectedDocument={selectedDocument}
+        documentRejectionComment={documentRejectionComment}
+        setDocumentRejectionComment={setDocumentRejectionComment}
+        handleViewDocument={handleViewDocument}
+        handleApproveDocument={handleApproveDocument}
+        handleRejectDocument={handleRejectDocument}
+        handleBackToDocuments={() => {
+          setSelectedDocument(null);
+          setDocumentRejectionComment("");
+        }}
+        documentNames={documentNames}
+      />
     </div>
   );
 }
