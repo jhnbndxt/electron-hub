@@ -29,6 +29,7 @@ import {
   approveEnrollment,
   resolveUserId,
   upsertEnrollmentProgress,
+  getAssessmentResultByStudentId,
 } from "../../../services/adminService";
 import { supabase } from "../../../supabase";
 
@@ -38,7 +39,7 @@ interface Student {
   email: string;
   strand: string;
   applicationDate: string;
-  aiTestScore?: number;
+  aiTestScore?: number | null;
   status: "pending" | "approved" | "incomplete";
   documents?: {
     psaBirthCertificate: boolean;
@@ -133,15 +134,16 @@ export function AdminDashboard() {
       return;
     }
 
-    const formattedApps = applications.map((app: any) => {
+    const formattedApps = await Promise.all(applications.map(async (app: any) => {
       const formData = app.form_data || {};
+      const aiTestScore = await getAssessmentResultByStudentId(app.user_id);
       return {
         id: app.id,
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
         email: formData.email,
         strand: formData.preferredTrack || 'Not Set',
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
-        aiTestScore: 85,
+        aiTestScore: aiTestScore,
         status: 'pending',
         documents: {
           psaBirthCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'birthCertificate') || false,
@@ -152,7 +154,7 @@ export function AdminDashboard() {
         },
         formData: app,
       };
-    });
+    }));
     setPendingApplications(formattedApps);
   };
 
@@ -818,7 +820,7 @@ export function AdminDashboard() {
                 <div>
                   <p className="text-xs text-gray-500 mb-1">AI Test Score</p>
                   <p className="text-sm font-medium text-gray-900">
-                    {selectedStudent.aiTestScore || "N/A"}%
+                    {selectedStudent.aiTestScore !== null && selectedStudent.aiTestScore !== undefined ? `${selectedStudent.aiTestScore}%` : "Not Taken"}
                   </p>
                 </div>
                 <div>

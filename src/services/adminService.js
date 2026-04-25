@@ -263,6 +263,29 @@ async function syncVerifiedPaymentsToEnrollments() {
   }
 }
 
+// Get assessment result for a student by student_id
+export const getAssessmentResultByStudentId = async (studentId) => {
+  try {
+    const { data, error } = await supabase
+      .from('assessment_results')
+      .select('overall_score')
+      .eq('student_id', studentId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Get assessment result error:', error);
+      return null;
+    }
+
+    return data?.overall_score || null;
+  } catch (error) {
+    console.error('Get assessment result error:', error);
+    return null;
+  }
+};
+
 // Get all pending applications (enrollments with status pending_documents or pending_review)
 export const getPendingApplications = async () => {
   try {

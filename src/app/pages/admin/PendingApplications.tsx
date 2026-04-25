@@ -20,6 +20,7 @@ import {
   resolveUserId,
   updateDocumentStatus,
   upsertEnrollmentProgress,
+  getAssessmentResultByStudentId,
 } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 
@@ -27,7 +28,7 @@ interface Student {
   id: number | string;
   name: string;
   applicationDate: string;
-  aiTestScore: number;
+  aiTestScore: number | null;
   status: "pending" | "incomplete" | "approved" | "rejected";
   strandApplied: string;
   documents: {
@@ -79,15 +80,17 @@ export function PendingApplications() {
       return;
     }
     
-    // Format applications from Supabase
-    const formattedApps = applications.map((app: any) => {
+    // Format applications from Supabase with assessment results
+    const formattedApps = await Promise.all(applications.map(async (app: any) => {
       const formData = app.form_data || {};
+      const aiTestScore = await getAssessmentResultByStudentId(app.user_id);
+      
       return {
         id: app.id,
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
         email: app.user_id || formData.email,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
-        aiTestScore: 85,
+        aiTestScore: aiTestScore, // Will be null if not taken
         status: 'pending',
         strandApplied: formData.preferredTrack || formData.track || 'Not Set',
         documents: {
@@ -98,7 +101,7 @@ export function PendingApplications() {
         enrollmentId: app.id,
         enrollmentData: app,
       };
-    });
+    }));
     
     setStudents(formattedApps);
     console.log('📋 Loaded', formattedApps.length, 'pending applications from Supabase');
@@ -575,7 +578,7 @@ export function PendingApplications() {
                             style={{ color: "#1E3A8A" }}
                           />
                           <span className="text-sm font-semibold text-gray-900">
-                            {student.aiTestScore}%
+                            {student.aiTestScore !== null ? `${student.aiTestScore}%` : "Not Taken"}
                           </span>
                         </div>
                       </td>
