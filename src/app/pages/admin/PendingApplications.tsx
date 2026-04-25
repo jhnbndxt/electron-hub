@@ -44,7 +44,6 @@ export function PendingApplications() {
   const { userData } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStudents, setSelectedStudents] = useState<number[]>([]);
   const [strandFilter, setStrandFilter] = useState("all");
   const [documentFilter, setDocumentFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
@@ -264,41 +263,19 @@ export function PendingApplications() {
   }
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.checked) {
-      setSelectedStudents(filteredStudents.map((s) => s.id as number));
-    } else {
-      setSelectedStudents([]);
-    }
+    // Bulk selection removed
   };
 
   const handleSelectStudent = (id: number | string) => {
-    const numId = typeof id === 'string' ? parseInt(id) : id;
-    if (selectedStudents.includes(numId)) {
-      setSelectedStudents(selectedStudents.filter((sid) => sid !== numId));
-    } else {
-      setSelectedStudents([...selectedStudents, numId]);
-    }
+    // Individual selection removed
   };
 
   const handleBulkApprove = () => {
-    if (selectedStudents.length === 0) {
-      alert("Please select at least one student to approve.");
-      return;
-    }
-    const selectedNames = filteredStudents
-      .filter((s) => selectedStudents.includes(s.id as number))
-      .map((s) => s.name)
-      .join(", ");
-    alert(`Bulk approved ${selectedStudents.length} student(s): ${selectedNames}`);
-    setSelectedStudents([]);
+    // Bulk approve removed
   };
 
   const handleExportPDF = () => {
-    if (selectedStudents.length === 0) {
-      alert("Please select at least one student to export.");
-      return;
-    }
-    alert(`Exporting ${selectedStudents.length} student record(s) to PDF...`);
+    alert(`Exporting student record(s) to PDF...`);
   };
 
   const handleApproveClick = (id: number | string) => {
@@ -502,39 +479,9 @@ export function PendingApplications() {
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="p-4 sm:p-6 border-b border-gray-200">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap items-center gap-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Applications
-              </h2>
-              {selectedStudents.length > 0 && (
-                <span
-                  className="px-3 py-1 rounded-full text-xs font-semibold"
-                  style={{ backgroundColor: "#DBEAFE", color: "#1E40AF" }}
-                >
-                  {selectedStudents.length} selected
-                </span>
-              )}
-            </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                onClick={handleBulkApprove}
-                disabled={selectedStudents.length === 0}
-                className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ backgroundColor: "#10B981" }}
-              >
-                <CheckCircle className="w-4 h-4" />
-                Bulk Approve
-              </button>
-              <button
-                onClick={handleExportPDF}
-                disabled={selectedStudents.length === 0}
-                className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg font-medium text-sm transition-all hover:bg-gray-100 border border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                style={{ color: "#374151" }}
-              >
-                <Download className="w-4 h-4" />
-                Export to PDF
-              </button>
-            </div>
+            <h2 className="text-xl font-semibold text-gray-900">
+              Applications
+            </h2>
           </div>
         </div>
 
@@ -542,18 +489,6 @@ export function PendingApplications() {
           <table className="w-full min-w-[980px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="px-6 py-4 text-left">
-                  <input
-                    type="checkbox"
-                    checked={
-                      filteredStudents.length > 0 &&
-                      selectedStudents.length === filteredStudents.length
-                    }
-                    onChange={handleSelectAll}
-                    className="w-4 h-4 rounded"
-                    style={{ accentColor: "#1E3A8A" }}
-                  />
-                </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Student Name
                 </th>
@@ -580,7 +515,7 @@ export function PendingApplications() {
             <tbody className="divide-y divide-gray-200">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={7} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <FileText className="w-12 h-12 text-gray-400" />
                       <div>
@@ -603,15 +538,6 @@ export function PendingApplications() {
                       key={student.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
-                      <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedStudents.includes(student.id as number)}
-                          onChange={() => handleSelectStudent(student.id)}
-                          className="w-4 h-4 rounded"
-                          style={{ accentColor: "#1E3A8A" }}
-                        />
-                      </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-gray-900">
                           {student.name}

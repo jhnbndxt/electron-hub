@@ -25,6 +25,7 @@ import {
   saveDraft, 
   loadDraft, 
   checkExistingEnrollment, 
+  getUserEnrollment,
   submitEnrollment,
   uploadDocument 
 } from "../../services/enrollmentService";
@@ -152,6 +153,7 @@ export function EnrollmentForm() {
   } | null>(null);
   const [hasAssessment, setHasAssessment] = useState(true);
   const [showAlreadySubmittedModal, setShowAlreadySubmittedModal] = useState(false);
+  const [isSubmittedEnrollment, setIsSubmittedEnrollment] = useState(false);
   const [certificationChecked, setCertificationChecked] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
@@ -224,8 +226,68 @@ export function EnrollmentForm() {
       // Check if enrollment already submitted
       const { data: existingEnrollment } = await checkExistingEnrollment(userEmail);
       if (existingEnrollment) {
-        setShowAlreadySubmittedModal(true);
-        return;
+        // Load the full enrollment data
+        const { data: enrollmentData } = await getUserEnrollment(userEmail);
+        if (enrollmentData) {
+          setIsSubmittedEnrollment(true);
+          // Map database columns to form fields
+          setFormData(prev => ({
+            ...prev,
+            firstName: enrollmentData.first_name || "",
+            lastName: enrollmentData.last_name || "",
+            middleName: enrollmentData.middle_name || "",
+            suffix: enrollmentData.suffix || "None",
+            sex: enrollmentData.sex || "",
+            civilStatus: enrollmentData.civil_status || "",
+            religion: enrollmentData.religion || "",
+            nationality: enrollmentData.nationality || "Filipino",
+            disability: enrollmentData.disability || "Not Applicable",
+            disabilityOther: enrollmentData.disability_other || "",
+            indigenousGroup: enrollmentData.indigenous_group || "Not Applicable",
+            indigenousGroupOther: enrollmentData.indigenous_group_other || "",
+            admissionType: enrollmentData.admission_type || "",
+            previousStudentId: enrollmentData.previous_student_id || "",
+            lrn: enrollmentData.lrn || "",
+            isWorkingStudent: enrollmentData.is_working_student || false,
+            birthday: enrollmentData.birth_date || "",
+            email: enrollmentData.email || "",
+            contactNumber: enrollmentData.contact_number || "",
+            facebookName: enrollmentData.facebook_name || "",
+            region: enrollmentData.region || "",
+            province: enrollmentData.province || "",
+            city: enrollmentData.city || "",
+            barangay: enrollmentData.barangay || "",
+            homeAddress: enrollmentData.home_address || "",
+            fatherLastName: enrollmentData.father_last_name || "",
+            fatherFirstName: enrollmentData.father_first_name || "",
+            fatherMiddleName: enrollmentData.father_middle_name || "",
+            fatherOccupation: enrollmentData.father_occupation || "",
+            fatherContact: enrollmentData.father_contact || "",
+            motherMaidenName: enrollmentData.mother_maiden_name || "",
+            motherLastName: enrollmentData.mother_last_name || "",
+            motherFirstName: enrollmentData.mother_first_name || "",
+            motherMiddleName: enrollmentData.mother_middle_name || "",
+            motherOccupation: enrollmentData.mother_occupation || "",
+            motherContact: enrollmentData.mother_contact || "",
+            guardianSource: enrollmentData.guardian_source || "",
+            guardianLastName: enrollmentData.guardian_last_name || "",
+            guardianFirstName: enrollmentData.guardian_first_name || "",
+            guardianMiddleName: enrollmentData.guardian_middle_name || "",
+            guardianOccupation: enrollmentData.guardian_occupation || "",
+            guardianContact: enrollmentData.guardian_contact || "",
+            is4PsMember: enrollmentData.is_4ps_member || false,
+            preferredTrack: enrollmentData.preferred_track || "",
+            elective1: enrollmentData.elective_1 || "",
+            elective2: enrollmentData.elective_2 || "",
+            yearLevel: enrollmentData.year_level || "",
+            primarySchool: enrollmentData.primary_school || "",
+            primaryYearGraduated: enrollmentData.primary_year_graduated || "",
+            secondarySchool: enrollmentData.secondary_school || "",
+            secondaryYearGraduated: enrollmentData.secondary_year_graduated || "",
+            grade10Adviser: enrollmentData.grade_10_adviser || "",
+          }));
+          return;
+        }
       }
       
       // Try to restore autosaved draft
@@ -351,6 +413,9 @@ export function EnrollmentForm() {
   }, [searchParams, userData]);
 
   const handleInputChange = (field: keyof FormData, value: string | boolean | File | null) => {
+    // Don't allow changes if this is a submitted enrollment
+    if (isSubmittedEnrollment) return;
+    
     setFormData(prev => {
       const newData = { ...prev, [field]: value };
       
@@ -385,6 +450,9 @@ export function EnrollmentForm() {
   };
 
   const handleFileChange = (field: keyof FormData, file: File | null) => {
+    // Don't allow changes if this is a submitted enrollment
+    if (isSubmittedEnrollment) return;
+    
     setFormData(prev => ({ ...prev, [field]: file }));
     if (errors[field]) {
       setErrors(prev => {
@@ -688,9 +756,10 @@ export function EnrollmentForm() {
           value={formData[field] as string}
           onChange={(e) => handleInputChange(field, e.target.value)}
           max={maxDate}
+          disabled={isSubmittedEnrollment}
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors[field] ? "border-red-500" : "border-gray-300"
-          }`}
+          } ${isSubmittedEnrollment ? "bg-gray-50 cursor-not-allowed opacity-60" : ""}`}
           placeholder={placeholder}
         />
         {errors[field] && (
@@ -713,9 +782,10 @@ export function EnrollmentForm() {
       <select
         value={formData[field] as string}
         onChange={(e) => handleInputChange(field, e.target.value)}
+        disabled={isSubmittedEnrollment}
         className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
           errors[field] ? "border-red-500" : "border-gray-300"
-        }`}
+        } ${isSubmittedEnrollment ? "bg-gray-50 cursor-not-allowed opacity-60" : ""}`}
       >
         <option value="">Select {label}</option>
         {options.map((option) => {
@@ -745,12 +815,13 @@ export function EnrollmentForm() {
       <div
         className={`relative border-2 border-dashed rounded-md p-4 transition-colors ${
           errors[field] ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-blue-500"
-        }`}
+        } ${isSubmittedEnrollment ? "opacity-60 cursor-not-allowed bg-gray-50" : ""}`}
       >
         <input
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           onChange={(e) => handleFileChange(field, e.target.files?.[0] || null)}
+          disabled={isSubmittedEnrollment}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
         />
         <div className="flex items-center gap-3">
@@ -761,7 +832,7 @@ export function EnrollmentForm() {
             </p>
             <p className="text-xs text-gray-500">PDF, JPG, or PNG</p>
           </div>
-          {formData[field] && (
+          {formData[field] && !isSubmittedEnrollment && (
             <button
               type="button"
               onClick={(e) => {
@@ -809,7 +880,8 @@ export function EnrollmentForm() {
             type="checkbox"
             checked={formData.isWorkingStudent}
             onChange={(e) => handleInputChange("isWorkingStudent", e.target.checked)}
-            className="w-4 h-4 text-blue-600"
+            disabled={isSubmittedEnrollment}
+            className="w-4 h-4 text-blue-600 disabled:cursor-not-allowed"
           />
           <span className="text-sm font-medium text-gray-700">Are you a working student?</span>
         </label>
@@ -962,7 +1034,8 @@ export function EnrollmentForm() {
               value="father"
               checked={formData.guardianSource === "father"}
               onChange={(e) => handleInputChange("guardianSource", e.target.value)}
-              className="w-4 h-4 text-blue-600"
+              disabled={isSubmittedEnrollment}
+              className="w-4 h-4 text-blue-600 disabled:cursor-not-allowed"
             />
             <span className="text-sm font-medium text-gray-700">Same as Father's Information</span>
           </label>
@@ -973,7 +1046,8 @@ export function EnrollmentForm() {
               value="mother"
               checked={formData.guardianSource === "mother"}
               onChange={(e) => handleInputChange("guardianSource", e.target.value)}
-              className="w-4 h-4 text-blue-600"
+              disabled={isSubmittedEnrollment}
+              className="w-4 h-4 text-blue-600 disabled:cursor-not-allowed"
             />
             <span className="text-sm font-medium text-gray-700">Same as Mother's Information</span>
           </label>
@@ -1000,7 +1074,8 @@ export function EnrollmentForm() {
             type="checkbox"
             checked={formData.is4PsMember}
             onChange={(e) => handleInputChange("is4PsMember", e.target.checked)}
-            className="w-4 h-4 text-blue-600"
+            disabled={isSubmittedEnrollment}
+            className="w-4 h-4 text-blue-600 disabled:cursor-not-allowed"
           />
           <span className="text-sm font-medium text-gray-700">4Ps Member?</span>
         </label>
@@ -1426,42 +1501,24 @@ export function EnrollmentForm() {
         )}
       </div>
 
-      {/* Already Submitted Modal */}
-      {showAlreadySubmittedModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div className="portal-glass-modal w-full max-w-md rounded-xl">
-            {/* Success Icon */}
-            <div className="p-6 text-center border-b border-gray-200">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="w-10 h-10 text-green-600" />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-2">
-                Enrollment Already Submitted
-              </h3>
-              <p className="text-gray-600">
-                You have already submitted your enrollment form. Your application is currently being reviewed by the Registrar.
-              </p>
-            </div>
-
-            {/* Action Button */}
-            <div className="p-6">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="w-full py-4 rounded-xl text-white font-semibold transition-all"
-                style={{ backgroundColor: "#1E3A8A" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1E40AF")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
-              >
-                Go to Dashboard
-              </button>
-            </div>
+      {/* View-Only Message for Submitted Enrollment */}
+      {isSubmittedEnrollment && (
+        <div className="mb-6 p-4 rounded-lg bg-green-50 border border-green-200 flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-green-900">
+              You already submitted this form
+            </p>
+            <p className="text-xs text-green-700 mt-1">
+              Your application is under review. All fields are now read-only.
+            </p>
           </div>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="text-xs font-semibold text-green-700 hover:text-green-900 whitespace-nowrap ml-2"
+          >
+            Go to Dashboard
+          </button>
         </div>
       )}
     </div>
