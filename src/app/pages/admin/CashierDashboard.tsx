@@ -349,15 +349,15 @@ export function CashierDashboard() {
 
       {/* Tabs */}
       <div className="backdrop-blur-xl bg-white/60 border border-white/50 shadow-lg overflow-hidden mb-0 flex-1">
-        <div className="flex flex-col sm:flex-row border-b border-white/30">
+        <div className="flex border-b border-white/30">
           <button
             onClick={() => setActiveTab("online")}
-            className={`flex-1 px-4 sm:px-6 py-4 font-bold transition-all ${
+            className={`px-6 py-4 font-bold transition-all flex-1 ${
               activeTab === "online"
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
             }`}
-            style={activeTab === "online" ? { backgroundColor: "var(--electron-blue)" } : {}}
+            style={activeTab === "online" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(255,255,255,0.3)" }}
           >
             <div className="flex items-center justify-center gap-2">
               <CreditCard className="w-5 h-5" />
@@ -366,12 +366,12 @@ export function CashierDashboard() {
           </button>
           <button
             onClick={() => setActiveTab("cash")}
-            className={`flex-1 px-4 sm:px-6 py-4 font-bold transition-all ${
+            className={`px-6 py-4 font-bold transition-all flex-1 ${
               activeTab === "cash"
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
             }`}
-            style={activeTab === "cash" ? { backgroundColor: "var(--electron-blue)" } : {}}
+            style={activeTab === "cash" ? { backgroundColor: "var(--electron-blue)" } : { backgroundColor: "rgba(255,255,255,0.3)" }}
           >
             <div className="flex items-center justify-center gap-2">
               <Banknote className="w-5 h-5" />
