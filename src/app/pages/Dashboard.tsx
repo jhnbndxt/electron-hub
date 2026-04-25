@@ -29,9 +29,23 @@ export function Dashboard() {
   const { userData, enrollmentProgress, hasVisitedPayment } = useAuth();
   const { openChat } = useChat();
   const [rejectedDocuments, setRejectedDocuments] = useState<Array<{ name: string; comment: string }>>([]);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
   
   // Get first name from full name
   const firstName = userData?.name ? userData.name.split(" ")[0] : "Student";
+
+  // Check if this is the user's first login
+  useEffect(() => {
+    if (!userData?.id) return;
+    
+    const loginTrackKey = `user_${userData.id}_has_logged_in`;
+    const hasLoggedInBefore = localStorage.getItem(loginTrackKey);
+    
+    if (!hasLoggedInBefore) {
+      setIsFirstLogin(true);
+      localStorage.setItem(loginTrackKey, "true");
+    }
+  }, [userData?.id]);
 
   // Check for rejected documents from Supabase
   useEffect(() => {
@@ -272,7 +286,7 @@ export function Dashboard() {
             </div>
 
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-5xl lg:text-[3.65rem]">
-              Welcome back,
+              {isFirstLogin ? "Welcome" : "Welcome back"},
               <span className="bg-gradient-to-r from-[#1E3A8A] via-[#2563EB] to-[#B91C1C] bg-clip-text pl-3 text-transparent">
                 {firstName}
               </span>

@@ -18,19 +18,25 @@ export function DashboardPage() {
   const completionPercentage = 33; // Example: assessment completed
   const { userData } = useAuth();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [isFirstLogin, setIsFirstLogin] = useState(false);
 
   // Get user's name
   const userName = userData?.name || "Student";
 
   // Show welcome modal when component mounts
   useEffect(() => {
-    // Check if we should show the modal (e.g., first visit after login)
-    const hasSeenWelcome = sessionStorage.getItem("hasSeenWelcome");
-    if (!hasSeenWelcome) {
+    if (!userData?.id) return;
+    
+    // Check if this is the user's first login
+    const loginTrackKey = `user_${userData.id}_has_logged_in`;
+    const hasLoggedInBefore = localStorage.getItem(loginTrackKey);
+    
+    if (!hasLoggedInBefore) {
+      setIsFirstLogin(true);
       setShowWelcomeModal(true);
-      sessionStorage.setItem("hasSeenWelcome", "true");
+      localStorage.setItem(loginTrackKey, "true");
     }
-  }, []);
+  }, [userData?.id]);
 
   const handleCloseModal = () => {
     setShowWelcomeModal(false);
@@ -41,7 +47,7 @@ export function DashboardPage() {
       <div className="space-y-8 w-full">
         {/* Welcome Section */}
         <div>
-          <h1 className="text-4xl mb-2">Welcome back, {userName}!</h1>
+          <h1 className="text-4xl mb-2">{isFirstLogin ? "Welcome" : "Welcome back"}, {userName}!</h1>
           <p className="text-gray-600">
             Here's your enrollment progress and important updates
           </p>
@@ -287,7 +293,7 @@ export function DashboardPage() {
                 className="text-3xl font-semibold mb-3"
                 style={{ color: "#1E3A8A" }}
               >
-                Welcome back, {userName}!
+                {isFirstLogin ? "Welcome" : "Welcome back"}, {userName}!
               </h2>
               <p className="text-gray-600 mb-8 leading-relaxed">
                 We're excited to have you here. Your enrollment journey continues—let's make it great together!
