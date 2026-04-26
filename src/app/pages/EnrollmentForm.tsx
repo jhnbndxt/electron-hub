@@ -288,8 +288,9 @@ export function EnrollmentForm() {
 
   // Load AI assessment results on mount
   useEffect(() => {
-    const userEmail = userData?.email || "student@gmail.com";
-    
+    const userEmail = userData?.email;
+    if (!userEmail) return;
+
     const initializeForm = async () => {
       // Check if enrollment already submitted
       const { data: existingEnrollment } = await checkExistingEnrollment(userEmail);
@@ -669,9 +670,18 @@ export function EnrollmentForm() {
       // Update enrollment progress
       updateEnrollmentProgress("Documents Submitted", "completed");
       updateEnrollmentProgress("Documents Verified", "current");
-      
-      // Navigate to payment
-      navigate("/dashboard/payment");
+
+      const uploadedDocuments = Object.entries(documentFiles)
+        .filter(([, file]) => file)
+        .map(([docType]) => ({ document_type: docType }));
+
+      setSubmittedSummaryData(normalizeSubmittedRecord({
+        ...enrollmentResult,
+        enrollment_documents: uploadedDocuments,
+        form_data: enrollmentData,
+      }));
+      setIsSubmittedEnrollment(true);
+      setCurrentPage(7);
     }
   };
 
@@ -1285,7 +1295,22 @@ export function EnrollmentForm() {
       .filter(Boolean)
       .join(" ");
     const documents = summaryData.documents || [];
-    const hasDocument = (key: string) => documents.some((doc: any) => doc.document_type === key || doc.type === key);
+    const hasDocument = (key: string) => {
+      if (documents.some((doc: any) => doc.document_type === key || doc.type === key)) {
+        return true;
+      }
+
+      const documentField = summaryData[key as keyof FormData];
+      if (documentField instanceof File) {
+        return true;
+      }
+      return typeof documentField === "string" && documentField.length > 0;
+    };
+
+    const summaryTitle = isSubmittedEnrollment ? "Enrollment Summary" : "Review Your Enrollment";
+    const summaryNote = isSubmittedEnrollment
+      ? "You have successfully submitted your enrollment information."
+      : "Review the information below before submitting your enrollment.";
 
     return (
       <motion.div
@@ -1296,10 +1321,26 @@ export function EnrollmentForm() {
         <div className="flex flex-col gap-2">
           <div className="inline-flex items-center gap-3 rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-900">
             <Eye className="w-4 h-4" />
-            Enrollment Summary
+            {summaryTitle}
           </div>
-          <p className="text-gray-600">You have successfully submitted your enrollment information.</p>
+          <p className="text-gray-600">{summaryNote}</p>
         </div>
+        {!isSubmittedEnrollment && (
+          <div className="rounded-3xl border border-slate-200 bg-blue-50 p-4 text-sm text-slate-700">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={certificationChecked}
+                onChange={(e) => setCertificationChecked(e.target.checked)}
+                className="mt-1 h-4 w-4 text-blue-600"
+              />
+              <span>
+                I certify that all information provided is true and correct. I understand that submitting false information
+                may result in enrollment delays or denial.
+              </span>
+            </label>
+          </div>
+        )}
 
         <div className="grid gap-6">
           <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm">
@@ -1468,12 +1509,14 @@ export function EnrollmentForm() {
             Student Enrollment System
           </div>
           <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
-            {isSubmittedEnrollment ? "Enrollment Summary" : "Enrollment Form"}
+            {isSubmittedEnrollment ? "Enrollment Summary" : currentPage === 7 ? "Enrollment Review" : "Enrollment Form"}
           </h1>
           <p className="text-gray-600 text-lg">
             {isSubmittedEnrollment
               ? "You have successfully submitted your enrollment information."
-              : "Please complete all required fields to proceed with your enrollment"}
+              : currentPage === 7
+              ? "Review your enrollment details below, then submit when you are ready."
+              : "Please complete all required fields to proceed with your enrollment."}
           </p>
         </div>
 
@@ -1526,6 +1569,24 @@ export function EnrollmentForm() {
             >
               Next
               <ArrowRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+        {currentPage === 7 && !isSubmittedEnrollment && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button
+              onClick={handlePrevious}
+              className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              Previous
+            </button>
+            <button
+              onClick={handleSubmit}
+              className="w-full sm:w-auto sm:ml-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
+              style={{ backgroundColor: "var(--electron-blue)" }}
+            >
+              Submit Enrollment
             </button>
           </div>
         )}
