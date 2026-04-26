@@ -2,12 +2,14 @@ import { useState } from "react";
 import { X, Sparkles, Camera } from "lucide-react";
 
 // Import images properly
-const img1 = "";
-const img2 = "";
-const img3 = "";
-const img4 = "";
-const img5 = "";
-const img6 = "";
+import img1 from "../../assets/18b44e3723251e412bd0fadd217ea61051dcdfa2.png";
+import img2 from "../../assets/590113ba9bb2e19a69cb0e1f3d4b2211789ff738.png";
+import img3 from "../../assets/63a49be5401f5c07dc8ee76ecbfe113ae15de5c4.png";
+import img4 from "../../assets/electron_malanday_campus.jpg";
+import img5 from "../../assets/b16ae30d5d6d39f2bef489483d492fd75e4a3817.png";
+import img6 from "../../assets/b90a269a02856b8f5b6c9cd41bf07f1c424e73b7.png";
+import img7 from "../../assets/e436fd159160a21a1f7541a2f6b43cc9616733f5.png";
+import img8 from "../../assets/fadfc2d28d8ed64cd497ea15bd077ecd2fef12d8.png";
 
 export function Gallery() {
   const galleryItems = [
@@ -49,13 +51,13 @@ export function Gallery() {
     },
     {
       id: 7,
-      src: img4,
+      src: img7,
       title: "Campus Overview",
       category: "Campus",
     },
     {
       id: 8,
-      src: img3,
+      src: img8,
       title: "Student Performance",
       category: "Events",
     },

@@ -229,16 +229,34 @@ export function RootLayout() {
               <h3 className="text-lg mb-4">Quick Links</h3>
               <div className="space-y-2">
                 <Link
+                  to="/"
+                  className="block text-sm text-blue-200 hover:text-white"
+                >
+                  Home
+                </Link>
+                <Link
                   to="/about"
                   className="block text-sm text-blue-200 hover:text-white"
                 >
                   About Us
                 </Link>
                 <Link
-                  to="/enrollment"
+                  to="/gallery"
+                  className="block text-sm text-blue-200 hover:text-white"
+                >
+                  Gallery
+                </Link>
+                <Link
+                  to="/enrollment-info"
                   className="block text-sm text-blue-200 hover:text-white"
                 >
                   Enrollment
+                </Link>
+                <Link
+                  to="/assessment"
+                  className="block text-sm text-blue-200 hover:text-white"
+                >
+                  Assessment
                 </Link>
                 <Link
                   to="/contact"

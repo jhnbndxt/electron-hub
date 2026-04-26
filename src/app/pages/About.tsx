@@ -1,5 +1,6 @@
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { GraduationCap, Lightbulb, Trophy, Zap, Quote, Sparkles } from "lucide-react";
+import campusPreview from "../../assets/electron_malanday_campus.jpg";
 
 export function About() {
   return (
@@ -160,7 +161,7 @@ export function About() {
           <div className="relative max-w-4xl mx-auto mb-12">
             <div className="absolute inset-0 rounded-2xl transform translate-x-4 translate-y-4" style={{ backgroundColor: "#1E3A8A", opacity: 0.1 }}></div>
             <ImageWithFallback
-              src="https://images.unsplash.com/photo-1657690939134-2fc25dfa0cce?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2hvb2wlMjBidWlsZGluZyUyMGVudHJhbmNlJTIwcGhpbGlwcGluZXMlMjBhcmNoaXRlY3R1cmV8ZW58MXx8fHwxNzc0NTI2MjI1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+              src={campusPreview}
               alt="Electron College Malanday Building"
               className="relative z-10 rounded-2xl shadow-2xl w-full h-[500px] object-cover"
             />
