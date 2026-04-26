@@ -97,11 +97,26 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   // Get form data for enrollment form display
   const getFormData = () => {
     if (reviewingStudent.formData) return reviewingStudent.formData;
-    if (reviewingStudent.enrollmentData?.form_data) return reviewingStudent.enrollmentData.form_data;
-    return null;
+    const rawFormData = reviewingStudent.enrollmentData?.form_data;
+    if (!rawFormData) return null;
+    if (typeof rawFormData === "string") {
+      try {
+        return JSON.parse(rawFormData);
+      } catch {
+        return null;
+      }
+    }
+    return rawFormData;
   };
 
   const formData = getFormData();
+
+  const formatBool = (value: boolean | undefined) => (value ? "Yes" : "No");
+  const guardianSourceLabel = formData?.guardianSource === "father"
+    ? "Same as Father"
+    : formData?.guardianSource === "mother"
+    ? "Same as Mother"
+    : formData?.guardianSource || "N/A";
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -173,12 +188,22 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                   <div>
                     <h4 className="text-sm font-bold text-gray-900 mb-2">Personal Information</h4>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Full Name:</span> <span className="font-medium">{formData.firstName} {formData.middleName} {formData.lastName}</span></div>
+                      <div><span className="text-gray-500">Admission Type:</span> <span className="font-medium">{formData.admissionType}</span></div>
+                      <div><span className="text-gray-500">Previous Student ID:</span> <span className="font-medium">{formData.previousStudentId || 'N/A'}</span></div>
                       <div><span className="text-gray-500">LRN:</span> <span className="font-medium">{formData.lrn}</span></div>
+                      <div><span className="text-gray-500">Full Name:</span> <span className="font-medium">{`${formData.lastName || ''}, ${formData.firstName || ''} ${formData.middleName || ''}`.trim()}</span></div>
+                      <div><span className="text-gray-500">Suffix:</span> <span className="font-medium">{formData.suffix || 'None'}</span></div>
                       <div><span className="text-gray-500">Sex:</span> <span className="font-medium">{formData.sex}</span></div>
+                      <div><span className="text-gray-500">Civil Status:</span> <span className="font-medium">{formData.civilStatus}</span></div>
+                      <div><span className="text-gray-500">Religion:</span> <span className="font-medium">{formData.religion}</span></div>
+                      <div><span className="text-gray-500">Nationality:</span> <span className="font-medium">{formData.nationality}</span></div>
+                      <div><span className="text-gray-500">Disability:</span> <span className="font-medium">{formData.disability}{formData.disability === 'Others' && formData.disabilityOther ? ` — ${formData.disabilityOther}` : ''}</span></div>
+                      <div><span className="text-gray-500">Indigenous Group:</span> <span className="font-medium">{formData.indigenousGroup}{formData.indigenousGroup === 'Others' && formData.indigenousGroupOther ? ` — ${formData.indigenousGroupOther}` : ''}</span></div>
                       <div><span className="text-gray-500">Birthday:</span> <span className="font-medium">{formData.birthday}</span></div>
-                      <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{formData.contactNumber}</span></div>
                       <div><span className="text-gray-500">Email:</span> <span className="font-medium">{formData.email}</span></div>
+                      <div><span className="text-gray-500">Contact Number:</span> <span className="font-medium">{formData.contactNumber}</span></div>
+                      <div><span className="text-gray-500">Facebook / Messenger:</span> <span className="font-medium">{formData.facebookName}</span></div>
+                      <div><span className="text-gray-500">Working Student:</span> <span className="font-medium">{formatBool(formData.isWorkingStudent)}</span></div>
                     </div>
                   </div>
 
@@ -188,31 +213,51 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div><span className="text-gray-500">Region:</span> <span className="font-medium">{formData.region}</span></div>
                       <div><span className="text-gray-500">Province:</span> <span className="font-medium">{formData.province || 'N/A'}</span></div>
-                      <div><span className="text-gray-500">City:</span> <span className="font-medium">{formData.city}</span></div>
+                      <div><span className="text-gray-500">City / Municipality:</span> <span className="font-medium">{formData.city}</span></div>
                       <div><span className="text-gray-500">Barangay:</span> <span className="font-medium">{formData.barangay}</span></div>
                       <div className="col-span-2"><span className="text-gray-500">Home Address:</span> <span className="font-medium">{formData.homeAddress}</span></div>
                     </div>
                   </div>
 
-                  {/* Academic Information */}
+                  {/* Parents and Guardian */}
                   <div className="pt-3 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Academic Information</h4>
+                    <h4 className="text-sm font-bold text-gray-900 mb-2">Parents & Guardian</h4>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Preferred Track:</span> <span className="font-medium">{formData.preferredTrack}</span></div>
-                      <div><span className="text-gray-500">School Year:</span> <span className="font-medium">{formData.schoolYear}</span></div>
-                      <div><span className="text-gray-500">Grade Level:</span> <span className="font-medium">{formData.gradeLevel}</span></div>
-                      <div><span className="text-gray-500">School Name:</span> <span className="font-medium">{formData.schoolName}</span></div>
+                      <div><span className="text-gray-500">Father's Name:</span> <span className="font-medium">{`${formData.fatherLastName || ''}, ${formData.fatherFirstName || ''} ${formData.fatherMiddleName || ''}`.trim()}</span></div>
+                      <div><span className="text-gray-500">Father's Occupation:</span> <span className="font-medium">{formData.fatherOccupation}</span></div>
+                      <div><span className="text-gray-500">Father's Contact:</span> <span className="font-medium">{formData.fatherContact}</span></div>
+                      <div><span className="text-gray-500">Mother's Maiden Name:</span> <span className="font-medium">{formData.motherMaidenName}</span></div>
+                      <div><span className="text-gray-500">Mother's Name:</span> <span className="font-medium">{`${formData.motherLastName || ''}, ${formData.motherFirstName || ''} ${formData.motherMiddleName || ''}`.trim()}</span></div>
+                      <div><span className="text-gray-500">Mother's Occupation:</span> <span className="font-medium">{formData.motherOccupation}</span></div>
+                      <div><span className="text-gray-500">Mother's Contact:</span> <span className="font-medium">{formData.motherContact}</span></div>
+                      <div><span className="text-gray-500">Guardian Relationship:</span> <span className="font-medium">{guardianSourceLabel}</span></div>
+                      <div><span className="text-gray-500">Guardian Name:</span> <span className="font-medium">{`${formData.guardianLastName || ''}, ${formData.guardianFirstName || ''} ${formData.guardianMiddleName || ''}`.trim() || 'N/A'}</span></div>
+                      <div><span className="text-gray-500">Guardian Occupation:</span> <span className="font-medium">{formData.guardianOccupation || 'N/A'}</span></div>
+                      <div><span className="text-gray-500">Guardian Contact:</span> <span className="font-medium">{formData.guardianContact || 'N/A'}</span></div>
+                      <div className="col-span-2"><span className="text-gray-500">4Ps Member:</span> <span className="font-medium">{formatBool(formData.is4PsMember)}</span></div>
                     </div>
                   </div>
 
-                  {/* Guardian Information */}
+                  {/* Enrollment Information */}
                   <div className="pt-3 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Guardian Information</h4>
+                    <h4 className="text-sm font-bold text-gray-900 mb-2">Enrollment Information</h4>
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Guardian Name:</span> <span className="font-medium">{formData.guardianName}</span></div>
-                      <div><span className="text-gray-500">Relationship:</span> <span className="font-medium">{formData.guardianRelationship}</span></div>
-                      <div><span className="text-gray-500">Contact:</span> <span className="font-medium">{formData.guardianContact}</span></div>
-                      <div><span className="text-gray-500">Address:</span> <span className="font-medium">{formData.guardianAddress}</span></div>
+                      <div><span className="text-gray-500">Preferred Track:</span> <span className="font-medium">{formData.preferredTrack}</span></div>
+                      <div><span className="text-gray-500">Elective 1:</span> <span className="font-medium">{formData.elective1}</span></div>
+                      <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{formData.elective2}</span></div>
+                      <div><span className="text-gray-500">Year Level:</span> <span className="font-medium">{formData.yearLevel}</span></div>
+                    </div>
+                  </div>
+
+                  {/* Educational Background */}
+                  <div className="pt-3 border-t border-gray-300/50">
+                    <h4 className="text-sm font-bold text-gray-900 mb-2">Educational Background</h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div><span className="text-gray-500">Primary School:</span> <span className="font-medium">{formData.primarySchool}</span></div>
+                      <div><span className="text-gray-500">Year Graduated:</span> <span className="font-medium">{formData.primaryYearGraduated}</span></div>
+                      <div><span className="text-gray-500">Secondary School:</span> <span className="font-medium">{formData.secondarySchool}</span></div>
+                      <div><span className="text-gray-500">Year Graduated:</span> <span className="font-medium">{formData.secondaryYearGraduated}</span></div>
+                      <div className="col-span-2"><span className="text-gray-500">Grade 10 Adviser:</span> <span className="font-medium">{formData.grade10Adviser || 'N/A'}</span></div>
                     </div>
                   </div>
                 </div>
