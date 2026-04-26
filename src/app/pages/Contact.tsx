@@ -253,7 +253,7 @@ export function Contact() {
           </h2>
           <div className="bg-white rounded-lg shadow-lg overflow-hidden" style={{ height: "450px" }}>
             <iframe
-              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.0347837276986!2d120.98!3d14.7!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMTTCsDQyJzAwLjAiTiAxMjDCsDU4JzQ4LjAiRQ!5e0!3m2!1sen!2sph!4v1234567890"
+              src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.929256610402!2d120.9550477758758!3d14.71659157422483!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b39615a3724f%3A0x4489491a2e00c9a6!2sElectron%20College!5e0!3m2!1sen!2sph!4v1777181635629!5m2!1sen!2sph"
               width="100%"
               height="100%"
               style={{ border: 0 }}
