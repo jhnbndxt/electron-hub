@@ -64,7 +64,6 @@ export function StudentRecords() {
         email: studentEmail,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at || '',
         track: normalizeTrack(
-          enrollment.preferred_track ||
           formData.preferred_track ||
           formData.preferredTrack ||
           formData.recommended_track ||

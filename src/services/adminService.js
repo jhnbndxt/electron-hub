@@ -328,7 +328,6 @@ export const getEnrolledStudents = async () => {
         id,
         user_id,
         form_data,
-        preferred_track,
         status,
         enrollment_date,
         created_at
