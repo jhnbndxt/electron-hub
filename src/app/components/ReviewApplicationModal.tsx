@@ -48,6 +48,7 @@ interface ReviewApplicationModalProps {
   handleRejectDocument: () => void;
   handleBackToDocuments: () => void;
   handleFinalApprove: () => void;
+  handleRejectApplication: () => void;
   documentNames: Record<string, string>;
   showFormData: boolean;
   setShowFormData: React.Dispatch<React.SetStateAction<boolean>>;
@@ -65,6 +66,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   handleRejectDocument,
   handleBackToDocuments,
   handleFinalApprove,
+  handleRejectApplication,
   documentNames,
   showFormData,
   setShowFormData,
@@ -287,6 +289,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
               <div className="grid gap-4 md:grid-cols-2">
                 {docKeys.map((key) => {
                   const doc = docs[key];
+                  const isProcessed = doc.status === "approved" || doc.status === "rejected";
                   return (
                     <div key={key} className="flex h-full flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
                       <div className="space-y-4">
@@ -306,15 +309,33 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                           </span>
                         </div>
                         {doc.rejectionComment && (
-                          <p className="text-sm text-red-700">{doc.rejectionComment}</p>
+                          <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                            <p className="text-sm font-medium text-red-700 mb-1">Rejection Reason:</p>
+                            <p className="text-sm text-red-600">{doc.rejectionComment}</p>
+                          </div>
+                        )}
+                        {isProcessed && (
+                          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-start gap-2">
+                            <div className="text-blue-600 mt-0.5 flex-shrink-0">🔒</div>
+                            <p className="text-xs text-blue-700">
+                              {doc.status === "approved" 
+                                ? "This document has been approved and is locked from further changes."
+                                : "This document has been rejected. Student must upload a new version to proceed."}
+                            </p>
+                          </div>
                         )}
                       </div>
                       <button
                         type="button"
                         onClick={() => handleViewDocument(key)}
-                        className="mt-4 inline-flex items-center justify-center rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                        disabled={isProcessed}
+                        className={`mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
+                          isProcessed
+                            ? "bg-gray-400 cursor-not-allowed opacity-60"
+                            : "bg-blue-600 hover:bg-blue-700"
+                        }`}
                       >
-                        Review document
+                        {isProcessed ? "Locked" : "Review document"}
                       </button>
                     </div>
                   );
@@ -337,6 +358,21 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                     {selectedDocument.data.status.toUpperCase()}
                   </span>
                 </div>
+
+                {/* Status Lock Alert */}
+                {(selectedDocument.data.status === "approved" || selectedDocument.data.status === "rejected") && (
+                  <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3">
+                    <div className="text-2xl flex-shrink-0">🔒</div>
+                    <div>
+                      <p className="font-semibold text-yellow-800">Document is Locked</p>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        {selectedDocument.data.status === "approved"
+                          ? "This document has been approved and cannot be changed. Further actions are disabled to prevent accidental modifications."
+                          : "This document has been rejected. The student must upload a new replacement file to reopen it for review. Your review decision will be locked."}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
                   <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -400,7 +436,8 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                         onChange={(e) => setDocumentRejectionComment(e.target.value)}
                         placeholder="Explain why this document is being rejected..."
                         rows={4}
-                        className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+                        disabled={selectedDocument.data.status !== "pending_review"}
+                        className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
                       />
                     </div>
                   </div>
@@ -417,13 +454,23 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                   <div className="flex flex-col gap-3 sm:flex-row">
                     <button
                       onClick={handleRejectDocument}
-                      className="min-w-[120px] rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700"
+                      disabled={selectedDocument.data.status !== "pending_review"}
+                      className={`min-w-[120px] rounded-full px-5 py-3 text-sm font-semibold text-white transition ${
+                        selectedDocument.data.status !== "pending_review"
+                          ? "bg-red-400 cursor-not-allowed opacity-50"
+                          : "bg-red-600 hover:bg-red-700"
+                      }`}
                     >
                       Reject
                     </button>
                     <button
                       onClick={handleApproveDocument}
-                      className="min-w-[120px] rounded-full bg-green-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-green-700"
+                      disabled={selectedDocument.data.status !== "pending_review"}
+                      className={`min-w-[120px] rounded-full px-5 py-3 text-sm font-semibold text-white transition ${
+                        selectedDocument.data.status !== "pending_review"
+                          ? "bg-green-400 cursor-not-allowed opacity-50"
+                          : "bg-green-600 hover:bg-green-700"
+                      }`}
                     >
                       Approve
                     </button>
@@ -440,14 +487,25 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                 ? 'All documents approved. Ready for final approval.'
                 : 'Approve all documents first to continue.'}
             </p>
-            <button
-              type="button"
-              onClick={handleFinalApprove}
-              disabled={!allDocumentsApproved}
-              className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
-            >
-              Approve Application
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={handleRejectApplication}
+                className="inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition bg-red-600 hover:bg-red-700"
+              >
+                <XCircle className="mr-2 h-4 w-4" />
+                Reject Application
+              </button>
+              <button
+                type="button"
+                onClick={handleFinalApprove}
+                disabled={!allDocumentsApproved}
+                className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
+              >
+                <CheckCircle className="mr-2 h-4 w-4" />
+                Approve Application
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -28,6 +28,7 @@ import {
   updateEnrollmentStatus,
   createAuditLog,
   approveEnrollment,
+  rejectEnrollment,
   resolveUserId,
   upsertEnrollmentProgress,
   getAssessmentResultByStudentId,
@@ -511,6 +512,55 @@ export function AdminDashboard() {
     }
   };
 
+  const handleRejectApplication = async () => {
+    if (!reviewingStudent) return;
+
+    // Show confirmation before rejecting the entire application
+    const confirmReject = window.confirm(
+      `Are you sure you want to REJECT the entire application for ${reviewingStudent.studentName || reviewingStudent.name || 'this student'}?\n\nThis action will:\n- Mark the application as REJECTED\n- Notify the student\n- Prevent further modifications\n\nThis action cannot be undone easily.`
+    );
+
+    if (!confirmReject) return;
+
+    try {
+      // Reject the entire enrollment
+      const { error } = await rejectEnrollment(
+        reviewingStudent.id,
+        "Application rejected during document review.",
+        actorReference
+      );
+
+      if (error) {
+        alert(`❌ Error rejecting application: ${error}`);
+        return;
+      }
+
+      // Notify the student
+      try {
+        await supabase.from('notifications').insert({
+          user_id: await resolveUserId(reviewingStudent.user_id || reviewingStudent.email || ""),
+          type: 'ENROLLMENT_REJECTED',
+          title: 'Application Rejected',
+          message: 'Your application was rejected during the document review process.',
+          is_read: false,
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      alert(`✅ Application REJECTED. Student has been notified.`);
+      setReviewingStudent(null);
+      setSelectedDocument(null);
+      setDocumentRejectionComment("");
+      loadApplications();
+      loadAuditLogs();
+      calculateStats();
+    } catch (error) {
+      console.error('Error rejecting application:', error);
+      alert(`❌ Error rejecting application: ${error}`);
+    }
+  };
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case "pending":
@@ -855,6 +905,7 @@ export function AdminDashboard() {
           setDocumentRejectionComment("");
         }}
         handleFinalApprove={handleApprove}
+        handleRejectApplication={handleRejectApplication}
         documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}

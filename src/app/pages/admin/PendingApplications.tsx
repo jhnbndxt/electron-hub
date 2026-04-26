@@ -23,6 +23,7 @@ import {
   upsertEnrollmentProgress,
   getAssessmentResultByStudentId,
 } from "../../../services/adminService";
+import { triggerNotification } from "../../../services/notificationService";
 import { supabase } from "../../../supabase";
 
 interface Student {
@@ -308,6 +309,53 @@ export function PendingApplications() {
     setReviewingStudent(null);
     setShowFormData(false);
     loadApplications();
+  };
+
+  const handleRejectApplication = async () => {
+    if (!reviewingStudent) return;
+
+    // Show confirmation before rejecting the entire application
+    const confirmReject = window.confirm(
+      `Are you sure you want to REJECT the entire application for ${reviewingStudent.studentName || reviewingStudent.name || 'this student'}?\n\nThis action will:\n- Mark the application as REJECTED\n- Notify the student\n- Prevent further modifications\n\nThis action cannot be undone easily.`
+    );
+
+    if (!confirmReject) return;
+
+    try {
+      // Reject the entire enrollment
+      const { error } = await rejectEnrollment(
+        reviewingStudent.id,
+        "Application rejected during document review.",
+        actorReference
+      );
+
+      if (error) {
+        alert(`❌ Error rejecting application: ${error}`);
+        return;
+      }
+
+      // Notify the student
+      try {
+        await triggerNotification(
+          reviewingStudent.user_id || reviewingStudent.email || "",
+          'ENROLLMENT_REJECTED',
+          { reason: "Your application was rejected during the document review process." }
+        );
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      alert(`✅ Application REJECTED. Student has been notified.`);
+      setShowDocumentModal(false);
+      setSelectedDocument(null);
+      setReviewingStudent(null);
+      setShowFormData(false);
+      setDocumentRejectionComment("");
+      loadApplications();
+    } catch (error) {
+      console.error('Error rejecting application:', error);
+      alert(`❌ Error rejecting application: ${error}`);
+    }
   };
 
   const getMissingDocuments = (student: Student): string[] => {
@@ -832,6 +880,7 @@ export function PendingApplications() {
           setDocumentRejectionComment("");
         }}
         handleFinalApprove={handleFinalApproveApplication}
+        handleRejectApplication={handleRejectApplication}
         documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}
