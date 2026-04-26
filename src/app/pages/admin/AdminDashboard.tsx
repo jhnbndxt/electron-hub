@@ -32,6 +32,7 @@ import {
   resolveUserId,
   upsertEnrollmentProgress,
   getAssessmentResultByStudentId,
+  getDashboardAnalytics,
 } from "../../../services/adminService";
 import { supabase } from "../../../supabase";
 
@@ -208,11 +209,21 @@ export function AdminDashboard() {
   };
 
   const calculateStats = async () => {
-    const { data: applications, error: appError } = await getPendingApplications();
+    const [
+      { data: applications, error: appError },
+      { data: analytics, error: analyticsError },
+    ] = await Promise.all([
+      getPendingApplications(),
+      getDashboardAnalytics(),
+    ]);
+
+    if (analyticsError) {
+      console.error('Error loading dashboard analytics:', analyticsError);
+    }
     
     if (!appError && applications) {
       setOverviewStats({
-        totalStudents: (applications.length || 0) + 5, // Approximation
+        totalStudents: analytics?.enrolledStudents || 0,
         pendingApplications: applications.length || 0,
         verifiedDocuments: applications.filter((app: any) => 
           app.enrollment_documents?.length === 7 // All docs uploaded
