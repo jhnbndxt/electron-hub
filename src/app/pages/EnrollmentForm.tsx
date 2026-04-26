@@ -156,6 +156,7 @@ export function EnrollmentForm() {
   const [isSubmittedEnrollment, setIsSubmittedEnrollment] = useState(false);
   const [submittedSummaryData, setSubmittedSummaryData] = useState<Record<string, any> | null>(null);
   const [certificationChecked, setCertificationChecked] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
@@ -616,9 +617,17 @@ export function EnrollmentForm() {
       alert("Please certify that the information you provided is true and correct before submitting.");
       return;
     }
-    
-    if (validatePage(6)) {
-      const userEmail = userData?.email || "student@gmail.com";
+
+    if (!validatePage(6)) return;
+
+    const userEmail = userData?.email;
+    if (!userEmail) {
+      alert("Unable to submit enrollment. Please sign in again.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
       const userId = userEmail; // Use email as user identifier (custom auth, not Supabase Auth)
       
       // Create enrollment submission data
@@ -682,6 +691,12 @@ export function EnrollmentForm() {
       }));
       setIsSubmittedEnrollment(true);
       setCurrentPage(7);
+      navigate("/dashboard/payment");
+    } catch (error) {
+      console.error('Enrollment submission error:', error);
+      alert('Failed to submit enrollment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1325,22 +1340,6 @@ export function EnrollmentForm() {
           </div>
           <p className="text-gray-600">{summaryNote}</p>
         </div>
-        {!isSubmittedEnrollment && (
-          <div className="rounded-3xl border border-slate-200 bg-blue-50 p-4 text-sm text-slate-700">
-            <label className="flex items-start gap-3">
-              <input
-                type="checkbox"
-                checked={certificationChecked}
-                onChange={(e) => setCertificationChecked(e.target.checked)}
-                className="mt-1 h-4 w-4 text-blue-600"
-              />
-              <span>
-                I certify that all information provided is true and correct. I understand that submitting false information
-                may result in enrollment delays or denial.
-              </span>
-            </label>
-          </div>
-        )}
 
         <div className="grid gap-6">
           <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm">
@@ -1494,6 +1493,22 @@ export function EnrollmentForm() {
               ))}
             </div>
           </section>
+          {!isSubmittedEnrollment && (
+            <div className="rounded-3xl border border-slate-200 bg-blue-50 p-4 text-sm text-slate-700">
+              <label className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={certificationChecked}
+                  onChange={(e) => setCertificationChecked(e.target.checked)}
+                  className="mt-1 h-4 w-4 text-blue-600"
+                />
+                <span>
+                  I certify that all information provided is true and correct. I understand that submitting false information
+                  may result in enrollment delays or denial.
+                </span>
+              </label>
+            </div>
+          )}
         </div>
       </motion.div>
     );
@@ -1573,22 +1588,31 @@ export function EnrollmentForm() {
           </div>
         )}
         {currentPage === 7 && !isSubmittedEnrollment && (
-          <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
-            <button
-              onClick={handlePrevious}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg"
-            >
-              <ArrowLeft className="w-5 h-5" />
-              Previous
-            </button>
-            <button
-              onClick={handleSubmit}
-              className="w-full sm:w-auto sm:ml-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
-              style={{ backgroundColor: "var(--electron-blue)" }}
-            >
-              Submit Enrollment
-            </button>
-          </div>
+          <>
+            {isSubmitting && (
+              <div className="rounded-3xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 mb-4">
+                Submitting your enrollment information. Please wait while we process your submission...
+              </div>
+            )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between">
+              <button
+                onClick={handlePrevious}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto px-6 py-3 bg-gray-300 text-gray-700 font-bold rounded-lg hover:bg-gray-400 transition-all flex items-center justify-center gap-2 shadow-md hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArrowLeft className="w-5 h-5" />
+                Previous
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto sm:ml-auto px-6 py-3 text-white font-bold rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ backgroundColor: "var(--electron-blue)" }}
+              >
+                {isSubmitting ? "Submitting..." : "Submit Enrollment"}
+              </button>
+            </div>
+          </>
         )}
       </div>
 
