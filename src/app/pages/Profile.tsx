@@ -94,7 +94,16 @@ export function Profile() {
         .order('created_at', { ascending: false })
         .limit(1);
       
-      setEnrollmentData(enrollments?.[0]?.form_data || enrollments?.[0] || null);
+      const latestEnrollment = enrollments?.[0];
+      setEnrollmentData(
+        latestEnrollment
+          ? {
+              ...latestEnrollment,
+              ...(latestEnrollment.form_data || {}),
+              enrollment_documents: latestEnrollment.enrollment_documents || [],
+            }
+          : null
+      );
     }
 
     // Check assessment history from Supabase
@@ -260,7 +269,9 @@ export function Profile() {
   const enrollmentDocuments =
     enrollmentData?.enrollment_documents ||
     (enrollmentData?.documents ? Object.values(enrollmentData.documents) : []);
-  const documentsVerified = enrollmentDocuments.filter((doc: any) => doc?.status === "approved").length;
+  const documentsVerified = enrollmentDocuments.filter(
+    (doc: any) => String(doc?.status || "").toLowerCase() === "approved"
+  ).length;
   const documentsSubmitted = enrollmentDocuments.filter((doc: any) => doc != null).length;
   const totalDocuments = 5; // Total required documents
   
