@@ -389,11 +389,20 @@ export function PublicLayout() {
             <div>
               <h3 className="font-semibold mb-3">Quick Links</h3>
               <div className="flex flex-col gap-2 text-sm">
+                <Link to="/" className="text-gray-300 hover:text-white">
+                  Home
+                </Link>
                 <Link to="/about" className="text-gray-300 hover:text-white">
                   About Us
                 </Link>
+                <Link to="/gallery" className="text-gray-300 hover:text-white">
+                  Gallery
+                </Link>
                 <Link to="/enrollment-info" className="text-gray-300 hover:text-white">
                   Enrollment
+                </Link>
+                <Link to="/assessment" className="text-gray-300 hover:text-white">
+                  Assessment
                 </Link>
                 <Link to="/contact" className="text-gray-300 hover:text-white">
                   Contact Us
