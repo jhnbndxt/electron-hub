@@ -368,44 +368,17 @@ export function Assessment() {
     });
   };
 
-  const scrollAssessmentTop = () => {
-    const scrollTarget =
-      (document.querySelector(".portal-glass-main") as HTMLElement | null) ||
-      document.scrollingElement ||
-      document.documentElement ||
-      document.body;
-
-    const scrollToTop = (element: HTMLElement | Element) => {
-      if (element instanceof HTMLElement && "scrollTo" in element) {
-        try {
-          (element as HTMLElement).scrollTo({ top: 0, behavior: "smooth" });
-        } catch {
-          (element as HTMLElement).scrollTop = 0;
-        }
-      } else {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-      }
-    };
-
-    scrollToTop(scrollTarget);
-  };
-
-  useEffect(() => {
-    const raf = window.requestAnimationFrame(() => {
-      scrollAssessmentTop();
-    });
-    return () => window.cancelAnimationFrame(raf);
-  }, [currentSection]);
-
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   const handlePrevious = () => {
     if (currentSection > 0) {
       setCurrentSection(currentSection - 1);
+      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
