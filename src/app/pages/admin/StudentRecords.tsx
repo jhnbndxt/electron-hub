@@ -42,7 +42,7 @@ export function StudentRecords() {
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || studentEmail || 'Unknown',
         email: studentEmail,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at || '',
-        strandEnrolled: formData.preferredTrack || formData.preferred_track || formData.recommendedTrack || formData.track || 'Not Set',
+        strandEnrolled: formData.preferredTrack || formData.preferred_track || formData.recommendedTrack || formData.track || enrollment.preferred_track || 'Not Set',
         status: enrollment.status || 'Enrolled',
         yearLevel: formData.yearLevel || formData.year_level || 'Grade 11',
       };

@@ -95,7 +95,7 @@ export function PendingApplications() {
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         aiTestScore: aiTestScore, // Will be null if not taken
         status: 'pending',
-        strandApplied: formData.preferredTrack || formData.track || 'Not Set',
+        strandApplied: formData.preferredTrack || formData.track || app.preferred_track || 'Not Set',
         documents: {
           psaBirthCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'birthCertificate') || false,
           form138: app.enrollment_documents?.some((d: any) => d.document_type === 'form138') || false,
