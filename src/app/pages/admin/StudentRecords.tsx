@@ -8,14 +8,35 @@ interface Student {
   name: string;
   email?: string;
   enrollmentDate: string;
-  strandEnrolled: string;
+  track: string;
   status: string;
   yearLevel: string;
 }
 
+const TRACK_OPTIONS = ["Academic", "Technical-Professional"] as const;
+
+const normalizeTrack = (value: unknown): string => {
+  const normalized = String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\s*-\s*/g, "-")
+    .toLowerCase();
+
+  if (normalized === "academic") return "Academic";
+  if (
+    normalized === "technical-professional" ||
+    normalized === "technical professional" ||
+    normalized === "technical_professional"
+  ) {
+    return "Technical-Professional";
+  }
+
+  return "";
+};
+
 export function StudentRecords() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStrand, setFilterStrand] = useState("all");
+  const [filterTrack, setFilterTrack] = useState("all");
   const [allStudents, setAllStudents] = useState<Student[]>([]);
 
   // Load enrolled students from Supabase
@@ -42,7 +63,14 @@ export function StudentRecords() {
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || studentEmail || 'Unknown',
         email: studentEmail,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at || '',
-        strandEnrolled: formData.preferredTrack || formData.preferred_track || formData.recommendedTrack || formData.track || enrollment.preferred_track || 'Not Set',
+        track: normalizeTrack(
+          enrollment.preferred_track ||
+          formData.preferred_track ||
+          formData.preferredTrack ||
+          formData.recommended_track ||
+          formData.recommendedTrack ||
+          formData.track
+        ) || 'Not Set',
         status: enrollment.status || 'Enrolled',
         yearLevel: formData.yearLevel || formData.year_level || 'Grade 11',
       };
@@ -51,28 +79,19 @@ export function StudentRecords() {
     setAllStudents(students);
   };
 
-  // Map strands to tracks
-  const getTrack = (strand: string): string => {
-    const academicStrands = ['STEM', 'ABM', 'HUMSS', 'GAS'];
-    const technicalStrands = ['TVL-ICT', 'TVL', 'ICT'];
-    
-    if (academicStrands.includes(strand)) return 'academic';
-    if (technicalStrands.includes(strand)) return 'technical-professional';
-    return 'all';
-  };
-
   // Filter students
-  let filteredStudents = allStudents.filter(
-    (student) =>
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.studentId.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  const selectedTrack = normalizeTrack(filterTrack);
+  const filteredStudents = allStudents.filter((student) => {
+    const matchesSearch =
+      !normalizedSearchQuery ||
+      student.name.toLowerCase().includes(normalizedSearchQuery) ||
+      student.studentId.toLowerCase().includes(normalizedSearchQuery);
+    const matchesTrack =
+      filterTrack === "all" || normalizeTrack(student.track) === selectedTrack;
 
-  if (filterStrand !== "all") {
-    filteredStudents = filteredStudents.filter(
-      (student) => getTrack(student.strandEnrolled) === filterStrand
-    );
-  }
+    return matchesSearch && matchesTrack;
+  });
 
   const getStatusStyle = (status: string) => {
     switch (status.toLowerCase()) {
@@ -130,18 +149,21 @@ export function StudentRecords() {
             />
           </div>
 
-          {/* Strand Filter */}
+          {/* Track Filter */}
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
-              value={filterStrand}
-              onChange={(e) => setFilterStrand(e.target.value)}
+              value={filterTrack}
+              onChange={(e) => setFilterTrack(e.target.value)}
               className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               style={{ color: "#374151" }}
             >
               <option value="all">All Tracks</option>
-              <option value="academic">Academic</option>
-              <option value="technical-professional">Technical-Professional</option>
+              {TRACK_OPTIONS.map((track) => (
+                <option key={track} value={track}>
+                  {track}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -177,7 +199,7 @@ export function StudentRecords() {
                   Name
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Strand
+                  Track
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Year Level
@@ -222,7 +244,7 @@ export function StudentRecords() {
                           className="inline-flex px-3 py-1 rounded-full text-xs font-semibold"
                           style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}
                         >
-                          {student.strandEnrolled}
+                          {student.track}
                         </span>
                       </td>
                       <td className="px-6 py-4">
