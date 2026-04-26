@@ -225,6 +225,12 @@ export async function triggerNotification(userId, trigger, additionalData = {}) 
       title: 'Documents Verified',
       message: 'All your documents have been verified and approved.',
     },
+    DOCUMENT_APPROVED: {
+      title: 'Document Approved',
+      message: additionalData.documentName 
+        ? `Your ${additionalData.documentName} has been approved.`
+        : 'Your document has been approved.',
+    },
     ENROLLMENT_APPROVED: {
       title: 'Enrollment Approved',
       message: 'Your enrollment has been approved. Welcome!',

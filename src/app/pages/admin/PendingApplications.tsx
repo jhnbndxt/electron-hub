@@ -219,6 +219,17 @@ export function PendingApplications() {
       ),
     }));
 
+    // Create notification for document approval
+    try {
+      await triggerNotification(
+        reviewingStudent.user_id || reviewingStudent.email || "",
+        'DOCUMENT_APPROVED',
+        { documentName: selectedDocument.name }
+      );
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+
     alert("✅ Document approved successfully!");
     setSelectedDocument(null);
     setDocumentRejectionComment("");

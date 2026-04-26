@@ -308,6 +308,19 @@ export function AdminDashboard() {
         ),
       }));
 
+      // Send notification to student
+      try {
+        await supabase.from('notifications').insert({
+          user_id: reviewingStudent.user_id || await resolveUserId(reviewingStudent.email || ""),
+          type: 'DOCUMENT_APPROVED',
+          title: 'Document Approved',
+          message: `Your ${selectedDocument.name} has been approved.`,
+          is_read: false,
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
       setSelectedDocument(null);
       setDocumentRejectionComment("");
     } catch (error) {
@@ -341,6 +354,19 @@ export function AdminDashboard() {
             : doc
         ),
       }));
+
+      // Send notification to student
+      try {
+        await supabase.from('notifications').insert({
+          user_id: reviewingStudent.user_id || await resolveUserId(reviewingStudent.email || ""),
+          type: 'DOCUMENT_REJECTED',
+          title: 'Document Rejected',
+          message: `Your ${selectedDocument.name} was rejected. Reason: ${documentRejectionComment}`,
+          is_read: false,
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
 
       setSelectedDocument(null);
       setDocumentRejectionComment("");
