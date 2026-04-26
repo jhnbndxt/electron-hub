@@ -377,13 +377,23 @@ export function PendingApplications() {
     return missing;
   };
 
+  // Map strands to tracks
+  const getTrack = (strand: string): string => {
+    const academicStrands = ['STEM', 'ABM', 'HUMSS', 'GAS'];
+    const technicalStrands = ['TVL-ICT', 'TVL', 'ICT'];
+    
+    if (academicStrands.includes(strand)) return 'academic';
+    if (technicalStrands.includes(strand)) return 'technical-professional';
+    return 'all';
+  };
+
   let filteredStudents = students.filter((student) =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (strandFilter !== "all") {
     filteredStudents = filteredStudents.filter(
-      (student) => student.strandApplied === strandFilter
+      (student) => getTrack(student.strandApplied) === strandFilter
     );
   }
 
@@ -578,13 +588,9 @@ export function PendingApplications() {
               className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
               style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
             >
-              <option value="all">All Strands</option>
-              <option value="STEM">STEM</option>
-              <option value="ABM">ABM</option>
-              <option value="HUMSS">HUMSS</option>
-              <option value="TVL-ICT">TVL-ICT</option>
-              <option value="ICT">ICT</option>
-              <option value="GAS">GAS</option>
+              <option value="all">All Tracks</option>
+              <option value="academic">Academic</option>
+              <option value="technical-professional">Technical-Professional</option>
             </select>
           </div>
 

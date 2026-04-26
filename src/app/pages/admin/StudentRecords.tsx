@@ -51,6 +51,16 @@ export function StudentRecords() {
     setAllStudents(students);
   };
 
+  // Map strands to tracks
+  const getTrack = (strand: string): string => {
+    const academicStrands = ['STEM', 'ABM', 'HUMSS', 'GAS'];
+    const technicalStrands = ['TVL-ICT', 'TVL', 'ICT'];
+    
+    if (academicStrands.includes(strand)) return 'academic';
+    if (technicalStrands.includes(strand)) return 'technical-professional';
+    return 'all';
+  };
+
   // Filter students
   let filteredStudents = allStudents.filter(
     (student) =>
@@ -60,7 +70,7 @@ export function StudentRecords() {
 
   if (filterStrand !== "all") {
     filteredStudents = filteredStudents.filter(
-      (student) => student.strandEnrolled === filterStrand
+      (student) => getTrack(student.strandEnrolled) === filterStrand
     );
   }
 
@@ -129,13 +139,9 @@ export function StudentRecords() {
               className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               style={{ color: "#374151" }}
             >
-              <option value="all">All Strands</option>
-              <option value="STEM">STEM</option>
-              <option value="HUMSS">HUMSS</option>
-              <option value="ABM">ABM</option>
-              <option value="GAS">GAS</option>
-              <option value="TVL-ICT">TVL-ICT</option>
-              <option value="ICT">ICT</option>
+              <option value="all">All Tracks</option>
+              <option value="academic">Academic</option>
+              <option value="technical-professional">Technical-Professional</option>
             </select>
           </div>
 
