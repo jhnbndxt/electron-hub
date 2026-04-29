@@ -263,13 +263,36 @@ async function syncVerifiedPaymentsToEnrollments() {
   }
 }
 
-// Get assessment result for a student by student_id
+// Get assessment result for a student by student_id or user_id (email)
 export const getAssessmentResultByStudentId = async (studentId) => {
   try {
+    let resolvedStudentId = studentId;
+
+    // If studentId looks like an email, resolve it to a UUID first
+    if (studentId && typeof studentId === 'string' && studentId.includes('@')) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', studentId)
+        .maybeSingle();
+
+      if (userError && userError.code !== 'PGRST116') {
+        console.error('Resolve user ID error:', userError);
+        return null;
+      }
+
+      if (!userData) {
+        console.warn('User not found for email:', studentId);
+        return null;
+      }
+
+      resolvedStudentId = userData.id;
+    }
+
     const { data, error } = await supabase
       .from('assessment_results')
       .select('overall_score')
-      .eq('student_id', studentId)
+      .eq('student_id', resolvedStudentId)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
