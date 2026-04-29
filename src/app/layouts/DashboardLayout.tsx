@@ -267,6 +267,32 @@ function DashboardLayoutContent() {
     }
   };
 
+  const handleBellClick = async () => {
+    // Mark all unread notifications as read when opening the dropdown
+    if (!showNotifications && unreadCount > 0 && userData?.id) {
+      const unreadNotificationIds = notifications
+        .filter((n) => !n.read)
+        .map((n) => n.id);
+
+      if (unreadNotificationIds.length > 0) {
+        await supabase
+          .from('notifications')
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .in('id', unreadNotificationIds);
+
+        // Update local state
+        const updatedNotifications = notifications.map((n: any) => ({
+          ...n,
+          read: true,
+        }));
+        setNotifications(updatedNotifications);
+      }
+    }
+
+    // Toggle dropdown
+    setShowNotifications(!showNotifications);
+  };
+
   const menuItems = [
     { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { path: "/dashboard/assessment", label: "Assessment", icon: Home },
@@ -470,7 +496,7 @@ function DashboardLayoutContent() {
               {/* Notification Bell with Badge */}
               <div className="relative" ref={notificationRef}>
                 <button
-                  onClick={() => setShowNotifications(!showNotifications)}
+                  onClick={handleBellClick}
                   className="portal-glass-icon-button relative rounded-xl p-2 text-slate-700 transition-colors hover:bg-white/70 hover:text-slate-900"
                   aria-label="Notifications"
                 >
