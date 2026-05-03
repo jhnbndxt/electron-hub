@@ -83,6 +83,7 @@ export function AdminDashboard() {
   const { userData } = useAuth();
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState("All");
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -234,9 +235,25 @@ export function AdminDashboard() {
     }
   };
 
-  const filteredStudents = pendingApplications.filter((student) =>
-    student.name && student.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredStudents = pendingApplications.filter((student) => {
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      [student.name, student.email, student.strand]
+        .filter(Boolean)
+        .some((value) =>
+          value?.toString().toLowerCase().includes(query)
+        );
+
+    const matchesStatus =
+      statusFilter === "All" || student.status.toLowerCase() === statusFilter.toLowerCase();
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const refreshDashboard = async () => {
+    await Promise.all([loadApplications(), loadAuditLogs(), calculateStats()]);
+  };
 
   // Reset document review state when modal opens
   const openReviewModal = async (student: Student) => {
@@ -720,29 +737,77 @@ export function AdminDashboard() {
       {/* Main Content */}
       <div className="flex-1 min-w-0">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
-          <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-              <FileCheck className="h-4 w-4" />
-              Dashboard Overview
+        <div className="mb-8 flex flex-col gap-6 lg:gap-8">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+                <FileCheck className="h-4 w-4" />
+                Registrar Dashboard
+              </div>
+              <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Welcome back, Registrar</h1>
+              <p className="text-gray-600 text-lg">Quickly review applications, verify documents, and keep enrollment moving.</p>
             </div>
-            <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Welcome, Registrar</h1>
-            <p className="text-gray-600 text-lg">Manage student applications and enrollment records</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="portal-glass-inline-control flex items-center gap-2 rounded-lg px-4 py-3">
+                <Calendar className="w-5 h-5 text-gray-500" />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => setSelectedDate(e.target.value)}
+                  className="border-none outline-none text-sm font-medium text-gray-700"
+                  style={{ accentColor: "#1E3A8A" }}
+                />
+              </div>
+              <button
+                onClick={refreshDashboard}
+                className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              >
+                Refresh
+              </button>
+            </div>
           </div>
-          <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
-            <Calendar className="w-5 h-5 text-gray-500" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="border-none outline-none text-sm font-medium text-gray-700"
-              style={{ accentColor: "#1E3A8A" }}
-            />
+
+          <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
+            <div className="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <Search className="w-5 h-5" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search students, emails, or strands..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full border-none bg-transparent pl-11 pr-4 py-3 text-sm font-medium text-slate-900 outline-none"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <label className="mb-2 block text-sm font-medium text-slate-600">Filter by Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
+                >
+                  <option>All</option>
+                  <option>Pending</option>
+                  <option>Approved</option>
+                  <option>Incomplete</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Section Header */}
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Dashboard Overview</h2>
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900">Dashboard Overview</h2>
+            <p className="text-sm text-gray-500">High-level registrar metrics and pending review queue.</p>
+          </div>
+          <p className="text-sm text-gray-500">
+            {filteredStudents.length} results matching filters
+          </p>
+        </div>
 
         {/* Overview Stats - 4 Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

@@ -1,4 +1,4 @@
-import { LayoutDashboard, FileText, Users, GraduationCap } from "lucide-react";
+import { LayoutDashboard, FileText, Users, GraduationCap, Settings, ShieldCheck } from "lucide-react";
 import { PortalShell, type PortalNavItem } from "../components/PortalShell";
 
 export function AdminLayout() {
@@ -7,6 +7,9 @@ export function AdminLayout() {
     { path: "/registrar/pending", label: "Pending Applications", icon: FileText },
     { path: "/registrar/students", label: "Student Records", icon: Users },
     { path: "/registrar/assessment-management", label: "Assessment Management", icon: GraduationCap },
+    { path: "/registrar/users", label: "User Management", icon: Users },
+    { path: "/registrar/audit-logs", label: "Audit Logs", icon: ShieldCheck },
+    { path: "/registrar/system-configuration", label: "System Configuration", icon: Settings },
   ];
 
   return (
