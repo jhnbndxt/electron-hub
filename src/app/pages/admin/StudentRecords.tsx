@@ -122,7 +122,7 @@ export function StudentRecords() {
   };
 
   return (
-    <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page w-full p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
