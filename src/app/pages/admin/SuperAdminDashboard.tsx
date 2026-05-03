@@ -16,11 +16,19 @@ import {
   Clock,
   DollarSign,
   CheckCircle,
+  Search,
+  Eye,
+  User,
+  CreditCard,
+  Wallet,
+  Banknote,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
-import { getDashboardAnalytics, getAuditLogs, getPaymentCollectionData } from "../../../services/adminService";
+import { getDashboardAnalytics, getAuditLogs, getPaymentCollectionData, getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
+import { triggerNotification } from "../../../services/notificationService";
+import { supabase } from "../../../supabase";
 import {
   BarChart,
   Bar,
@@ -46,6 +54,32 @@ interface AuditLog {
   details: string;
 }
 
+interface OnlinePayment {
+  id: string;
+  studentEmail: string;
+  studentName: string;
+  paymentMode: "bank" | "gcash";
+  referenceNumber: string;
+  receiptData: string;
+  receiptFileName: string;
+  status: "pending" | "approved" | "rejected";
+  submittedDate: string;
+  enrollmentData: any;
+  rejectionComment?: string;
+}
+
+interface CashPayment {
+  id: string;
+  queueNumber: string;
+  studentEmail: string;
+  studentName: string;
+  schedule: { date: string; time: string };
+  status: "pending" | "paid" | "cancelled";
+  generatedDate: string;
+  enrollmentData: any;
+  paidDate?: string;
+}
+
 export function SuperAdminDashboard() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -61,6 +95,8 @@ export function SuperAdminDashboard() {
     rejectedEnrollments: 0,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [onlinePayments, setOnlinePayments] = useState<OnlinePayment[]>([]);
+  const [cashPayments, setCashPayments] = useState<CashPayment[]>([]);
   const [paymentCollectionData, setPaymentCollectionData] = useState([
     { day: "Mon", amount: 4200 },
     { day: "Tue", amount: 5100 },
@@ -75,6 +111,7 @@ export function SuperAdminDashboard() {
     loadStats();
     loadRecentActivity();
     loadPaymentData();
+    loadPayments();
   }, []);
 
   const loadStats = async () => {
@@ -152,6 +189,75 @@ export function SuperAdminDashboard() {
     if (paymentData) {
       setPaymentCollectionData(paymentData);
     }
+  };
+
+  const loadPayments = async () => {
+    // Load all payments from Supabase
+    const { data: allPayments, error } = await getAllPayments();
+
+    if (error) {
+      console.error('Error loading payments:', error);
+      setOnlinePayments([]);
+      setCashPayments([]);
+      return;
+    }
+
+    if (!allPayments) {
+      setOnlinePayments([]);
+      setCashPayments([]);
+      return;
+    }
+
+    // Fetch user details for student names
+    const studentIds = [...new Set(allPayments.map((p: any) => p.student_id))];
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, full_name, email")
+      .in("id", studentIds);
+
+    const userMap: Record<string, { name: string; email: string }> = {};
+    users?.forEach((u: any) => {
+      userMap[u.id] = { name: u.full_name, email: u.email };
+    });
+
+    // Separate online vs cash payments
+    const onlinePending = allPayments
+      .filter((p: any) => (p.payment_method === 'bank' || p.payment_method === 'gcash') && p.status === 'pending')
+      .map((p: any) => ({
+        id: p.id,
+        studentEmail: userMap[p.student_id]?.email || p.student_id,
+        studentName: userMap[p.student_id]?.name || 'Unknown Student',
+        paymentMode: p.payment_method as "bank" | "gcash",
+        referenceNumber: p.reference_number || '',
+        receiptData: p.receipt_file_url || '',
+        receiptFileName: p.receipt_file_path?.split('/').pop() || 'receipt',
+        status: 'pending' as const,
+        submittedDate: p.submitted_at
+          ? new Date(p.submitted_at).toLocaleDateString()
+          : new Date(p.created_at).toLocaleDateString(),
+        enrollmentData: {},
+      }));
+
+    const cashPending = allPayments
+      .filter((p: any) => p.payment_method === 'cash' && (p.status === 'pending' || p.status === 'paid'))
+      .map((p: any) => ({
+        id: p.id,
+        queueNumber: p.queue_number || '',
+        studentEmail: userMap[p.student_id]?.email || p.student_id,
+        studentName: userMap[p.student_id]?.name || 'Unknown Student',
+        schedule: {
+          date: p.queue_schedule_date
+            ? new Date(p.queue_schedule_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+            : '',
+          time: p.queue_schedule_time || '9:00 AM - 4:00 PM',
+        },
+        status: p.status as "pending" | "paid" | "cancelled",
+        generatedDate: new Date(p.created_at).toLocaleDateString(),
+        enrollmentData: {},
+      }));
+
+    setOnlinePayments(onlinePending);
+    setCashPayments(cashPending);
   };
 
   const summaryCards = [
@@ -349,6 +455,173 @@ export function SuperAdminDashboard() {
                 </Link>
               );
             })}
+          </div>
+        </section>
+
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold mb-6 text-gray-900">Payment Queue</h2>
+          <div className="rounded-2xl border border-white/50 bg-white shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Student
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Payment Method
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Reference Number
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Submitted Date
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {onlinePayments.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        No pending online payments
+                      </td>
+                    </tr>
+                  ) : (
+                    onlinePayments.slice(0, 5).map((payment) => (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                              <User className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{payment.studentName}</div>
+                              <div className="text-sm text-gray-500 truncate">{payment.studentEmail}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            {payment.paymentMode === "bank" ? (
+                              <>
+                                <CreditCard className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                <span className="text-sm text-gray-900">Bank</span>
+                              </>
+                            ) : (
+                              <>
+                                <Wallet className="w-4 h-4 text-blue-600 flex-shrink-0" />
+                                <span className="text-sm text-gray-900">GCash</span>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-sm text-gray-900 font-mono truncate">{payment.referenceNumber}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-500">{payment.submittedDate}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {onlinePayments.length > 5 && (
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-center">
+                <Link
+                  to="/branchcoordinator/payments"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                >
+                  View all {onlinePayments.length} pending payments
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mb-10">
+          <h2 className="text-2xl font-bold mb-6 text-gray-900">Payment History</h2>
+          <div className="rounded-2xl border border-white/50 bg-white shadow-lg overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[800px]">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Queue #
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Student
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Scheduled Date
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {cashPayments.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-8 text-center text-gray-500">
+                        No cash payment records
+                      </td>
+                    </tr>
+                  ) : (
+                    cashPayments.slice(0, 5).map((payment) => (
+                      <tr key={payment.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-lg font-bold text-blue-600">{payment.queueNumber}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                              <User className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 truncate">{payment.studentName}</div>
+                              <div className="text-sm text-gray-500 truncate">{payment.studentEmail}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900">{payment.schedule.date}</div>
+                              <div className="text-xs text-gray-500">{payment.schedule.time}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {payment.status === "pending" && (
+                            <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                              Awaiting
+                            </span>
+                          )}
+                          {payment.status === "paid" && (
+                            <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              Paid
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {cashPayments.length > 5 && (
+              <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 text-center">
+                <Link
+                  to="/branchcoordinator/payments"
+                  className="text-sm font-medium text-blue-600 hover:text-blue-800"
+                >
+                  View all {cashPayments.length} payment records
+                </Link>
+              </div>
+            )}
           </div>
         </section>
 
