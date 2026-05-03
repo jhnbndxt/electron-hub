@@ -541,105 +541,41 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
               <div className="space-y-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Document detail</p>
+                    <p className="text-sm text-gray-500">Document view</p>
                     <h3 className="mt-1 text-xl font-semibold text-gray-900">{displayedDocument.name}</h3>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <span className={`inline-flex rounded-full px-3 py-2 text-sm font-semibold ${
-                      displayedDocument.data.status === "approved"
-                        ? "bg-green-100 text-green-800"
-                        : displayedDocument.data.status === "rejected"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-amber-100 text-amber-800"
-                    }`}>
-                      {displayedDocument.data.status.toUpperCase()}
-                    </span>
-                    <button
-                      onClick={() => setDisplayedDocument(null)}
-                      className="inline-flex items-center gap-2 rounded-full bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
-                    >
-                      <X className="h-4 w-4" />
-                      Back to Documents
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => setDisplayedDocument(null)}
+                    className="inline-flex items-center gap-2 rounded-full bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
+                  >
+                    <X className="h-4 w-4" />
+                    Close
+                  </button>
                 </div>
 
-                {/* Status Lock Alert */}
-                {(displayedDocument.data.status === "approved" || displayedDocument.data.status === "rejected") && (
-                  <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3">
-                    <div className="text-2xl flex-shrink-0">🔒</div>
-                    <div>
-                      <p className="font-semibold text-yellow-800">Document is Locked</p>
-                      <p className="text-sm text-yellow-700 mt-1">
-                        {displayedDocument.data.status === "approved"
-                          ? "This document has been approved and cannot be changed. Further actions are disabled to prevent accidental modifications."
-                          : "This document has been rejected. The student must upload a new replacement file to reopen it for review. Your review decision will be locked."}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-                  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-gray-700">Document preview</p>
-                      <p className="mt-1 text-xs text-gray-500">Review the file before making a decision.</p>
-                    </div>
-                    <div className="rounded-2xl border border-gray-200 bg-gray-950 p-4">
-                      <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-gray-950 flex items-center justify-center">
-                        {displayedDocument.data.fileUrl ? (
-                          displayedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                            <img
-                              src={displayedDocument.data.fileUrl}
-                              alt={displayedDocument.name}
-                              className="h-full w-full object-contain"
-                            />
-                          ) : (
-                            <div className="text-center p-6">
-                              <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-                              <p className="text-sm text-gray-400">Document preview not available.</p>
-                            </div>
-                          )
-                        ) : (
-                          <p className="text-sm text-gray-400">No preview available</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-5">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <p className="text-sm font-semibold text-gray-900 mb-4">Document information</p>
-                      <div className="space-y-3 text-sm text-gray-600">
-                        <div className="flex justify-between gap-4">
-                          <span className="font-medium text-gray-700">File name</span>
-                          <span className="truncate text-right text-gray-900">{displayedDocument.data.fileName}</span>
+                {/* Document Display */}
+                <div className="rounded-2xl border border-gray-200 bg-gray-950 p-6">
+                  <div className="aspect-[4/5] max-h-[70vh] overflow-hidden rounded-2xl bg-gray-950 flex items-center justify-center">
+                    {displayedDocument.data.fileUrl ? (
+                      displayedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                        <img
+                          src={displayedDocument.data.fileUrl}
+                          alt={displayedDocument.name}
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <div className="text-center p-6">
+                          <FileText className="mx-auto mb-4 h-16 w-16 text-gray-400" />
+                          <p className="text-lg text-gray-300 mb-2">Document Preview</p>
+                          <p className="text-sm text-gray-400">This document type cannot be previewed directly.</p>
+                          <p className="text-xs text-gray-500 mt-2">{displayedDocument.data.fileName}</p>
                         </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="font-medium text-gray-700">Uploaded</span>
-                          <span className="text-gray-900">{displayedDocument.data.uploadDate}</span>
-                        </div>
-                        <div className="flex justify-between gap-4">
-                          <span className="font-medium text-gray-700">Status</span>
-                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            displayedDocument.data.status === "approved"
-                              ? "bg-green-100 text-green-800"
-                              : displayedDocument.data.status === "rejected"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}>
-                            {displayedDocument.data.status.toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {displayedDocument.data.rejectionComment && (
-                      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-semibold text-gray-900 mb-3">Rejection reason</p>
-                        <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                          <p className="text-sm text-red-600">{displayedDocument.data.rejectionComment}</p>
-                        </div>
+                      )
+                    ) : (
+                      <div className="text-center p-6">
+                        <FileText className="mx-auto mb-4 h-16 w-16 text-gray-400" />
+                        <p className="text-lg text-gray-300 mb-2">No Preview Available</p>
+                        <p className="text-sm text-gray-400">Document file not found.</p>
                       </div>
                     )}
                   </div>
