@@ -26,6 +26,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { loadProfileImageUrl } from "../utils/profileImage";
 import { supabase } from "../../supabase";
 import logo from "../../assets/electronLogo";
+import { Button } from "../components/ui/button";
 
 function DashboardLayoutContent() {
   const location = useLocation();
@@ -842,43 +843,36 @@ function DashboardLayoutContent() {
             backdropFilter: "blur(4px)",
           }}
         >
-          <div className="portal-glass-modal w-full max-w-sm rounded-xl">
-            {/* Question */}
+          <div className="portal-glass-modal w-full max-w-sm rounded-xl animate-in fade-in-0 zoom-in-95 duration-200">
+            {/* Icon and Question */}
             <div className="p-8 text-center">
-              <h3 className="text-2xl font-bold text-gray-900">
-                Log Out?
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <LogOut className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Log out?
               </h3>
-              <p className="text-sm text-gray-700 mt-3 font-medium">
-                Are you sure you want to log out?
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                You’ll need to sign in again to access your account.
+              <p className="text-sm text-gray-600">
+                Are you sure you want to log out of your account?
               </p>
             </div>
 
             {/* Action Buttons */}
-            <div className="p-6 pt-0 flex gap-3">
-              <button
+            <div className="px-6 pb-6 flex gap-3">
+              <Button
+                variant="outline"
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1 py-4 rounded-xl font-semibold transition-all"
-                style={{
-                  backgroundColor: "#E5E7EB",
-                  color: "#374151",
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#D1D5DB")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#E5E7EB")}
+                className="flex-1"
               >
-                No
-              </button>
-              <button
+                Cancel
+              </Button>
+              <Button
+                variant="default"
                 onClick={handleLogout}
-                className="flex-1 py-4 rounded-xl text-white font-semibold transition-all"
-                style={{ backgroundColor: "#1E3A8A" }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = "#1E40AF")}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = "#1E3A8A")}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
               >
-                Yes
-              </button>
+                Log out
+              </Button>
             </div>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { ArrowLeft, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 import logo from "../../assets/electronLogo";
 
