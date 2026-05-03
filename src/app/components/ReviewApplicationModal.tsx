@@ -100,9 +100,11 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   // Transform documents for display
   const docs: Record<string, any> = {};
   enrollmentDocs.forEach((d: any) => {
+    // Only set to pending if status is null/undefined, otherwise keep the actual status
+    const status = d.status || "pending";
     docs[d.document_type] = {
       id: d.id,
-      status: d.status || "pending",
+      status: status,
       uploadDate: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—",
       fileName: (d.file_path || d.file_url || "").split("/").pop() || "document",
       fileUrl: d.file_path || d.file_url || null,
@@ -124,7 +126,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   };
 
   const handleSelectAll = () => {
-    const selectableDocs = docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected");
+    const selectableDocs = docKeys.filter(key => docs[key].status !== "approved");
     setSelectedDocuments(prev =>
       prev.length === selectableDocs.length ? [] : selectableDocs
     );
@@ -417,7 +419,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                     )}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {selectedDocuments.length} of {docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected").length} selectable selected
+                    {selectedDocuments.length} of {docKeys.filter(key => docs[key].status !== "approved").length} selectable selected
                   </div>
                 </div>
 
@@ -455,7 +457,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                             className="hover:bg-gray-50"
                           >
                             <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {isPending || doc.status === "rejected" ? (
+                              {doc.status !== "approved" ? (
                                 <button
                                   onClick={() => handleSelectDocument(key)}
                                   className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
@@ -475,7 +477,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                                 <FileText className="h-5 w-5 text-gray-400" />
                                 <div
                                   className="cursor-pointer"
-                                  onClick={() => (isPending || doc.status === "rejected") && handleRowClick(key)}
+                                  onClick={() => handleRowClick(key)}
                                 >
                                   <div className="text-sm font-medium text-gray-900">
                                     {documentNames[key] || key}
@@ -502,7 +504,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
-                                {isPending || doc.status === "rejected" ? (
+                                {doc.status !== "approved" ? (
                                   <>
                                     <button
                                       onClick={() => handleApproveFromTableLocal(key)}
