@@ -655,15 +655,22 @@ function DashboardLayoutContent() {
 
                     {/* Footer */}
                     <div className="relative z-10 border-t border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm flex items-center justify-between gap-3">
-                      {notifications.length > 5 && (
-                        <Link
-                          to="/dashboard"
-                          onClick={() => setShowNotifications(false)}
+                      {notifications.length > 0 && (
+                        <button
+                          onClick={async () => {
+                            if (userData?.id) {
+                              await supabase
+                                .from('notifications')
+                                .delete()
+                                .eq('user_id', userData.id);
+                              setNotifications([]);
+                            }
+                          }}
                           className="text-sm font-medium"
-                          style={{ color: "var(--electron-blue)" }}
+                          style={{ color: "#EF4444" }}
                         >
-                          View All ({notifications.length})
-                        </Link>
+                          Clear All
+                        </button>
                       )}
                       <button
                         onClick={() => setShowNotifications(false)}
