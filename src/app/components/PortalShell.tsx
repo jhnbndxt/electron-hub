@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 import logo from "../../assets/electronLogo";
+import { Button } from "./ui/button";
 
 export interface PortalNavItem {
   path: string;
@@ -188,43 +189,42 @@ export function PortalShell({
 
       {showLogoutModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 flex items-center justify-center p-4 z-50"
           style={{
             backgroundColor: "rgba(0, 0, 0, 0.5)",
             backdropFilter: "blur(4px)",
           }}
         >
-          <div className="portal-glass-modal w-full max-w-sm rounded-xl">
-            <div className="p-6 text-center sm:p-8">
-              <h3 className="text-xl font-bold text-gray-900 sm:text-2xl">Log Out?</h3>
-              <p className="text-sm text-gray-700 mt-3 font-medium">
-                Are you sure you want to log out?
-              </p>
-              <p className="text-sm text-gray-500 mt-2">
-                You’ll need to sign in again to access your account.
+          <div className="portal-glass-modal w-full max-w-sm rounded-xl animate-in fade-in-0 zoom-in-95 duration-200">
+            {/* Icon and Question */}
+            <div className="p-8 text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+                <LogOut className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Log out?
+              </h3>
+              <p className="text-sm text-gray-600">
+                Are you sure you want to log out of your account?
               </p>
             </div>
 
-            <div className="flex gap-3 p-4 pt-0 sm:p-6 sm:pt-0">
-              <button
-                type="button"
+            {/* Action Buttons */}
+            <div className="px-6 pb-6 flex gap-3">
+              <Button
+                variant="outline"
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1 rounded-xl py-3 font-semibold transition-all sm:py-4"
-                style={{
-                  backgroundColor: "#E5E7EB",
-                  color: "#374151",
-                }}
+                className="flex-1"
               >
-                No
-              </button>
-              <button
-                type="button"
+                Cancel
+              </Button>
+              <Button
+                variant="default"
                 onClick={handleLogout}
-                className="flex-1 rounded-xl py-3 font-semibold text-white transition-all sm:py-4"
-                style={{ backgroundColor: "#1E3A8A" }}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
               >
-                Yes
-              </button>
+                Log out
+              </Button>
             </div>
           </div>
         </div>
