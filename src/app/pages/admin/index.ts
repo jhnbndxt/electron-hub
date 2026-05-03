@@ -15,4 +15,6 @@ export { IntegrationsAPIs } from "./IntegrationsAPIs";
 export { SecurityPolicies } from "./SecurityPolicies";
 export { Billing } from "./Billing";
 export { CashierDashboard } from "./CashierDashboard";
+export { CashierPaymentHistory } from "./CashierPaymentHistory";
+export { BranchCoordinatorPayments } from "./BranchCoordinatorPayments";
 export { DocumentVerification } from "./DocumentVerification";

@@ -44,6 +44,7 @@ import { SuperAdminDashboard } from "./pages/admin/SuperAdminDashboard";
 import { SuperAdminAuditLogs } from "./pages/admin/SuperAdminAuditLogs";
 import { CashierDashboard } from "./pages/admin/CashierDashboard";
 import { CashierPaymentHistory } from "./pages/admin/CashierPaymentHistory";
+import { BranchCoordinatorPayments } from "./pages/admin/BranchCoordinatorPayments";
 import { AssessmentManagement } from "./pages/admin/AssessmentManagement";
 import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
@@ -160,6 +161,7 @@ export default function App() {
             { index: true, Component: SuperAdminDashboard },
             { path: "pending", Component: PendingApplications },
             { path: "enrollment", element: <Navigate to="/branchcoordinator" replace /> },
+            { path: "payments", Component: BranchCoordinatorPayments },
             { path: "students", Component: StudentRecords },
             { path: "student-profile/:id", Component: StudentProfile },
             { path: "assessment-management", Component: AssessmentManagement },
