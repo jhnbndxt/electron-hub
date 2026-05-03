@@ -528,21 +528,25 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Notification List */}
-                    <div className="relative z-10 bg-white/60 p-4">
+                    <div className="relative z-10 bg-white/60 max-h-[400px] overflow-y-auto">
                       {loadingNotifications ? (
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-                            <span>Loading notifications...</span>
+                        <div className="p-4">
+                          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                            <div className="flex items-center gap-3">
+                              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
+                              <span>Loading notifications...</span>
+                            </div>
                           </div>
                         </div>
                       ) : notifications.length === 0 ? (
-                        <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
-                          No notifications yet
+                        <div className="p-4">
+                          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+                            No notifications yet
+                          </div>
                         </div>
                       ) : (
-                        <div className="space-y-3">
-                          {notifications.map((notification) => {
+                        <div className="space-y-3 p-4">
+                          {notifications.slice(0, 5).map((notification) => {
                             const variant = getNotificationVariant(notification.type);
                             const variantStyles = getVariantStyles(variant);
 
@@ -650,10 +654,20 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Footer */}
-                    <div className="relative z-10 border-t border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm">
+                    <div className="relative z-10 border-t border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm flex items-center justify-between gap-3">
+                      {notifications.length > 5 && (
+                        <Link
+                          to="/dashboard"
+                          onClick={() => setShowNotifications(false)}
+                          className="text-sm font-medium"
+                          style={{ color: "var(--electron-blue)" }}
+                        >
+                          View All ({notifications.length})
+                        </Link>
+                      )}
                       <button
                         onClick={() => setShowNotifications(false)}
-                        className="text-sm font-medium w-full text-center"
+                        className="text-sm font-medium ml-auto"
                         style={{ color: "var(--electron-blue)" }}
                       >
                         Close
