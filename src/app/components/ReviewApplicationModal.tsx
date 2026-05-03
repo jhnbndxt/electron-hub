@@ -82,8 +82,6 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   handleBulkApprove,
   handleApproveFromTable,
 }) => {
-  // State for preview modal
-  const [previewDocument, setPreviewDocument] = useState<{ key: string; name: string; data: DocumentData } | null>(null);
   // State for rejection modal
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectingDocument, setRejectingDocument] = useState<{ key: string; name: string } | null>(null);
@@ -200,18 +198,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
 
   // Handler for hover preview
   const handleHoverPreview = (docKey: string, show: boolean) => {
-    if (show) {
-      const doc = docs[docKey];
-      if (doc.fileUrl && doc.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-        setPreviewDocument({
-          key: docKey,
-          name: documentNames[docKey] || docKey,
-          data: doc,
-        });
-      }
-    } else {
-      setPreviewDocument(null);
-    }
+    // Hover preview removed as requested
   };
 
   // Get form data for enrollment form display
@@ -410,12 +397,12 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                   <div className="flex items-center gap-4">
                     <button
                       onClick={handleSelectAll}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 bg-white px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
                     >
                       {selectedDocuments.length === docKeys.filter(key => docs[key].status === "pending").length && docKeys.filter(key => docs[key].status === "pending").length > 0 ? (
-                        <CheckSquare className="h-4 w-4" />
+                        <CheckSquare className="h-4 w-4 text-blue-600" />
                       ) : (
-                        <Square className="h-4 w-4" />
+                        <Square className="h-4 w-4 text-gray-400" />
                       )}
                       Select All Pending
                     </button>
@@ -467,23 +454,21 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                             key={key}
                             className={`hover:bg-gray-50 cursor-pointer ${isProcessed ? 'cursor-default' : ''}`}
                             onClick={() => !isProcessed && handleRowClick(key)}
-                            onMouseEnter={() => handleHoverPreview(key, true)}
-                            onMouseLeave={() => handleHoverPreview(key, false)}
                           >
                             <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               {isPending ? (
                                 <button
                                   onClick={() => handleSelectDocument(key)}
-                                  className="text-gray-400 hover:text-gray-600"
+                                  className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
                                 >
                                   {selectedDocuments.includes(key) ? (
-                                    <CheckSquare className="h-5 w-5" />
+                                    <CheckSquare className="h-4 w-4 text-blue-600" />
                                   ) : (
-                                    <Square className="h-5 w-5" />
+                                    <Square className="h-4 w-4 text-gray-400" />
                                   )}
                                 </button>
                               ) : (
-                                <div className="h-5 w-5"></div>
+                                <div className="w-6 h-6"></div>
                               )}
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -708,71 +693,6 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Quick Preview Modal */}
-      {previewDocument && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setPreviewDocument(null)}
-          />
-          <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">
-            {/* Preview Header */}
-            <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4">
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Quick Preview</p>
-                <h3 className="mt-1 text-lg font-semibold text-gray-900">{previewDocument.name}</h3>
-              </div>
-              <button
-                onClick={() => setPreviewDocument(null)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
-                aria-label="Close preview"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Preview Content */}
-            <div className="p-6">
-              <div className="rounded-2xl border border-gray-200 bg-gray-950 p-4">
-                <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-gray-950 flex items-center justify-center max-h-96">
-                  {previewDocument.data.fileUrl ? (
-                    previewDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                      <img
-                        src={previewDocument.data.fileUrl}
-                        alt={previewDocument.name}
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <div className="text-center p-6">
-                        <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
-                        <p className="text-sm text-gray-400">Document preview not available.</p>
-                        <p className="text-xs text-gray-500 mt-2">This appears to be a non-image document.</p>
-                      </div>
-                    )
-                  ) : (
-                    <p className="text-sm text-gray-400">No preview available</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Preview Actions */}
-              <div className="mt-4 flex justify-end gap-3">
-                <button
-                  onClick={() => {
-                    setPreviewDocument(null);
-                    handleViewDocument(previewDocument.key);
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-                >
-                  <Eye className="h-4 w-4" />
-                  Full Review
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Rejection Reason Modal */}
       {showRejectModal && rejectingDocument && (
