@@ -873,6 +873,9 @@ export function AdminDashboard() {
                     </td>
                   </tr>
                 ) : (
+                  filteredStudents.map((student) => {
+                    const statusStyle = getStatusStyle(student.status);
+                    return (
                       <tr
                         key={student.id}
                         className="hover:bg-gray-50 transition-colors"
@@ -928,6 +931,8 @@ export function AdminDashboard() {
                           </button>
                         </td>
                       </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
@@ -1011,6 +1016,7 @@ export function AdminDashboard() {
           setSelectedDocuments([]);
         }}
         reviewingStudent={reviewingStudent}
+        setReviewingStudent={setReviewingStudent}
         documentRejectionComment={documentRejectionComment}
         setDocumentRejectionComment={setDocumentRejectionComment}
         handleViewDocument={handleViewDocument}

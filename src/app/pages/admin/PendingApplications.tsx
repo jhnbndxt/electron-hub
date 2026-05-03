@@ -977,6 +977,7 @@ export function PendingApplications() {
           setSelectedDocuments([]);
         }}
         reviewingStudent={reviewingStudent}
+        setReviewingStudent={setReviewingStudent}
         documentRejectionComment={documentRejectionComment}
         setDocumentRejectionComment={setDocumentRejectionComment}
         handleViewDocument={handleViewDocument}

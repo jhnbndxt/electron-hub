@@ -55,6 +55,7 @@ interface ReviewApplicationModalProps {
   documentNames: Record<string, string>;
   showFormData: boolean;
   setShowFormData: React.Dispatch<React.SetStateAction<boolean>>;
+  setReviewingStudent: React.Dispatch<React.SetStateAction<ReviewingStudent | null>>;
   // New props for bulk operations
   selectedDocuments: string[];
   setSelectedDocuments: React.Dispatch<React.SetStateAction<string[]>>;
@@ -77,6 +78,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   documentNames,
   showFormData,
   setShowFormData,
+  setReviewingStudent,
   // New props for bulk operations
   selectedDocuments,
   setSelectedDocuments,
@@ -140,16 +142,6 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
     setSelectedDocuments([]);
   };
 
-  // Handler for quick preview
-  const handleQuickPreview = (docKey: string) => {
-    const doc = docs[docKey];
-    setPreviewDocument({
-      key: docKey,
-      name: documentNames[docKey] || docKey,
-      data: doc,
-    });
-  };
-
   // Handler for approve from table
   const handleApproveFromTableLocal = (docKey: string) => {
     handleApproveFromTable(docKey);
@@ -170,10 +162,10 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   const handleConfirmReject = () => {
     if (!rejectingDocument || !rejectReason.trim()) return;
 
-    // Update local state first
+    // Update local copy of the selected student's documents before sending the request.
     setReviewingStudent((prev: any) => ({
       ...prev,
-      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+      enrollment_documents: prev?.enrollment_documents?.map((doc: any) =>
         doc.document_type === rejectingDocument.key
           ? { ...doc, status: "rejected", rejection_comment: rejectReason.trim() }
           : doc
