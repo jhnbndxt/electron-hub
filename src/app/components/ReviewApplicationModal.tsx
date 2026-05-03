@@ -43,7 +43,6 @@ interface ReviewApplicationModalProps {
   isOpen: boolean;
   onClose: () => void;
   reviewingStudent: ReviewingStudent | null;
-  selectedDocument: SelectedDocument | null;
   documentRejectionComment: string;
   setDocumentRejectionComment: React.Dispatch<React.SetStateAction<string>>;
   handleViewDocument: (key: string) => void;
@@ -66,7 +65,6 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   isOpen,
   onClose,
   reviewingStudent,
-  selectedDocument,
   documentRejectionComment,
   setDocumentRejectionComment,
   handleViewDocument,
@@ -86,6 +84,12 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
 }) => {
   // State for preview modal
   const [previewDocument, setPreviewDocument] = useState<{ key: string; name: string; data: DocumentData } | null>(null);
+  // State for rejection modal
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectingDocument, setRejectingDocument] = useState<{ key: string; name: string } | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  // State for document display
+  const [displayedDocument, setDisplayedDocument] = useState<{ key: string; name: string; data: DocumentData } | null>(null);
 
   if (!isOpen || !reviewingStudent) return null;
 
@@ -147,6 +151,67 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   // Handler for approve from table
   const handleApproveFromTableLocal = (docKey: string) => {
     handleApproveFromTable(docKey);
+  };
+
+  // Handler for reject from table
+  const handleRejectFromTable = (docKey: string) => {
+    const doc = docs[docKey];
+    setRejectingDocument({
+      key: docKey,
+      name: documentNames[docKey] || docKey,
+    });
+    setRejectReason("");
+    setShowRejectModal(true);
+  };
+
+  // Handler for confirming rejection
+  const handleConfirmReject = () => {
+    if (!rejectingDocument || !rejectReason.trim()) return;
+
+    // Update local state first
+    setReviewingStudent((prev: any) => ({
+      ...prev,
+      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+        doc.document_type === rejectingDocument.key
+          ? { ...doc, status: "rejected", rejection_comment: rejectReason.trim() }
+          : doc
+      ),
+    }));
+
+    // Call the parent's reject handler
+    handleViewDocument(rejectingDocument.key);
+    setDocumentRejectionComment(rejectReason.trim());
+    setTimeout(() => handleRejectDocument(), 100);
+
+    setShowRejectModal(false);
+    setRejectingDocument(null);
+    setRejectReason("");
+  };
+
+  // Handler for row click to display document
+  const handleRowClick = (docKey: string) => {
+    const doc = docs[docKey];
+    setDisplayedDocument({
+      key: docKey,
+      name: documentNames[docKey] || docKey,
+      data: doc,
+    });
+  };
+
+  // Handler for hover preview
+  const handleHoverPreview = (docKey: string, show: boolean) => {
+    if (show) {
+      const doc = docs[docKey];
+      if (doc.fileUrl && doc.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+        setPreviewDocument({
+          key: docKey,
+          name: documentNames[docKey] || docKey,
+          data: doc,
+        });
+      }
+    } else {
+      setPreviewDocument(null);
+    }
   };
 
   // Get form data for enrollment form display
@@ -338,7 +403,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
             </div>
 
             {/* Document Table */}
-            {!selectedDocument ? (
+            {!displayedDocument ? (
               <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                 {/* Bulk Actions Header */}
                 <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4">
@@ -396,9 +461,16 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                         const doc = docs[key];
                         const isPending = doc.status === "pending";
                         const isProcessed = doc.status === "approved" || doc.status === "rejected";
+                        const isImage = doc.fileUrl && doc.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                         return (
-                          <tr key={key} className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap">
+                          <tr
+                            key={key}
+                            className={`hover:bg-gray-50 cursor-pointer ${isProcessed ? 'cursor-default' : ''}`}
+                            onClick={() => !isProcessed && handleRowClick(key)}
+                            onMouseEnter={() => handleHoverPreview(key, true)}
+                            onMouseLeave={() => handleHoverPreview(key, false)}
+                          >
+                            <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               {isPending ? (
                                 <button
                                   onClick={() => handleSelectDocument(key)}
@@ -441,33 +513,29 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                               {doc.uploadDate}
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
-                                {doc.fileUrl && (
-                                  <button
-                                    onClick={() => handleQuickPreview(key)}
-                                    className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                                    title="Quick Preview"
-                                  >
-                                    <PreviewIcon className="h-4 w-4" />
-                                  </button>
-                                )}
                                 {isPending ? (
-                                  <button
-                                    onClick={() => handleApproveFromTableLocal(key)}
-                                    className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700"
-                                  >
-                                    <CheckCircle className="h-3 w-3" />
-                                    Approve
-                                  </button>
+                                  <>
+                                    <button
+                                      onClick={() => handleApproveFromTableLocal(key)}
+                                      className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700"
+                                    >
+                                      <CheckCircle className="h-3 w-3" />
+                                      Approve
+                                    </button>
+                                    <button
+                                      onClick={() => handleRejectFromTable(key)}
+                                      className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                                    >
+                                      <XCircle className="h-3 w-3" />
+                                      Reject
+                                    </button>
+                                  </>
                                 ) : (
-                                  <button
-                                    onClick={() => handleViewDocument(key)}
-                                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
-                                  >
-                                    <Eye className="h-3 w-3" />
-                                    View
-                                  </button>
+                                  <span className="text-gray-400 text-xs">
+                                    {doc.status === "approved" ? "Approved" : "Rejected"}
+                                  </span>
                                 )}
                               </div>
                             </td>
@@ -483,27 +551,36 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-gray-500">Document detail</p>
-                    <h3 className="mt-1 text-xl font-semibold text-gray-900">{selectedDocument.name}</h3>
+                    <h3 className="mt-1 text-xl font-semibold text-gray-900">{displayedDocument.name}</h3>
                   </div>
-                  <span className={`inline-flex rounded-full px-3 py-2 text-sm font-semibold ${
-                    selectedDocument.data.status === "approved"
-                      ? "bg-green-100 text-green-800"
-                      : selectedDocument.data.status === "rejected"
-                      ? "bg-red-100 text-red-800"
-                      : "bg-amber-100 text-amber-800"
-                  }`}>
-                    {selectedDocument.data.status.toUpperCase()}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={`inline-flex rounded-full px-3 py-2 text-sm font-semibold ${
+                      displayedDocument.data.status === "approved"
+                        ? "bg-green-100 text-green-800"
+                        : displayedDocument.data.status === "rejected"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-amber-100 text-amber-800"
+                    }`}>
+                      {displayedDocument.data.status.toUpperCase()}
+                    </span>
+                    <button
+                      onClick={() => setDisplayedDocument(null)}
+                      className="inline-flex items-center gap-2 rounded-full bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
+                    >
+                      <X className="h-4 w-4" />
+                      Back to Documents
+                    </button>
+                  </div>
                 </div>
 
                 {/* Status Lock Alert */}
-                {(selectedDocument.data.status === "approved" || selectedDocument.data.status === "rejected") && (
+                {(displayedDocument.data.status === "approved" || displayedDocument.data.status === "rejected") && (
                   <div className="rounded-2xl border border-yellow-200 bg-yellow-50 p-4 flex items-start gap-3">
                     <div className="text-2xl flex-shrink-0">🔒</div>
                     <div>
                       <p className="font-semibold text-yellow-800">Document is Locked</p>
                       <p className="text-sm text-yellow-700 mt-1">
-                        {selectedDocument.data.status === "approved"
+                        {displayedDocument.data.status === "approved"
                           ? "This document has been approved and cannot be changed. Further actions are disabled to prevent accidental modifications."
                           : "This document has been rejected. The student must upload a new replacement file to reopen it for review. Your review decision will be locked."}
                       </p>
@@ -519,11 +596,11 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                     </div>
                     <div className="rounded-2xl border border-gray-200 bg-gray-950 p-4">
                       <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-gray-950 flex items-center justify-center">
-                        {selectedDocument.data.fileUrl ? (
-                          selectedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                        {displayedDocument.data.fileUrl ? (
+                          displayedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                             <img
-                              src={selectedDocument.data.fileUrl}
-                              alt={selectedDocument.name}
+                              src={displayedDocument.data.fileUrl}
+                              alt={displayedDocument.name}
                               className="h-full w-full object-contain"
                             />
                           ) : (
@@ -545,72 +622,57 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                       <div className="space-y-3 text-sm text-gray-600">
                         <div className="flex justify-between gap-4">
                           <span className="font-medium text-gray-700">File name</span>
-                          <span className="truncate text-right text-gray-900">{selectedDocument.data.fileName}</span>
+                          <span className="truncate text-right text-gray-900">{displayedDocument.data.fileName}</span>
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="font-medium text-gray-700">Uploaded</span>
-                          <span className="text-gray-900">{selectedDocument.data.uploadDate}</span>
+                          <span className="text-gray-900">{displayedDocument.data.uploadDate}</span>
                         </div>
                         <div className="flex justify-between gap-4">
                           <span className="font-medium text-gray-700">Status</span>
                           <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            selectedDocument.data.status === "approved"
+                            displayedDocument.data.status === "approved"
                               ? "bg-green-100 text-green-800"
-                              : selectedDocument.data.status === "rejected"
+                              : displayedDocument.data.status === "rejected"
                               ? "bg-red-100 text-red-800"
                               : "bg-amber-100 text-amber-800"
                           }`}>
-                            {selectedDocument.data.status.toUpperCase()}
+                            {displayedDocument.data.status.toUpperCase()}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                      <p className="text-sm font-semibold text-gray-900 mb-3">Rejection reason</p>
-                      <textarea
-                        value={documentRejectionComment}
-                        onChange={(e) => setDocumentRejectionComment(e.target.value)}
-                        placeholder="Explain why this document is being rejected..."
-                        rows={4}
-                        disabled={selectedDocument.data.status !== "pending_review"}
-                        className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-500 disabled:cursor-not-allowed"
-                      />
-                    </div>
-                  </div>
-                </div>
+                    {displayedDocument.data.rejectionComment && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <p className="text-sm font-semibold text-gray-900 mb-3">Rejection reason</p>
+                        <div className="rounded-lg bg-red-50 border border-red-200 p-3">
+                          <p className="text-sm text-red-600">{displayedDocument.data.rejectionComment}</p>
+                        </div>
+                      </div>
+                    )}
 
-                <div className="flex flex-col gap-3 border-t border-gray-200 pt-5 sm:flex-row sm:items-center sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={handleBackToDocuments}
-                    className="rounded-full border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
-                  >
-                    Back to documents
-                  </button>
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      onClick={handleRejectDocument}
-                      disabled={selectedDocument.data.status !== "pending_review"}
-                      className={`min-w-[120px] rounded-full px-5 py-3 text-sm font-semibold text-white transition ${
-                        selectedDocument.data.status !== "pending_review"
-                          ? "bg-red-400 cursor-not-allowed opacity-50"
-                          : "bg-red-600 hover:bg-red-700"
-                      }`}
-                    >
-                      Reject
-                    </button>
-                    <button
-                      onClick={handleApproveDocument}
-                      disabled={selectedDocument.data.status !== "pending_review"}
-                      className={`min-w-[120px] rounded-full px-5 py-3 text-sm font-semibold text-white transition ${
-                        selectedDocument.data.status !== "pending_review"
-                          ? "bg-green-400 cursor-not-allowed opacity-50"
-                          : "bg-green-600 hover:bg-green-700"
-                      }`}
-                    >
-                      Approve
-                    </button>
+                    {displayedDocument.data.status === "pending" && (
+                      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+                        <p className="text-sm font-semibold text-gray-900 mb-3">Actions</p>
+                        <div className="flex flex-col gap-3">
+                          <button
+                            onClick={() => handleApproveFromTableLocal(displayedDocument.key)}
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                            Approve Document
+                          </button>
+                          <button
+                            onClick={() => handleRejectFromTable(displayedDocument.key)}
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700"
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Reject Document
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -705,6 +767,68 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                 >
                   <Eye className="h-4 w-4" />
                   Full Review
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rejection Reason Modal */}
+      {showRejectModal && rejectingDocument && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setShowRejectModal(false)}
+          />
+          <div className="relative flex w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">
+            {/* Rejection Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-red-50 to-red-100 px-6 py-4">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.24em] text-red-500">Reject Document</p>
+                <h3 className="mt-1 text-lg font-semibold text-gray-900">{rejectingDocument.name}</h3>
+              </div>
+              <button
+                onClick={() => setShowRejectModal(false)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+                aria-label="Close rejection modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Rejection Content */}
+            <div className="p-6">
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  Please provide a reason for rejecting this document. This will be sent to the student.
+                </p>
+              </div>
+
+              <textarea
+                value={rejectReason}
+                onChange={(e) => setRejectReason(e.target.value)}
+                placeholder="Enter rejection reason..."
+                rows={4}
+                className="w-full resize-none rounded-2xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-red-500 focus:ring-2 focus:ring-red-500"
+                autoFocus
+              />
+
+              {/* Rejection Actions */}
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowRejectModal(false)}
+                  className="inline-flex items-center gap-2 rounded-full bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmReject}
+                  disabled={!rejectReason.trim()}
+                  className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject Document
                 </button>
               </div>
             </div>

@@ -1020,7 +1020,6 @@ export function AdminDashboard() {
           setSelectedDocuments([]);
         }}
         reviewingStudent={reviewingStudent}
-        selectedDocument={selectedDocument}
         documentRejectionComment={documentRejectionComment}
         setDocumentRejectionComment={setDocumentRejectionComment}
         handleViewDocument={handleViewDocument}
