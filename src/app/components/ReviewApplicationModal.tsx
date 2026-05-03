@@ -124,9 +124,9 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   };
 
   const handleSelectAll = () => {
-    const pendingDocs = docKeys.filter(key => docs[key].status === "pending");
+    const selectableDocs = docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected");
     setSelectedDocuments(prev =>
-      prev.length === pendingDocs.length ? [] : pendingDocs
+      prev.length === selectableDocs.length ? [] : selectableDocs
     );
   };
 
@@ -399,12 +399,12 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                       onClick={handleSelectAll}
                       className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 bg-white px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
                     >
-                      {selectedDocuments.length === docKeys.filter(key => docs[key].status === "pending").length && docKeys.filter(key => docs[key].status === "pending").length > 0 ? (
+                      {selectedDocuments.length === docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected").length && docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected").length > 0 ? (
                         <CheckSquare className="h-4 w-4 text-blue-600" />
                       ) : (
                         <Square className="h-4 w-4 text-gray-400" />
                       )}
-                      Select All Pending
+                      Select All Pending/Rejected
                     </button>
                     {selectedDocuments.length > 0 && (
                       <button
@@ -417,7 +417,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                     )}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {selectedDocuments.length} of {docKeys.filter(key => docs[key].status === "pending").length} pending selected
+                    {selectedDocuments.length} of {docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected").length} selectable selected
                   </div>
                 </div>
 
@@ -447,16 +447,16 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                       {docKeys.map((key) => {
                         const doc = docs[key];
                         const isPending = doc.status === "pending";
-                        const isProcessed = doc.status === "approved" || doc.status === "rejected";
+                        const isProcessed = doc.status === "approved";
                         const isImage = doc.fileUrl && doc.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i);
                         return (
                           <tr
                             key={key}
-                            className={`hover:bg-gray-50 cursor-pointer ${isProcessed ? 'cursor-default' : ''}`}
-                            onClick={() => !isProcessed && handleRowClick(key)}
+                            className={`hover:bg-gray-50 cursor-pointer ${isProcessed && doc.status !== "rejected" ? 'cursor-default' : ''}`}
+                            onClick={() => (isPending || doc.status === "rejected") && handleRowClick(key)}
                           >
                             <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {isPending ? (
+                              {isPending || doc.status === "rejected" ? (
                                 <button
                                   onClick={() => handleSelectDocument(key)}
                                   className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
@@ -500,26 +500,28 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
-                                {isPending ? (
+                                {isPending || doc.status === "rejected" ? (
                                   <>
                                     <button
                                       onClick={() => handleApproveFromTableLocal(key)}
                                       className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700"
                                     >
                                       <CheckCircle className="h-3 w-3" />
-                                      Approve
+                                      {doc.status === "rejected" ? "Re-approve" : "Approve"}
                                     </button>
-                                    <button
-                                      onClick={() => handleRejectFromTable(key)}
-                                      className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                                    >
-                                      <XCircle className="h-3 w-3" />
-                                      Reject
-                                    </button>
+                                    {doc.status !== "approved" && (
+                                      <button
+                                        onClick={() => handleRejectFromTable(key)}
+                                        className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
+                                      >
+                                        <XCircle className="h-3 w-3" />
+                                        Reject
+                                      </button>
+                                    )}
                                   </>
                                 ) : (
                                   <span className="text-gray-400 text-xs">
-                                    {doc.status === "approved" ? "Approved" : "Rejected"}
+                                    Approved
                                   </span>
                                 )}
                               </div>
