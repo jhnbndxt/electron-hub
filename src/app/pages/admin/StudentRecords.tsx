@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Download } from "lucide-react";
+import { Search, Filter, Download, Users } from "lucide-react";
 import { getEnrolledStudents } from "../../../services/adminService";
 
 interface Student {
