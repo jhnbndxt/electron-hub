@@ -162,6 +162,8 @@ export default function App() {
             { path: "pending", Component: PendingApplications },
             { path: "enrollment", element: <Navigate to="/branchcoordinator" replace /> },
             { path: "payments", Component: BranchCoordinatorPayments },
+            { path: "cashier-dashboard", Component: CashierDashboard },
+            { path: "cashier-dashboard/history", Component: CashierPaymentHistory },
             { path: "students", Component: StudentRecords },
             { path: "student-profile/:id", Component: StudentProfile },
             { path: "assessment-management", Component: AssessmentManagement },

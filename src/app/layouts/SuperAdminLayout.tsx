@@ -7,6 +7,7 @@ import {
   Grid3x3,
   ClipboardCheck,
   Settings,
+  Banknote,
 } from "lucide-react";
 import { PortalShell, type PortalNavItem } from "../components/PortalShell";
 
@@ -14,6 +15,8 @@ export function SuperAdminLayout() {
   const navItems: PortalNavItem[] = [
     { path: "/branchcoordinator", label: "Overview", icon: LayoutDashboard, exact: true },
     { path: "/branchcoordinator/pending", label: "Pending Applications", icon: FileText },
+    { path: "/branchcoordinator/payments", label: "Payment Management", icon: Banknote },
+    { path: "/branchcoordinator/cashier-dashboard", label: "Cashier Queue", icon: Banknote },
     { path: "/branchcoordinator/students", label: "Student Records", icon: Users },
     { path: "/branchcoordinator/section-management", label: "Section Management", icon: Grid3x3 },
     { path: "/branchcoordinator/assessment-management", label: "Assessment Management", icon: GraduationCap },
