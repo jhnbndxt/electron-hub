@@ -452,8 +452,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                         return (
                           <tr
                             key={key}
-                            className={`hover:bg-gray-50 cursor-pointer ${isProcessed && doc.status !== "rejected" ? 'cursor-default' : ''}`}
-                            onClick={() => (isPending || doc.status === "rejected") && handleRowClick(key)}
+                            className="hover:bg-gray-50"
                           >
                             <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                               {isPending || doc.status === "rejected" ? (
@@ -474,7 +473,10 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-3">
                                 <FileText className="h-5 w-5 text-gray-400" />
-                                <div>
+                                <div
+                                  className="cursor-pointer"
+                                  onClick={() => (isPending || doc.status === "rejected") && handleRowClick(key)}
+                                >
                                   <div className="text-sm font-medium text-gray-900">
                                     {documentNames[key] || key}
                                   </div>
@@ -635,28 +637,6 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                         <p className="text-sm font-semibold text-gray-900 mb-3">Rejection reason</p>
                         <div className="rounded-lg bg-red-50 border border-red-200 p-3">
                           <p className="text-sm text-red-600">{displayedDocument.data.rejectionComment}</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {displayedDocument.data.status === "pending" && (
-                      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <p className="text-sm font-semibold text-gray-900 mb-3">Actions</p>
-                        <div className="flex flex-col gap-3">
-                          <button
-                            onClick={() => handleApproveFromTableLocal(displayedDocument.key)}
-                            className="inline-flex items-center justify-center gap-2 rounded-full bg-green-600 px-5 py-3 text-sm font-semibold text-white hover:bg-green-700"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                            Approve Document
-                          </button>
-                          <button
-                            onClick={() => handleRejectFromTable(displayedDocument.key)}
-                            className="inline-flex items-center justify-center gap-2 rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700"
-                          >
-                            <XCircle className="h-4 w-4" />
-                            Reject Document
-                          </button>
                         </div>
                       </div>
                     )}
