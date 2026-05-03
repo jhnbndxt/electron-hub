@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Download, Users } from "lucide-react";
+import { Search, Filter, Download, Users, Eye, Edit2 } from "lucide-react";
 import { getEnrolledStudents } from "../../../services/adminService";
+import { useNavigate } from "react-router";
 
 interface Student {
   id: string;
@@ -35,9 +36,12 @@ const normalizeTrack = (value: unknown): string => {
 };
 
 export function StudentRecords() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTrack, setFilterTrack] = useState("all");
   const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   // Load enrolled students from Supabase
   useEffect(() => {
@@ -92,6 +96,19 @@ export function StudentRecords() {
     return matchesSearch && matchesTrack;
   });
 
+  // Pagination
+  const totalPages = Math.ceil(filteredStudents.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
+
+  const handleViewStudent = (student: Student) => {
+    const isSuperAdmin = false; // You may need to get this from auth context
+    navigate(isSuperAdmin ? `/branchcoordinator/students/${student.id}` : `/registrar/students/${student.id}`, {
+      state: { student }
+    });
+  };
+
   const getStatusStyle = (status: string) => {
     switch (status.toLowerCase()) {
       case "enrolled":
@@ -134,43 +151,37 @@ export function StudentRecords() {
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg p-5 mb-6">
-        <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-4 mb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           {/* Search */}
-          <div className="relative w-full md:flex-1 md:min-w-[240px]">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--electron-blue)" }} />
+          <div className="relative flex-1">
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
               placeholder="Search by name or student ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
-              style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
 
           {/* Track Filter */}
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <select
-              value={filterTrack}
-              onChange={(e) => setFilterTrack(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
-              style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
-            >
-              <option value="all">All Tracks</option>
-              {TRACK_OPTIONS.map((track) => (
-                <option key={track} value={track}>
-                  {track}
-                </option>
-              ))}
-            </select>
-          </div>
+          <select
+            value={filterTrack}
+            onChange={(e) => setFilterTrack(e.target.value)}
+            className="px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+          >
+            <option value="all">All Tracks</option>
+            {TRACK_OPTIONS.map((track) => (
+              <option key={track} value={track}>
+                {track}
+              </option>
+            ))}
+          </select>
 
           {/* Export Button */}
           <button
-            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
-            style={{ backgroundColor: "#10B981" }}
+            className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2 bg-blue-600"
           >
             <Download className="w-4 h-4" />
             Export
@@ -180,13 +191,6 @@ export function StudentRecords() {
 
       {/* Student Records Table */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        {/* Table Header */}
-        <div className="p-4 sm:p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Enrolled Students
-          </h2>
-        </div>
-
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px]">
@@ -210,19 +214,22 @@ export function StudentRecords() {
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status
                 </th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredStudents.length === 0 ? (
+              {paginatedStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500">
                     {allStudents.length === 0 
                       ? "No enrolled students yet. Applications will appear here after approval."
                       : "No students match your search criteria."}
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => {
+                paginatedStudents.map((student) => {
                   const statusStyle = getStatusStyle(student.status);
                   return (
                     <tr
@@ -273,6 +280,24 @@ export function StudentRecords() {
                           {student.status}
                         </span>
                       </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewStudent(student)}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
+                            title="View student"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleViewStudent(student)}
+                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
+                            title="Edit student"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   );
                 })
@@ -281,12 +306,46 @@ export function StudentRecords() {
           </table>
         </div>
 
-        {/* Table Footer */}
-        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50">
+        {/* Table Footer with Pagination */}
+        <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50 flex items-center justify-between">
           <p className="text-sm text-gray-600">
-            Showing <span className="font-medium">{filteredStudents.length}</span> of{" "}
-            <span className="font-medium">{allStudents.length}</span> students
+            Showing <span className="font-medium">{startIndex + 1}</span> to{" "}
+            <span className="font-medium">{Math.min(endIndex, filteredStudents.length)}</span> of{" "}
+            <span className="font-medium">{filteredStudents.length}</span> students
           </p>
+          
+          {/* Pagination Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ←
+            </button>
+            
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`px-3 py-2 text-sm rounded-lg ${
+                  currentPage === page
+                    ? "bg-blue-600 text-white"
+                    : "border border-gray-300 hover:bg-gray-100"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+            
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              →
+            </button>
+          </div>
         </div>
       </div>
     </div>
