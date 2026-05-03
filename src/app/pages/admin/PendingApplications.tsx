@@ -62,6 +62,7 @@ export function PendingApplications() {
   const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
   const [documentRejectionComment, setDocumentRejectionComment] = useState("");
   const [showFormData, setShowFormData] = useState(false);
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const actorReference = userData?.id || userData?.email || 'registrar';
 
   useEffect(() => {
@@ -293,6 +294,99 @@ export function PendingApplications() {
     loadApplications();
   };
 
+  const handleBulkApprove = async (documentKeys: string[]) => {
+    if (!reviewingStudent || documentKeys.length === 0) return;
+
+    try {
+      // Approve each document
+      for (const docKey of documentKeys) {
+        const documentId = reviewingStudent.enrollment_documents?.find(
+          (d: any) => d.document_type === docKey
+        )?.id;
+
+        if (documentId) {
+          const { error } = await updateDocumentStatus(documentId, 'approved');
+          if (error) {
+            console.error(`Error approving document ${docKey}:`, error);
+            alert(`Error approving ${documentNames[docKey] || docKey}`);
+            return;
+          }
+        }
+      }
+
+      // Update local state
+      setReviewingStudent((prev: any) => ({
+        ...prev,
+        enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+          documentKeys.includes(doc.document_type)
+            ? { ...doc, status: "approved" }
+            : doc
+        ),
+      }));
+
+      // Create notification for bulk approval
+      try {
+        await triggerNotification(
+          reviewingStudent.user_id || reviewingStudent.email || "",
+          'DOCUMENTS_APPROVED',
+          { documentCount: documentKeys.length, documents: documentKeys.map(key => documentNames[key] || key) }
+        );
+      } catch (error) {
+        console.error('Error creating notification:', error);
+      }
+
+      alert(`✅ ${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved successfully!`);
+      loadApplications();
+    } catch (error) {
+      console.error('Bulk approve error:', error);
+      alert('Error during bulk approval. Please try again.');
+    }
+  };
+
+  const handleApproveFromTable = async (docKey: string) => {
+    if (!reviewingStudent) return;
+
+    const documentId = reviewingStudent.enrollment_documents?.find(
+      (d: any) => d.document_type === docKey
+    )?.id;
+
+    if (!documentId) {
+      alert("Document not found");
+      return;
+    }
+
+    const { error } = await updateDocumentStatus(documentId, 'approved');
+
+    if (error) {
+      alert(`Error approving document: ${error}`);
+      return;
+    }
+
+    // Update local state immediately
+    setReviewingStudent((prev: any) => ({
+      ...prev,
+      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+        doc.document_type === docKey
+          ? { ...doc, status: "approved" }
+          : doc
+      ),
+    }));
+
+    // Create notification for document approval
+    try {
+      await triggerNotification(
+        reviewingStudent.user_id || reviewingStudent.email || "",
+        'DOCUMENT_APPROVED',
+        { documentName: documentNames[docKey] || docKey }
+      );
+    } catch (error) {
+      console.error('Error creating notification:', error);
+    }
+
+    alert("✅ Document approved successfully!");
+    loadApplications();
+  };
+
   const handleFinalApproveApplication = async () => {
     if (!reviewingStudent) return;
 
@@ -414,10 +508,6 @@ export function PendingApplications() {
 
   const handleSelectStudent = (id: number | string) => {
     // Individual selection removed
-  };
-
-  const handleBulkApprove = () => {
-    // Bulk approve removed
   };
 
   const handleExportPDF = () => {
@@ -884,6 +974,7 @@ export function PendingApplications() {
         onClose={() => {
           setShowDocumentModal(false);
           setSelectedDocument(null);
+          setSelectedDocuments([]);
         }}
         reviewingStudent={reviewingStudent}
         selectedDocument={selectedDocument}
@@ -895,12 +986,17 @@ export function PendingApplications() {
         handleBackToDocuments={() => {
           setSelectedDocument(null);
           setDocumentRejectionComment("");
+          setSelectedDocuments([]);
         }}
         handleFinalApprove={handleFinalApproveApplication}
         handleRejectApplication={handleRejectApplication}
         documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}
+        selectedDocuments={selectedDocuments}
+        setSelectedDocuments={setSelectedDocuments}
+        handleBulkApprove={handleBulkApprove}
+        handleApproveFromTable={handleApproveFromTable}
       />
     </div>
   );

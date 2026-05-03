@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   X,
   Eye,
@@ -10,6 +10,9 @@ import {
   BookOpen,
   AlertCircle,
   XCircle,
+  CheckSquare,
+  Square,
+  Eye as PreviewIcon,
 } from "lucide-react";
 
 interface DocumentData {
@@ -52,6 +55,11 @@ interface ReviewApplicationModalProps {
   documentNames: Record<string, string>;
   showFormData: boolean;
   setShowFormData: React.Dispatch<React.SetStateAction<boolean>>;
+  // New props for bulk operations
+  selectedDocuments: string[];
+  setSelectedDocuments: React.Dispatch<React.SetStateAction<string[]>>;
+  handleBulkApprove: (documentKeys: string[]) => void;
+  handleApproveFromTable: (docKey: string) => void;
 }
 
 const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
@@ -70,7 +78,15 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   documentNames,
   showFormData,
   setShowFormData,
+  // New props for bulk operations
+  selectedDocuments,
+  setSelectedDocuments,
+  handleBulkApprove,
+  handleApproveFromTable,
 }) => {
+  // State for preview modal
+  const [previewDocument, setPreviewDocument] = useState<{ key: string; name: string; data: DocumentData } | null>(null);
+
   if (!isOpen || !reviewingStudent) return null;
 
   // Get student name from either field
@@ -95,6 +111,43 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   const docKeys = Object.keys(docs);
   const approved = docKeys.filter((k) => docs[k].status === "approved").length;
   const allDocumentsApproved = docKeys.length > 0 && docKeys.every((key) => docs[key].status === "approved");
+
+  // Handlers for bulk operations
+  const handleSelectDocument = (docKey: string) => {
+    setSelectedDocuments(prev =>
+      prev.includes(docKey)
+        ? prev.filter(key => key !== docKey)
+        : [...prev, docKey]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const pendingDocs = docKeys.filter(key => docs[key].status === "pending");
+    setSelectedDocuments(prev =>
+      prev.length === pendingDocs.length ? [] : pendingDocs
+    );
+  };
+
+  const handleBulkApproveSelected = () => {
+    if (selectedDocuments.length === 0) return;
+    handleBulkApprove(selectedDocuments);
+    setSelectedDocuments([]);
+  };
+
+  // Handler for quick preview
+  const handleQuickPreview = (docKey: string) => {
+    const doc = docs[docKey];
+    setPreviewDocument({
+      key: docKey,
+      name: documentNames[docKey] || docKey,
+      data: doc,
+    });
+  };
+
+  // Handler for approve from table
+  const handleApproveFromTableLocal = (docKey: string) => {
+    handleApproveFromTable(docKey);
+  };
 
   // Get form data for enrollment form display
   const getFormData = () => {
@@ -284,62 +337,146 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
               </div>
             </div>
 
-            {/* Document Grid or Selected Document */}
+            {/* Document Table */}
             {!selectedDocument ? (
-              <div className="grid gap-4 md:grid-cols-2">
-                {docKeys.map((key) => {
-                  const doc = docs[key];
-                  const isProcessed = doc.status === "approved" || doc.status === "rejected";
-                  return (
-                    <div key={key} className="flex h-full flex-col justify-between rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:shadow-md">
-                      <div className="space-y-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{documentNames[key] || key}</p>
-                            <p className="mt-2 text-xs text-gray-500">Uploaded {doc.uploadDate}</p>
-                          </div>
-                          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                            doc.status === "approved"
-                              ? "bg-green-100 text-green-800"
-                              : doc.status === "rejected"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-amber-100 text-amber-800"
-                          }`}>
-                            {doc.status.toUpperCase()}
-                          </span>
-                        </div>
-                        {doc.rejectionComment && (
-                          <div className="rounded-lg bg-red-50 border border-red-200 p-3">
-                            <p className="text-sm font-medium text-red-700 mb-1">Rejection Reason:</p>
-                            <p className="text-sm text-red-600">{doc.rejectionComment}</p>
-                          </div>
-                        )}
-                        {isProcessed && (
-                          <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 flex items-start gap-2">
-                            <div className="text-blue-600 mt-0.5 flex-shrink-0">🔒</div>
-                            <p className="text-xs text-blue-700">
-                              {doc.status === "approved" 
-                                ? "This document has been approved and is locked from further changes."
-                                : "This document has been rejected. Student must upload a new version to proceed."}
-                            </p>
-                          </div>
-                        )}
-                      </div>
+              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                {/* Bulk Actions Header */}
+                <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4">
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={handleSelectAll}
+                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      {selectedDocuments.length === docKeys.filter(key => docs[key].status === "pending").length && docKeys.filter(key => docs[key].status === "pending").length > 0 ? (
+                        <CheckSquare className="h-4 w-4" />
+                      ) : (
+                        <Square className="h-4 w-4" />
+                      )}
+                      Select All Pending
+                    </button>
+                    {selectedDocuments.length > 0 && (
                       <button
-                        type="button"
-                        onClick={() => handleViewDocument(key)}
-                        disabled={isProcessed}
-                        className={`mt-4 inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold text-white transition ${
-                          isProcessed
-                            ? "bg-gray-400 cursor-not-allowed opacity-60"
-                            : "bg-blue-600 hover:bg-blue-700"
-                        }`}
+                        onClick={handleBulkApproveSelected}
+                        className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
                       >
-                        {isProcessed ? "Locked" : "Review document"}
+                        <CheckCircle className="h-4 w-4" />
+                        Approve Selected ({selectedDocuments.length})
                       </button>
-                    </div>
-                  );
-                })}
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {selectedDocuments.length} of {docKeys.filter(key => docs[key].status === "pending").length} pending selected
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Select
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Document
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Uploaded
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {docKeys.map((key) => {
+                        const doc = docs[key];
+                        const isPending = doc.status === "pending";
+                        const isProcessed = doc.status === "approved" || doc.status === "rejected";
+                        return (
+                          <tr key={key} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              {isPending ? (
+                                <button
+                                  onClick={() => handleSelectDocument(key)}
+                                  className="text-gray-400 hover:text-gray-600"
+                                >
+                                  {selectedDocuments.includes(key) ? (
+                                    <CheckSquare className="h-5 w-5" />
+                                  ) : (
+                                    <Square className="h-5 w-5" />
+                                  )}
+                                </button>
+                              ) : (
+                                <div className="h-5 w-5"></div>
+                              )}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-3">
+                                <FileText className="h-5 w-5 text-gray-400" />
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {documentNames[key] || key}
+                                  </div>
+                                  <div className="text-sm text-gray-500 truncate max-w-xs">
+                                    {doc.fileName}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
+                                doc.status === "approved"
+                                  ? "bg-green-100 text-green-800"
+                                  : doc.status === "rejected"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-amber-100 text-amber-800"
+                              }`}>
+                                {doc.status.toUpperCase()}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {doc.uploadDate}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <div className="flex items-center gap-2">
+                                {doc.fileUrl && (
+                                  <button
+                                    onClick={() => handleQuickPreview(key)}
+                                    className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                                    title="Quick Preview"
+                                  >
+                                    <PreviewIcon className="h-4 w-4" />
+                                  </button>
+                                )}
+                                {isPending ? (
+                                  <button
+                                    onClick={() => handleApproveFromTableLocal(key)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700"
+                                  >
+                                    <CheckCircle className="h-3 w-3" />
+                                    Approve
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => handleViewDocument(key)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700"
+                                  >
+                                    <Eye className="h-3 w-3" />
+                                    View
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             ) : (
               <div className="space-y-6">
@@ -509,6 +646,71 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Quick Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setPreviewDocument(null)}
+          />
+          <div className="relative flex w-full max-w-2xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">
+            {/* Preview Header */}
+            <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4">
+              <div className="min-w-0">
+                <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Quick Preview</p>
+                <h3 className="mt-1 text-lg font-semibold text-gray-900">{previewDocument.name}</h3>
+              </div>
+              <button
+                onClick={() => setPreviewDocument(null)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+                aria-label="Close preview"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Preview Content */}
+            <div className="p-6">
+              <div className="rounded-2xl border border-gray-200 bg-gray-950 p-4">
+                <div className="aspect-[4/5] overflow-hidden rounded-2xl bg-gray-950 flex items-center justify-center max-h-96">
+                  {previewDocument.data.fileUrl ? (
+                    previewDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                      <img
+                        src={previewDocument.data.fileUrl}
+                        alt={previewDocument.name}
+                        className="h-full w-full object-contain"
+                      />
+                    ) : (
+                      <div className="text-center p-6">
+                        <FileText className="mx-auto mb-4 h-12 w-12 text-gray-400" />
+                        <p className="text-sm text-gray-400">Document preview not available.</p>
+                        <p className="text-xs text-gray-500 mt-2">This appears to be a non-image document.</p>
+                      </div>
+                    )
+                  ) : (
+                    <p className="text-sm text-gray-400">No preview available</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Preview Actions */}
+              <div className="mt-4 flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setPreviewDocument(null);
+                    handleViewDocument(previewDocument.key);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  <Eye className="h-4 w-4" />
+                  Full Review
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

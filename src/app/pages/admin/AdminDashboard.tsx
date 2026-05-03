@@ -100,6 +100,7 @@ export function AdminDashboard() {
   const [reviewingStudent, setReviewingStudent] = useState<any>(null);
   const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
   const [documentRejectionComment, setDocumentRejectionComment] = useState("");
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
 
   const documentNames: Record<string, string> = {
     psaBirthCertificate: "PSA Birth Certificate",
@@ -384,6 +385,93 @@ export function AdminDashboard() {
     } catch (error) {
       console.error("Error rejecting document:", error);
       alert("Failed to reject document");
+    }
+  };
+
+  const handleBulkApprove = async (documentKeys: string[]) => {
+    if (!reviewingStudent || documentKeys.length === 0) return;
+
+    try {
+      // Approve each document
+      for (const docKey of documentKeys) {
+        await updateDocumentStatus(docKey, "approved", reviewingStudent.id, actorReference);
+        await createAuditLog(
+          'DOCUMENT_APPROVED',
+          `Approved ${documentNames[docKey] || docKey} for student ${reviewingStudent.name || reviewingStudent.studentName}`,
+          actorReference,
+          reviewingStudent.id
+        );
+      }
+
+      // Update local state
+      setReviewingStudent((prev: any) => ({
+        ...prev,
+        enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+          documentKeys.includes(doc.document_type)
+            ? { ...doc, status: "approved" }
+            : doc
+        ),
+      }));
+
+      // Send notification to student
+      try {
+        await supabase.from('notifications').insert({
+          user_id: reviewingStudent.user_id || await resolveUserId(reviewingStudent.email || ""),
+          type: 'DOCUMENTS_APPROVED',
+          title: 'Documents Approved',
+          message: `${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} have been approved.`,
+          is_read: false,
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      alert(`✅ ${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved successfully!`);
+    } catch (error) {
+      console.error('Bulk approve error:', error);
+      alert('Error during bulk approval. Please try again.');
+    }
+  };
+
+  const handleApproveFromTable = async (docKey: string) => {
+    if (!reviewingStudent) return;
+
+    try {
+      await updateDocumentStatus(docKey, "approved", reviewingStudent.id, actorReference);
+      await createAuditLog(
+        'DOCUMENT_APPROVED',
+        `Approved ${documentNames[docKey] || docKey} for student ${reviewingStudent.name || reviewingStudent.studentName}`,
+        actorReference,
+        reviewingStudent.id
+      );
+
+      // Update local state
+      setReviewingStudent((prev: any) => ({
+        ...prev,
+        enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
+          doc.document_type === docKey
+            ? { ...doc, status: "approved" }
+            : doc
+        ),
+      }));
+
+      // Send notification to student
+      try {
+        await supabase.from('notifications').insert({
+          user_id: reviewingStudent.user_id || await resolveUserId(reviewingStudent.email || ""),
+          type: 'DOCUMENT_APPROVED',
+          title: 'Document Approved',
+          message: `Your ${documentNames[docKey] || docKey} has been approved.`,
+          is_read: false,
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      alert("✅ Document approved successfully!");
+    } catch (error) {
+      console.error('Error approving document:', error);
+      alert('Error approving document. Please try again.');
     }
   };
 
@@ -929,6 +1017,7 @@ export function AdminDashboard() {
         onClose={() => {
           setReviewingStudent(null);
           setSelectedDocument(null);
+          setSelectedDocuments([]);
         }}
         reviewingStudent={reviewingStudent}
         selectedDocument={selectedDocument}
@@ -940,12 +1029,17 @@ export function AdminDashboard() {
         handleBackToDocuments={() => {
           setSelectedDocument(null);
           setDocumentRejectionComment("");
+          setSelectedDocuments([]);
         }}
         handleFinalApprove={handleApprove}
         handleRejectApplication={handleRejectApplication}
         documentNames={documentNames}
         showFormData={showFormData}
         setShowFormData={setShowFormData}
+        selectedDocuments={selectedDocuments}
+        setSelectedDocuments={setSelectedDocuments}
+        handleBulkApprove={handleBulkApprove}
+        handleApproveFromTable={handleApproveFromTable}
       />
 
       {/* Document View Modal */}
