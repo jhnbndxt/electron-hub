@@ -282,10 +282,12 @@ export function SuperAdminDashboard() {
       <div className="min-w-0 flex-1">
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome, Branch Coordinator
-            </h1>
-            <p className="text-gray-600">System overview and administrative controls</p>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+              <BarChart3 className="h-4 w-4" />
+              System Overview
+            </div>
+            <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Welcome, Branch Coordinator</h1>
+            <p className="text-gray-600 text-lg">System overview and administrative controls</p>
           </div>
           <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
             <Calendar className="w-5 h-5 text-gray-500" />

@@ -998,13 +998,17 @@ export function SectionManagement() {
     <div className="p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Section Management</h1>
-        <p className="text-gray-600">Generate and manage class sections for enrolled students</p>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+          <Grid3x3 className="h-4 w-4" />
+          Section Management
+        </div>
+        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Section Management</h1>
+        <p className="text-gray-600 text-lg">Generate and manage class sections for enrolled students</p>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Students</p>
@@ -1016,7 +1020,7 @@ export function SectionManagement() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Sections</p>
@@ -1028,7 +1032,7 @@ export function SectionManagement() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Unsectioned</p>
@@ -1046,13 +1050,13 @@ export function SectionManagement() {
         <button
           onClick={autoGenerateSections}
           disabled={enrolledStudents.length === 0}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold transition-all hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
         >
           <Grid3x3 className="w-5 h-5" />
           Auto-Generate Sections
         </button>
         
-        <div className="flex items-center gap-3 bg-white border border-gray-300 rounded-lg px-4">
+        <div className="flex items-center gap-3 bg-white border border-gray-300 rounded-lg px-4 shadow-sm">
           <label className="text-sm text-gray-600">Max per section:</label>
           <input
             type="number"
@@ -1119,7 +1123,7 @@ export function SectionManagement() {
       )}
 
       {/* Sections List */}
-      <div className="bg-white rounded-lg border border-gray-200 mb-6">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-900">Generated Sections</h2>
         </div>

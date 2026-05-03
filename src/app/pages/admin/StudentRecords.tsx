@@ -125,26 +125,27 @@ export function StudentRecords() {
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
-          Student Records
-        </h1>
-        <p className="text-gray-600">
-          View and manage enrolled student records
-        </p>
+        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+          <Users className="h-4 w-4" />
+          Student Management
+        </div>
+        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Student Records</h1>
+        <p className="text-gray-600 text-lg">View and manage enrolled student records</p>
       </div>
 
       {/* Search & Filter Bar */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">
+      <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg p-5 mb-6">
         <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-center">
           {/* Search */}
           <div className="relative w-full md:flex-1 md:min-w-[240px]">
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--electron-blue)" }} />
             <input
               type="text"
               placeholder="Search by name or student ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
             />
           </div>
 
@@ -154,8 +155,8 @@ export function StudentRecords() {
             <select
               value={filterTrack}
               onChange={(e) => setFilterTrack(e.target.value)}
-              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              style={{ color: "#374151" }}
+              className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
             >
               <option value="all">All Tracks</option>
               {TRACK_OPTIONS.map((track) => (
@@ -168,7 +169,7 @@ export function StudentRecords() {
 
           {/* Export Button */}
           <button
-            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2"
+            className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
             <Download className="w-4 h-4" />

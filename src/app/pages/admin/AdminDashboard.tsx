@@ -722,12 +722,12 @@ export function AdminDashboard() {
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Welcome, Registrar
-            </h1>
-            <p className="text-gray-600">
-              Manage student applications and enrollment records
-            </p>
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
+              <FileCheck className="h-4 w-4" />
+              Dashboard Overview
+            </div>
+            <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Welcome, Registrar</h1>
+            <p className="text-gray-600 text-lg">Manage student applications and enrollment records</p>
           </div>
           <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
             <Calendar className="w-5 h-5 text-gray-500" />
@@ -747,7 +747,7 @@ export function AdminDashboard() {
         {/* Overview Stats - 4 Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {/* Total Students */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
@@ -763,7 +763,7 @@ export function AdminDashboard() {
           </div>
 
           {/* Pending Applications */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
@@ -781,7 +781,7 @@ export function AdminDashboard() {
           </div>
 
           {/* Verified Documents */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
@@ -799,7 +799,7 @@ export function AdminDashboard() {
           </div>
 
           {/* Pending Payments */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-md hover:shadow-lg transition-shadow">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
@@ -821,8 +821,8 @@ export function AdminDashboard() {
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Pending Applications</h2>
 
         {/* Pending Applications Table */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-x-auto">
-          <div className="p-6 border-b border-gray-200">
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+          <div className="p-4 sm:p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">
                 Pending Applications
@@ -834,15 +834,15 @@ export function AdminDashboard() {
                   placeholder="Search students..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
-                  style={{ accentColor: "#10B981" }}
+                  className="pl-10 pr-4 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+                  style={{ "--tw-ring-color": "var(--electron-blue)" } as any}
                 />
               </div>
             </div>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[980px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -873,13 +873,9 @@ export function AdminDashboard() {
                     </td>
                   </tr>
                 ) : (
-                  filteredStudents.map((student) => {
-                    const statusStyle = getStatusStyle(student.status);
-                    return (
                       <tr
                         key={student.id}
-                        className="hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => openReviewModal(student)}
+                        className="hover:bg-gray-50 transition-colors"
                       >
                         <td className="px-6 py-4">
                           <p className="text-sm font-medium text-gray-900">
@@ -922,21 +918,16 @@ export function AdminDashboard() {
                               student.status.slice(1)}
                           </span>
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="px-6 py-4 text-center">
                           <button
-                            className="text-sm font-medium hover:underline"
-                            style={{ color: "#10B981" }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openReviewModal(student);
-                            }}
+                            onClick={() => openReviewModal(student)}
+                            className="mx-auto inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                            title="Review Application"
                           >
                             Review
                           </button>
                         </td>
                       </tr>
-                    );
-                  })
                 )}
               </tbody>
             </table>
