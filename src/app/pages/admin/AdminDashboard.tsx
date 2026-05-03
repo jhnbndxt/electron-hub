@@ -733,9 +733,9 @@ export function AdminDashboard() {
   };
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 xl:flex-row w-full">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       {/* Main Content */}
-      <div className="flex-1 min-w-0">
+      <div className="w-full">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-6 lg:gap-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
@@ -1012,8 +1012,8 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent Activity Sidebar */}
-      <div className="w-full flex-shrink-0 xl:w-80 mt-8 xl:mt-0">
+      {/* Recent Activity Sidebar - Hidden */}
+      <div className="hidden">
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm xl:sticky xl:top-8">
           <div className="p-6 border-b border-gray-200" style={{ backgroundColor: "#F0FDF4" }}>
             <div className="flex items-center gap-2">
