@@ -1,6 +1,6 @@
 import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Download } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
@@ -30,6 +30,7 @@ export function Profile() {
   const { userData, enrollmentProgress, updateUserData } = useAuth();
   const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
   
   const [profileData, setProfileData] = useState({
     fullName: userData?.name || "Student",
@@ -49,6 +50,7 @@ export function Profile() {
   const [paymentData, setPaymentData] = useState<any>(null);
   const [profileImageUrl, setProfileImageUrl] = useState(userData?.profilePictureUrl || "");
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     if (userData) {
@@ -211,8 +213,16 @@ export function Profile() {
 
   // Reload profile data when component mounts or when returning from edit
   useEffect(() => {
-    // Check status on mount (loads from Supabase)
-    checkStatus();
+    const initializeProfile = async () => {
+      try {
+        // Check status on mount (loads from Supabase)
+        await checkStatus();
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeProfile();
 
     // Add event listener for window focus (when user returns to tab)
     const handleFocus = () => {
@@ -347,6 +357,21 @@ export function Profile() {
   return (
     <div className="flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       <Toaster position="top-center" />
+
+      {/* Loading State - Prevent profile flicker */}
+      {isInitializing && (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: "var(--electron-blue)", opacity: 0.2 }}>
+              <div className="w-8 h-8 rounded-full border-4 border-gray-300 border-t-blue-600 animate-spin" style={{ borderTopColor: "var(--electron-blue)" }}></div>
+            </div>
+            <p className="text-gray-600 font-medium">Loading your profile...</p>
+          </div>
+        </div>
+      )}
+
+      {!isInitializing && (
+        <>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -739,6 +764,8 @@ export function Profile() {
           </div>
         </div>
       </div>
+        </>
+      )}
     </div>
   );
 }

@@ -157,6 +157,7 @@ export function EnrollmentForm() {
   const [submittedSummaryData, setSubmittedSummaryData] = useState<Record<string, any> | null>(null);
   const [certificationChecked, setCertificationChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
@@ -290,60 +291,68 @@ export function EnrollmentForm() {
   // Load AI assessment results on mount
   useEffect(() => {
     const userEmail = userData?.email;
-    if (!userEmail) return;
+    if (!userEmail) {
+      setIsInitializing(false);
+      return;
+    }
 
     const initializeForm = async () => {
-      // Check if enrollment already submitted
-      const { data: existingEnrollment } = await checkExistingEnrollment(userEmail);
-      if (existingEnrollment) {
-        // Load the full enrollment data
-        const { data: enrollmentData } = await getUserEnrollment(userEmail);
-        if (enrollmentData) {
-          setIsSubmittedEnrollment(true);
-          setCurrentPage(7);
-          setSubmittedSummaryData(normalizeSubmittedRecord(enrollmentData));
-          return;
-        }
-      }
-      
-      // Try to restore autosaved draft
-      const { data: draftData } = await loadDraft(userEmail);
-      if (draftData) {
-        try {
-          const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draftData;
-          setFormData(prev => ({ ...prev, ...restData }));
-          console.log("✅ Enrollment draft restored from Supabase");
-        } catch (error) {
-          console.error("Failed to restore draft:", error);
-        }
-      }
-      
-      // Load AI assessment results
       try {
-        const result = await getLatestAssessmentResult(userEmail);
-        
-        if (result) {
-          setAiRecommendation({
-            track: result.track,
-            electives: result.electives,
-          });
-          
-          // Only set default values if no draft exists
-          if (!draftData) {
-            setFormData(prev => ({
-              ...prev,
-              preferredTrack: result.track,
-              elective1: result.electives[0] || "",
-              elective2: result.electives[1] || "",
-            }));
+        // Check if enrollment already submitted
+        const { data: existingEnrollment } = await checkExistingEnrollment(userEmail);
+        if (existingEnrollment) {
+          // Load the full enrollment data
+          const { data: enrollmentData } = await getUserEnrollment(userEmail);
+          if (enrollmentData) {
+            setIsSubmittedEnrollment(true);
+            setCurrentPage(7);
+            setSubmittedSummaryData(normalizeSubmittedRecord(enrollmentData));
+            setIsInitializing(false);
+            return;
           }
-          setHasAssessment(true);
-        } else {
+        }
+        
+        // Try to restore autosaved draft
+        const { data: draftData } = await loadDraft(userEmail);
+        if (draftData) {
+          try {
+            const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draftData;
+            setFormData(prev => ({ ...prev, ...restData }));
+            console.log("✅ Enrollment draft restored from Supabase");
+          } catch (error) {
+            console.error("Failed to restore draft:", error);
+          }
+        }
+        
+        // Load AI assessment results
+        try {
+          const result = await getLatestAssessmentResult(userEmail);
+          
+          if (result) {
+            setAiRecommendation({
+              track: result.track,
+              electives: result.electives,
+            });
+            
+            // Only set default values if no draft exists
+            if (!draftData) {
+              setFormData(prev => ({
+                ...prev,
+                preferredTrack: result.track,
+                elective1: result.electives[0] || "",
+                elective2: result.electives[1] || "",
+              }));
+            }
+            setHasAssessment(true);
+          } else {
+            setHasAssessment(false);
+          }
+        } catch (error) {
+          console.error("Error loading assessment results:", error);
           setHasAssessment(false);
         }
-      } catch (error) {
-        console.error("Error loading assessment results:", error);
-        setHasAssessment(false);
+      } finally {
+        setIsInitializing(false);
       }
     };
     
@@ -1517,6 +1526,20 @@ export function EnrollmentForm() {
   return (
     <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full min-h-screen bg-transparent">
       <div className="w-full max-w-4xl mx-auto">
+        {/* Loading State - Prevent form flicker */}
+        {isInitializing && (
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: "var(--electron-blue)", opacity: 0.2 }}>
+                <div className="w-8 h-8 rounded-full border-4 border-gray-300 border-t-blue-600 animate-spin" style={{ borderTopColor: "var(--electron-blue)" }}></div>
+              </div>
+              <p className="text-gray-600 font-medium">Loading your enrollment information...</p>
+            </div>
+          </div>
+        )}
+
+        {!isInitializing && (
+          <>
         {/* Header */}
         <div className="text-center mb-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
@@ -1612,6 +1635,8 @@ export function EnrollmentForm() {
                 {isSubmitting ? "Submitting..." : "Submit Enrollment"}
               </button>
             </div>
+          </>
+        )}
           </>
         )}
       </div>

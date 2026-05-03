@@ -563,6 +563,20 @@ export function Payment() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+      {/* Loading State - Prevent form flicker */}
+      {isLoading && !paymentApproved && !showQueueTicket && !isSubmitted && (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4" style={{ backgroundColor: "var(--electron-blue)", opacity: 0.2 }}>
+              <div className="w-8 h-8 rounded-full border-4 border-gray-300 border-t-blue-600 animate-spin" style={{ borderTopColor: "var(--electron-blue)" }}></div>
+            </div>
+            <p className="text-gray-600 font-medium">Loading your payment information...</p>
+          </div>
+        </div>
+      )}
+
+      {!isLoading && (
+        <>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl mb-2" style={{ color: "var(--electron-blue)" }}>
@@ -876,6 +890,8 @@ export function Payment() {
             </p>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
