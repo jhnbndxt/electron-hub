@@ -14,6 +14,7 @@ import {
   Square,
   Eye as PreviewIcon,
 } from "lucide-react";
+import DocumentViewerModal from './DocumentViewerModal';
 
 interface DocumentData {
   id: string;
@@ -86,8 +87,9 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectingDocument, setRejectingDocument] = useState<{ key: string; name: string } | null>(null);
   const [rejectReason, setRejectReason] = useState("");
-  // State for document display
-  const [displayedDocument, setDisplayedDocument] = useState<{ key: string; name: string; data: DocumentData } | null>(null);
+  // State for document viewer modal
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false);
+  const [viewedDocument, setViewedDocument] = useState<{ key: string; name: string; data: DocumentData } | null>(null);
 
   if (!isOpen || !reviewingStudent) return null;
 
@@ -188,14 +190,15 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
     setRejectReason("");
   };
 
-  // Handler for row click to display document
+  // Handler for row click to open document viewer
   const handleRowClick = (docKey: string) => {
     const doc = docs[docKey];
-    setDisplayedDocument({
+    setViewedDocument({
       key: docKey,
       name: documentNames[docKey] || docKey,
       data: doc,
     });
+    setShowDocumentViewer(true);
   };
 
   // Handler for hover preview
@@ -392,8 +395,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
             </div>
 
             {/* Document Table */}
-            {!displayedDocument ? (
-              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                 {/* Bulk Actions Header */}
                 <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4">
                   <div className="flex items-center gap-4">
@@ -537,51 +539,6 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                   </table>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-gray-500">Document view</p>
-                    <h3 className="mt-1 text-xl font-semibold text-gray-900">{displayedDocument.name}</h3>
-                  </div>
-                  <button
-                    onClick={() => setDisplayedDocument(null)}
-                    className="inline-flex items-center gap-2 rounded-full bg-gray-600 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700"
-                  >
-                    <X className="h-4 w-4" />
-                    Close
-                  </button>
-                </div>
-
-                {/* Document Display */}
-                <div className="rounded-2xl border border-gray-200 bg-gray-950 p-6">
-                  <div className="aspect-[4/5] max-h-[70vh] overflow-hidden rounded-2xl bg-gray-950 flex items-center justify-center">
-                    {displayedDocument.data.fileUrl ? (
-                      displayedDocument.data.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                        <img
-                          src={displayedDocument.data.fileUrl}
-                          alt={displayedDocument.name}
-                          className="h-full w-full object-contain"
-                        />
-                      ) : (
-                        <div className="text-center p-6">
-                          <FileText className="mx-auto mb-4 h-16 w-16 text-gray-400" />
-                          <p className="text-lg text-gray-300 mb-2">Document Preview</p>
-                          <p className="text-sm text-gray-400">This document type cannot be previewed directly.</p>
-                          <p className="text-xs text-gray-500 mt-2">{displayedDocument.data.fileName}</p>
-                        </div>
-                      )
-                    ) : (
-                      <div className="text-center p-6">
-                        <FileText className="mx-auto mb-4 h-16 w-16 text-gray-400" />
-                        <p className="text-lg text-gray-300 mb-2">No Preview Available</p>
-                        <p className="text-sm text-gray-400">Document file not found.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
         <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4">
@@ -674,6 +631,19 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Document Viewer Modal */}
+      {showDocumentViewer && viewedDocument && (
+        <DocumentViewerModal
+          isOpen={showDocumentViewer}
+          onClose={() => {
+            setShowDocumentViewer(false);
+            setViewedDocument(null);
+          }}
+          documentName={viewedDocument.name}
+          documentData={viewedDocument.data}
+        />
       )}
     </div>
   );
