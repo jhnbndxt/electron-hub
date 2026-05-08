@@ -125,16 +125,18 @@ export function Login() {
     }
   };
 
+  if (showMaintenanceNotice) {
+    return (
+      <MaintenanceNotice
+        message="The student portal is currently under maintenance. Access for students is temporarily unavailable while system updates are being performed. Please try again later and wait for further announcements."
+        showButton={true}
+        onButtonClick={() => navigate("/", { replace: true })}
+      />
+    );
+  }
+
   return (
     <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-      {showMaintenanceNotice ? (
-        <MaintenanceNotice
-          message="The student portal is currently under maintenance. Access for students is temporarily unavailable while system updates are being performed. Please try again later and wait for further announcements."
-          showButton={true}
-          onButtonClick={() => navigate("/", { replace: true })}
-        />
-      ) : (
-        <>
           {/* Assessment Banner */}
           <div className="relative z-10 w-full max-w-md">
         {showBanner && (
@@ -267,9 +269,6 @@ export function Login() {
           </div>
         </div>
       </div>
-      </>
-      )}
-
       {/* Chat Assistant */}
       <ChatAssistant />
     </div>

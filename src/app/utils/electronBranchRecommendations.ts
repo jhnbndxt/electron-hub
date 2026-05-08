@@ -30,8 +30,7 @@ export const ELECTRON_BRANCHES: ElectronBranch[] = [
     websiteUrl: OFFICIAL_WEBSITE_URL,
     facebookUrl: OFFICIAL_FACEBOOK_URL,
     sourceLabel: "Official website and programs page",
-    description:
-      "Main campus focused on degree-based education and industry-oriented technical-vocational training with hands-on learning pathways.",
+    description: "Main campus for college and technical-vocational programs.",
     programs: [
       "Bachelor of Science in Criminology",
       "Bachelor of Science in Information System",
@@ -74,8 +73,7 @@ export const ELECTRON_BRANCHES: ElectronBranch[] = [
     websiteUrl: OFFICIAL_WEBSITE_URL,
     facebookUrl: OFFICIAL_FACEBOOK_URL,
     sourceLabel: "Official programs page and branch listing references",
-    description:
-      "Valenzuela campus offering technical-vocational pathways and assessment-centered skills training for food service and programming fields.",
+    description: "Valenzuela campus for focused skills training.",
     programs: [
       "Cookery NC II",
       "Bread and Pastry NC II",
@@ -94,8 +92,7 @@ export const ELECTRON_BRANCHES: ElectronBranch[] = [
     websiteUrl: OFFICIAL_WEBSITE_URL,
     facebookUrl: OFFICIAL_FACEBOOK_URL,
     sourceLabel: "Official programs page",
-    description:
-      "Valenzuela campus aligned with communication and electrical installation training for students pursuing hands-on technical careers.",
+    description: "Skills training campus for hands-on technical pathways.",
     programs: [
       "Contact Center Services NC II",
       "Electrical Installation and Maintenance NC II",
@@ -111,8 +108,7 @@ export const ELECTRON_BRANCHES: ElectronBranch[] = [
     websiteUrl: OFFICIAL_WEBSITE_URL,
     facebookUrl: OFFICIAL_FACEBOOK_URL,
     sourceLabel: "Public branch directory references",
-    description:
-      "Quezon City branch connected to Electron's college and technical education programs for degree and skills-based learners.",
+    description: "Quezon City campus for college and technical programs.",
     programs: [
       "Bachelor of Science in Information System",
       "Bachelor of Science in Tourism Management",
@@ -130,8 +126,7 @@ export const ELECTRON_BRANCHES: ElectronBranch[] = [
     websiteUrl: OFFICIAL_WEBSITE_URL,
     facebookUrl: OFFICIAL_FACEBOOK_URL,
     sourceLabel: "CourseFinder PH",
-    description:
-      "Caloocan campus listed with undergraduate and TESDA-related technical-vocational offerings for college and skills training pathways.",
+    description: "Caloocan campus for college and TESDA pathways.",
     programs: [
       "Bachelor of Science in Tourism Management",
       "Bachelor of Science in Criminology",
@@ -208,6 +203,45 @@ function programMatchesCategories(program: string, categories: string[]) {
   });
 }
 
+const COURSE_PROGRAM_KEYWORDS: Record<string, string[]> = {
+  "information technology": ["information system", "computer systems", "programming", "java"],
+  "computer science": ["information system", "computer systems", "programming", "java"],
+  "software engineering": ["information system", "programming", "java"],
+  "computer engineering": ["computer systems", "electronics", "electrical", "information system"],
+  tourism: ["tourism management", "tourism promotion", "events management"],
+  "hospitality management": ["food service", "cookery", "bread", "pastry"],
+  "culinary arts": ["food service", "cookery", "bread", "pastry"],
+  "baking & pastry": ["bread", "pastry"],
+  "automotive technology": ["automotive technology"],
+  "mechanical engineering": ["automotive technology", "welding", "fabrication"],
+  "electrical engineering": ["electrical technology", "electrical installation"],
+  "electronics engineering": ["electronics technology", "electronics"],
+  education: ["teacher education", "technical teacher", "trainers methodology"],
+  "physical education": ["teacher education", "technical teacher", "trainers methodology"],
+  criminology: ["criminology"],
+  "business administration": ["bookkeeping"],
+  marketing: ["bookkeeping"],
+  management: ["bookkeeping", "food service", "events management"],
+  "multimedia arts": ["3d animation", "garments", "fashion", "design"],
+  film: ["3d animation", "visual", "media"],
+  "graphic design": ["3d animation", "garments", "fashion", "design"],
+};
+
+function normalizeCourseName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function programMatchesSuggestedCourse(program: string, course: string) {
+  const normalizedProgram = normalizeCourseName(program);
+  const normalizedCourse = normalizeCourseName(course);
+  const keywords = COURSE_PROGRAM_KEYWORDS[normalizedCourse] || [normalizedCourse];
+
+  return keywords.some((keyword) => {
+    const normalizedKeyword = normalizeCourseName(keyword);
+    return normalizedProgram.includes(normalizedKeyword) || normalizedKeyword.includes(normalizedProgram);
+  });
+}
+
 export function getRecommendedElectronBranches({
   track,
   electives,
@@ -223,6 +257,7 @@ export function getRecommendedElectronBranches({
   topDomains: string[];
   topInterests: string[];
 }): BranchRecommendation[] {
+  const hasSuggestedCourseFilter = suggestedCourses.length > 0;
   const assessmentCategories = getAssessmentCategories([
     track,
     ...electives,
@@ -237,18 +272,22 @@ export function getRecommendedElectronBranches({
 
   const recommendations = ELECTRON_BRANCHES.map((branch) => {
     const matchedCategories = branch.categories.filter((category) => activeCategories.includes(category));
-    const matchedPrograms = branch.programs.filter((program) => programMatchesCategories(program, activeCategories));
-    const matchScore = matchedCategories.length * 3 + matchedPrograms.length;
+    const courseMatchedPrograms = branch.programs.filter((program) =>
+      suggestedCourses.some((course) => programMatchesSuggestedCourse(program, course))
+    );
+    const categoryMatchedPrograms = branch.programs.filter((program) => programMatchesCategories(program, activeCategories));
+    const matchedPrograms = hasSuggestedCourseFilter ? courseMatchedPrograms : categoryMatchedPrograms;
+    const matchScore = matchedPrograms.length * 4 + matchedCategories.length;
 
     return {
       ...branch,
       matchScore,
       matchedCategories,
-      matchedPrograms: matchedPrograms.length > 0 ? matchedPrograms : branch.programs.slice(0, 4),
+      matchedPrograms,
       isBestMatch: false,
     };
   })
-    .filter((branch) => branch.matchScore > 0)
+    .filter((branch) => (hasSuggestedCourseFilter ? branch.matchedPrograms.length > 0 : branch.matchScore > 0))
     .sort((left, right) => right.matchScore - left.matchScore);
 
   if (recommendations.length > 0) {

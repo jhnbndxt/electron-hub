@@ -36,7 +36,7 @@ function NotificationTimestamp({ timestamp }: { timestamp: string }) {
   const formattedTimestamp = formatNotificationTimestamp(timestamp);
 
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-500">
+    <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] leading-4 text-slate-400">
       <span>{formattedTimestamp.absolute}</span>
       <span className="text-slate-300">•</span>
       <span>{formattedTimestamp.relative}</span>
@@ -171,27 +171,31 @@ function DashboardLayoutContent() {
     switch (variant) {
       case 'success':
         return {
-          wrapper: 'rounded-3xl border border-emerald-200 bg-emerald-50/80 text-slate-900',
-          iconBg: 'bg-emerald-100 text-emerald-700',
+          wrapper: 'border-l-emerald-400',
+          iconBg: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100',
+          dot: 'bg-emerald-500',
           actionColor: 'text-emerald-700',
         };
       case 'warning':
         return {
-          wrapper: 'rounded-3xl border border-amber-200 bg-amber-50/80 text-slate-900',
-          iconBg: 'bg-amber-100 text-amber-700',
+          wrapper: 'border-l-amber-400',
+          iconBg: 'bg-amber-50 text-amber-600 ring-1 ring-amber-100',
+          dot: 'bg-amber-500',
           actionColor: 'text-amber-700',
         };
       case 'error':
         return {
-          wrapper: 'rounded-3xl border border-rose-200 bg-rose-50/80 text-slate-900',
-          iconBg: 'bg-rose-100 text-rose-700',
+          wrapper: 'border-l-rose-400',
+          iconBg: 'bg-rose-50 text-rose-600 ring-1 ring-rose-100',
+          dot: 'bg-rose-500',
           actionColor: 'text-rose-700',
         };
       default:
         return {
-          wrapper: 'rounded-3xl border border-slate-200 bg-slate-50/90 text-slate-900',
-          iconBg: 'bg-slate-100 text-slate-700',
-          actionColor: 'text-slate-700',
+          wrapper: 'border-l-blue-400',
+          iconBg: 'bg-blue-50 text-blue-600 ring-1 ring-blue-100',
+          dot: 'bg-blue-500',
+          actionColor: 'text-blue-700',
         };
     }
   };
@@ -604,23 +608,33 @@ function DashboardLayoutContent() {
                 {/* Notification Dropdown */}
                 {showNotifications && (
                   <div
-                    className="portal-glass-menu absolute right-0 z-50 mt-3 w-[calc(100vw-2rem)] max-w-sm overflow-hidden rounded-lg sm:w-80"
+                    className="portal-glass-menu absolute right-0 z-50 mt-3 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/10 sm:w-96"
                   >
                     {/* Arrow pointing up */}
                     <div
-                      className="absolute -top-2 right-4 h-4 w-4 rotate-45 border-l border-t border-slate-200/80 bg-slate-50/95 backdrop-blur-md"
+                      className="absolute -top-2 right-4 h-4 w-4 rotate-45 border-l border-t border-slate-200/80 bg-white"
                     />
 
                     {/* Header */}
-                    <div className="relative z-10 border-b border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm">
-                      <h3 className="font-semibold text-gray-900">Notifications</h3>
+                    <div className="relative z-10 flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
+                      <div>
+                        <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+                        <p className="text-xs text-slate-500">
+                          {unreadCount > 0 ? `${unreadCount} unread update${unreadCount === 1 ? "" : "s"}` : "You're all caught up"}
+                        </p>
+                      </div>
+                      {notifications.length > 0 && (
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                          {notifications.length}
+                        </span>
+                      )}
                     </div>
 
                     {/* Notification List */}
-                    <div className="relative z-10 bg-white/60 max-h-[400px] overflow-y-auto">
+                    <div className="relative z-10 max-h-[360px] overflow-y-auto bg-white scroll-smooth [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
                       {loadingNotifications ? (
-                        <div className="p-4">
-                          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        <div className="p-3">
+                          <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
                             <LoadingState
                               message="Loading notifications..."
                               subtext="Checking recent enrollment updates."
@@ -630,13 +644,13 @@ function DashboardLayoutContent() {
                           </div>
                         </div>
                       ) : notifications.length === 0 ? (
-                        <div className="p-4">
-                          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center text-sm text-slate-500">
+                        <div className="p-3">
+                          <div className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
                             No notifications yet
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-3 p-4">
+                        <div className="divide-y divide-slate-100">
                           {notifications.slice(0, 5).map((notification) => {
                             const variant = getNotificationVariant(notification.type);
                             const variantStyles = getVariantStyles(variant);
@@ -648,23 +662,28 @@ function DashboardLayoutContent() {
                                   onClick={() =>
                                     handleNotificationClick(notification.id, notification)
                                   }
-                                  className={`w-full text-left transition-all hover:shadow-lg ${variantStyles.wrapper}`}
+                                  className={`w-full border-l-2 px-3.5 py-3 text-left transition-colors hover:bg-slate-50/90 ${variantStyles.wrapper}`}
                                 >
                                   <div className="flex items-start gap-3">
                                     <div
-                                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variantStyles.iconBg}`}
+                                      className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${variantStyles.iconBg}`}
                                     >
-                                      <CheckCircle className="w-5 h-5" />
+                                      <CheckCircle className="h-4 w-4" />
                                     </div>
-                                    <div className="flex-1">
-                                      <p className="text-sm font-semibold text-slate-900 mb-1">
-                                        Enrollment Form Accepted
-                                      </p>
-                                      <p className="text-xs leading-relaxed mb-2 text-slate-700">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <p className="text-sm font-semibold leading-5 text-slate-900">
+                                          Enrollment Form Accepted
+                                        </p>
+                                        {!notification.read && (
+                                          <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${variantStyles.dot}`} />
+                                        )}
+                                      </div>
+                                      <p className="mt-0.5 text-xs leading-5 text-slate-600">
                                         {notification.message}
                                       </p>
-                                      <p className={`text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
-                                        Go to Payment Tab →
+                                      <p className={`mt-1 text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
+                                        Go to Payment
                                       </p>
                                       <NotificationTimestamp timestamp={notification.timestamp} />
                                     </div>
@@ -680,23 +699,28 @@ function DashboardLayoutContent() {
                                   onClick={() =>
                                     handleNotificationClick(notification.id, notification)
                                   }
-                                  className={`w-full text-left transition-all hover:shadow-lg ${variantStyles.wrapper}`}
+                                  className={`w-full border-l-2 px-3.5 py-3 text-left transition-colors hover:bg-slate-50/90 ${variantStyles.wrapper}`}
                                 >
                                   <div className="flex items-start gap-3">
                                     <div
-                                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variantStyles.iconBg}`}
+                                      className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${variantStyles.iconBg}`}
                                     >
-                                      <AlertTriangle className="w-5 h-5" />
+                                      <AlertTriangle className="h-4 w-4" />
                                     </div>
-                                    <div className="flex-1">
-                                      <p className="text-sm font-semibold text-slate-900 mb-1">
-                                        Action Required: Document Rejected
-                                      </p>
-                                      <p className="text-xs leading-relaxed mb-2 text-slate-700 whitespace-pre-line">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-start justify-between gap-2">
+                                        <p className="text-sm font-semibold leading-5 text-slate-900">
+                                          Action Required: Document Rejected
+                                        </p>
+                                        {!notification.read && (
+                                          <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${variantStyles.dot}`} />
+                                        )}
+                                      </div>
+                                      <p className="mt-0.5 whitespace-pre-line text-xs leading-5 text-slate-600">
                                         {notification.message}
                                       </p>
-                                      <p className={`text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
-                                        Click here to review and re-upload your document →
+                                      <p className={`mt-1 text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
+                                        Review document
                                       </p>
                                       <NotificationTimestamp timestamp={notification.timestamp} />
                                     </div>
@@ -711,21 +735,28 @@ function DashboardLayoutContent() {
                                 onClick={() =>
                                   handleNotificationClick(notification.id, notification)
                                 }
-                                className={`w-full text-left transition-all hover:shadow-lg ${variantStyles.wrapper}`}
+                                className={`w-full border-l-2 px-3.5 py-3 text-left transition-colors hover:bg-slate-50/90 ${variantStyles.wrapper}`}
                               >
                                 <div className="flex items-start gap-3">
                                   <div
-                                    className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${variantStyles.iconBg}`}
+                                    className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${variantStyles.iconBg}`}
                                   >
-                                    <span className="text-sm font-semibold">
-                                      {notification.read ? '•' : '!'}
-                                    </span>
+                                    {variant === "warning" || variant === "error" ? (
+                                      <AlertTriangle className="h-4 w-4" />
+                                    ) : (
+                                      <Bell className="h-4 w-4" />
+                                    )}
                                   </div>
-                                  <div className="flex-1">
-                                    <p className="text-sm font-semibold text-slate-900 mb-1">
-                                      {notification.title || 'Notification'}
-                                    </p>
-                                    <p className="text-xs leading-relaxed text-slate-700">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-sm font-semibold leading-5 text-slate-900">
+                                        {notification.title || 'Notification'}
+                                      </p>
+                                      {!notification.read && (
+                                        <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${variantStyles.dot}`} />
+                                      )}
+                                    </div>
+                                    <p className="mt-0.5 text-xs leading-5 text-slate-600">
                                       {notification.message}
                                     </p>
                                     <NotificationTimestamp timestamp={notification.timestamp} />
@@ -739,7 +770,7 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Footer */}
-                    <div className="relative z-10 border-t border-slate-200/80 bg-white/72 px-4 py-3 backdrop-blur-sm flex items-center justify-between gap-3">
+                    <div className="relative z-10 flex items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-2.5">
                       {notifications.length > 0 && (
                         <button
                           onClick={async () => {
@@ -751,16 +782,14 @@ function DashboardLayoutContent() {
                               setNotifications([]);
                             }
                           }}
-                          className="text-sm font-medium"
-                          style={{ color: "#EF4444" }}
+                          className="rounded-md px-2 py-1 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50"
                         >
                           Clear All
                         </button>
                       )}
                       <button
                         onClick={() => setShowNotifications(false)}
-                        className="text-sm font-medium ml-auto"
-                        style={{ color: "var(--electron-blue)" }}
+                        className="ml-auto rounded-md px-2 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50"
                       >
                         Close
                       </button>
