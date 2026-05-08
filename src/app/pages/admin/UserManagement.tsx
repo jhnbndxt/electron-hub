@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Plus, Edit2, Trash2, X, Shield, User, Users, CheckCircle, RefreshCw } from "lucide-react";
-import { Skeleton } from "../../components/ui/skeleton";
+import { Search, Filter, Plus, Edit2, Trash2, X, Shield, User, Users, CheckCircle, RefreshCw, Eye, EyeOff } from "lucide-react";
+import bcrypt from "bcryptjs";
 import { LoadingState } from "../../components/LoadingState";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation } from "react-router";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { supabase } from "../../../supabase";
+import { registerUser } from "../../../services/authService";
+import { createAuditLog } from "../../../services/adminService";
 
 interface UserAccount {
   id: string;
@@ -16,6 +18,130 @@ interface UserAccount {
   dateCreated: string;
 }
 
+type CreatableRole = "student" | "registrar" | "branchcoordinator" | "cashier";
+
+type AddUserForm = {
+  firstName: string;
+  middleName: string;
+  lastName: string;
+  sex: string;
+  birthDate: string;
+  contactNumber: string;
+  email: string;
+  role: CreatableRole;
+  password: string;
+  confirmPassword: string;
+};
+
+type AddUserField = keyof AddUserForm;
+
+const initialAddUserForm: AddUserForm = {
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  sex: "",
+  birthDate: "",
+  contactNumber: "",
+  email: "",
+  role: "student",
+  password: "",
+  confirmPassword: "",
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CONTACT_NUMBER_PATTERN = /^(09\d{9}|\+639\d{9})$/;
+const NAME_PATTERN = /^[\p{L}][\p{L}\s'.-]*$/u;
+const STAFF_ROLES: CreatableRole[] = ["registrar", "branchcoordinator", "cashier"];
+
+const getPasswordRequirements = (password: string) => {
+  const missingRequirements: string[] = [];
+  if (password.length < 8) missingRequirements.push("at least 8 characters");
+  if (!/[A-Z]/.test(password)) missingRequirements.push("one uppercase letter");
+  if (!/[a-z]/.test(password)) missingRequirements.push("one lowercase letter");
+  if (!/\d/.test(password)) missingRequirements.push("one number");
+  if (!/[^A-Za-z0-9]/.test(password)) missingRequirements.push("one special character");
+  return missingRequirements;
+};
+
+const formatRequirementList = (requirements: string[]) => {
+  if (requirements.length === 1) return requirements[0];
+  if (requirements.length === 2) return `${requirements[0]} and ${requirements[1]}`;
+  return `${requirements.slice(0, -1).join(", ")}, and ${requirements[requirements.length - 1]}`;
+};
+
+const getAddUserFieldError = (field: AddUserField, form: AddUserForm) => {
+  const isStudent = form.role === "student";
+
+  switch (field) {
+    case "firstName": {
+      const value = form.firstName.trim();
+      if (!value) return "Enter a first name.";
+      if (value.length < 2) return "First name must be at least 2 characters long.";
+      if (!NAME_PATTERN.test(value)) return "First name can only include letters, spaces, apostrophes, periods, and hyphens.";
+      return "";
+    }
+    case "middleName": {
+      const value = form.middleName.trim();
+      if (value && !NAME_PATTERN.test(value)) return "Middle name can only include letters, spaces, apostrophes, periods, and hyphens.";
+      return "";
+    }
+    case "lastName": {
+      const value = form.lastName.trim();
+      if (!value) return "Enter a last name.";
+      if (value.length < 2) return "Last name must be at least 2 characters long.";
+      if (!NAME_PATTERN.test(value)) return "Last name can only include letters, spaces, apostrophes, periods, and hyphens.";
+      return "";
+    }
+    case "sex": {
+      if (isStudent && !form.sex) return "Select sex.";
+      return "";
+    }
+    case "birthDate": {
+      const value = form.birthDate.trim();
+      if (!isStudent) return "";
+      if (!value) return "Enter date of birth.";
+      const birthDate = new Date(value);
+      const today = new Date();
+      const age = today.getFullYear() - birthDate.getFullYear();
+      if (Number.isNaN(birthDate.getTime()) || birthDate > today || age > 120) {
+        return "Please enter a valid date of birth.";
+      }
+      return "";
+    }
+    case "contactNumber": {
+      const value = form.contactNumber.trim();
+      if (!isStudent) return "";
+      if (!value) return "Enter contact number.";
+      if (!CONTACT_NUMBER_PATTERN.test(value)) return "Use 09XXXXXXXXX or +639XXXXXXXXX.";
+      return "";
+    }
+    case "email": {
+      const value = form.email.trim();
+      if (!value) return "Enter an email address.";
+      if (!EMAIL_PATTERN.test(value)) return "Use a valid email format like name@example.com.";
+      return "";
+    }
+    case "role": {
+      if (!["student", ...STAFF_ROLES].includes(form.role)) return "Select a permitted role.";
+      return "";
+    }
+    case "password": {
+      if (!form.password) return "Enter a password.";
+      const missingRequirements = getPasswordRequirements(form.password);
+      if (missingRequirements.length > 0) return `Password must include ${formatRequirementList(missingRequirements)}.`;
+      return "";
+    }
+    case "confirmPassword": {
+      if (!isStudent) return "";
+      if (!form.confirmPassword) return "Confirm the password.";
+      if (form.password !== form.confirmPassword) return "Passwords do not match.";
+      return "";
+    }
+    default:
+      return "";
+  }
+};
+
 export function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
@@ -24,21 +150,28 @@ export function UserManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showErrorToast, setShowErrorToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [touchedAddUserFields, setTouchedAddUserFields] = useState<Partial<Record<AddUserField, boolean>>>({});
   const { userRole, userData } = useAuth();
   const location = useLocation();
 
   // Form state for adding new user
-  const [newUserForm, setNewUserForm] = useState({
-    name: "",
-    email: "",
-    role: "student",
-    password: "",
-  });
+  const [newUserForm, setNewUserForm] = useState<AddUserForm>(initialAddUserForm);
 
   // Determine if we're in super admin context
   const isSuperAdmin = userRole === "superadmin" || location.pathname.startsWith("/superadmin");
+  const canCreateUsers = userRole === "branchcoordinator";
+  const isStudentAddForm = newUserForm.role === "student";
+  const addUserErrors = (Object.keys(initialAddUserForm) as AddUserField[]).reduce((errors, field) => {
+    errors[field] = getAddUserFieldError(field, newUserForm);
+    return errors;
+  }, {} as Record<AddUserField, string>);
+  const isAddUserFormValid = (Object.keys(addUserErrors) as AddUserField[]).every((field) => !addUserErrors[field]);
 
   // Load users from Supabase
   const [users, setUsers] = useState<UserAccount[]>([]);
@@ -79,6 +212,45 @@ export function UserManagement() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  const showSuccess = (message: string) => {
+    setSuccessMessage(message);
+    setShowSuccessToast(true);
+    setTimeout(() => setShowSuccessToast(false), 3000);
+  };
+
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    setShowErrorToast(true);
+    setTimeout(() => setShowErrorToast(false), 4000);
+  };
+
+  const setAddUserFieldTouched = (field: AddUserField) => {
+    setTouchedAddUserFields((current) => ({ ...current, [field]: true }));
+  };
+
+  const getVisibleAddUserError = (field: AddUserField) => {
+    return touchedAddUserFields[field] ? addUserErrors[field] : "";
+  };
+
+  const getAddUserInputClassName = (field: AddUserField) => {
+    const hasError = Boolean(getVisibleAddUserError(field));
+    return `w-full px-4 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+      hasError ? "border-red-300 bg-red-50" : "border-gray-300"
+    }`;
+  };
+
+  const updateAddUserField = (field: AddUserField, value: string) => {
+    const nextValue = field === "email" ? value.trimStart().toLowerCase() : value;
+    setNewUserForm((current) => ({
+      ...current,
+      [field]: nextValue,
+      ...(field === "role" && value !== "student"
+        ? { sex: "", birthDate: "", contactNumber: "", confirmPassword: "" }
+        : {}),
+    }));
+    setAddUserFieldTouched(field);
+  };
 
   const visibleUsers = users.filter((user) => user.status !== "inactive");
 
@@ -163,65 +335,145 @@ export function UserManagement() {
   };
 
   const handleAddUser = () => {
+    if (!canCreateUsers) {
+      showError("Only Branch Coordinator accounts can create users.");
+      return;
+    }
+
     setShowAddModal(true);
-    setNewUserForm({
-      name: "",
-      email: "",
-      role: "student",
-      password: "",
-    });
+    setNewUserForm(initialAddUserForm);
+    setTouchedAddUserFields({});
+    setShowPassword(false);
   };
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate form
-    if (!newUserForm.name || !newUserForm.email || !newUserForm.password) {
-      alert("Please fill in all fields");
+
+    if (!canCreateUsers) {
+      showError("Only Branch Coordinator accounts can create users.");
       return;
     }
 
-    // Check if user already exists
-    const existingUser = users.find((u) => u.email.toLowerCase() === newUserForm.email.toLowerCase());
-    
-    if (existingUser) {
-      alert("A user with this email already exists");
+    setTouchedAddUserFields(
+      (Object.keys(initialAddUserForm) as AddUserField[]).reduce((fields, field) => {
+        fields[field] = true;
+        return fields;
+      }, {} as Partial<Record<AddUserField, boolean>>)
+    );
+
+    const firstValidationError = (Object.keys(addUserErrors) as AddUserField[])
+      .map((field) => addUserErrors[field])
+      .find(Boolean);
+
+    if (firstValidationError) {
+      showError(firstValidationError);
       return;
     }
 
-    // Create new user in Supabase
-    const { data, error } = await supabase
-      .from('users')
-      .insert({
-        email: newUserForm.email,
-        full_name: newUserForm.name,
-        role: newUserForm.role,
-        password_hash: newUserForm.password, // Note: In production, hash this server-side
-        status: 'active',
-      })
-      .select()
-      .single();
+    setIsCreatingUser(true);
 
-    if (error) {
-      console.error('Error creating user:', error);
-      alert('Failed to create user: ' + error.message);
-      return;
+    try {
+      const normalizedEmail = newUserForm.email.trim().toLowerCase();
+      const firstName = newUserForm.firstName.trim();
+      const middleName = newUserForm.middleName.trim();
+      const lastName = newUserForm.lastName.trim();
+      const fullName = [firstName, middleName, lastName].filter(Boolean).join(" ");
+
+      const { data: existingUser, error: duplicateCheckError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", normalizedEmail)
+        .maybeSingle();
+
+      if (duplicateCheckError) {
+        showError(duplicateCheckError.message || "Unable to verify email availability.");
+        return;
+      }
+
+      if (existingUser) {
+        showError("A user with this email already exists.");
+        return;
+      }
+
+      let createdUser: any = null;
+
+      if (newUserForm.role === "student") {
+        const { error: registerError, user } = await registerUser(
+          normalizedEmail,
+          newUserForm.password,
+          {
+            firstName,
+            lastName,
+            middleName: middleName || null,
+            sex: newUserForm.sex,
+            birthDate: newUserForm.birthDate.trim(),
+            contactNumber: newUserForm.contactNumber.trim(),
+          }
+        );
+
+        if (registerError || !user) {
+          showError(registerError || "Unable to create student account.");
+          return;
+        }
+
+        createdUser = user;
+      } else {
+        const passwordHash = await bcrypt.hash(newUserForm.password, 10);
+        const { data, error } = await supabase
+          .from("users")
+          .insert({
+            email: normalizedEmail,
+            password_hash: passwordHash,
+            full_name: fullName,
+            first_name: firstName,
+            middle_name: middleName || null,
+            last_name: lastName,
+            role: newUserForm.role,
+            admin_type: newUserForm.role,
+            status: "active",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (error) {
+          showError(error.message || "Unable to create staff account.");
+          return;
+        }
+
+        createdUser = data;
+      }
+
+      await createAuditLog(
+        userData?.id || userData?.email || "system",
+        "USER_ACCOUNT_CREATED",
+        `Created ${getRoleLabel(newUserForm.role)} account for ${fullName} (${normalizedEmail}).`,
+        "success",
+        {
+          resourceType: "user",
+          resourceId: createdUser?.id,
+          changes: {
+            created_user_email: normalizedEmail,
+            created_user_name: fullName,
+            assigned_role: newUserForm.role,
+            created_by: userData?.email || userData?.id || "system",
+            created_at: new Date().toISOString(),
+          },
+        }
+      );
+
+      await loadUsers();
+      setShowAddModal(false);
+      showSuccess(`${getRoleLabel(newUserForm.role)} account created successfully!`);
+      setNewUserForm(initialAddUserForm);
+      setTouchedAddUserFields({});
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      showError(error.message || "Failed to create user.");
+    } finally {
+      setIsCreatingUser(false);
     }
-
-    // Reload users from Supabase
-    await loadUsers();
-    setShowAddModal(false);
-    setSuccessMessage("User created successfully!");
-    setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 3000);
-    
-    // Reset form
-    setNewUserForm({
-      name: "",
-      email: "",
-      role: "student",
-      password: "",
-    });
   };
 
   const getRoleStyle = (role: string) => {
@@ -344,8 +596,10 @@ export function UserManagement() {
           </button>
           <button
             onClick={handleAddUser}
-            className="w-full sm:w-auto justify-center px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2 shadow-md"
-            style={{ backgroundColor: "#1E3A8A" }}
+            disabled={!canCreateUsers}
+            className="w-full sm:w-auto justify-center px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2 shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+            style={{ backgroundColor: canCreateUsers ? "#1E3A8A" : "#64748B" }}
+            title={canCreateUsers ? "Add user" : "Only Branch Coordinators can create users"}
           >
             <Plus className="w-5 h-5" />
             Add User
@@ -520,7 +774,6 @@ export function UserManagement() {
                 </button>
               </div>
             </div>
-                          title="Deactivate user"
             {/* Modal Body */}
             <div className="p-6">
               {/* User Info */}
@@ -703,7 +956,7 @@ export function UserManagement() {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="bg-white shadow-2xl max-w-md w-full"
+            className="bg-white shadow-2xl max-h-[90vh] w-full max-w-2xl overflow-hidden"
             style={{ borderRadius: "12px" }}
             onClick={(e) => e.stopPropagation()}
           >
@@ -726,66 +979,208 @@ export function UserManagement() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6">
+            <div className="max-h-[calc(90vh-89px)] overflow-y-auto p-6">
               <form className="space-y-4" onSubmit={handleCreateUser}>
-                {/* Name */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Name
-                  </label>
-                  <input
-                    type="text"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter full name"
-                    value={newUserForm.name}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, name: e.target.value })}
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <input
-                    type="email"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter email address"
-                    value={newUserForm.email}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, email: e.target.value })}
-                  />
-                </div>
-
-                {/* Role */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Role
+                    Role <span className="text-red-600">*</span>
                   </label>
                   <select
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className={getAddUserInputClassName("role")}
                     value={newUserForm.role}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, role: e.target.value })}
+                    onChange={(e) => updateAddUserField("role", e.target.value as CreatableRole)}
+                    onBlur={() => setAddUserFieldTouched("role")}
                   >
                     <option value="student">Student</option>
                     <option value="registrar">Registrar</option>
                     <option value="branchcoordinator">Branch Coordinator</option>
                     <option value="cashier">Cashier</option>
-                    <option value="superadmin">Super Admin</option>
                   </select>
                 </div>
 
-                {/* Password */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      First Name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={getAddUserInputClassName("firstName")}
+                      placeholder="Enter first name"
+                      value={newUserForm.firstName}
+                      onChange={(e) => updateAddUserField("firstName", e.target.value)}
+                      onBlur={() => setAddUserFieldTouched("firstName")}
+                      autoComplete="given-name"
+                    />
+                    {getVisibleAddUserError("firstName") && (
+                      <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("firstName")}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Last Name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      className={getAddUserInputClassName("lastName")}
+                      placeholder="Enter last name"
+                      value={newUserForm.lastName}
+                      onChange={(e) => updateAddUserField("lastName", e.target.value)}
+                      onBlur={() => setAddUserFieldTouched("lastName")}
+                      autoComplete="family-name"
+                    />
+                    {getVisibleAddUserError("lastName") && (
+                      <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("lastName")}</p>
+                    )}
+                  </div>
+                </div>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Password
+                    Middle Name <span className="text-gray-400">(optional)</span>
                   </label>
                   <input
-                    type="password"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter password"
-                    value={newUserForm.password}
-                    onChange={(e) => setNewUserForm({ ...newUserForm, password: e.target.value })}
+                    type="text"
+                    className={getAddUserInputClassName("middleName")}
+                    placeholder="Enter middle name"
+                    value={newUserForm.middleName}
+                    onChange={(e) => updateAddUserField("middleName", e.target.value)}
+                    onBlur={() => setAddUserFieldTouched("middleName")}
+                    autoComplete="additional-name"
                   />
+                  {getVisibleAddUserError("middleName") && (
+                    <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("middleName")}</p>
+                  )}
+                </div>
+
+                {isStudentAddForm && (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Sex <span className="text-red-600">*</span>
+                      </label>
+                      <select
+                        className={getAddUserInputClassName("sex")}
+                        value={newUserForm.sex}
+                        onChange={(e) => updateAddUserField("sex", e.target.value)}
+                        onBlur={() => setAddUserFieldTouched("sex")}
+                      >
+                        <option value="" disabled>Select sex</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                      </select>
+                      {getVisibleAddUserError("sex") && (
+                        <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("sex")}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Date of Birth <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        className={getAddUserInputClassName("birthDate")}
+                        value={newUserForm.birthDate}
+                        onChange={(e) => updateAddUserField("birthDate", e.target.value)}
+                        onBlur={() => setAddUserFieldTouched("birthDate")}
+                      />
+                      {getVisibleAddUserError("birthDate") && (
+                        <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("birthDate")}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {isStudentAddForm && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Contact Number <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="tel"
+                      className={getAddUserInputClassName("contactNumber")}
+                      placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                      value={newUserForm.contactNumber}
+                      onChange={(e) => updateAddUserField("contactNumber", e.target.value)}
+                      onBlur={() => setAddUserFieldTouched("contactNumber")}
+                      autoComplete="tel"
+                    />
+                    {getVisibleAddUserError("contactNumber") && (
+                      <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("contactNumber")}</p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Email Address <span className="text-red-600">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    className={getAddUserInputClassName("email")}
+                    placeholder="Enter email address"
+                    value={newUserForm.email}
+                    onChange={(e) => updateAddUserField("email", e.target.value)}
+                    onBlur={() => setAddUserFieldTouched("email")}
+                    autoComplete="email"
+                  />
+                  {getVisibleAddUserError("email") && (
+                    <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("email")}</p>
+                  )}
+                </div>
+
+                <div className={isStudentAddForm ? "grid gap-4 sm:grid-cols-2" : ""}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Password <span className="text-red-600">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className={`${getAddUserInputClassName("password")} pr-11`}
+                        placeholder="Enter password"
+                        value={newUserForm.password}
+                        onChange={(e) => updateAddUserField("password", e.target.value)}
+                        onBlur={() => setAddUserFieldTouched("password")}
+                        autoComplete="new-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {getVisibleAddUserError("password") ? (
+                      <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("password")}</p>
+                    ) : (
+                      <p className="mt-1.5 text-xs text-gray-500">Use 8+ characters with uppercase, lowercase, a number, and a special character.</p>
+                    )}
+                  </div>
+
+                  {isStudentAddForm && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm Password <span className="text-red-600">*</span>
+                      </label>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        className={getAddUserInputClassName("confirmPassword")}
+                        placeholder="Confirm password"
+                        value={newUserForm.confirmPassword}
+                        onChange={(e) => updateAddUserField("confirmPassword", e.target.value)}
+                        onBlur={() => setAddUserFieldTouched("confirmPassword")}
+                        autoComplete="new-password"
+                      />
+                      {getVisibleAddUserError("confirmPassword") && (
+                        <p className="mt-1.5 text-xs font-medium text-red-600">{getVisibleAddUserError("confirmPassword")}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -800,10 +1195,11 @@ export function UserManagement() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 shadow-md"
+                    disabled={!isAddUserFormValid || isCreatingUser}
+                    className="flex-1 px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                     style={{ backgroundColor: "#1E3A8A" }}
                   >
-                    Create User
+                    {isCreatingUser ? "Creating..." : "Create User"}
                   </button>
                 </div>
               </form>
@@ -834,6 +1230,33 @@ export function UserManagement() {
           <button
             onClick={() => setShowSuccessToast(false)}
             className="p-1 hover:bg-blue-200 rounded transition-colors"
+          >
+            <X className="w-4 h-4 text-gray-700" />
+          </button>
+        </div>
+      )}
+
+      {showErrorToast && (
+        <div
+          className="fixed top-8 left-1/2 -translate-x-1/2 flex items-center gap-3 px-6 py-4 rounded-lg shadow-2xl border-2 animate-slideInDown z-50 min-w-[320px]"
+          style={{
+            backgroundColor: "#FEF2F2",
+            borderColor: "#B91C1C"
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ backgroundColor: "#B91C1C" }}
+          >
+            <X className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-bold text-gray-900">{errorMessage}</p>
+            <p className="text-xs text-gray-700 mt-0.5">Please review the highlighted fields.</p>
+          </div>
+          <button
+            onClick={() => setShowErrorToast(false)}
+            className="p-1 hover:bg-red-100 rounded transition-colors"
           >
             <X className="w-4 h-4 text-gray-700" />
           </button>
