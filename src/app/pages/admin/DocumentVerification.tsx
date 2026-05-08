@@ -16,6 +16,7 @@ import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
 import { createAuditLog, resolveUserId } from "../../../services/adminService";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface StudentDocument {
   studentId: string;
@@ -293,16 +294,13 @@ export function DocumentVerification() {
   };
 
   return (
-    <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-          <FileText className="h-4 w-4" />
-          Document Verification System
-        </div>
-        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Document Verification</h1>
-        <p className="text-gray-600 text-lg">Review and approve student document submissions. Verify all required documents before proceeding.</p>
-      </div>
+    <div className="portal-dashboard-page min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="Document Review"
+        title="Document Verification"
+        subtitle="Review and approve student document submissions before proceeding"
+        icon={FileText}
+      />
 
       {isLoading && (
         <LoadingState

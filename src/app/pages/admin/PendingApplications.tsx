@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import ReviewApplicationModal from "../../components/ReviewApplicationModal";
 import {
   getPendingApplications,
@@ -663,15 +664,12 @@ export function PendingApplications() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-          <FileCheck className="h-4 w-4" />
-          Application Review System
-        </div>
-        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Pending Applications</h1>
-        <p className="text-gray-600 text-lg">Review and process student applications requiring action</p>
-      </div>
+      <DashboardPageHeader
+        badge="Application Review"
+        title="Pending Applications"
+        subtitle="Review and process student applications requiring action"
+        icon={FileCheck}
+      />
 
       {/* Filter Bar */}
       <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg p-5 mb-6">

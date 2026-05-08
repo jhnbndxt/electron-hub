@@ -5,6 +5,7 @@ import { LoadingState } from "../../components/LoadingState";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation } from "react-router";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
 import { registerUser } from "../../../services/authService";
 import { createAuditLog } from "../../../services/adminService";
@@ -554,16 +555,14 @@ export function UserManagement() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
-            User Management
-          </h1>
-          <p className="text-gray-600">
-            Manage user accounts and access permissions
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-4">
+      <DashboardPageHeader
+        badge="Access Control"
+        title="User Management"
+        subtitle="Manage user accounts and access permissions"
+        icon={Shield}
+        actions={
+          <>
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             <div className="px-3 py-1.5 rounded-md bg-blue-50 border border-blue-200">
               <span className="text-xs font-medium text-blue-700">
                 Total Users: {visibleUsers.length}
@@ -580,8 +579,6 @@ export function UserManagement() {
               </span>
             </div>
           </div>
-        </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
           <button
             onClick={() => {
               loadUsers();
@@ -604,8 +601,9 @@ export function UserManagement() {
             <Plus className="w-5 h-5" />
             Add User
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-200 bg-gray-50/70 p-6 lg:flex-row lg:items-center lg:justify-between">

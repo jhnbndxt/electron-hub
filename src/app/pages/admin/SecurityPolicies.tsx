@@ -1,4 +1,5 @@
 import { Shield, Lock, Key, AlertTriangle, CheckCircle } from "lucide-react";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 export function SecurityPolicies() {
   const securitySettings = [
@@ -99,16 +100,13 @@ export function SecurityPolicies() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          Security Policies
-        </h1>
-        <p className="text-gray-600">
-          Manage system-wide security settings and policies
-        </p>
-      </div>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="Security"
+        title="Security Policies"
+        subtitle="Manage system-wide security settings and policies"
+        icon={Shield}
+      />
 
       {/* Security Status Banner */}
       <div

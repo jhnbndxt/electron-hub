@@ -5,6 +5,7 @@ import { LoadingState } from "../../components/LoadingState";
 import { getEnrolledStudents } from "../../../services/adminService";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
 
 interface EnrolledStudent {
@@ -1059,7 +1060,7 @@ export function SectionManagement() {
 
   if (isLoading && sections.length === 0) {
     return (
-      <div className="p-8">
+      <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
         <LoadingState
           message="Loading section setup..."
           subtext="Preparing sections, capacity settings, and student assignment data."
@@ -1069,21 +1070,18 @@ export function SectionManagement() {
   }
 
   return (
-    <div className="p-8">
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       {isAssignmentSyncing && (
         <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-900">
           Section details are loading — showing available sections while student assignment data updates.
         </div>
       )}
-      {/* Header */}
-      <div className="mb-8">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-          <Grid3x3 className="h-4 w-4" />
-          Section Management
-        </div>
-        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Section Management</h1>
-        <p className="text-gray-600 text-lg">Generate and manage class sections for enrolled students</p>
-      </div>
+      <DashboardPageHeader
+        badge="Class Organization"
+        title="Section Management"
+        subtitle="Generate and manage class sections for enrolled students"
+        icon={Grid3x3}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

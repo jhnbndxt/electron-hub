@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { getAuditLogs } from "../../../services/adminService";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface AuditLog {
   id: string;
@@ -162,15 +163,12 @@ export function AdminAuditLogs() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          Audit Logs
-        </h1>
-        <p className="text-gray-600">
-          Track all system activities and user actions
-        </p>
-      </div>
+      <DashboardPageHeader
+        badge="Activity Monitoring"
+        title="Audit Logs"
+        subtitle="Track all system activities and user actions"
+        icon={FileText}
+      />
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">

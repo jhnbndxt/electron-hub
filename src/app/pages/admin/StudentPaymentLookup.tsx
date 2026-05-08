@@ -13,6 +13,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { supabase } from "../../../supabase";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface StudentPaymentStatus {
   email: string;
@@ -181,11 +182,12 @@ export function StudentPaymentLookup() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Student Payment Lookup</h1>
-        <p className="text-gray-600">Search for a student to check their payment status</p>
-      </div>
+      <DashboardPageHeader
+        badge="Payment Search"
+        title="Student Payment Lookup"
+        subtitle="Search for a student to check their payment status"
+        icon={CreditCard}
+      />
 
       {/* Search Card */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-5 sm:p-8 mb-8">

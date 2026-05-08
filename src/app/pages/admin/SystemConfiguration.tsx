@@ -17,6 +17,7 @@ import {
   X,
 } from "lucide-react";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import {
@@ -480,20 +481,13 @@ export function SystemConfiguration() {
 
   return (
     <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
-      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
-            System Configuration
-          </h1>
-          <p className="text-gray-600 max-w-3xl">
-            Manage branch-level system settings using live, persisted data.
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Last updated: {formatLastUpdated(lastUpdatedAt)}
-          </p>
-        </div>
-
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+      <DashboardPageHeader
+        badge="System Settings"
+        title="System Configuration"
+        subtitle={`Manage branch-level system settings using live, persisted data. Last updated: ${formatLastUpdated(lastUpdatedAt)}`}
+        icon={Settings}
+        actions={
+          <>
           <button
             type="button"
             onClick={() => void loadConfiguration()}
@@ -511,8 +505,9 @@ export function SystemConfiguration() {
             {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
             Save Configuration
           </button>
-        </div>
-      </div>
+          </>
+        }
+      />
 
       {notice && (
         <div

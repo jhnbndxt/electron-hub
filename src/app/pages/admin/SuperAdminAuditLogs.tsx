@@ -2,6 +2,7 @@ import { Search, Filter, Download, Shield, User, Settings, FileText, Calendar } 
 import { exportToCSV } from "../../../utils/csvExport";
 import { useState, useEffect } from "react";
 import { getAuditLogs } from "../../../services/adminService";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface AuditLog {
   id: string | number;
@@ -211,15 +212,12 @@ export function SuperAdminAuditLogs() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          Audit Logs
-        </h1>
-        <p className="text-gray-600">
-          Complete system activity and security logs
-        </p>
-      </div>
+      <DashboardPageHeader
+        badge="Activity Monitoring"
+        title="Audit Logs"
+        subtitle="Complete system activity and security logs"
+        icon={Shield}
+      />
 
       {/* Filter Bar */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-4 mb-6">

@@ -463,7 +463,7 @@
 .portal-dashboard-page {
   position: relative;
   width: 100%;
-  max-width: 78rem;
+  max-width: none;
   margin-inline: auto;
 }
 

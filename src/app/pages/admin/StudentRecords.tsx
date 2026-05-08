@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Search, Filter, Download, Users, Eye, Edit2 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { getEnrolledStudents } from "../../../services/adminService";
 import { useNavigate } from "react-router";
 
@@ -157,15 +158,12 @@ export function StudentRecords() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-          <Users className="h-4 w-4" />
-          Student Management
-        </div>
-        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Student Records</h1>
-        <p className="text-gray-600 text-lg">View and manage enrolled student records</p>
-      </div>
+      <DashboardPageHeader
+        badge="Student Management"
+        title="Student Records"
+        subtitle="View and manage enrolled student records"
+        icon={Users}
+      />
 
       {/* Search & Filter Bar */}
       <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg p-5 mb-6">

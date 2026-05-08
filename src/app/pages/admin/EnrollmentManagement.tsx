@@ -3,6 +3,7 @@ import { Search, CheckCircle, User, FileText, CreditCard, GraduationCap } from "
 import { getEnrollmentManagementStudents, enrollStudent, getStudentPaymentStatus } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface StudentApplication {
   id: string;
@@ -138,13 +139,12 @@ export function EnrollmentManagement() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Enrollment Management</h1>
-        <p className="text-gray-600">
-          Enroll students who have completed payment verification
-        </p>
-      </div>
+      <DashboardPageHeader
+        badge="Enrollment Processing"
+        title="Enrollment Management"
+        subtitle="Enroll students who have completed payment verification"
+        icon={GraduationCap}
+      />
 
       {/* Filters */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6">

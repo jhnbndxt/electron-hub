@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
@@ -304,15 +305,12 @@ export function CashierDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-          <DollarSign className="h-4 w-4" />
-          Payment Processing
-        </div>
-        <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Payment Management</h1>
-        <p className="text-gray-600 text-lg">Review and approve student payment submissions</p>
-      </div>
+      <DashboardPageHeader
+        badge="Payment Processing"
+        title="Cashier Queue"
+        subtitle="Review and approve student payment submissions"
+        icon={DollarSign}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">

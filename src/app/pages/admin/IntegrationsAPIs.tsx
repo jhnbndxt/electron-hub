@@ -1,5 +1,6 @@
 import { Key, Plus, Trash2, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface APIKey {
   id: number;
@@ -58,16 +59,13 @@ export function IntegrationsAPIs() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          Integrations & APIs
-        </h1>
-        <p className="text-gray-600">
-          Manage external integrations and API access keys
-        </p>
-      </div>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="Developer Tools"
+        title="Integrations & APIs"
+        subtitle="Manage external integrations and API access keys"
+        icon={Key}
+      />
 
       {/* API Keys Section */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">

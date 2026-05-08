@@ -1,4 +1,5 @@
 import { CreditCard, DollarSign, TrendingUp, Calendar, Download, CheckCircle } from "lucide-react";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 export function Billing() {
   const billingOverview = {
@@ -60,16 +61,13 @@ export function Billing() {
   ];
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          Billing & Subscription
-        </h1>
-        <p className="text-gray-600">
-          Manage your subscription plan and billing information
-        </p>
-      </div>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="Billing"
+        title="Billing & Subscription"
+        subtitle="Manage your subscription plan and billing information"
+        icon={CreditCard}
+      />
 
       {/* Current Plan Card */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm mb-6">

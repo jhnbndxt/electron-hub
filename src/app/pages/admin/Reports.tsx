@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Download, TrendingUp, Users, Award, GraduationCap } from "lucide-react";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 export function Reports() {
   const enrollmentData = [
@@ -37,26 +38,23 @@ export function Reports() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-            Reports & Analytics
-          </h1>
-          <p className="text-gray-600">
-            Comprehensive insights and statistics
-          </p>
-        </div>
-        <button
-          onClick={handleExportReport}
-          className="px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2"
-          style={{ backgroundColor: "#1E3A8A" }}
-        >
-          <Download className="w-5 h-5" />
-          Export Report
-        </button>
-      </div>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="Analytics"
+        title="Reports & Analytics"
+        subtitle="Comprehensive insights and statistics"
+        icon={TrendingUp}
+        actions={
+          <button
+            onClick={handleExportReport}
+            className="px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 flex items-center gap-2"
+            style={{ backgroundColor: "#1E3A8A" }}
+          >
+            <Download className="w-5 h-5" />
+            Export Report
+          </button>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

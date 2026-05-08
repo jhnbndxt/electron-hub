@@ -9,6 +9,7 @@ import {
   Users,
   FileText,
 } from "lucide-react";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 export function AdminSettings() {
   const [settings, setSettings] = useState({
@@ -37,18 +38,15 @@ export function AdminSettings() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          System Settings
-        </h1>
-        <p className="text-gray-600">
-          Configure your enrollment system preferences
-        </p>
-      </div>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="System Settings"
+        title="System Settings"
+        subtitle="Configure your enrollment system preferences"
+        icon={Globe}
+      />
 
-      <div className="max-w-4xl">
+      <div>
         {/* General Settings */}
         <div className="bg-white rounded-lg border border-gray-200 p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">

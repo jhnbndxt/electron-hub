@@ -2,6 +2,7 @@ import { useNavigate, useParams, useLocation } from "react-router";
 import { ArrowLeft, Mail, GraduationCap, Award, FileText, Image } from "lucide-react";
 import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from "recharts";
 import { useAuth } from "../../context/AuthContext";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface StudentData {
   id: number;
@@ -56,7 +57,7 @@ export function StudentProfile() {
   };
 
   return (
-    <div className="p-8">
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       {/* Header with Back Button */}
       <div className="mb-8">
         <button
@@ -67,12 +68,12 @@ export function StudentProfile() {
           <ArrowLeft className="w-4 h-4" />
           Back to Student Records
         </button>
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          Student Profile
-        </h1>
-        <p className="text-gray-600">
-          Detailed information and records for {student.name}
-        </p>
+        <DashboardPageHeader
+          badge="Student Management"
+          title="Student Profile"
+          subtitle={`Detailed information and records for ${student.name}`}
+          icon={GraduationCap}
+        />
       </div>
 
       {/* Profile Overview Card */}

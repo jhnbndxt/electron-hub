@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
 
 interface PaymentRecord {
@@ -197,11 +198,12 @@ export function BranchCoordinatorPayments() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Management</h1>
-        <p className="text-gray-600">View and manage all student payments - pending, approved, and rejected</p>
-      </div>
+      <DashboardPageHeader
+        badge="Payment Administration"
+        title="Payment Management"
+        subtitle="View and manage all student payments - pending, approved, and rejected"
+        icon={Banknote}
+      />
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">

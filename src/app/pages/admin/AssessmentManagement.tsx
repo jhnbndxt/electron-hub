@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import {
   getAssessmentQuestions,
   createQuestion,
@@ -391,14 +392,12 @@ export function AssessmentManagement() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-      <div className="mb-8">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-          Assessment Question Bank
-        </h1>
-        <p className="text-gray-600 max-w-3xl">
-          Manage and customize assessment questions across all categories. Interest questions stay checklist-based and do not use a single correct answer.
-        </p>
-      </div>
+      <DashboardPageHeader
+        badge="Assessment Management"
+        title="Assessment Question Bank"
+        subtitle="Manage and customize assessment questions across all categories"
+        icon={Brain}
+      />
 
       <AnimatePresence>
         {saveSuccess && (

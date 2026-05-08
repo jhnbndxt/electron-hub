@@ -7,6 +7,7 @@ import {
   Award,
   Target,
 } from "lucide-react";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import {
   BarChart,
   Bar,
@@ -206,16 +207,13 @@ export function AdminAITestResults() {
   };
 
   return (
-    <div className="p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-gray-900 mb-2">
-          AI Test Results
-        </h1>
-        <p className="text-gray-600">
-          View and analyze AI-assisted strand recommendation results
-        </p>
-      </div>
+    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <DashboardPageHeader
+        badge="Assessment Analytics"
+        title="AI Test Results"
+        subtitle="View and analyze AI-assisted strand recommendation results"
+        icon={Brain}
+      />
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">

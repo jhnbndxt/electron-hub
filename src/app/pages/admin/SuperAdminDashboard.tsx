@@ -26,6 +26,7 @@ import {
 import { useState, useEffect } from "react";
 import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
+import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { getDashboardAnalytics, getAuditLogs, getPaymentCollectionData } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { supabase } from "../../../supabase";
@@ -288,26 +289,24 @@ export function SuperAdminDashboard() {
       style={{ maxWidth: "none" }}
     >
       <div className="min-w-0 flex-1">
-        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between w-full">
-          <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>
-              <BarChart3 className="h-4 w-4" />
-              System Overview
+        <DashboardPageHeader
+          badge="System Overview"
+          title="Overview"
+          subtitle="Monitor branch activity, enrollment progress, and administrative controls"
+          icon={BarChart3}
+          actions={
+            <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
+              <Calendar className="w-5 h-5 text-gray-500" />
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className="border-none outline-none text-sm font-medium text-gray-700"
+                style={{ accentColor: "#1E3A8A" }}
+              />
             </div>
-            <h1 className="text-4xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>Welcome, Branch Coordinator</h1>
-            <p className="text-gray-600 text-lg">System overview and administrative controls</p>
-          </div>
-          <div className="portal-glass-inline-control flex w-full items-center gap-2 rounded-lg px-4 py-2 sm:w-auto">
-            <Calendar className="w-5 h-5 text-gray-500" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="border-none outline-none text-sm font-medium text-gray-700"
-              style={{ accentColor: "#1E3A8A" }}
-            />
-          </div>
-        </div>
+          }
+        />
 
         <section className="mb-10">
           <h2 className="text-2xl font-bold mb-6 text-gray-900">Top Summary Cards</h2>
