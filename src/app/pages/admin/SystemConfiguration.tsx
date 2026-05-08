@@ -13,8 +13,9 @@ import {
   Grid3x3,
   AlertTriangle,
   CheckCircle2,
+  ArrowRight,
+  X,
 } from "lucide-react";
-import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
@@ -52,8 +53,55 @@ function formatDateLabel(dateValue) {
   });
 }
 
-function formatToggleLabel(isEnabled) {
-  return isEnabled ? "Enabled" : "Disabled";
+const CONFIGURATION_FIELD_LABELS = {
+  institution_name: "Institution Name",
+  system_timezone: "System Timezone",
+  academic_year: "Academic Year",
+  support_email: "Support Email",
+  enrollment_start_date: "Enrollment Start Date",
+  enrollment_end_date: "Enrollment End Date",
+  default_section_capacity: "Default Section Capacity",
+  enrollment_open: "Enrollment Status",
+  maintenance_mode: "Maintenance Mode",
+};
+
+function formatConfigurationValue(fieldKey, value) {
+  if (value === null || value === undefined || value === "") {
+    return "Not set";
+  }
+
+  if (fieldKey === "enrollment_open") {
+    return value ? "Open" : "Closed";
+  }
+
+  if (fieldKey === "maintenance_mode") {
+    return value ? "Enabled" : "Disabled";
+  }
+
+  if (fieldKey === "enrollment_start_date" || fieldKey === "enrollment_end_date") {
+    return formatDateLabel(value);
+  }
+
+  if (fieldKey === "default_section_capacity") {
+    return `${value} students`;
+  }
+
+  return String(value);
+}
+
+function buildConfigurationChanges(previousSettings, nextSettings) {
+  if (!previousSettings || !nextSettings) {
+    return [];
+  }
+
+  return Object.keys(CONFIGURATION_FIELD_LABELS)
+    .filter((fieldKey) => previousSettings[fieldKey] !== nextSettings[fieldKey])
+    .map((fieldKey) => ({
+      key: fieldKey,
+      label: CONFIGURATION_FIELD_LABELS[fieldKey],
+      previousValue: formatConfigurationValue(fieldKey, previousSettings[fieldKey]),
+      nextValue: formatConfigurationValue(fieldKey, nextSettings[fieldKey]),
+    }));
 }
 
 function formatLastUpdated(lastUpdatedAt) {
@@ -141,6 +189,9 @@ export function SystemConfiguration() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState(null);
   const [notice, setNotice] = useState(null);
   const [errors, setErrors] = useState({});
+  const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastSavedBy, setLastSavedBy] = useState(null);
 
   const loadRuntimeSummary = async (academicYear) => {
     const currentSchoolYear = normalizeAcademicYear(academicYear);
@@ -222,6 +273,10 @@ export function SystemConfiguration() {
 
   const hasChanges = useMemo(() => {
     return normalizeSettingsForCompare(settings) !== normalizeSettingsForCompare(initialSettings);
+  }, [initialSettings, settings]);
+
+  const pendingConfigurationChanges = useMemo(() => {
+    return buildConfigurationChanges(initialSettings, settings);
   }, [initialSettings, settings]);
 
   const runtimeCards = useMemo(() => {
@@ -367,7 +422,7 @@ export function SystemConfiguration() {
     });
   };
 
-  const handleSave = async () => {
+  const handleSaveClick = () => {
     const validationErrors = buildValidationErrors(settings || {});
     setErrors(validationErrors);
 
@@ -376,6 +431,20 @@ export function SystemConfiguration() {
       return;
     }
 
+    if (pendingConfigurationChanges.length === 0) {
+      return;
+    }
+
+    setNotice(null);
+    setShowConfirmSaveModal(true);
+  };
+
+  const handleConfirmSave = async () => {
+    if (saving) {
+      return;
+    }
+
+    setShowConfirmSaveModal(false);
     setSaving(true);
     const saveResult = await saveSystemSettings(settings, userData?.id || userData?.email || null);
     setSaving(false);
@@ -384,6 +453,7 @@ export function SystemConfiguration() {
     setInitialSettings(saveResult.data);
     setSource(saveResult.source);
     setLastUpdatedAt(saveResult.lastUpdatedAt);
+    setLastSavedBy(userData?.name || userData?.email || "Current user");
 
     const nextRuntimeSummary = await loadRuntimeSummary(saveResult.data.academic_year);
     setRuntimeSummary(nextRuntimeSummary);
@@ -393,13 +463,8 @@ export function SystemConfiguration() {
       return;
     }
 
-    setNotice({
-      type: "success",
-      message:
-        saveResult.source === "supabase"
-          ? "System configuration saved to Supabase successfully."
-          : "System configuration saved locally in this browser.",
-    });
+    setNotice(null);
+    setShowSuccessModal(true);
   };
 
   if (loading || !settings) {
@@ -439,7 +504,7 @@ export function SystemConfiguration() {
           </button>
           <button
             type="button"
-            onClick={() => void handleSave()}
+            onClick={handleSaveClick}
             disabled={saving || !hasChanges}
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
@@ -617,6 +682,126 @@ export function SystemConfiguration() {
           Active data source: <span className="font-medium text-gray-700">{source === "supabase" ? "Supabase" : "Browser-local fallback"}</span>
         </div>
       </div>
+
+      {showConfirmSaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+            onClick={() => {
+              if (!saving) {
+                setShowConfirmSaveModal(false);
+              }
+            }}
+          />
+          <div className="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                    <Settings className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-950">Confirm Configuration Changes</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Review the modified settings before applying them to the system.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmSaveModal(false)}
+                  disabled={saving}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-200 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Close confirmation modal"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="max-h-[62vh] overflow-y-auto px-5 py-5 sm:px-6">
+              <div className="space-y-3">
+                {pendingConfigurationChanges.map((change) => (
+                  <div key={change.key} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-3 flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-blue-600" />
+                      <p className="text-sm font-semibold text-slate-900">{change.label}</p>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                        <p className="text-xs font-medium text-slate-500">Previous</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-slate-800">{change.previousValue}</p>
+                      </div>
+                      <div className="flex justify-center text-blue-700">
+                        <ArrowRight className="h-5 w-5" />
+                      </div>
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+                        <p className="text-xs font-medium text-blue-700">New</p>
+                        <p className="mt-1 break-words text-sm font-semibold text-blue-950">{change.nextValue}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
+              <button
+                type="button"
+                onClick={() => setShowConfirmSaveModal(false)}
+                disabled={saving}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleConfirmSave()}
+                disabled={saving}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {saving ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Confirm Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)} />
+          <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-emerald-100 bg-white text-center shadow-2xl">
+            <div className="px-6 pb-6 pt-8">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                <CheckCircle2 className="h-9 w-9" />
+              </div>
+              <h2 className="mt-5 text-2xl font-semibold text-slate-950">
+                System configuration updated successfully.
+              </h2>
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm text-slate-600">
+                <p>
+                  <span className="font-semibold text-slate-800">Saved:</span> {formatLastUpdated(lastUpdatedAt)}
+                </p>
+                {lastSavedBy && (
+                  <p className="mt-1">
+                    <span className="font-semibold text-slate-800">Updated by:</span> {lastSavedBy}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+              <button
+                type="button"
+                onClick={() => setShowSuccessModal(false)}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
