@@ -53,6 +53,7 @@ function DashboardLayoutContent() {
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [maintenanceCountdown, setMaintenanceCountdown] = useState(5);
   const [showMaintenanceNotice, setShowMaintenanceNotice] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
@@ -105,6 +106,22 @@ function DashboardLayoutContent() {
 
     return () => window.clearTimeout(timeout);
   }, [showMaintenanceNotice, maintenanceCountdown, logout, navigate]);
+
+  if (isSettingsLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
+        <div className="max-w-md w-full rounded-3xl border border-slate-200 bg-white p-10 shadow-lg text-center">
+          <div className="mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-blue-100">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
+          </div>
+          <h1 className="text-2xl font-semibold text-slate-900 mb-2">Checking maintenance status</h1>
+          <p className="text-sm text-slate-600">
+            Please wait while we secure your student portal session.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (showMaintenanceNotice && settingsLoaded && isMaintenanceModeActive && isStudentUser) {
     return (
@@ -200,6 +217,10 @@ function DashboardLayoutContent() {
     let active = true;
 
     async function loadSystemSettings() {
+      if (active) {
+        setIsSettingsLoading(true);
+      }
+
       try {
         const result = await getSystemSettings();
         if (active && result?.data) {
@@ -210,6 +231,7 @@ function DashboardLayoutContent() {
       } finally {
         if (active) {
           setSettingsLoaded(true);
+          setIsSettingsLoading(false);
         }
       }
     }
