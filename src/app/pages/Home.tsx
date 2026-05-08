@@ -4,6 +4,7 @@ import { Link } from "react-router";
 import { ArrowRight, CheckCircle, BookOpen, Award, Users, Sparkles, Megaphone, Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ConfirmationModal } from "../components/ConfirmationModal";
+import { formatLocalDateTime } from "../utils/dateTime";
 import { createAnnouncement, deleteAnnouncement, getAnnouncements, hasCustomAnnouncements, syncAnnouncementsToRemote, updateAnnouncement } from "../../services/announcementService";
 
 type AnnouncementAccent = "blue" | "red";
@@ -34,18 +35,8 @@ const buildInitialAnnouncementFormState = (): AnnouncementFormState => ({
   accentColor: "blue",
 });
 
-const formatAnnouncementDate = (value: string) => {
-  const parsedDate = new Date(value);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "Recently posted";
-  }
-
-  return parsedDate.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  });
+const formatAnnouncementDate = (announcement: Announcement) => {
+  return formatLocalDateTime(announcement.updatedAt || announcement.createdAt || announcement.postedAt);
 };
 
 const getAnnouncementAccentStyles = (accentColor: AnnouncementAccent) => {
@@ -709,7 +700,7 @@ export function Home() {
                                 <p className="text-gray-600 mb-3 leading-relaxed whitespace-pre-line">
                                   {announcement.content}
                                 </p>
-                                <p className="text-sm text-gray-500 font-medium">Posted on {formatAnnouncementDate(announcement.postedAt)}</p>
+                                <p className="text-sm text-gray-500 font-medium">Posted on {formatAnnouncementDate(announcement)}</p>
                               </div>
 
                               {canManageAnnouncements && (

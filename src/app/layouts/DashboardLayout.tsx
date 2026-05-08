@@ -26,10 +26,23 @@ import { useAuth } from "../context/AuthContext";
 import { ChatProvider, useChat } from "../context/ChatContext";
 import { getSystemSettings } from "../../services/systemSettingsService";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import { formatNotificationTimestamp } from "../utils/dateTime";
 import { loadProfileImageUrl } from "../utils/profileImage";
 import { supabase } from "../../supabase";
 import logo from "../../assets/electronLogo";
 import { Button } from "../components/ui/button";
+
+function NotificationTimestamp({ timestamp }: { timestamp: string }) {
+  const formattedTimestamp = formatNotificationTimestamp(timestamp);
+
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-slate-500">
+      <span>{formattedTimestamp.absolute}</span>
+      <span className="text-slate-300">•</span>
+      <span>{formattedTimestamp.relative}</span>
+    </div>
+  );
+}
 
 function DashboardLayoutContent() {
   const location = useLocation();
@@ -653,9 +666,7 @@ function DashboardLayoutContent() {
                                       <p className={`text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
                                         Go to Payment Tab →
                                       </p>
-                                      <p className="text-xs text-slate-400 mt-1">
-                                        {new Date(notification.timestamp).toLocaleDateString()}
-                                      </p>
+                                      <NotificationTimestamp timestamp={notification.timestamp} />
                                     </div>
                                   </div>
                                 </button>
@@ -687,9 +698,7 @@ function DashboardLayoutContent() {
                                       <p className={`text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
                                         Click here to review and re-upload your document →
                                       </p>
-                                      <p className="text-xs text-slate-400 mt-1">
-                                        {new Date(notification.timestamp).toLocaleDateString()}
-                                      </p>
+                                      <NotificationTimestamp timestamp={notification.timestamp} />
                                     </div>
                                   </div>
                                 </button>
@@ -719,9 +728,7 @@ function DashboardLayoutContent() {
                                     <p className="text-xs leading-relaxed text-slate-700">
                                       {notification.message}
                                     </p>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                      {new Date(notification.timestamp).toLocaleDateString()}
-                                    </p>
+                                    <NotificationTimestamp timestamp={notification.timestamp} />
                                   </div>
                                 </div>
                               </button>
