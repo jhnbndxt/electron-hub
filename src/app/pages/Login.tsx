@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { ChatAssistant } from "../components/ChatAssistant";
+import { MaintenanceNotice } from "../components/MaintenanceNotice";
 import { Eye, EyeOff, LockKeyhole, Mail, Sparkles } from "lucide-react";
 import { loginUser } from "../../services/authService";
+import { getSystemSettings } from "../../services/systemSettingsService";
 import logo from "../../assets/electronLogo";
 
 export function Login() {
@@ -14,6 +16,7 @@ export function Login() {
   const [error, setError] = useState("");
   const [showBanner, setShowBanner] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showMaintenanceNotice, setShowMaintenanceNotice] = useState(false);
   const navigate = useNavigate();
   const { login } = useAuth();
   const [searchParams] = useSearchParams();
@@ -68,6 +71,16 @@ export function Login() {
       // Successful login - determine role and navigate
       const userRole = user.role?.toLowerCase() || "student";
       
+      // Check maintenance mode for students
+      if (userRole === "student") {
+        const settingsResult = await getSystemSettings();
+        if (settingsResult?.data?.maintenance_mode) {
+          setShowMaintenanceNotice(true);
+          setIsLoading(false);
+          return;
+        }
+      }
+      
       // Prepare user data with all fields from database
       const userData = {
         id: user.id,
@@ -114,8 +127,16 @@ export function Login() {
 
   return (
     <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-      {/* Assessment Banner */}
-      <div className="relative z-10 w-full max-w-md">
+      {showMaintenanceNotice ? (
+        <MaintenanceNotice
+          message="The student portal is currently under maintenance. Access for students is temporarily unavailable while system updates are being performed. Please try again later and wait for further announcements."
+          showButton={true}
+          onButtonClick={() => navigate("/", { replace: true })}
+        />
+      ) : (
+        <>
+          {/* Assessment Banner */}
+          <div className="relative z-10 w-full max-w-md">
         {showBanner && (
           <div
             className="mb-5 rounded-[1.5rem] border border-blue-200/80 bg-white/92 px-4 py-4 shadow-lg backdrop-blur-md animate-slide-down"
@@ -246,6 +267,8 @@ export function Login() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Chat Assistant */}
       <ChatAssistant />
