@@ -65,12 +65,17 @@ export function EnrollmentInfo() {
   const enrollmentOpen = systemSettings?.enrollment_open !== false;
   const enrollmentPeriodText = `${formatDateLabel(enrollmentStartDate)} - ${formatDateLabel(enrollmentEndDate)} for Academic Year ${academicYearLabel}`;
 
-  const requirements = [
-    "Original copy of Form 138 (Report Card)",
-    "Certificate of Good Moral Character",
-    "Birth Certificate (PSA copy)",
-    "2x2 ID Pictures (4 copies)",
-    "Photocopy of Parent's/Guardian's ID",
+  const requiredDocuments = [
+    "Form 138 (Report Card)",
+    "Birth Certificate",
+    "ID Picture",
+    "Grade 10 Diploma",
+  ];
+
+  const optionalDocuments = [
+    "ESC Certificate",
+    "Form 137",
+    "Certificate of Good Moral",
   ];
 
   const enrollmentSteps = [
@@ -215,17 +220,41 @@ export function EnrollmentInfo() {
               <p className="text-gray-600 mb-6">
                 Please prepare the following documents before proceeding with your enrollment:
               </p>
-              <ul className="space-y-4">
-                {requirements.map((requirement, index) => (
-                  <li key={index} className="flex items-start gap-3">
-                    <CheckCircle
-                      className="w-6 h-6 flex-shrink-0 mt-0.5"
-                      style={{ color: "var(--electron-red)" }}
-                    />
-                    <span className="text-gray-700">{requirement}</span>
-                  </li>
-                ))}
-              </ul>
+              <div className="space-y-8">
+                <div>
+                  <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--electron-blue)" }}>
+                    Required Documents
+                  </h3>
+                  <ul className="space-y-4">
+                    {requiredDocuments.map((requirement, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <CheckCircle
+                          className="w-6 h-6 flex-shrink-0 mt-0.5"
+                          style={{ color: "var(--electron-red)" }}
+                        />
+                        <span className="text-gray-700">{requirement}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-semibold mb-4" style={{ color: "var(--electron-blue)" }}>
+                    Optional / To Follow Up
+                  </h3>
+                  <ul className="space-y-4">
+                    {optionalDocuments.map((requirement, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <CheckCircle
+                          className="w-6 h-6 flex-shrink-0 mt-0.5"
+                          style={{ color: "var(--electron-red)" }}
+                        />
+                        <span className="text-gray-700">{requirement}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
               <div
                 className="mt-6 p-4 rounded-md border-l-4"
                 style={{
