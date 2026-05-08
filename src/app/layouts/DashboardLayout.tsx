@@ -106,21 +106,6 @@ function DashboardLayoutContent() {
     return () => window.clearTimeout(timeout);
   }, [showMaintenanceNotice, maintenanceCountdown, logout, navigate]);
 
-
-  if (showMaintenanceNotice && settingsLoaded && isMaintenanceModeActive && isStudentUser) {
-    return (
-      <MaintenanceNotice
-        message="The student portal is currently under maintenance. You will be logged out shortly. Please try again later."
-        countdown={maintenanceCountdown}
-        showButton={true}
-        onButtonClick={() => {
-          logout();
-          navigate("/", { replace: true });
-        }}
-      />
-    );
-  }
-
   useEffect(() => {
     let isActive = true;
 
@@ -403,6 +388,20 @@ function DashboardLayoutContent() {
       document.body.style.overflow = originalOverflow;
     };
   }, [isMobileNavOpen]);
+
+  if (showMaintenanceNotice && settingsLoaded && isMaintenanceModeActive && isStudentUser) {
+    return (
+      <MaintenanceNotice
+        message="The student portal is currently under maintenance. You will be logged out shortly. Please try again later."
+        countdown={maintenanceCountdown}
+        showButton={true}
+        onButtonClick={() => {
+          logout();
+          navigate("/", { replace: true });
+        }}
+      />
+    );
+  }
 
   return (
     <div className="portal-glass-shell min-h-screen flex lg:h-screen lg:overflow-hidden">

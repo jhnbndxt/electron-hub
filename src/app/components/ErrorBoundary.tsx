@@ -5,35 +5,33 @@ import { Button } from "./ui/button";
 export function ErrorBoundary() {
   const error = useRouteError() as any;
   const navigate = useNavigate();
+  const isDevelopment = process.env.NODE_ENV === "development";
+  const userMessage = error?.status === 404
+    ? "The page you're looking for doesn't exist."
+    : "The page could not be loaded. Please go back or return to your dashboard.";
 
   console.error("Route error:", error);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-        <div className="bg-red-100 text-red-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="portal-glass-shell flex min-h-screen items-center justify-center px-4 py-8">
+      <div className="relative z-10 w-full max-w-md rounded-[1.5rem] border border-white/65 bg-white/82 p-8 text-center shadow-[0_24px_70px_-36px_rgba(15,23,42,0.42)] backdrop-blur-xl">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50 text-red-600">
           <AlertCircle className="h-8 w-8" />
         </div>
         
-        <h1 className="text-2xl mb-2" style={{ color: "var(--electron-blue)" }}>
-          Oops! Something went wrong
+        <h1 className="mb-3 text-2xl font-bold text-slate-950">
+          Something went wrong
         </h1>
         
-        <p className="text-gray-600 mb-6">
-          {error?.statusText || error?.message || "An unexpected error occurred"}
+        <p className="mb-6 text-sm leading-6 text-slate-600">
+          {userMessage}
         </p>
 
-        {error?.status === 404 && (
-          <p className="text-sm text-gray-500 mb-6">
-            The page you're looking for doesn't exist.
-          </p>
-        )}
-
-        <div className="flex gap-3 justify-center">
+        <div className="flex flex-col justify-center gap-3 sm:flex-row">
           <Button
             onClick={() => navigate(-1)}
             variant="outline"
-            className="flex items-center gap-2"
+            className="flex min-h-11 items-center gap-2 rounded-xl"
           >
             <ArrowLeft className="h-4 w-4" />
             Go Back
@@ -41,7 +39,7 @@ export function ErrorBoundary() {
           
           <Button
             onClick={() => navigate("/dashboard")}
-            className="flex items-center gap-2"
+            className="flex min-h-11 items-center gap-2 rounded-xl"
             style={{ 
               backgroundColor: "var(--electron-blue)",
               color: "white"
@@ -52,13 +50,13 @@ export function ErrorBoundary() {
           </Button>
         </div>
 
-        {process.env.NODE_ENV === "development" && error?.stack && (
+        {isDevelopment && (error?.stack || error?.message) && (
           <details className="mt-6 text-left">
             <summary className="text-sm text-gray-500 cursor-pointer">
               Error Details (Dev Only)
             </summary>
             <pre className="mt-2 text-xs bg-gray-100 p-3 rounded overflow-auto max-h-40">
-              {error.stack}
+              {error?.stack || error?.message}
             </pre>
           </details>
         )}

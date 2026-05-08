@@ -396,49 +396,6 @@ export function EnrollmentForm() {
   const isEnrollmentOpen = systemSettings?.enrollment_open !== false;
   const isLoading = isInitializing || isSettingsLoading;
 
-  if (isLoading) {
-    return (
-      <div className="portal-dashboard-page flex flex-col items-center justify-center min-h-screen p-6 bg-[#F8FAFC]">
-        <div className="max-w-3xl w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
-          <div className="mb-6">
-            <Skeleton className="h-8 w-2/3 mb-4" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {Array.from({ length: 4 }).map((_, idx) => (
-              <div key={idx} className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="h-3 w-5/6" />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isEnrollmentOpen && !isSubmittedEnrollment) {
-    return (
-      <div className="portal-dashboard-page flex flex-col items-center justify-center min-h-screen p-6 bg-[#F8FAFC]">
-        <div className="max-w-3xl w-full rounded-3xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
-          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-600" />
-          <h1 className="text-3xl font-semibold text-red-900 mb-3">Enrollment is currently closed until further notice</h1>
-          <p className="text-sm text-red-800 mb-6">
-            The enrollment window is not open at this time. Please check back later or contact the registrar for updates.
-          </p>
-          <button
-            type="button"
-            onClick={() => window.history.back()}
-            className="inline-flex items-center justify-center rounded-full bg-[#1E3A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#162f55] transition"
-          >
-            Go back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Auto-fill form with user data from AuthContext
   useEffect(() => {
     if (userData && userData.firstName) {
@@ -1602,6 +1559,63 @@ export function EnrollmentForm() {
       </motion.div>
     );
   };
+
+  if (isLoading) {
+    return (
+      <div className="portal-dashboard-page flex min-h-screen w-full items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-3xl rounded-[1.5rem] border border-white/65 bg-white/80 p-6 shadow-[0_24px_70px_-36px_rgba(15,23,42,0.42)] backdrop-blur-xl sm:p-8">
+          <div className="mb-7">
+            <Skeleton className="mb-4 h-9 w-2/3 rounded-xl" />
+            <Skeleton className="h-4 w-1/2 rounded-xl" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-4">
+                <Skeleton className="h-4 w-3/4 rounded-xl" />
+                <Skeleton className="h-3 w-full rounded-xl" />
+                <Skeleton className="h-3 w-5/6 rounded-xl" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isEnrollmentOpen && !isSubmittedEnrollment) {
+    return (
+      <div className="portal-dashboard-page flex min-h-screen w-full items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-2xl rounded-[1.5rem] border border-white/65 bg-white/82 p-6 text-center shadow-[0_24px_70px_-36px_rgba(15,23,42,0.42)] backdrop-blur-xl sm:p-8 md:p-10">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-red-600 shadow-[0_18px_36px_-28px_rgba(185,28,28,0.55)]">
+            <AlertCircle className="h-8 w-8" />
+          </div>
+          <h1 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">
+            Enrollment is currently closed
+          </h1>
+          <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-slate-700">
+            The enrollment window is not open at this time. Please check back later or contact the registrar for updates.
+          </p>
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-100"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Go Back
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/dashboard")}
+              className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--electron-blue)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-22px_rgba(30,58,138,0.85)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-blue-200"
+            >
+              Go to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full min-h-screen bg-transparent">
