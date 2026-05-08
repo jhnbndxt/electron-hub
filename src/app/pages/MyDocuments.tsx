@@ -1,7 +1,9 @@
 import { FileText, Upload, CheckCircle, AlertCircle, Download, XCircle, Bell } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
+import { getSystemSettings } from "../../services/systemSettingsService";
 
 interface DocumentStatus {
   name: string;
@@ -30,10 +32,34 @@ const DOC_NAME_TO_KEY: Record<string, string> = {
 };
 
 export function MyDocuments() {
-  const { userData } = useAuth();
+  const navigate = useNavigate();
+  const { userData, logout } = useAuth();
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+
+  // Check for maintenance mode on mount
+  useEffect(() => {
+    let isActive = true;
+
+    async function checkMaintenance() {
+      try {
+        const result = await getSystemSettings();
+        if (isActive && result?.data?.maintenance_mode) {
+          logout();
+          navigate("/");
+        }
+      } catch (error) {
+        console.error('Error checking maintenance mode:', error);
+      }
+    }
+
+    void checkMaintenance();
+
+    return () => {
+      isActive = false;
+    };
+  }, [navigate, logout]);
 
   useEffect(() => {
     if (userData?.email) {

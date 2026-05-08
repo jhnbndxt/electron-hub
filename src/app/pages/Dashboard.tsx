@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   Sparkles,
   CheckCircle2,
@@ -24,15 +24,41 @@ import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { getSystemSettings } from "../../services/systemSettingsService";
 
 export function Dashboard() {
-  const { userData, enrollmentProgress, hasVisitedPayment } = useAuth();
+  const navigate = useNavigate();
+  const { userData, enrollmentProgress, hasVisitedPayment, logout } = useAuth();
   const { openChat } = useChat();
   const [rejectedDocuments, setRejectedDocuments] = useState<Array<{ name: string; comment: string }>>([]);
   const [isFirstLogin, setIsFirstLogin] = useState(false);
+  const [systemSettings, setSystemSettings] = useState<any>(null);
   
   // Get first name from full name
   const firstName = userData?.name ? userData.name.split(" ")[0] : "Student";
+
+  // Check for maintenance mode on mount
+  useEffect(() => {
+    let isActive = true;
+
+    async function checkMaintenance() {
+      try {
+        const result = await getSystemSettings();
+        if (isActive && result?.data?.maintenance_mode) {
+          logout();
+          navigate("/");
+        }
+      } catch (error) {
+        console.error('Error checking maintenance mode:', error);
+      }
+    }
+
+    void checkMaintenance();
+
+    return () => {
+      isActive = false;
+    };
+  }, [navigate, logout]);
 
   // Check if this is the user's first login
   useEffect(() => {

@@ -6,6 +6,7 @@ import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
+import { getSystemSettings } from "../../services/systemSettingsService";
 
 interface Question {
   id: number;
@@ -25,12 +26,35 @@ interface Section {
 
 export function Assessment() {
   const navigate = useNavigate();
-  const { userData, updateEnrollmentProgress } = useAuth();
+  const { userData, updateEnrollmentProgress, logout } = useAuth();
   const [currentSection, setCurrentSection] = useState(0);
   const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
+
+  // Check for maintenance mode on mount
+  useEffect(() => {
+    let isActive = true;
+
+    async function checkMaintenance() {
+      try {
+        const result = await getSystemSettings();
+        if (isActive && result?.data?.maintenance_mode) {
+          logout();
+          navigate("/");
+        }
+      } catch (error) {
+        console.error('Error checking maintenance mode:', error);
+      }
+    }
+
+    void checkMaintenance();
+
+    return () => {
+      isActive = false;
+    };
+  }, [navigate, logout]);
 
   const isInterestQuestion = (question: Question) => question.category === "Interests";
 

@@ -145,7 +145,7 @@ interface FormData {
 export function EnrollmentForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { updateEnrollmentProgress, userData } = useAuth();
+  const { updateEnrollmentProgress, userData, logout } = useAuth();
   const [currentPage, setCurrentPage] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [aiRecommendation, setAiRecommendation] = useState<{
@@ -160,6 +160,29 @@ export function EnrollmentForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
+
+  // Check for maintenance mode on mount
+  useEffect(() => {
+    let isActive = true;
+
+    async function checkMaintenance() {
+      try {
+        const result = await getSystemSettings();
+        if (isActive && result?.data?.maintenance_mode) {
+          logout();
+          navigate("/");
+        }
+      } catch (error) {
+        console.error('Error checking maintenance mode:', error);
+      }
+    }
+
+    void checkMaintenance();
+
+    return () => {
+      isActive = false;
+    };
+  }, [navigate, logout]);
 
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",

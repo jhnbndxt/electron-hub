@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
+import { MaintenanceNotice } from "../components/MaintenanceNotice";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ChatProvider, useChat } from "../context/ChatContext";
@@ -51,6 +52,7 @@ function DashboardLayoutContent() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const paymentTooltipRef = useRef<HTMLDivElement>(null);
@@ -77,17 +79,20 @@ function DashboardLayoutContent() {
   const isMaintenanceModeActive = systemSettings?.maintenance_mode === true;
   const isStudentUser = userRole === "student" || userData?.role === "student";
 
-  if (isMaintenanceModeActive && isStudentUser) {
+  // Automatically logout students when maintenance mode is detected
+  useEffect(() => {
+    if (settingsLoaded && isMaintenanceModeActive && isStudentUser) {
+      logout();
+    }
+  }, [settingsLoaded, isMaintenanceModeActive, isStudentUser, logout]);
+
+  // Show maintenance notice after settings are loaded and student is still logged in
+  if (settingsLoaded && isMaintenanceModeActive && isStudentUser) {
     return (
-      <div className="portal-dashboard-page p-6 min-h-screen bg-[#F8FAFC]">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
-          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-600" />
-          <h1 className="text-3xl font-semibold text-red-900 mb-3">Student access is temporarily unavailable</h1>
-          <p className="text-sm text-red-700 max-w-2xl mx-auto leading-relaxed">
-            The system is currently in maintenance mode. Student portals and enrollment pages have been disabled while maintenance is active. Cashier, branch coordinator, and registrar access remain available.
-          </p>
-        </div>
-      </div>
+      <MaintenanceNotice 
+        message="The student portal is currently under maintenance. Please try again later." 
+        showButton={true}
+      />
     );
   }
 
@@ -169,9 +174,17 @@ function DashboardLayoutContent() {
     let active = true;
 
     async function loadSystemSettings() {
-      const result = await getSystemSettings();
-      if (active && result?.data) {
-        setSystemSettings(result.data);
+      try {
+        const result = await getSystemSettings();
+        if (isActive && result?.data) {
+          setSystemSettings(result.data);
+        }
+      } catch (error) {
+        console.error('Error loading system settings:', error);
+      } finally {
+        if (isActive) {
+          setSettingsLoaded(true);
+        }
       }
     }
 
@@ -208,7 +221,7 @@ function DashboardLayoutContent() {
     loadNotifications();
 
     return () => {
-      active = false;
+      isActive = false;
     };
   }, [userData?.id]);
 
