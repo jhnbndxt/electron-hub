@@ -1139,6 +1139,22 @@ export function Results() {
                     </div>
                   </div>
 
+                  {branch.matchedPrograms.length > 0 && (
+                    <div className="mt-3">
+                      <h5 className="text-sm font-semibold text-gray-900 mb-2">Programs Offered</h5>
+                      <div className="flex flex-wrap gap-1">
+                        {branch.matchedPrograms.map((program, index) => (
+                          <span
+                            key={index}
+                            className="inline-block rounded-md bg-gray-100 px-2 py-1 text-xs text-gray-700"
+                          >
+                            {program}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="mt-4 flex flex-col gap-2 sm:flex-row">
                     <a
                       href={branch.facebookUrl}
