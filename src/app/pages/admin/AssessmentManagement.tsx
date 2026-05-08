@@ -154,6 +154,7 @@ export function AssessmentManagement() {
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editedQuestion, setEditedQuestion] = useState<AssessmentQuestion | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<string[]>(
     categories.map((c) => c.name)
@@ -171,6 +172,7 @@ export function AssessmentManagement() {
   }, []);
 
   const loadQuestions = async () => {
+    setIsLoading(true);
     // First check if questions exist in database
     const exists = await questionsExistInDatabase();
     
@@ -186,6 +188,7 @@ export function AssessmentManagement() {
           formatAssessmentQuestion({ id: index + 1, ...question })
         );
         setQuestions(formatted);
+        setIsLoading(false);
         return;
       }
       
@@ -195,6 +198,7 @@ export function AssessmentManagement() {
         const formattedQuestions = data.map((question: any) => formatAssessmentQuestion(question));
         setQuestions(formattedQuestions);
       }
+      setIsLoading(false);
     } else {
       const { error: syncError } = await syncInterestChecklistQuestions();
 
@@ -213,6 +217,7 @@ export function AssessmentManagement() {
           formatAssessmentQuestion({ id: index + 1, ...question })
         );
         setQuestions(formatted);
+        setIsLoading(false);
         return;
       }
       
@@ -227,6 +232,7 @@ export function AssessmentManagement() {
         );
         setQuestions(formatted);
       }
+      setIsLoading(false);
     }
   };
 
@@ -369,6 +375,31 @@ export function AssessmentManagement() {
       color: "#B91C1C",
     },
   ];
+
+  if (isLoading) {
+    return (
+      <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="mb-8 space-y-4">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <Skeleton className="h-6 w-1/2 mb-4" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-16 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">

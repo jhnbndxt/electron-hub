@@ -22,6 +22,7 @@ import { ChatAssistant } from "../components/ChatAssistant";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ChatProvider, useChat } from "../context/ChatContext";
+import { getSystemSettings } from "../../services/systemSettingsService";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { loadProfileImageUrl } from "../utils/profileImage";
 import { supabase } from "../../supabase";
@@ -37,6 +38,7 @@ function DashboardLayoutContent() {
     hasVisitedPayment,
     enrollmentProgress,
     userData,
+    userRole,
     refreshEnrollmentProgress,
     updateUserData,
   } = useAuth();
@@ -48,6 +50,7 @@ function DashboardLayoutContent() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
+  const [systemSettings, setSystemSettings] = useState<any>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const paymentTooltipRef = useRef<HTMLDivElement>(null);
@@ -70,6 +73,23 @@ function DashboardLayoutContent() {
         step.name === "Enrolled") &&
       step.status !== "pending"
   );
+
+  const isMaintenanceModeActive = systemSettings?.maintenance_mode === true;
+  const isStudentUser = userRole === "student" || userData?.role === "student";
+
+  if (isMaintenanceModeActive && isStudentUser) {
+    return (
+      <div className="portal-dashboard-page p-6 min-h-screen bg-[#F8FAFC]">
+        <div className="mx-auto max-w-4xl rounded-3xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
+          <AlertTriangle className="mx-auto mb-4 h-12 w-12 text-red-600" />
+          <h1 className="text-3xl font-semibold text-red-900 mb-3">Student access is temporarily unavailable</h1>
+          <p className="text-sm text-red-700 max-w-2xl mx-auto leading-relaxed">
+            The system is currently in maintenance mode. Student portals and enrollment pages have been disabled while maintenance is active. Cashier, branch coordinator, and registrar access remain available.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   useEffect(() => {
     let isActive = true;
@@ -146,6 +166,17 @@ function DashboardLayoutContent() {
   };
 
   useEffect(() => {
+    let active = true;
+
+    async function loadSystemSettings() {
+      const result = await getSystemSettings();
+      if (active && result?.data) {
+        setSystemSettings(result.data);
+      }
+    }
+
+    void loadSystemSettings();
+
     const loadNotifications = async () => {
       if (!userData?.id) {
         setLoadingNotifications(false);
@@ -175,6 +206,10 @@ function DashboardLayoutContent() {
       setLoadingNotifications(false);
     };
     loadNotifications();
+
+    return () => {
+      active = false;
+    };
   }, [userData?.id]);
 
   // Monitor enrollment progress changes from Supabase
@@ -236,7 +271,7 @@ function DashboardLayoutContent() {
         setShowPaymentTooltip(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 

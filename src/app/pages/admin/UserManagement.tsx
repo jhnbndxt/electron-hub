@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, Filter, Plus, Edit2, Trash2, X, Shield, User, Users, CheckCircle, RefreshCw } from "lucide-react";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../context/AuthContext";
 import { useLocation } from "react-router";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -22,6 +23,7 @@ export function UserManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [successMessage, setSuccessMessage] = useState("");
   const { userRole, userData } = useAuth();
   const location = useLocation();
@@ -41,6 +43,7 @@ export function UserManagement() {
   const [users, setUsers] = useState<UserAccount[]>([]);
 
   const loadUsers = async () => {
+    setIsLoading(true);
     const { data, error } = await supabase
       .from('users')
       .select('id, email, full_name, role, status, created_at')
@@ -49,6 +52,13 @@ export function UserManagement() {
     if (error) {
       console.error('Error loading users:', error);
       setUsers([]);
+      setIsLoading(false);
+      return;
+    }
+
+    if (!data) {
+      setUsers([]);
+      setIsLoading(false);
       return;
     }
 
@@ -62,6 +72,7 @@ export function UserManagement() {
     }));
 
     setUsers(formattedUsers);
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -276,6 +287,31 @@ export function UserManagement() {
         return role;
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-8 space-y-4">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3 mb-6">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <Skeleton className="h-5 w-1/2 mb-4" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

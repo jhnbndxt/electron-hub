@@ -16,6 +16,7 @@ import {
   CreditCard,
   Wallet,
 } from "lucide-react";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
@@ -83,6 +84,7 @@ export function CashierDashboard() {
   const [cashPayments, setCashPayments] = useState<CashPayment[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<OnlinePayment | null>(null);
   const [selectedCashPayment, setSelectedCashPayment] = useState<CashPayment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [rejectionComment, setRejectionComment] = useState("");
@@ -95,6 +97,7 @@ export function CashierDashboard() {
   }, []);
 
   const loadPayments = async () => {
+    setIsLoading(true);
     // Load all payments from Supabase
     const { data: allPayments, error } = await getAllPayments();
 
@@ -102,12 +105,14 @@ export function CashierDashboard() {
       console.error('Error loading payments:', error);
       setOnlinePayments([]);
       setCashPayments([]);
+      setIsLoading(false);
       return;
     }
 
     if (!allPayments) {
       setOnlinePayments([]);
       setCashPayments([]);
+      setIsLoading(false);
       return;
     }
 
@@ -161,6 +166,7 @@ export function CashierDashboard() {
 
     setOnlinePayments(onlinePending);
     setCashPayments(cashPending);
+    setIsLoading(false);
   };
 
   const handleApproveOnlinePayment = async () => {
@@ -283,6 +289,32 @@ export function CashierDashboard() {
   const onlineApproved = onlinePayments.filter((p) => p.status === "approved").length;
   const cashPending = cashPayments.filter((p) => p.status === "pending").length;
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
+
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-8 space-y-4">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, idx) => (
+            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <Skeleton className="h-5 w-1/2 mb-4" />
+              <Skeleton className="h-8 w-full" />
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6 space-y-4">
+          <Skeleton className="h-12 w-full" />
+          {Array.from({ length: 5 }).map((_, idx) => (
+            <Skeleton key={idx} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">

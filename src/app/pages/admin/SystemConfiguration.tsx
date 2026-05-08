@@ -14,6 +14,7 @@ import {
   AlertTriangle,
   CheckCircle2,
 } from "lucide-react";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import {
@@ -26,6 +27,11 @@ function getCurrentSchoolYear(date = new Date()) {
   const month = date.getMonth();
 
   return month >= 6 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
+function normalizeAcademicYear(rawValue) {
+  const normalizedValue = String(rawValue || "").trim();
+  return /^\d{4}-\d{4}$/.test(normalizedValue) ? normalizedValue : getCurrentSchoolYear();
 }
 
 function formatDateLabel(dateValue) {
@@ -111,10 +117,7 @@ function buildValidationErrors(settings) {
   }
 
   [
-    ["max_applications_per_day", "Maximum applications per day"],
     ["default_section_capacity", "Default section capacity"],
-    ["max_upload_size_mb", "Maximum upload size"],
-    ["session_timeout_minutes", "Session timeout"],
   ].forEach(([fieldKey, label]) => {
     const parsedValue = Number(settings[fieldKey]);
 
@@ -138,8 +141,8 @@ export function SystemConfiguration() {
   const [notice, setNotice] = useState(null);
   const [errors, setErrors] = useState({});
 
-  const loadRuntimeSummary = async () => {
-    const currentSchoolYear = getCurrentSchoolYear();
+  const loadRuntimeSummary = async (academicYear) => {
+    const currentSchoolYear = normalizeAcademicYear(academicYear);
     const currentUrl = typeof window !== "undefined" ? window.location.origin : "Unavailable";
     const hasSupabaseConfiguration = Boolean(
       import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -192,7 +195,7 @@ export function SystemConfiguration() {
     setLoading(true);
 
     const settingsResult = await getSystemSettings();
-    const nextRuntimeSummary = await loadRuntimeSummary();
+    const nextRuntimeSummary = await loadRuntimeSummary(settingsResult.data.academic_year);
 
     setSettings(settingsResult.data);
     setInitialSettings(settingsResult.data);
@@ -315,14 +318,11 @@ export function SystemConfiguration() {
         icon: Settings,
         color: "#10B981",
         bgColor: "#D1FAE5",
-        description: "Settings that affect intake volume, enrollment availability, uploads, and session handling.",
+        description: "Settings that affect enrollment availability and the application window.",
         fields: [
           { key: "enrollment_start_date", label: "Enrollment Start Date", type: "date" },
           { key: "enrollment_end_date", label: "Enrollment End Date", type: "date" },
-          { key: "max_applications_per_day", label: "Max Applications Per Day", type: "number", min: 1 },
           { key: "default_section_capacity", label: "Default Section Capacity", type: "number", min: 1 },
-          { key: "max_upload_size_mb", label: "Max Upload Size (MB)", type: "number", min: 1 },
-          { key: "session_timeout_minutes", label: "Session Timeout (Minutes)", type: "number", min: 1 },
         ],
         toggles: [
           {
@@ -343,11 +343,6 @@ export function SystemConfiguration() {
             key: "maintenance_mode",
             label: "Maintenance Mode",
             description: "Restrict normal user access while maintenance or data fixes are being performed.",
-          },
-          {
-            key: "debug_mode",
-            label: "Debug Mode",
-            description: "Expose additional troubleshooting details for coordinators and developers.",
           },
         ],
       },
@@ -389,7 +384,7 @@ export function SystemConfiguration() {
     setSource(saveResult.source);
     setLastUpdatedAt(saveResult.lastUpdatedAt);
 
-    const nextRuntimeSummary = await loadRuntimeSummary();
+    const nextRuntimeSummary = await loadRuntimeSummary(saveResult.data.academic_year);
     setRuntimeSummary(nextRuntimeSummary);
 
     if (saveResult.warning) {
@@ -409,9 +404,22 @@ export function SystemConfiguration() {
   if (loading || !settings) {
     return (
       <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
-        <div className="portal-glass-panel flex items-center justify-center gap-3 rounded-xl p-10 text-gray-600">
-          <LoaderCircle className="h-6 w-6 animate-spin" />
-          <span>Loading system configuration...</span>
+        <div className="space-y-6">
+          <div className="space-y-4">
+            <Skeleton className="h-6 w-1/3" />
+            <Skeleton className="h-10 w-2/3" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, idx) => (
+              <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <Skeleton className="h-5 w-1/2 mb-4" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full mt-3" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -614,10 +622,6 @@ export function SystemConfiguration() {
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="text-sm text-gray-500">Default Section Capacity</p>
             <p className="mt-1 font-medium text-gray-900">{settings.default_section_capacity} students</p>
-          </div>
-          <div className="rounded-lg border border-gray-200 p-4">
-            <p className="text-sm text-gray-500">Session Timeout</p>
-            <p className="mt-1 font-medium text-gray-900">{settings.session_timeout_minutes} minutes</p>
           </div>
         </div>
 

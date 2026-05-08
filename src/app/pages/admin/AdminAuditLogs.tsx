@@ -1,6 +1,7 @@
 import { Search, Filter, Download, FileText, Calendar } from "lucide-react";
 import { exportToCSV } from "../../../utils/csvExport";
 import { useState, useEffect } from "react";
+import { Skeleton } from "../../components/ui/skeleton";
 import { getAuditLogs } from "../../../services/adminService";
 
 interface AuditLog {
@@ -17,6 +18,7 @@ export function AdminAuditLogs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [allLogs, setAllLogs] = useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   // Date filter state (default: today)
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
@@ -30,10 +32,12 @@ export function AdminAuditLogs() {
   }, []);
 
   const loadAuditLogs = async () => {
+    setIsLoading(true);
     const { data: logs, error } = await getAuditLogs();
     if (error || !logs) {
       console.error('Error loading audit logs:', error);
       setAllLogs([]);
+      setIsLoading(false);
       return;
     }
     const formatted = logs.map((log: any) => ({
@@ -46,6 +50,7 @@ export function AdminAuditLogs() {
       status: log.status || 'success',
     }));
     setAllLogs(formatted);
+    setIsLoading(false);
   };
 
 
@@ -142,6 +147,23 @@ export function AdminAuditLogs() {
       rows,
     });
   };
+
+  if (isLoading) {
+    return (
+      <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+        <div className="mb-8 space-y-4">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">

@@ -66,28 +66,10 @@ export const SYSTEM_SETTINGS_DEFINITIONS = [
     description: 'Whether new student enrollment is currently open.',
   },
   {
-    key: 'max_applications_per_day',
-    type: 'number',
-    defaultValue: 50,
-    description: 'Maximum applications the branch should accept per day.',
-  },
-  {
     key: 'default_section_capacity',
     type: 'number',
     defaultValue: 50,
     description: 'Default section capacity used by the section management workflow.',
-  },
-  {
-    key: 'max_upload_size_mb',
-    type: 'number',
-    defaultValue: 25,
-    description: 'Maximum file upload size for enrollment documents in megabytes.',
-  },
-  {
-    key: 'session_timeout_minutes',
-    type: 'number',
-    defaultValue: 30,
-    description: 'Session timeout duration for portal users in minutes.',
   },
   {
     key: 'student_notifications_enabled',
@@ -124,12 +106,6 @@ export const SYSTEM_SETTINGS_DEFINITIONS = [
     type: 'boolean',
     defaultValue: false,
     description: 'Restrict general access for maintenance activities.',
-  },
-  {
-    key: 'debug_mode',
-    type: 'boolean',
-    defaultValue: false,
-    description: 'Expose extended debugging information for troubleshooting.',
   },
 ];
 

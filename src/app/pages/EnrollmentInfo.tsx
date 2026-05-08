@@ -1,9 +1,70 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { CheckCircle, FileText, UserCheck, Send, Sparkles, GraduationCap } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { getSystemSettings } from "../../services/systemSettingsService";
+
+function formatDateLabel(dateValue) {
+  if (!dateValue) {
+    return "Not set";
+  }
+
+  const parsedDate = new Date(dateValue);
+  if (Number.isNaN(parsedDate.getTime())) {
+    return dateValue;
+  }
+
+  return parsedDate.toLocaleDateString("en-PH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function getCurrentAcademicYear() {
+  const now = new Date();
+  const year = now.getFullYear();
+  return now.getMonth() >= 6 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
+
+function getDefaultEnrollmentWindow(academicYear) {
+  const startYear = Number.parseInt(String(academicYear || "").split("-")[0], 10);
+  const normalizedYear = Number.isFinite(startYear) ? startYear : new Date().getFullYear();
+
+  return {
+    start: `${normalizedYear}-03-01`,
+    end: `${normalizedYear}-04-30`,
+  };
+}
 
 export function EnrollmentInfo() {
   const { userRole } = useAuth();
+  const [systemSettings, setSystemSettings] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      const result = await getSystemSettings();
+      if (active && result?.data) {
+        setSystemSettings(result.data);
+      }
+    }
+
+    void loadSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const fallbackAcademicYear = systemSettings?.academic_year ?? getCurrentAcademicYear();
+  const defaultWindow = getDefaultEnrollmentWindow(fallbackAcademicYear);
+  const enrollmentStartDate = systemSettings?.enrollment_start_date ?? defaultWindow.start;
+  const enrollmentEndDate = systemSettings?.enrollment_end_date ?? defaultWindow.end;
+  const academicYearLabel = systemSettings?.academic_year ?? fallbackAcademicYear;
+  const enrollmentOpen = systemSettings?.enrollment_open !== false;
+  const enrollmentPeriodText = `${formatDateLabel(enrollmentStartDate)} - ${formatDateLabel(enrollmentEndDate)} for Academic Year ${academicYearLabel}`;
+
   const requirements = [
     "Original copy of Form 138 (Report Card)",
     "Certificate of Good Moral Character",
@@ -85,8 +146,16 @@ export function EnrollmentInfo() {
               className="inline-block px-8 py-4 rounded-lg text-white shadow-lg font-semibold text-lg"
               style={{ backgroundColor: "#B91C1C" }}
             >
-              Enrollment Period: March 1 - April 30, 2026
+              Enrollment Period: {enrollmentPeriodText}
             </div>
+            {!enrollmentOpen && (
+              <div className="mt-6 rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900">
+                <h3 className="text-xl font-semibold mb-2">Enrollment is currently closed</h3>
+                <p className="text-sm text-red-800">
+                  The enrollment window is currently closed. Please check back during the next open enrollment period or contact the registrar for assistance.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </section>

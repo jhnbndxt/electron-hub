@@ -50,6 +50,7 @@ export function PendingApplications() {
   const [strandFilter, setStrandFilter] = useState("all");
   const [documentFilter, setDocumentFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -70,16 +71,19 @@ export function PendingApplications() {
   }, []);
 
   const loadApplications = async () => {
+    setIsLoading(true);
     const { data: applications, error } = await getPendingApplications();
     
     if (error) {
       console.error('Error loading applications:', error);
       setStudents([]);
+      setIsLoading(false);
       return;
     }
 
     if (!applications || applications.length === 0) {
       setStudents([]);
+      setIsLoading(false);
       console.log('📋 No pending applications found');
       return;
     }
@@ -108,6 +112,7 @@ export function PendingApplications() {
     }));
     
     setStudents(formattedApps);
+    setIsLoading(false);
     console.log('📋 Loaded', formattedApps.length, 'pending applications from Supabase');
   };
 
@@ -642,6 +647,23 @@ export function PendingApplications() {
         };
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+        <div className="mb-8 space-y-4">
+          <Skeleton className="h-6 w-1/3" />
+          <Skeleton className="h-12 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+        <div className="space-y-4">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">

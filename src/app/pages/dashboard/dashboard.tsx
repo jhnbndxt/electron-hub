@@ -13,15 +13,25 @@ import { Card } from "../../components/ui/card";
 import { Progress } from "../../components/ui/progress";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { getSystemSettings } from "../../../services/systemSettingsService";
+
+function getCurrentAcademicYear() {
+  const now = new Date();
+  const year = now.getFullYear();
+  return now.getMonth() >= 6 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
 
 export function DashboardPage() {
   const completionPercentage = 33; // Example: assessment completed
   const { userData } = useAuth();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [isFirstLogin, setIsFirstLogin] = useState(false);
+  const [systemSettings, setSystemSettings] = useState(null);
 
   // Get user's name
   const userName = userData?.name || "Student";
+  const academicYearLabel = systemSettings?.academic_year || getCurrentAcademicYear();
+  const enrollmentOpen = systemSettings?.enrollment_open !== false;
 
   // Show welcome modal when component mounts
   useEffect(() => {
@@ -37,6 +47,22 @@ export function DashboardPage() {
       localStorage.setItem(loginTrackKey, "true");
     }
   }, [userData?.id]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      const result = await getSystemSettings();
+      if (active && result?.data) {
+        setSystemSettings(result.data);
+      }
+    }
+
+    void loadSettings();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleCloseModal = () => {
     setShowWelcomeModal(false);
@@ -83,14 +109,27 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-lg border-2 border-gray-200">
-              <AlertCircle className="h-6 w-6 text-gray-400 flex-shrink-0 mt-1" />
+            <div className={`flex items-start gap-3 p-4 rounded-lg border-2 ${enrollmentOpen ? "border-gray-200 bg-gray-50" : "border-red-200 bg-red-50"}`}>
+              <AlertCircle className={`h-6 w-6 ${enrollmentOpen ? "text-gray-400" : "text-red-600"} flex-shrink-0 mt-1`} />
               <div>
                 <h3 className="text-lg mb-1">Enrollment</h3>
-                <p className="text-sm text-gray-600">Not Started</p>
+                <p className={`text-sm ${enrollmentOpen ? "text-gray-600" : "text-red-700"}`}>
+                  {enrollmentOpen ? "Not Started" : "Closed"}
+                </p>
               </div>
             </div>
           </div>
+          {!enrollmentOpen && (
+            <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-900 mt-6">
+              <div className="flex items-center gap-3 mb-3">
+                <AlertCircle className="h-5 w-5 text-red-600" />
+                <span className="font-semibold">Enrollment is currently closed</span>
+              </div>
+              <p className="text-sm">
+                The student enrollment window is closed at this time. Please check back later or contact the registrar if you need assistance.
+              </p>
+            </div>
+          )}
         </Card>
 
         {/* Quick Actions */}
@@ -174,7 +213,7 @@ export function DashboardPage() {
                     <span className="text-sm text-gray-500">March 15</span>
                   </div>
                   <p className="text-gray-600">
-                    Online enrollment for SY 2026-2027 is now accepting applications
+                    Online enrollment for SY {academicYearLabel} is now accepting applications
                   </p>
                 </div>
               </div>
@@ -241,7 +280,7 @@ export function DashboardPage() {
               <div>
                 <h3 className="mb-1">Classes Begin</h3>
                 <p className="text-sm text-gray-600">
-                  First day of school year 2026-2027
+                  First day of school year {academicYearLabel}
                 </p>
               </div>
             </div>

@@ -21,6 +21,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "motion/react";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
+import { getSystemSettings } from "../../services/systemSettingsService";
 import { 
   saveDraft, 
   loadDraft, 
@@ -158,6 +159,7 @@ export function EnrollmentForm() {
   const [certificationChecked, setCertificationChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [systemSettings, setSystemSettings] = useState<any>(null);
 
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
@@ -358,6 +360,46 @@ export function EnrollmentForm() {
     
     initializeForm();
   }, [userData]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSettings() {
+      const result = await getSystemSettings();
+      if (active && result?.data) {
+        setSystemSettings(result.data);
+      }
+    }
+
+    void loadSettings();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const isEnrollmentOpen = systemSettings?.enrollment_open !== false;
+
+  if (!isInitializing && !isEnrollmentOpen && !isSubmittedEnrollment) {
+    return (
+      <div className="portal-dashboard-page flex flex-col items-center justify-center min-h-screen p-6 bg-[#F8FAFC]">
+        <div className="max-w-3xl w-full rounded-3xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
+          <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-600" />
+          <h1 className="text-3xl font-semibold text-red-900 mb-3">Enrollment is currently closed</h1>
+          <p className="text-sm text-red-800 mb-6">
+            The enrollment window is not open at this time. Please check back later or contact the registrar for updates.
+          </p>
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="inline-flex items-center justify-center rounded-full bg-[#1E3A8A] px-6 py-3 text-sm font-semibold text-white hover:bg-[#162f55] transition"
+          >
+            Go back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // Auto-fill form with user data from AuthContext
   useEffect(() => {
