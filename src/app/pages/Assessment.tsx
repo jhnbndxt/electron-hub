@@ -16,7 +16,7 @@ interface Question {
   category: string;
 }
 
-type AnswerValue = number | number[];
+type AnswerValue = number;
 
 interface Section {
   name: string;
@@ -35,17 +35,8 @@ export function Assessment() {
 
   const isInterestQuestion = (question: Question) => question.category === "Interests";
 
-  const getSelectedInterestAnswers = (questionId: number) => {
-    const answer = answers[questionId];
-    return Array.isArray(answer) ? answer : [];
-  };
-
   const isQuestionAnswered = (question: Question) => {
     const answer = answers[question.id];
-
-    if (isInterestQuestion(question)) {
-      return Array.isArray(answer) && answer.length > 0;
-    }
 
     return typeof answer === "number";
   };
@@ -350,26 +341,6 @@ export function Assessment() {
     }));
   };
 
-  const handleInterestToggle = (questionId: number, optionIndex: number) => {
-    setAnswers((currentAnswers) => {
-      const currentSelections = Array.isArray(currentAnswers[questionId])
-        ? [...(currentAnswers[questionId] as number[])]
-        : [];
-      const nextSelections = currentSelections.includes(optionIndex)
-        ? currentSelections.filter((currentIndex) => currentIndex !== optionIndex)
-        : [...currentSelections, optionIndex].sort((leftIndex, rightIndex) => leftIndex - rightIndex);
-      const nextAnswers = { ...currentAnswers };
-
-      if (nextSelections.length === 0) {
-        delete nextAnswers[questionId];
-      } else {
-        nextAnswers[questionId] = nextSelections;
-      }
-
-      return nextAnswers;
-    });
-  };
-
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
@@ -555,28 +526,31 @@ export function Assessment() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {isInterestQuestion(question) ? (
                     <div className="sm:col-span-2">
-                      <p className="mb-4 text-sm font-medium text-red-600">Select all that apply.</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <p className="mb-4 text-sm font-medium text-red-600">
+                        Rate this statement from 5 - Strongly Agree to 1 - Strongly Disagree.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                         {question.options.map((option, optionIndex) => {
-                          const selectedOptions = getSelectedInterestAnswers(question.id);
-                          const isSelected = selectedOptions.includes(optionIndex);
+                          const ratingValue = 5 - optionIndex;
+                          const isSelected = answers[question.id] === ratingValue;
 
                           return (
                             <label
                               key={optionIndex}
-                              className={`flex cursor-pointer items-start gap-3 rounded-lg border-2 px-4 py-3 transition-all ${
+                              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 px-3 py-4 text-center transition-all ${
                                 isSelected
                                   ? "border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
                                   : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
                               }`}
                             >
                               <input
-                                type="checkbox"
+                                type="radio"
+                                name={`interest-${question.id}`}
                                 checked={isSelected}
-                                onChange={() => handleInterestToggle(question.id, optionIndex)}
-                                className="mt-0.5 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
+                                onChange={() => handleAnswer(question.id, ratingValue)}
+                                className="h-5 w-5 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
                               />
-                              <span className="text-sm font-medium leading-6">{option}</span>
+                              <span className="text-xs font-semibold leading-5">{option}</span>
                             </label>
                           );
                         })}
@@ -650,7 +624,7 @@ export function Assessment() {
         {!allCurrentQuestionsAnswered && (
           <p className="text-center text-sm text-gray-500 mt-4">
             {currentSectionData.name === "Interests"
-              ? "Please choose at least one checklist item for every interest question to continue"
+              ? "Please rate every interest statement to continue"
               : "Please answer all questions in this section to continue"}
           </p>
         )}

@@ -309,7 +309,7 @@ export const getAssessmentResultByStudentId = async (studentId) => {
   }
 };
 
-// Get all pending applications (enrollments with status pending_documents or pending_review)
+// Get all active applications that still need enrollment progress tracking.
 export const getPendingApplications = async () => {
   try {
     const { data, error } = await supabase
@@ -324,7 +324,8 @@ export const getPendingApplications = async () => {
         enrollment_documents(*)
       `
       )
-      .in('status', ['pending_documents', 'pending_review'])
+      .neq('status', 'enrolled')
+      .neq('status', 'rejected')
       .order('enrollment_date', { ascending: false });
 
     if (error) {

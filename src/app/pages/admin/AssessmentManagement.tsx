@@ -29,6 +29,7 @@ import {
   initializeQuestions,
   getDefaultAssessmentQuestions,
   syncInterestChecklistQuestions,
+  syncDefaultAssessmentQuestions,
 } from "../../../services/assessmentService";
 
 interface AssessmentQuestion {
@@ -72,8 +73,8 @@ const categories = [
     name: "Interests",
     icon: Heart,
     color: "#EF4444",
-    description: "Checklist-based preference signals that guide track and elective matching.",
-    supportLabel: "Multi-select checklist",
+    description: "5-point Likert preference signals that guide track and elective matching.",
+    supportLabel: "Likert scale",
   },
 ];
 
@@ -203,10 +204,16 @@ export function AssessmentManagement() {
       }
       setIsLoading(false);
     } else {
+      const { error: bankSyncError } = await syncDefaultAssessmentQuestions();
+
+      if (bankSyncError) {
+        console.error('Error syncing assessment question bank:', bankSyncError);
+      }
+
       const { error: syncError } = await syncInterestChecklistQuestions();
 
       if (syncError) {
-        console.error('Error syncing interest checklist questions:', syncError);
+        console.error('Error syncing interest Likert questions:', syncError);
       }
 
       // Load from database
@@ -371,9 +378,9 @@ export function AssessmentManagement() {
       color: "#0F766E",
     },
     {
-      label: "Checklist Questions",
+      label: "Likert Questions",
       value: checklistQuestionsCount,
-      detail: "Interest prompts saved without a single correct answer",
+      detail: "Interest prompts rated on a 5-point scale",
       icon: Heart,
       color: "#B91C1C",
     },
@@ -384,7 +391,7 @@ export function AssessmentManagement() {
       <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
         <LoadingState
           message="Retrieving assessment records..."
-          subtext="Loading question banks, categories, and checklist prompts."
+          subtext="Loading question banks, categories, and Likert prompts."
         />
       </div>
     );
@@ -478,7 +485,7 @@ export function AssessmentManagement() {
                           {categoryQuestions.length} question{categoryQuestions.length === 1 ? "" : "s"}
                         </span>
                         <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-700">
-                          {checklistCategory ? "Checklist-based" : "Single correct answer"}
+                          {checklistCategory ? "Likert scale" : "Single correct answer"}
                         </span>
                       </div>
                     </div>
@@ -570,7 +577,7 @@ export function AssessmentManagement() {
 
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  {checklistCategory ? "Checklist Items" : "Answer Options"}
+                                  {checklistCategory ? "Likert Scale Options" : "Answer Options"}
                                 </label>
                                 <div className="space-y-2">
                                   {newQuestion.options?.map((option, index) => (
@@ -605,7 +612,7 @@ export function AssessmentManagement() {
                                         className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
                                         placeholder={
                                           checklistCategory
-                                            ? `Checklist item ${index + 1}`
+                                            ? `Likert option ${index + 1}`
                                             : `Option ${String.fromCharCode(65 + index)}`
                                         }
                                       />
@@ -616,7 +623,7 @@ export function AssessmentManagement() {
 
                               {checklistCategory && (
                                 <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                                  Interest questions render as checklists in the assessment. Students can select multiple items, and no single correct answer is stored for this category.
+                                  Interest questions render as a 5-point Likert scale. Students choose one rating, and no single correct answer is stored for this category.
                                 </div>
                               )}
 
@@ -666,7 +673,7 @@ export function AssessmentManagement() {
                                     </div>
                                     {checklistCategory && (
                                       <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
-                                        Checklist
+                                        Likert
                                       </span>
                                     )}
                                   </div>
@@ -691,7 +698,7 @@ export function AssessmentManagement() {
 
                                     <div>
                                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        {checklistCategory ? "Checklist Items" : "Answer Options"}
+                                        {checklistCategory ? "Likert Scale Options" : "Answer Options"}
                                       </label>
                                       <div className="space-y-2">
                                         {editedQuestion?.options.map((option, index) => (
@@ -732,7 +739,7 @@ export function AssessmentManagement() {
                                               className="flex-1 bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-400"
                                               placeholder={
                                                 checklistCategory
-                                                  ? `Checklist item ${index + 1}`
+                                                  ? `Likert option ${index + 1}`
                                                   : `Option ${String.fromCharCode(65 + index)}`
                                               }
                                             />
@@ -743,7 +750,7 @@ export function AssessmentManagement() {
 
                                     {checklistCategory && (
                                       <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-                                        Students can select multiple checklist items for Interest questions. No single correct answer is stored for this category.
+                                        Students choose one 5-point rating for Interest questions. No single correct answer is stored for this category.
                                       </div>
                                     )}
 
@@ -780,7 +787,7 @@ export function AssessmentManagement() {
                                         </span>
                                         {checklistCategory && (
                                           <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
-                                            Checklist
+                                            Likert
                                           </span>
                                         )}
                                       </div>
@@ -819,7 +826,7 @@ export function AssessmentManagement() {
                                           }`}
                                         >
                                           <span className="mr-2 font-semibold">
-                                            {checklistCategory ? "□" : `${String.fromCharCode(65 + index)}.`}
+                                            {checklistCategory ? `${5 - index}` : `${String.fromCharCode(65 + index)}.`}
                                           </span>
                                           {option}
                                         </div>
@@ -829,7 +836,7 @@ export function AssessmentManagement() {
 
                                   {checklistCategory && (
                                     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                                      These items appear to students as a checklist and contribute to their interest-cluster score when selected.
+                                      These options appear to students as a 5-point Likert scale and contribute to their interest-cluster score by rating.
                                     </div>
                                   )}
                                 </div>

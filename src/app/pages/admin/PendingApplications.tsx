@@ -12,6 +12,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
@@ -25,6 +26,7 @@ import {
   updateDocumentStatus,
   upsertEnrollmentProgress,
   getAssessmentResultByStudentId,
+  getStudentPaymentStatus,
 } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { supabase } from "../../../supabase";
@@ -35,6 +37,7 @@ interface Student {
   applicationDate: string;
   aiTestScore: number | null;
   status: "pending" | "incomplete" | "approved" | "rejected";
+  currentStatus: string;
   strandApplied: string;
   documents: {
     psaBirthCertificate: boolean;
@@ -45,6 +48,58 @@ interface Student {
   email?: string;
   enrollmentData?: any;
 }
+
+const COMPLETED_PAYMENT_STATUSES = new Set(["verified", "approved", "completed", "paid"]);
+const PENDING_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
+
+const getCurrentEnrollmentStatus = ({
+  hasAssessment,
+  enrollmentStatus,
+  paymentStatus,
+  paymentMethod,
+  documentsUploaded,
+  documentsApproved,
+}: {
+  hasAssessment: boolean;
+  enrollmentStatus?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  documentsUploaded: number;
+  documentsApproved: number;
+}) => {
+  const normalizedEnrollmentStatus = enrollmentStatus?.toLowerCase() || "";
+  const normalizedPaymentStatus = paymentStatus?.toLowerCase() || "";
+  const normalizedPaymentMethod = paymentMethod?.toLowerCase() || "";
+
+  if (
+    normalizedEnrollmentStatus === "enrolled" ||
+    (normalizedPaymentStatus && COMPLETED_PAYMENT_STATUSES.has(normalizedPaymentStatus))
+  ) {
+    return "Enrolled";
+  }
+
+  if (normalizedPaymentStatus && PENDING_PAYMENT_STATUSES.has(normalizedPaymentStatus)) {
+    return normalizedPaymentMethod === "cash" ? "Payment Pending" : "Payment Verification";
+  }
+
+  if (normalizedEnrollmentStatus === "documents_verified") {
+    return "Payment Pending";
+  }
+
+  if (documentsUploaded > 0 && documentsApproved === documentsUploaded) {
+    return "Documents Verified";
+  }
+
+  if (hasAssessment) {
+    return "Assessment Completed";
+  }
+
+  if (documentsUploaded > 0 || hasAssessment || normalizedEnrollmentStatus === "pending_review") {
+    return "Documents Pending";
+  }
+
+  return "Application Submitted";
+};
 
 export function PendingApplications() {
   const { userData } = useAuth();
@@ -68,6 +123,11 @@ export function PendingApplications() {
   const [showFormData, setShowFormData] = useState(false);
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const actorReference = userData?.id || userData?.email || 'registrar';
+  const alert = (message: string) => {
+    const text = String(message || "");
+    if (text.includes("âœ…") || text.includes("✅")) return;
+    window.alert(message);
+  };
 
   useEffect(() => {
     loadApplications();
@@ -94,7 +154,13 @@ export function PendingApplications() {
     // Format applications from Supabase with assessment results
     const formattedApps = await Promise.all(applications.map(async (app: any) => {
       const formData = app.form_data || {};
-      const aiTestScore = await getAssessmentResultByStudentId(app.user_id);
+      const [aiTestScore, paymentStatusResponse] = await Promise.all([
+        getAssessmentResultByStudentId(app.user_id),
+        getStudentPaymentStatus(app.user_id),
+      ]);
+      const docs = app.enrollment_documents || [];
+      const approvedDocuments = docs.filter((doc: any) => doc.status === "approved" || doc.verified === true).length;
+      const payment = paymentStatusResponse?.data;
       
       return {
         id: app.id,
@@ -102,7 +168,15 @@ export function PendingApplications() {
         email: app.user_id || formData.email,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         aiTestScore: aiTestScore, // Will be null if not taken
-        status: 'pending',
+        status: app.status === "documents_verified" ? "approved" : "pending",
+        currentStatus: getCurrentEnrollmentStatus({
+          hasAssessment: aiTestScore !== null,
+          enrollmentStatus: app.status,
+          paymentStatus: payment?.status,
+          paymentMethod: payment?.payment_method,
+          documentsUploaded: docs.length,
+          documentsApproved: approvedDocuments,
+        }),
         strandApplied: formData.preferredTrack || formData.track || app.preferred_track || 'Not Set',
         documents: {
           psaBirthCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'birthCertificate') || false,
@@ -146,6 +220,100 @@ export function PendingApplications() {
       pending,
       allApproved: approved === uploaded,
     };
+  };
+
+  const updateStudentDocumentState = (
+    enrollmentId: number | string | undefined,
+    documentType: string,
+    updates: Record<string, any>
+  ) => {
+    if (!enrollmentId) return;
+
+    setStudents((prevStudents) =>
+      prevStudents.map((student) => {
+        if (student.id !== enrollmentId) return student;
+
+        const nextDocuments = (student.enrollmentData?.enrollment_documents || []).map((doc: any) =>
+          doc.document_type === documentType ? { ...doc, ...updates } : doc
+        );
+        const approvedDocuments = nextDocuments.filter(
+          (doc: any) => doc.status === "approved" || doc.verified === true
+        ).length;
+
+        return {
+          ...student,
+          currentStatus: getCurrentEnrollmentStatus({
+            hasAssessment: student.aiTestScore !== null,
+            enrollmentStatus: student.enrollmentData?.status,
+            documentsUploaded: nextDocuments.length,
+            documentsApproved: approvedDocuments,
+          }),
+          enrollmentData: {
+            ...student.enrollmentData,
+            enrollment_documents: nextDocuments,
+          },
+        };
+      })
+    );
+
+    setReviewingStudent((prev: any) => {
+      if (!prev || prev.id !== enrollmentId) return prev;
+
+      const nextDocuments = (prev.enrollment_documents || []).map((doc: any) =>
+        doc.document_type === documentType ? { ...doc, ...updates } : doc
+      );
+
+      return {
+        ...prev,
+        enrollment_documents: nextDocuments,
+        enrollmentData: {
+          ...prev.enrollmentData,
+          enrollment_documents: nextDocuments,
+        },
+      };
+    });
+  };
+
+  const updateStudentEnrollmentState = (
+    enrollmentId: number | string | undefined,
+    updates: Record<string, any>
+  ) => {
+    if (!enrollmentId) return;
+
+    setStudents((prevStudents) =>
+      prevStudents
+        .map((student) => {
+          if (student.id !== enrollmentId) return student;
+
+          const nextEnrollmentData = {
+            ...student.enrollmentData,
+            ...updates,
+          };
+          const docs = nextEnrollmentData.enrollment_documents || [];
+          const approvedDocuments = docs.filter(
+            (doc: any) => doc.status === "approved" || doc.verified === true
+          ).length;
+
+          return {
+            ...student,
+            status: nextEnrollmentData.status === "documents_verified" ? "approved" : student.status,
+            currentStatus: getCurrentEnrollmentStatus({
+              hasAssessment: student.aiTestScore !== null,
+              enrollmentStatus: nextEnrollmentData.status,
+              documentsUploaded: docs.length,
+              documentsApproved: approvedDocuments,
+            }),
+            enrollmentData: nextEnrollmentData,
+          };
+        })
+        .filter((student) => student.enrollmentData?.status !== "enrolled")
+    );
+
+    setReviewingStudent((prev: any) =>
+      prev && prev.id === enrollmentId
+        ? { ...prev, enrollmentData: { ...prev.enrollmentData, ...updates } }
+        : prev
+    );
   };
 
   const handleReviewDocuments = async (student: Student) => {
@@ -211,22 +379,18 @@ export function PendingApplications() {
       return;
     }
 
-    const { error } = await updateDocumentStatus(documentId, 'approved');
+    const { data, error } = await updateDocumentStatus(documentId, 'approved');
 
     if (error) {
       alert(`Error approving document: ${error}`);
       return;
     }
 
-    // Update local state immediately
-    setReviewingStudent((prev: any) => ({
-      ...prev,
-      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
-        doc.document_type === selectedDocument.key
-          ? { ...doc, status: "approved" }
-          : doc
-      ),
-    }));
+    updateStudentDocumentState(reviewingStudent.id, selectedDocument.key, {
+      ...(data || {}),
+      status: "approved",
+      rejection_comment: null,
+    });
 
     // Create notification for document approval
     try {
@@ -240,27 +404,31 @@ export function PendingApplications() {
     }
 
     alert("✅ Document approved successfully!");
+    toast.success(`${selectedDocument.name} approved.`);
     setSelectedDocument(null);
     setDocumentRejectionComment("");
-    loadApplications();
   };
 
-  const handleRejectDocument = async () => {
-    if (!reviewingStudent || !selectedDocument) return;
+  const handleRejectDocument = async (documentKey?: string, rejectionComment?: string) => {
+    const activeDocumentKey = documentKey || selectedDocument?.key;
+    const activeDocumentName = documentNames[activeDocumentKey || ""] || selectedDocument?.name || "Document";
+    const activeRejectionComment = rejectionComment || documentRejectionComment;
+
+    if (!reviewingStudent || !activeDocumentKey) return;
     
-    if (!documentRejectionComment.trim()) {
+    if (!activeRejectionComment.trim()) {
       alert("❌ Rejection reason is required. Please provide a clear explanation.");
       return;
     }
 
-    if (documentRejectionComment.trim().length < 10) {
+    if (activeRejectionComment.trim().length < 10) {
       alert("❌ Please provide a more detailed rejection reason (at least 10 characters).");
       return;
     }
 
     // Find the document in the enrollment
     const documentId = reviewingStudent.enrollment_documents?.find(
-      (d: any) => d.document_type === selectedDocument.key
+      (d: any) => d.document_type === activeDocumentKey
     )?.id;
 
     if (!documentId) {
@@ -268,38 +436,34 @@ export function PendingApplications() {
       return;
     }
 
-    const { error } = await updateDocumentStatus(documentId, 'rejected', documentRejectionComment.trim());
+    const { data, error } = await updateDocumentStatus(documentId, 'rejected', activeRejectionComment.trim());
 
     if (error) {
       alert(`Error rejecting document: ${error}`);
       return;
     }
 
-    // Update local state immediately
-    setReviewingStudent((prev: any) => ({
-      ...prev,
-      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
-        doc.document_type === selectedDocument.key
-          ? { ...doc, status: "rejected", rejection_comment: documentRejectionComment.trim() }
-          : doc
-      ),
-    }));
+    updateStudentDocumentState(reviewingStudent.id, activeDocumentKey, {
+      ...(data || {}),
+      status: "rejected",
+      rejection_comment: activeRejectionComment.trim(),
+    });
 
     // Create notification
     try {
       await triggerNotification(
         reviewingStudent.user_id || reviewingStudent.email || "",
         'DOCUMENTS_REJECTED',
-        { message: documentRejectionComment.trim() }
+        { message: activeRejectionComment.trim() }
       );
     } catch (error) {
       console.error('Error creating notification:', error);
     }
 
     alert(`✅ Document rejected. Student has been notified.`);
+    toast.success(`${activeDocumentName} rejected. Student notified.`);
     setSelectedDocument(null);
     setDocumentRejectionComment("");
-    loadApplications();
   };
 
   const handleBulkApprove = async (documentKeys: string[]) => {
@@ -313,24 +477,20 @@ export function PendingApplications() {
         )?.id;
 
         if (documentId) {
-          const { error } = await updateDocumentStatus(documentId, 'approved');
+          const { data, error } = await updateDocumentStatus(documentId, 'approved');
           if (error) {
             console.error(`Error approving document ${docKey}:`, error);
             alert(`Error approving ${documentNames[docKey] || docKey}`);
             return;
           }
+
+          updateStudentDocumentState(reviewingStudent.id, docKey, {
+            ...(data || {}),
+            status: "approved",
+            rejection_comment: null,
+          });
         }
       }
-
-      // Update local state
-      setReviewingStudent((prev: any) => ({
-        ...prev,
-        enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
-          documentKeys.includes(doc.document_type)
-            ? { ...doc, status: "approved" }
-            : doc
-        ),
-      }));
 
       // Create notification for bulk approval
       try {
@@ -344,7 +504,7 @@ export function PendingApplications() {
       }
 
       alert(`✅ ${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved successfully!`);
-      loadApplications();
+      toast.success(`${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved.`);
     } catch (error) {
       console.error('Bulk approve error:', error);
       alert('Error during bulk approval. Please try again.');
@@ -363,22 +523,18 @@ export function PendingApplications() {
       return;
     }
 
-    const { error } = await updateDocumentStatus(documentId, 'approved');
+    const { data, error } = await updateDocumentStatus(documentId, 'approved');
 
     if (error) {
       alert(`Error approving document: ${error}`);
       return;
     }
 
-    // Update local state immediately
-    setReviewingStudent((prev: any) => ({
-      ...prev,
-      enrollment_documents: prev.enrollment_documents?.map((doc: any) =>
-        doc.document_type === docKey
-          ? { ...doc, status: "approved" }
-          : doc
-      ),
-    }));
+    updateStudentDocumentState(reviewingStudent.id, docKey, {
+      ...(data || {}),
+      status: "approved",
+      rejection_comment: null,
+    });
 
     // Create notification for document approval
     try {
@@ -392,7 +548,7 @@ export function PendingApplications() {
     }
 
     alert("✅ Document approved successfully!");
-    loadApplications();
+    toast.success(`${documentNames[docKey] || docKey} approved.`);
   };
 
   const handleFinalApproveApplication = async () => {
@@ -417,11 +573,12 @@ export function PendingApplications() {
     }
 
     alert(`✅ Documents verified. Student can now proceed to payment.`);
+    updateStudentEnrollmentState(reviewingStudent.id, { status: "documents_verified" });
+    toast.success("Application approved. Student can proceed to payment.");
     setShowDocumentModal(false);
     setSelectedDocument(null);
     setReviewingStudent(null);
     setShowFormData(false);
-    loadApplications();
   };
 
   const handleRejectApplication = async () => {
@@ -459,12 +616,13 @@ export function PendingApplications() {
       }
 
       alert(`✅ Application REJECTED. Student has been notified.`);
+      setStudents((prevStudents) => prevStudents.filter((student) => student.id !== reviewingStudent.id));
+      toast.success("Application rejected. Student notified.");
       setShowDocumentModal(false);
       setSelectedDocument(null);
       setReviewingStudent(null);
       setShowFormData(false);
       setDocumentRejectionComment("");
-      loadApplications();
     } catch (error) {
       console.error('Error rejecting application:', error);
       alert(`❌ Error rejecting application: ${error}`);
@@ -573,11 +731,10 @@ export function PendingApplications() {
         }
 
         alert(`✅ ${student.name}'s documents are verified. Payment is now unlocked.`);
+        updateStudentEnrollmentState(student.id, { status: "documents_verified" });
+        toast.success(`${student.name}'s documents are verified.`);
         setShowApproveModal(false);
         setActionStudentId(null);
-        
-        // Reload applications
-        loadApplications();
       }
     }
   };
@@ -604,12 +761,11 @@ export function PendingApplications() {
         }
 
         alert(`✅ ${student.name}'s application has been rejected.`);
+        setStudents((prevStudents) => prevStudents.filter((item) => item.id !== student.id));
+        toast.success(`${student.name}'s application rejected.`);
         setShowRejectModal(false);
         setActionStudentId(null);
         setRejectionReason("");
-        
-        // Reload applications
-        loadApplications();
       }
     } else {
       alert("❌ Please provide a rejection reason.");
@@ -651,6 +807,22 @@ export function PendingApplications() {
     }
   };
 
+  const getCurrentStatusStyle = (status: string) => {
+    if (status === "Enrolled" || status === "Documents Verified") {
+      return "border-green-200 bg-green-50 text-green-700";
+    }
+
+    if (status.includes("Payment")) {
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    }
+
+    if (status === "Assessment Completed") {
+      return "border-indigo-200 bg-indigo-50 text-indigo-700";
+    }
+
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  };
+
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
@@ -664,6 +836,7 @@ export function PendingApplications() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
+      <Toaster position="top-right" />
       <DashboardPageHeader
         badge="Application Review"
         title="Pending Applications"
@@ -735,7 +908,7 @@ export function PendingApplications() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px]">
+          <table className="w-full min-w-[1120px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -754,6 +927,9 @@ export function PendingApplications() {
                   Status
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                  Current Status
+                </th>
+                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Missing Documents
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -764,7 +940,7 @@ export function PendingApplications() {
             <tbody className="divide-y divide-gray-200">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center">
+                  <td colSpan={8} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <FileText className="w-12 h-12 text-gray-400" />
                       <div>
@@ -842,6 +1018,11 @@ export function PendingApplications() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
+                        <span className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${getCurrentStatusStyle(student.currentStatus)}`}>
+                          {student.currentStatus}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
                         {missingDocs.length > 0 ? (
                           <div className="flex flex-wrap gap-1">
                             {missingDocs.map((doc, idx) => (
@@ -887,7 +1068,7 @@ export function PendingApplications() {
           <p className="text-sm text-gray-600">
             Showing{" "}
             <span className="font-medium">{filteredStudents.length}</span> pending
-            applications (approved students are hidden)
+            applications (students remain visible until fully enrolled)
           </p>
         </div>
       </div>

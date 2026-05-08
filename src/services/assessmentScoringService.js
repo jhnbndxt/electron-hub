@@ -2,9 +2,8 @@
  * Dynamic Assessment Scoring Service
  *
  * Objective sections are normalized from the live question counts in Supabase.
- * Interest clusters are derived from the selected option content in the live
- * checklist-based Interests question bank. Legacy 1-5 Likert responses are
- * still supported so older in-progress assessments do not break.
+ * Interest clusters support the live 5-point Likert Interests question bank
+ * and older checklist-based saved assessments.
  */
 
 import { supabase } from '../supabase';
@@ -245,8 +244,11 @@ function hasLegacyLikertInterestAnswers(answers, interestQuestions = []) {
   return interestQuestions.some((question) => {
     const response = Number(answers?.[question.id]);
     const optionCount = Array.isArray(question?.options) ? question.options.length : 0;
+    const usesLikertOptions = Array.isArray(question?.options) && question.options.some((option) =>
+      String(option || '').toLowerCase().includes('strongly agree')
+    );
 
-    return Number.isFinite(response) && optionCount > 0 && response > optionCount - 1;
+    return Number.isFinite(response) && optionCount > 0 && (response > optionCount - 1 || usesLikertOptions);
   });
 }
 

@@ -48,7 +48,7 @@ interface ReviewApplicationModalProps {
   setDocumentRejectionComment: React.Dispatch<React.SetStateAction<string>>;
   handleViewDocument: (key: string) => void;
   handleApproveDocument: () => void;
-  handleRejectDocument: () => void;
+  handleRejectDocument: (documentKey?: string, rejectionComment?: string) => void;
   handleBackToDocuments: () => void;
   handleFinalApprove: () => void;
   handleRejectApplication: () => void;
@@ -172,10 +172,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
       ),
     }));
 
-    // Call the parent's reject handler
-    handleViewDocument(rejectingDocument.key);
-    setDocumentRejectionComment(rejectReason.trim());
-    setTimeout(() => handleRejectDocument(), 100);
+    handleRejectDocument(rejectingDocument.key, rejectReason.trim());
 
     setShowRejectModal(false);
     setRejectingDocument(null);
