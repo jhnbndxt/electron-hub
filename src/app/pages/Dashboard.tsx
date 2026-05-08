@@ -451,7 +451,7 @@ export function Dashboard() {
                       Check dashboard regularly
                     </div>
                     <div className="rounded-full border border-white/20 bg-white/10 px-4 py-2">
-                      Watch your email for notices
+                      Check your notifications here for important updates and announcements
                     </div>
                   </div>
                 </div>
@@ -460,7 +460,7 @@ export function Dashboard() {
 
             <div className="rounded-[1.75rem] border border-white/20 bg-white/12 p-5 backdrop-blur-sm">
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-50/75">
-                What to Watch For
+                Upcoming Updates
               </p>
 
               <div className="mt-5 grid gap-3">
@@ -468,8 +468,8 @@ export function Dashboard() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
                     <div>
-                      <p className="font-semibold text-white">Class schedule and section assignment</p>
-                      <p className="mt-1 text-sm text-emerald-50/85">Your official section and timetable will appear once released.</p>
+                      <p className="font-semibold text-white">Section release</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Your section assignment will appear on the dashboard after the enrollment period ends. Stay updated through notifications.</p>
                     </div>
                   </div>
                 </div>
@@ -478,8 +478,8 @@ export function Dashboard() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
                     <div>
-                      <p className="font-semibold text-white">Orientation details and student guidelines</p>
-                      <p className="mt-1 text-sm text-emerald-50/85">Expect reminders about orientation, policies, and next campus steps.</p>
+                      <p className="font-semibold text-white">Orientation schedule and student guidelines</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Notifications about orientation schedules and student guidelines will be posted. Check the Announcements page for updates.</p>
                     </div>
                   </div>
                 </div>
@@ -488,16 +488,11 @@ export function Dashboard() {
                   <div className="flex items-start gap-3">
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
                     <div>
-                      <p className="font-semibold text-white">Student ID release and onboarding updates</p>
-                      <p className="mt-1 text-sm text-emerald-50/85">Keep checking your dashboard and email for release schedules and announcements.</p>
+                      <p className="font-semibold text-white">Other news and announcements</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Additional news and updates will be posted on the website homepage.</p>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-emerald-950/20 px-4 py-3 text-sm text-emerald-50/95 ring-1 ring-white/10">
-                <span>Stay active here for the latest campus updates.</span>
-                <ArrowRight className="h-4 w-4 shrink-0" />
               </div>
             </div>
           </div>

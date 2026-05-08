@@ -22,6 +22,7 @@ import { useAuth } from "../context/AuthContext";
 import { motion } from "motion/react";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 import { getSystemSettings } from "../../services/systemSettingsService";
+import { Skeleton } from "../components/ui/skeleton";
 import { 
   saveDraft, 
   loadDraft, 
@@ -159,6 +160,7 @@ export function EnrollmentForm() {
   const [certificationChecked, setCertificationChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
 
   // Check for maintenance mode on mount
@@ -388,9 +390,22 @@ export function EnrollmentForm() {
     let active = true;
 
     async function loadSettings() {
-      const result = await getSystemSettings();
-      if (active && result?.data) {
-        setSystemSettings(result.data);
+      setIsSettingsLoading(true);
+
+      try {
+        const result = await getSystemSettings();
+        if (active) {
+          setSystemSettings(result?.data ?? { enrollment_open: true });
+        }
+      } catch (error) {
+        console.error('Error loading system settings:', error);
+        if (active) {
+          setSystemSettings({ enrollment_open: true });
+        }
+      } finally {
+        if (active) {
+          setIsSettingsLoading(false);
+        }
       }
     }
 
@@ -402,13 +417,36 @@ export function EnrollmentForm() {
   }, []);
 
   const isEnrollmentOpen = systemSettings?.enrollment_open !== false;
+  const isLoading = isInitializing || isSettingsLoading;
 
-  if (!isInitializing && !isEnrollmentOpen && !isSubmittedEnrollment) {
+  if (isLoading) {
+    return (
+      <div className="portal-dashboard-page flex flex-col items-center justify-center min-h-screen p-6 bg-[#F8FAFC]">
+        <div className="max-w-3xl w-full rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+          <div className="mb-6">
+            <Skeleton className="h-8 w-2/3 mb-4" />
+            <Skeleton className="h-4 w-1/2" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, idx) => (
+              <div key={idx} className="space-y-3 rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isEnrollmentOpen && !isSubmittedEnrollment) {
     return (
       <div className="portal-dashboard-page flex flex-col items-center justify-center min-h-screen p-6 bg-[#F8FAFC]">
         <div className="max-w-3xl w-full rounded-3xl border border-red-200 bg-red-50 p-8 text-center shadow-sm">
           <AlertCircle className="mx-auto mb-4 h-12 w-12 text-red-600" />
-          <h1 className="text-3xl font-semibold text-red-900 mb-3">Enrollment is currently closed</h1>
+          <h1 className="text-3xl font-semibold text-red-900 mb-3">Enrollment is currently closed until further notice</h1>
           <p className="text-sm text-red-800 mb-6">
             The enrollment window is not open at this time. Please check back later or contact the registrar for updates.
           </p>

@@ -53,6 +53,8 @@ function DashboardLayoutContent() {
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [maintenanceCountdown, setMaintenanceCountdown] = useState(5);
+  const [showMaintenanceNotice, setShowMaintenanceNotice] = useState(false);
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const paymentTooltipRef = useRef<HTMLDivElement>(null);
@@ -79,19 +81,36 @@ function DashboardLayoutContent() {
   const isMaintenanceModeActive = systemSettings?.maintenance_mode === true;
   const isStudentUser = userRole === "student" || userData?.role === "student";
 
-  // Automatically logout students when maintenance mode is detected
   useEffect(() => {
     if (settingsLoaded && isMaintenanceModeActive && isStudentUser) {
-      logout();
+      setShowMaintenanceNotice(true);
+      setMaintenanceCountdown(5);
     }
-  }, [settingsLoaded, isMaintenanceModeActive, isStudentUser, logout]);
+  }, [settingsLoaded, isMaintenanceModeActive, isStudentUser]);
 
-  // Show maintenance notice after settings are loaded and student is still logged in
-  if (settingsLoaded && isMaintenanceModeActive && isStudentUser) {
+  useEffect(() => {
+    if (!showMaintenanceNotice) {
+      return;
+    }
+
+    if (maintenanceCountdown <= 0) {
+      logout();
+      navigate("/", { replace: true });
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setMaintenanceCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+
+    return () => window.clearTimeout(timeout);
+  }, [showMaintenanceNotice, maintenanceCountdown, logout, navigate]);
+
+  if (showMaintenanceNotice && settingsLoaded && isMaintenanceModeActive && isStudentUser) {
     return (
-      <MaintenanceNotice 
-        message="The student portal is currently under maintenance. Please try again later." 
-        showButton={true}
+      <MaintenanceNotice
+        message="The student portal is currently under maintenance. You will be logged out shortly. Please try again later."
+        countdown={maintenanceCountdown}
       />
     );
   }
@@ -125,11 +144,13 @@ function DashboardLayoutContent() {
       case 'PAYMENT_VERIFIED':
       case 'DOCUMENTS_VERIFIED':
       case 'ENROLLMENT_APPROVED':
+      case 'ENROLLMENT_OPENED':
         return 'success';
 
       case 'PAYMENT_SUBMITTED':
       case 'ENROLLMENT_SUBMITTED':
       case 'DOCUMENTS_REJECTED':
+      case 'ENROLLMENT_CLOSED':
         return 'warning';
 
       case 'PAYMENT_REJECTED':

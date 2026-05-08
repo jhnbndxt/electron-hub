@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { Skeleton } from "../../components/ui/skeleton";
 import ReviewApplicationModal from "../../components/ReviewApplicationModal";
 import {
   getPendingApplications,
@@ -655,6 +656,7 @@ export function PendingApplications() {
           <Skeleton className="h-6 w-1/3" />
           <Skeleton className="h-12 w-2/3" />
           <Skeleton className="h-4 w-1/2" />
+          <p className="text-sm text-slate-600">Loading pending applications...</p>
         </div>
         <div className="space-y-4">
           <Skeleton className="h-14 w-full" />

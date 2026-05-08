@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { createAuditLog, resolveUserId } from './adminService';
+import { broadcastNotificationToStudents } from './notificationService';
 
 const STORAGE_KEY = 'electron_hub_system_settings';
 
@@ -361,6 +362,12 @@ export async function saveSystemSettings(nextSettings, actorReference) {
   const timestamp = new Date().toISOString();
   const localPayload = writeLocalPayload(nextSettings, timestamp);
 
+  const previousSettingsResult = await getSystemSettings();
+  const previousSettings = previousSettingsResult?.data || buildDefaultSettings();
+  const previousEnrollmentOpen = previousSettings.enrollment_open !== false;
+  const nextEnrollmentOpen = localPayload.settings.enrollment_open !== false;
+  const studentNotificationsEnabled = localPayload.settings.student_notifications_enabled !== false;
+
   try {
     const resolvedUserId = actorReference ? await resolveUserId(actorReference) : null;
     const payload = SYSTEM_SETTINGS_DEFINITIONS.map((definition) => ({
@@ -396,6 +403,15 @@ export async function saveSystemSettings(nextSettings, actorReference) {
       );
     } catch (auditError) {
       console.error('System settings audit log error:', auditError);
+    }
+
+    if (studentNotificationsEnabled && previousEnrollmentOpen !== nextEnrollmentOpen) {
+      try {
+        const enrollmentTrigger = nextEnrollmentOpen ? 'ENROLLMENT_OPENED' : 'ENROLLMENT_CLOSED';
+        await broadcastNotificationToStudents(enrollmentTrigger);
+      } catch (broadcastError) {
+        console.error('Error broadcasting enrollment status notifications:', broadcastError);
+      }
     }
 
     return {

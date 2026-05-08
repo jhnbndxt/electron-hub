@@ -2,11 +2,13 @@ import { AlertTriangle } from "lucide-react";
 
 interface MaintenanceNoticeProps {
   message?: string;
+  countdown?: number | null;
   showButton?: boolean;
 }
 
 export function MaintenanceNotice({ 
   message = "The student portal is currently under maintenance. Please try again later.",
+  countdown = null,
   showButton = false 
 }: MaintenanceNoticeProps) {
   return (
@@ -31,6 +33,11 @@ export function MaintenanceNotice({
             <p className="text-sm text-red-700">
               Admin and staff accounts remain accessible during maintenance.
             </p>
+            {countdown !== null && (
+              <p className="mt-3 text-sm text-red-700">
+                You will be logged out in {countdown} second{countdown === 1 ? '' : 's'}.
+              </p>
+            )}
           </div>
 
           {showButton && (

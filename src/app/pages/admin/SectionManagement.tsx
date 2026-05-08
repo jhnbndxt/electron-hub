@@ -226,6 +226,8 @@ export function SectionManagement() {
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ name: "", maxCapacity: 50 });
   const [isLoading, setIsLoading] = useState(true);
+  const [isSectionDataReady, setIsSectionDataReady] = useState(false);
+  const [isAssignmentSyncing, setIsAssignmentSyncing] = useState(false);
   const [pendingConfirmation, setPendingConfirmation] = useState<SectionConfirmation>(null);
   const [autoGenerateSettings, setAutoGenerateSettings] = useState({
     maxStudentsPerSection: 50,
@@ -240,34 +242,89 @@ export function SectionManagement() {
 
   const loadSectionData = async () => {
     setIsLoading(true);
-    const [{ data: enrollments, error: enrollmentError }, { data: sectionRows, error: sectionError }] = await Promise.all([
-      getEnrolledStudents(),
-      supabase
-        .from("sections")
-        .select("id, section_code, grade_level, track, capacity, school_year, semester")
-        .eq("school_year", currentSchoolYear)
-        .order("section_code"),
-    ]);
+    setIsSectionDataReady(false);
+    setIsAssignmentSyncing(false);
+    setSections([]);
+    setEnrolledStudents([]);
 
-    if (enrollmentError || !enrollments) {
-      console.error("Error loading enrolled students:", enrollmentError);
-      setEnrolledStudents([]);
+    const sectionPromise = supabase
+      .from("sections")
+      .select("id, section_code, grade_level, track, capacity, school_year, semester")
+      .eq("school_year", currentSchoolYear)
+      .order("section_code");
+
+    const enrollmentPromise = getEnrolledStudents();
+
+    const sectionResult = await sectionPromise;
+    if (sectionResult.error) {
+      console.error("Error loading sections:", sectionResult.error);
       setSections([]);
       setIsLoading(false);
       return;
     }
 
-    if (sectionError) {
-      console.error("Error loading sections:", sectionError);
+    const currentSections = sectionResult.data || [];
+    const placeholderSections = currentSections.map((section) => ({
+      id: section.id,
+      name: section.section_code,
+      track: section.track,
+      elective1: undefined,
+      elective2: undefined,
+      combinationKey: undefined,
+      yearLevel: toDisplayYearLevel(section.grade_level),
+      students: [],
+      maxCapacity: section.capacity || 50,
+    }));
+
+    setSections(placeholderSections);
+    setIsSectionDataReady(true);
+    setIsLoading(false);
+    setIsAssignmentSyncing(true);
+
+    const enrollmentResult = await enrollmentPromise;
+    if (enrollmentResult.error || !enrollmentResult.data) {
+      console.error("Error loading enrolled students:", enrollmentResult.error);
       setEnrolledStudents([]);
-      setSections([]);
-      setIsLoading(false);
+      setIsAssignmentSyncing(false);
       return;
     }
 
-    const currentSections = sectionRows || [];
+    const enrollments = enrollmentResult.data;
+    const baseEnrolled = enrollments
+      .map((enrollment: any) => {
+        const formData = enrollment.form_data || {};
+        const email = enrollment.user_id || formData.email || "";
+
+        if (!email) {
+          return null;
+        }
+
+        return {
+          id: enrollment.id,
+          name:
+            formData.studentName ||
+            `${formData.firstName || ""} ${formData.lastName || ""}`.trim() ||
+            email,
+          email,
+          track: normalizeSectionField(
+            formData.preferredTrack ||
+              formData.preferred_track ||
+              formData.recommendedTrack ||
+              formData.track,
+            "Not Set"
+          ),
+          elective1: normalizeSectionField(formData.elective1, "Not Set"),
+          elective2: normalizeSectionField(formData.elective2, "Not Set"),
+          yearLevel: toDisplayYearLevel(formData.yearLevel || formData.year_level),
+          sectionId: undefined,
+          section: undefined,
+        };
+      })
+      .filter(Boolean) as EnrolledStudent[];
+
+    setEnrolledStudents(baseEnrolled);
+
     const currentSectionIds = currentSections.map((section) => section.id);
-
     let assignmentRows: Array<{ enrollment_id: string; section_id: string }> = [];
     if (currentSectionIds.length > 0) {
       const { data: assignments, error: assignmentError } = await supabase
@@ -278,9 +335,7 @@ export function SectionManagement() {
 
       if (assignmentError) {
         console.error("Error loading section assignments:", assignmentError);
-        setEnrolledStudents([]);
-        setSections([]);
-        setIsLoading(false);
+        setIsAssignmentSyncing(false);
         return;
       }
 
@@ -365,6 +420,7 @@ export function SectionManagement() {
 
     setEnrolledStudents(enrolled);
     setSections(mappedSections);
+    setIsAssignmentSyncing(false);
   };
 
   const autoGenerateSections = async () => {
@@ -1000,13 +1056,14 @@ export function SectionManagement() {
 
   const unsectionedStudents = sortStudentsByName(enrolledStudents.filter(s => !s.section));
 
-  if (isLoading) {
+  if (isLoading && sections.length === 0) {
     return (
       <div className="p-8">
         <div className="mb-8 space-y-4">
           <Skeleton className="h-6 w-1/3" />
           <Skeleton className="h-12 w-2/3" />
           <Skeleton className="h-4 w-1/2" />
+          <p className="text-sm text-slate-600">Loading section setup...</p>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {Array.from({ length: 3 }).map((_, idx) => (
@@ -1027,6 +1084,11 @@ export function SectionManagement() {
 
   return (
     <div className="p-8">
+      {isAssignmentSyncing && (
+        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-900">
+          Section details are loading — showing available sections while student assignment data updates.
+        </div>
+      )}
       {/* Header */}
       <div className="mb-8">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold" style={{ color: "var(--electron-blue)" }}>

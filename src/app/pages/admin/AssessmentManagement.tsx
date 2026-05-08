@@ -16,6 +16,7 @@ import {
   FileText,
   CheckCircle,
 } from "lucide-react";
+import { Skeleton } from "../../components/ui/skeleton";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import {
   getAssessmentQuestions,
@@ -383,6 +384,7 @@ export function AssessmentManagement() {
           <Skeleton className="h-6 w-1/3" />
           <Skeleton className="h-12 w-2/3" />
           <Skeleton className="h-4 w-1/2" />
+          <p className="text-sm text-slate-600">Loading assessment questions...</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
           {Array.from({ length: 3 }).map((_, idx) => (

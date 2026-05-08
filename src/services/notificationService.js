@@ -38,6 +38,66 @@ async function resolveNotificationUserId(userReference) {
   return data?.id || null;
 }
 
+const NOTIFICATION_MAP = {
+  ASSESSMENT_COMPLETED: {
+    title: 'Assessment Completed',
+    message: 'You have successfully completed the career assessment.',
+  },
+  ENROLLMENT_SUBMITTED: {
+    title: 'Enrollment Submitted',
+    message: 'Your enrollment form has been submitted successfully.',
+  },
+  PAYMENT_SUBMITTED: {
+    title: 'Payment Submitted',
+    message: 'Your payment has been submitted for verification.',
+  },
+  PAYMENT_VERIFIED: {
+    title: 'Payment Verified',
+    message: 'Your payment has been verified successfully.',
+  },
+  PAYMENT_REJECTED: {
+    title: 'Payment Rejected',
+    message: 'Your payment was rejected. Please try again.',
+  },
+  DOCUMENTS_VERIFIED: {
+    title: 'Documents Verified',
+    message: 'All your documents have been verified and approved.',
+  },
+  DOCUMENT_APPROVED: {
+    title: 'Document Approved',
+    message: additionalData =>
+      additionalData.documentName
+        ? `Your ${additionalData.documentName} has been approved.`
+        : 'Your document has been approved.',
+  },
+  ENROLLMENT_APPROVED: {
+    title: 'Enrollment Approved',
+    message: 'Your enrollment has been approved. Welcome!',
+  },
+  ENROLLMENT_REJECTED: {
+    title: 'Enrollment Rejected',
+    message: 'Your enrollment was not approved. Please review the feedback.',
+  },
+  DOCUMENTS_REJECTED: {
+    title: 'Documents Rejected',
+    message: (additionalData) =>
+      additionalData.message || 'One or more enrollment documents were rejected. Please review the feedback.',
+  },
+  DOCUMENT_REJECTED: {
+    title: 'Document Rejected',
+    message: (additionalData) =>
+      additionalData.message || 'A document was rejected. Please review and reupload.',
+  },
+  ENROLLMENT_CLOSED: {
+    title: 'Enrollment Closed',
+    message: 'Enrollment is currently closed until further notice. We will notify you when it reopens.',
+  },
+  ENROLLMENT_OPENED: {
+    title: 'Enrollment Reopened',
+    message: 'Enrollment is now open again. Please complete your application while the window is available.',
+  },
+};
+
 /**
  * Add a new notification
  */
@@ -200,68 +260,80 @@ export async function deleteAllNotifications(userReference) {
  * Convenience function for common notification types
  */
 export async function triggerNotification(userId, trigger, additionalData = {}) {
-  const notificationMap = {
-    ASSESSMENT_COMPLETED: {
-      title: 'Assessment Completed',
-      message: 'You have successfully completed the career assessment.',
-    },
-    ENROLLMENT_SUBMITTED: {
-      title: 'Enrollment Submitted',
-      message: 'Your enrollment form has been submitted successfully.',
-    },
-    PAYMENT_SUBMITTED: {
-      title: 'Payment Submitted',
-      message: 'Your payment has been submitted for verification.',
-    },
-    PAYMENT_VERIFIED: {
-      title: 'Payment Verified',
-      message: 'Your payment has been verified successfully.',
-    },
-    PAYMENT_REJECTED: {
-      title: 'Payment Rejected',
-      message: 'Your payment was rejected. Please try again.',
-    },
-    DOCUMENTS_VERIFIED: {
-      title: 'Documents Verified',
-      message: 'All your documents have been verified and approved.',
-    },
-    DOCUMENT_APPROVED: {
-      title: 'Document Approved',
-      message: additionalData.documentName 
-        ? `Your ${additionalData.documentName} has been approved.`
-        : 'Your document has been approved.',
-    },
-    ENROLLMENT_APPROVED: {
-      title: 'Enrollment Approved',
-      message: 'Your enrollment has been approved. Welcome!',
-    },
-    ENROLLMENT_REJECTED: {
-      title: 'Enrollment Rejected',
-      message: 'Your enrollment was not approved. Please review the feedback.',
-    },
-    DOCUMENTS_REJECTED: {
-      title: 'Documents Rejected',
-      message: additionalData.message || 'One or more enrollment documents were rejected. Please review the feedback.',
-    },
-    DOCUMENT_REJECTED: {
-      title: 'Document Rejected',
-      message: additionalData.message || 'A document was rejected. Please review and reupload.',
-    },
-  };
-
-  const notification = notificationMap[trigger];
+  const notification = NOTIFICATION_MAP[trigger];
   if (!notification) {
     console.warn('Unknown notification trigger:', trigger);
     return null;
   }
 
+  const message =
+    typeof notification.message === 'function'
+      ? notification.message(additionalData)
+      : notification.message;
+
   return addNotification(
     userId,
     trigger,
     notification.title,
-    notification.message,
+    message,
     { trigger, ...additionalData }
   );
+}
+
+export async function broadcastNotificationToStudents(trigger, additionalData = {}) {
+  const notification = NOTIFICATION_MAP[trigger];
+  if (!notification) {
+    console.warn('Unknown broadcast notification trigger:', trigger);
+    return [];
+  }
+
+  try {
+    const { data: students, error: studentError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('role', 'student');
+
+    if (studentError) {
+      console.error('Error loading student recipients for notifications:', studentError);
+      return [];
+    }
+
+    const payload = (students || []).map((student) => ({
+      user_id: student.id,
+      type: trigger,
+      title: notification.title,
+      message:
+        typeof notification.message === 'function'
+          ? notification.message(additionalData)
+          : notification.message,
+      is_read: false,
+      data: { trigger, ...additionalData },
+      created_at: new Date().toISOString(),
+    }));
+
+    if (payload.length === 0) {
+      return [];
+    }
+
+    const { data: inserted, error: insertError } = await supabase
+      .from('notifications')
+      .insert(payload)
+      .select();
+
+    if (insertError) {
+      console.error('Error broadcasting notification to students:', insertError);
+      return [];
+    }
+
+    console.log('📬 Broadcast notification created for students:', {
+      trigger,
+      recipients: payload.length,
+    });
+    return inserted || [];
+  } catch (error) {
+    console.error('Error broadcasting notification to students:', error);
+    return [];
+  }
 }
 
 /**
