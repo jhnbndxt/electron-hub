@@ -1,9 +1,25 @@
 import { Link } from "react-router";
 import { useEffect, useState } from "react";
-import { Award, ArrowRight, Sparkles, TrendingUp, Download, CheckCircle, GraduationCap, Briefcase } from "lucide-react";
+import {
+  Award,
+  ArrowRight,
+  Sparkles,
+  TrendingUp,
+  Download,
+  CheckCircle,
+  GraduationCap,
+  Briefcase,
+  Building2,
+  MapPin,
+  Phone,
+  ExternalLink,
+  Star,
+  BookOpen,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 import { LoadingState } from "../components/LoadingState";
+import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 
 interface AssessmentResults {
   track: string;
@@ -317,6 +333,14 @@ export function Results() {
   const allCareerPathways = electives.flatMap(elective =>
     getCareerPathways(track, elective)
   );
+  const recommendedBranches = getRecommendedElectronBranches({
+    track,
+    electives,
+    suggestedCourses: uniqueCourses,
+    careerPathways: allCareerPathways,
+    topDomains,
+    topInterests,
+  });
 
   const handleDownloadPDF = async () => {
     setIsDownloading(true);
@@ -936,6 +960,124 @@ export function Results() {
             </div>
           </div>
         </div>
+
+        {/* Recommended Electron Branches */}
+        {recommendedBranches.length > 0 && (
+          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
+            <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                  <Building2 className="h-4 w-4" />
+                  Electron branch match
+                </div>
+                <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
+                  Recommended Electron Branches
+                </h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-gray-600">
+                  These branches are matched to your assessment result, suggested electives, and related college or TESDA program pathways.
+                </p>
+              </div>
+              <a
+                href="https://electroncollege.edu.ph/programs/"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+              >
+                View Official Programs
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              {recommendedBranches.map((branch) => (
+                <article
+                  key={branch.id}
+                  className={`relative overflow-hidden rounded-xl border p-5 transition-all hover:-translate-y-0.5 hover:shadow-xl ${
+                    branch.isBestMatch ? "border-blue-300 bg-blue-50/55 shadow-lg" : "border-gray-200 bg-white shadow-sm"
+                  }`}
+                >
+                  {branch.isBestMatch && (
+                    <div className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-blue-700 px-3 py-1 text-xs font-semibold text-white shadow-sm">
+                      <Star className="h-3.5 w-3.5" />
+                      Best Match
+                    </div>
+                  )}
+
+                  <div className="mb-4 flex items-start gap-3 pr-24">
+                    <div
+                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white shadow-md"
+                      style={{ backgroundColor: branch.isBestMatch ? "var(--electron-blue)" : "var(--electron-red)" }}
+                    >
+                      <Building2 className="h-6 w-6" />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-lg font-bold leading-snug text-gray-900">{branch.name}</h4>
+                      <p className="mt-1 text-xs font-medium text-gray-500">{branch.sourceLabel}</p>
+                    </div>
+                  </div>
+
+                  <p className="mb-4 text-sm leading-6 text-gray-700">{branch.description}</p>
+
+                  <div className="space-y-3 text-sm text-gray-700">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+                      <span>{branch.address}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 shrink-0 text-blue-700" />
+                      <span>{branch.contact}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <div className="mb-3 flex items-center gap-2">
+                      <BookOpen className="h-4 w-4 text-blue-700" />
+                      <p className="text-sm font-semibold text-gray-900">Relevant available programs</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {branch.matchedPrograms.slice(0, 8).map((program) => (
+                        <span
+                          key={program}
+                          className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs font-semibold text-gray-700"
+                        >
+                          {program}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                    <a
+                      href={branch.facebookUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
+                    >
+                      View Facebook Page
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                    <a
+                      href={`tel:${branch.contact.replace(/[^\d+]/g, "")}`}
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                    >
+                      Contact Branch
+                      <Phone className="h-4 w-4" />
+                    </a>
+                    <a
+                      href={branch.websiteUrl || "https://electroncollege.edu.ph/programs/"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-100"
+                    >
+                      View Programs
+                      <BookOpen className="h-4 w-4" />
+                    </a>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Track Overview Section */}
         <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
