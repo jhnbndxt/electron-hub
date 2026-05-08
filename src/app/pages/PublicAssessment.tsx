@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart,
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
+import { LoadingState } from "../components/LoadingState";
 
 interface Question {
   id: number;
@@ -207,10 +208,11 @@ export function PublicAssessment() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6" style={publicAssessmentShellStyle}>
-        <div className="portal-glass-panel rounded-[1.75rem] px-10 py-9 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "var(--electron-blue)" }}></div>
-          <p className="text-gray-600">Loading assessment...</p>
-        </div>
+        <LoadingState
+          message="Retrieving assessment records..."
+          subtext="Preparing the public assessment questions."
+          compact
+        />
       </div>
     );
   }

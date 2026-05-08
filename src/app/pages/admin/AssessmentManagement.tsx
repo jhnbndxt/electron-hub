@@ -17,6 +17,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
+import { LoadingState } from "../../components/LoadingState";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import {
   getAssessmentQuestions,
@@ -380,25 +381,10 @@ export function AssessmentManagement() {
   if (isLoading) {
     return (
       <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-        <div className="mb-8 space-y-4">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-12 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
-          <p className="text-sm text-slate-600">Loading assessment questions...</p>
-        </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <Skeleton className="h-6 w-1/2 mb-4" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ))}
-        </div>
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <Skeleton key={idx} className="h-16 w-full" />
-          ))}
-        </div>
+        <LoadingState
+          message="Retrieving assessment records..."
+          subtext="Loading question banks, categories, and checklist prompts."
+        />
       </div>
     );
   }

@@ -15,6 +15,7 @@ import {
 import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
 import { createAuditLog, resolveUserId } from "../../../services/adminService";
+import { LoadingState } from "../../components/LoadingState";
 
 interface StudentDocument {
   studentId: string;
@@ -304,12 +305,11 @@ export function DocumentVerification() {
       </div>
 
       {isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="text-center">
-            <Loader className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600">Loading documents...</p>
-          </div>
-        </div>
+        <LoadingState
+          message="Loading documents..."
+          subtext="Retrieving uploaded files and verification statuses."
+          compact
+        />
       )}
 
       {!isLoading && (

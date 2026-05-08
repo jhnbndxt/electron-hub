@@ -14,6 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
+import { LoadingState } from "../../components/LoadingState";
 import { supabase } from "../../../supabase";
 
 interface PaymentRecord {
@@ -186,24 +187,10 @@ export function BranchCoordinatorPayments() {
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
-        <div className="mb-8 space-y-4">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-12 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <Skeleton className="h-5 w-1/2 mb-4" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ))}
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+        <LoadingState
+          message="Fetching payment history..."
+          subtext="Loading branch transactions, statuses, and revenue totals."
+        />
       </div>
     );
   }

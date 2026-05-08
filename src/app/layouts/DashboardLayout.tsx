@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { MaintenanceNotice } from "../components/MaintenanceNotice";
+import { LoadingState } from "../components/LoadingState";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { ChatProvider, useChat } from "../context/ChatContext";
@@ -607,10 +608,12 @@ function DashboardLayoutContent() {
                       {loadingNotifications ? (
                         <div className="p-4">
                           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-                            <div className="flex items-center gap-3">
-                              <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />
-                              <span>Loading notifications...</span>
-                            </div>
+                            <LoadingState
+                              message="Loading notifications..."
+                              subtext="Checking recent enrollment updates."
+                              compact
+                              className="min-h-0 py-2"
+                            />
                           </div>
                         </div>
                       ) : notifications.length === 0 ? (

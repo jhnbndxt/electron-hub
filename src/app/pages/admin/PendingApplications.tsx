@@ -14,6 +14,7 @@ import {
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Skeleton } from "../../components/ui/skeleton";
+import { LoadingState } from "../../components/LoadingState";
 import ReviewApplicationModal from "../../components/ReviewApplicationModal";
 import {
   getPendingApplications,
@@ -652,17 +653,10 @@ export function PendingApplications() {
   if (isLoading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-        <div className="mb-8 space-y-4">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-12 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
-          <p className="text-sm text-slate-600">Loading pending applications...</p>
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-        </div>
+        <LoadingState
+          message="Loading pending applications..."
+          subtext="Fetching submitted applications and document review status."
+        />
       </div>
     );
   }

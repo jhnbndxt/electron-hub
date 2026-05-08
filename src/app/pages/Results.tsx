@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Award, ArrowRight, Sparkles, TrendingUp, Download, CheckCircle, GraduationCap, Briefcase } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
+import { LoadingState } from "../components/LoadingState";
 
 interface AssessmentResults {
   track: string;
@@ -66,9 +67,11 @@ export function Results() {
   if (loading) {
     return (
       <div className="portal-dashboard-page flex min-h-full items-center justify-center p-4 sm:p-6 lg:p-8 w-full">
-        <div className="portal-glass-panel w-full max-w-xl rounded-2xl p-8 text-center">
-          <p className="text-xl text-gray-600">Loading assessment results...</p>
-        </div>
+        <LoadingState
+          message="Loading assessment results..."
+          subtext="Retrieving your latest strand recommendation and score breakdown."
+          compact
+        />
       </div>
     );
   }

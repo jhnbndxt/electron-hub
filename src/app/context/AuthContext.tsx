@@ -369,7 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       isActive = false;
     };
-  }, [userData?.email, userData?.id, userData?.name, userData?.adminType]);
+  }, [userData?.email]);
 
   useEffect(() => {
     if (!userData?.email) {

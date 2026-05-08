@@ -17,18 +17,28 @@ interface DocumentStatus {
 
 const REQUIRED_DOCS = [
   { key: "form138", name: "Form 138 (Report Card)" },
-  { key: "goodMoral", name: "Good Moral Certificate" },
   { key: "birthCertificate", name: "PSA Birth Certificate" },
   { key: "idPicture", name: "2x2 ID Pictures" },
-  { key: "parentGuardianId", name: "Photocopy of Parent's/Guardian ID" },
+  { key: "diploma", name: "Grade 10 Diploma" },
 ];
+
+const OPTIONAL_DOCS = [
+  { key: "goodMoral", name: "Certificate of Good Moral" },
+  { key: "escCertificate", name: "ESC Certificate" },
+  { key: "form137", name: "Form 137" },
+];
+
+const ALL_DOCS = [...REQUIRED_DOCS, ...OPTIONAL_DOCS];
 
 const DOC_NAME_TO_KEY: Record<string, string> = {
   "Form 138 (Report Card)": "form138",
+  "Certificate of Good Moral": "goodMoral",
   "Good Moral Certificate": "goodMoral",
   "PSA Birth Certificate": "birthCertificate",
   "2x2 ID Pictures": "idPicture",
-  "Photocopy of Parent's/Guardian ID": "parentGuardianId",
+  "Grade 10 Diploma": "diploma",
+  "ESC Certificate": "escCertificate",
+  "Form 137": "form137",
 };
 
 export function MyDocuments() {
@@ -91,12 +101,12 @@ export function MyDocuments() {
 
     if (enrollError) {
       console.error("Error fetching enrollment:", enrollError);
-      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      setDocuments(ALL_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
       return;
     }
 
     if (!enrollment) {
-      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      setDocuments(ALL_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
       return;
     }
 
@@ -110,11 +120,11 @@ export function MyDocuments() {
 
     if (docsError) {
       console.error("Error fetching documents:", docsError);
-      setDocuments(REQUIRED_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
+      setDocuments(ALL_DOCS.map(d => ({ name: d.name, documentType: d.key, status: "not_uploaded" })));
       return;
     }
 
-    const docStatuses: DocumentStatus[] = REQUIRED_DOCS.map(reqDoc => {
+    const docStatuses: DocumentStatus[] = ALL_DOCS.map(reqDoc => {
       const uploaded = docs?.find(d => d.document_type === reqDoc.key);
       if (!uploaded) {
         return { name: reqDoc.name, documentType: reqDoc.key, status: "not_uploaded" };
@@ -146,6 +156,65 @@ export function MyDocuments() {
 
     setDocuments(docStatuses);
   };
+
+  const getCategoryCounts = (docDefinitions: typeof REQUIRED_DOCS) => {
+    const categoryDocs = docDefinitions
+      .map((definition) => documents.find((doc) => doc.documentType === definition.key))
+      .filter(Boolean) as DocumentStatus[];
+
+    return {
+      uploaded: categoryDocs.filter((doc) => doc.status !== "not_uploaded").length,
+      approved: categoryDocs.filter((doc) => doc.status === "approved").length,
+      total: docDefinitions.length,
+    };
+  };
+
+  const renderDocumentChecklist = (docDefinitions: typeof REQUIRED_DOCS) => (
+    <ul className="space-y-3">
+      {docDefinitions.map((reqDoc, index) => {
+        const doc = documents.find(d => d.documentType === reqDoc.key);
+        const isUploaded = doc && doc.status !== "not_uploaded";
+
+        return (
+          <li key={index} className="flex items-center justify-between gap-4 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <div className="flex items-center gap-3 min-w-0">
+              <div
+                className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                  doc?.status === "approved" ? "bg-green-100" :
+                  doc?.status === "rejected" ? "bg-red-100" :
+                  isUploaded ? "bg-yellow-100" : "bg-gray-100"
+                }`}
+              >
+                {doc?.status === "approved" && <CheckCircle className="w-4 h-4 text-green-600" />}
+                {doc?.status === "rejected" && <XCircle className="w-4 h-4 text-red-600" />}
+                {doc?.status === "pending" && <AlertCircle className="w-4 h-4 text-yellow-600" />}
+              </div>
+              <span className={isUploaded ? "text-gray-900 font-medium" : "text-gray-500"}>
+                {reqDoc.name}
+              </span>
+            </div>
+
+            {!isUploaded && (
+              <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-blue-700 transition-colors flex-shrink-0">
+                <Upload className="w-4 h-4" />
+                {uploadingDoc === reqDoc.name ? "Uploading..." : "Upload"}
+                <input
+                  type="file"
+                  className="hidden"
+                  accept="image/*,.pdf"
+                  disabled={uploadingDoc !== null}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(reqDoc.name, file);
+                  }}
+                />
+              </label>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   const handleFileUpload = async (docName: string, file: File) => {
     if (!userData?.email) return;
@@ -367,51 +436,24 @@ export function MyDocuments() {
 
         {/* Required Documents Checklist with Upload */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Required Documents</h2>
-          <ul className="space-y-3">
-            {REQUIRED_DOCS.map((reqDoc, index) => {
-              const doc = documents.find(d => d.documentType === reqDoc.key);
-              const isUploaded = doc && doc.status !== "not_uploaded";
-              
-              return (
-                <li key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                        doc?.status === "approved" ? "bg-green-100" :
-                        doc?.status === "rejected" ? "bg-red-100" :
-                        isUploaded ? "bg-yellow-100" : "bg-gray-100"
-                      }`}
-                    >
-                      {doc?.status === "approved" && <CheckCircle className="w-4 h-4 text-green-600" />}
-                      {doc?.status === "rejected" && <XCircle className="w-4 h-4 text-red-600" />}
-                      {doc?.status === "pending" && <AlertCircle className="w-4 h-4 text-yellow-600" />}
-                    </div>
-                    <span className={isUploaded ? "text-gray-900 font-medium" : "text-gray-500"}>
-                      {reqDoc.name}
-                    </span>
-                  </div>
-                  
-                  {!isUploaded && (
-                    <label className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-blue-700 transition-colors">
-                      <Upload className="w-4 h-4" />
-                      {uploadingDoc === reqDoc.name ? "Uploading..." : "Upload"}
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept="image/*,.pdf"
-                        disabled={uploadingDoc !== null}
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload(reqDoc.name, file);
-                        }}
-                      />
-                    </label>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Required Documents</h2>
+            <span className="text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold">
+              {getCategoryCounts(REQUIRED_DOCS).uploaded}/{getCategoryCounts(REQUIRED_DOCS).total} uploaded · {getCategoryCounts(REQUIRED_DOCS).approved} approved
+            </span>
+          </div>
+          {renderDocumentChecklist(REQUIRED_DOCS)}
+        </div>
+
+        {/* Optional Documents Checklist with Upload */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">Optional Documents</h2>
+            <span className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold">
+              {getCategoryCounts(OPTIONAL_DOCS).uploaded}/{getCategoryCounts(OPTIONAL_DOCS).total} uploaded · {getCategoryCounts(OPTIONAL_DOCS).approved} approved
+            </span>
+          </div>
+          {renderDocumentChecklist(OPTIONAL_DOCS)}
         </div>
       </div>
     </div>

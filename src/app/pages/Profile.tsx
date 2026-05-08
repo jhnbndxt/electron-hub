@@ -8,6 +8,7 @@ import { supabase } from "../../supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { loadProfileImageUrl, uploadProfileImage } from "../utils/profileImage";
 import { exportToCSV, formatDateForCSV } from "../../utils/csvExport";
+import { LoadingState } from "../components/LoadingState";
 
 interface AssessmentResult {
   id: string;
@@ -374,14 +375,10 @@ export function Profile() {
       <Toaster position="top-center" />
 
       {isInitializing ? (
-        <div className="flex min-h-screen items-center justify-center">
-          <div className="text-center">
-            <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50 shadow-sm">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-200 border-t-blue-700"></div>
-            </div>
-            <p className="font-medium text-gray-600">Loading your profile...</p>
-          </div>
-        </div>
+        <LoadingState
+          message="Loading your profile..."
+          subtext="Retrieving your personal information, records, and latest activity."
+        />
       ) : (
         <div className="mx-auto w-full max-w-7xl space-y-6">
           <div className="flex flex-col gap-2">

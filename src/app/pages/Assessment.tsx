@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { LoadingState } from "../components/LoadingState";
 import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/assessmentResultService";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
@@ -230,10 +231,11 @@ export function Assessment() {
   if (loading) {
     return (
       <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:h-[calc(100dvh-5rem)] lg:min-h-0 lg:overflow-hidden lg:p-8">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: "var(--electron-blue)" }}></div>
-          <p className="text-gray-600">Loading assessment...</p>
-        </div>
+        <LoadingState
+          message="Retrieving assessment records..."
+          subtext="We are preparing your assessment questions and progress."
+          compact
+        />
       </div>
     );
   }

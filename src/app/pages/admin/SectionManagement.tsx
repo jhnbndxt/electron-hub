@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Users, Grid3x3, BookOpen, X, Edit2, Trash2, Save, Download } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
+import { LoadingState } from "../../components/LoadingState";
 import { getEnrolledStudents } from "../../../services/adminService";
 import { useAuth } from "../../context/AuthContext";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -1059,25 +1060,10 @@ export function SectionManagement() {
   if (isLoading && sections.length === 0) {
     return (
       <div className="p-8">
-        <div className="mb-8 space-y-4">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-12 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
-          <p className="text-sm text-slate-600">Loading section setup...</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {Array.from({ length: 3 }).map((_, idx) => (
-            <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <Skeleton className="h-5 w-1/2 mb-4" />
-              <Skeleton className="h-12 w-full" />
-            </div>
-          ))}
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-        </div>
+        <LoadingState
+          message="Loading section setup..."
+          subtext="Preparing sections, capacity settings, and student assignment data."
+        />
       </div>
     );
   }

@@ -3,6 +3,7 @@ import { exportToCSV } from "../../../utils/csvExport";
 import { useState, useEffect } from "react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { getAuditLogs } from "../../../services/adminService";
+import { LoadingState } from "../../components/LoadingState";
 
 interface AuditLog {
   id: string;
@@ -151,16 +152,10 @@ export function AdminAuditLogs() {
   if (isLoading) {
     return (
       <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-        <div className="mb-8 space-y-4">
-          <Skeleton className="h-6 w-1/3" />
-          <Skeleton className="h-12 w-2/3" />
-          <Skeleton className="h-4 w-1/2" />
-        </div>
-        <div className="space-y-4">
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-          <Skeleton className="h-14 w-full" />
-        </div>
+        <LoadingState
+          message="Loading audit logs..."
+          subtext="Retrieving system activity, user actions, and security events."
+        />
       </div>
     );
   }

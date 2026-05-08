@@ -15,6 +15,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
+import { LoadingState } from "../../components/LoadingState";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import {
@@ -404,23 +405,10 @@ export function SystemConfiguration() {
   if (loading || !settings) {
     return (
       <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
-        <div className="space-y-6">
-          <div className="space-y-4">
-            <Skeleton className="h-6 w-1/3" />
-            <Skeleton className="h-10 w-2/3" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-                <Skeleton className="h-5 w-1/2 mb-4" />
-                <Skeleton className="h-8 w-full" />
-                <Skeleton className="h-8 w-full mt-3" />
-              </div>
-            ))}
-          </div>
-        </div>
+        <LoadingState
+          message="Checking system configuration..."
+          subtext="Loading enrollment, maintenance, and notification settings."
+        />
       </div>
     );
   }
