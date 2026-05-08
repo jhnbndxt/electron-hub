@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
-import { getSystemSettings } from "../../services/systemSettingsService";
 import { supabase } from "../../supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { loadProfileImageUrl, uploadProfileImage } from "../utils/profileImage";
@@ -33,29 +32,6 @@ export function Profile() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   
-  // Check for maintenance mode on mount
-  useEffect(() => {
-    let isActive = true;
-
-    async function checkMaintenance() {
-      try {
-        const result = await getSystemSettings();
-        if (isActive && result?.data?.maintenance_mode) {
-          logout();
-          navigate("/");
-        }
-      } catch (error) {
-        console.error('Error checking maintenance mode:', error);
-      }
-    }
-
-    void checkMaintenance();
-
-    return () => {
-      isActive = false;
-    };
-  }, [navigate, logout]);
-
   const [profileData, setProfileData] = useState({
     fullName: userData?.name || "Student",
     email: userData?.email || "",
@@ -138,7 +114,8 @@ export function Profile() {
         setAssessmentHistory([]);
       } else {
         const history = await getAssessmentHistory(userEmail);
-        setAssessmentHistory(history.results);
+        const results = (history.results?.filter(Boolean) ?? []) as AssessmentResult[];
+        setAssessmentHistory(results);
       }
     } catch (error) {
       console.error('Error fetching assessment history:', error);

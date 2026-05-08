@@ -111,6 +111,11 @@ function DashboardLayoutContent() {
       <MaintenanceNotice
         message="The student portal is currently under maintenance. You will be logged out shortly. Please try again later."
         countdown={maintenanceCountdown}
+        showButton={true}
+        onButtonClick={() => {
+          logout();
+          navigate("/", { replace: true });
+        }}
       />
     );
   }
@@ -197,13 +202,13 @@ function DashboardLayoutContent() {
     async function loadSystemSettings() {
       try {
         const result = await getSystemSettings();
-        if (isActive && result?.data) {
+        if (active && result?.data) {
           setSystemSettings(result.data);
         }
       } catch (error) {
         console.error('Error loading system settings:', error);
       } finally {
-        if (isActive) {
+        if (active) {
           setSettingsLoaded(true);
         }
       }
@@ -242,7 +247,7 @@ function DashboardLayoutContent() {
     loadNotifications();
 
     return () => {
-      isActive = false;
+      active = false;
     };
   }, [userData?.id]);
 

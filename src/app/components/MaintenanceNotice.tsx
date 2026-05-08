@@ -4,12 +4,14 @@ interface MaintenanceNoticeProps {
   message?: string;
   countdown?: number | null;
   showButton?: boolean;
+  onButtonClick?: () => void;
 }
 
 export function MaintenanceNotice({ 
   message = "The student portal is currently under maintenance. Please try again later.",
   countdown = null,
-  showButton = false 
+  showButton = false,
+  onButtonClick,
 }: MaintenanceNoticeProps) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-slate-50 to-slate-100">
@@ -43,7 +45,7 @@ export function MaintenanceNotice({
           {showButton && (
             <div className="mt-8">
               <button
-                onClick={() => window.location.href = "/"}
+                onClick={onButtonClick ?? (() => window.location.href = "/")}
                 className="inline-flex items-center justify-center px-6 py-3 rounded-lg text-white font-semibold transition-all hover:opacity-90"
                 style={{ backgroundColor: "var(--electron-blue)" }}
               >

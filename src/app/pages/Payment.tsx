@@ -3,7 +3,6 @@ import { Building2, Wallet, Banknote, Upload, CheckCircle2, X, Copy, Check, Cale
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router";
 import { supabase } from "../../supabase";
-import { getSystemSettings } from "../../services/systemSettingsService";
 
 type PaymentMode = "bank" | "gcash" | "cash" | null;
 
@@ -50,28 +49,6 @@ export function Payment() {
   const [paymentApproved, setPaymentApproved] = useState(false);
   const [approvedPaymentData, setApprovedPaymentData] = useState<any>(null);
 
-  // Check for maintenance mode on mount
-  useEffect(() => {
-    let isActive = true;
-
-    async function checkMaintenance() {
-      try {
-        const result = await getSystemSettings();
-        if (isActive && result?.data?.maintenance_mode) {
-          logout();
-          navigate("/");
-        }
-      } catch (error) {
-        console.error('Error checking maintenance mode:', error);
-      }
-    }
-
-    void checkMaintenance();
-
-    return () => {
-      isActive = false;
-    };
-  }, [navigate, logout]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Check if payment already submitted or approved from Supabase

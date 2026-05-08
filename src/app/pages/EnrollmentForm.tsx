@@ -163,29 +163,6 @@ export function EnrollmentForm() {
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
 
-  // Check for maintenance mode on mount
-  useEffect(() => {
-    let isActive = true;
-
-    async function checkMaintenance() {
-      try {
-        const result = await getSystemSettings();
-        if (isActive && result?.data?.maintenance_mode) {
-          logout();
-          navigate("/");
-        }
-      } catch (error) {
-        console.error('Error checking maintenance mode:', error);
-      }
-    }
-
-    void checkMaintenance();
-
-    return () => {
-      isActive = false;
-    };
-  }, [navigate, logout]);
-
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
     previousStudentId: "",
