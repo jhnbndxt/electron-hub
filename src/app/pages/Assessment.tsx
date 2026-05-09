@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -27,11 +27,13 @@ interface Section {
 export function Assessment() {
   const navigate = useNavigate();
   const { userData, updateEnrollmentProgress, logout } = useAuth();
+  const assessmentProgressKey = `assessmentProgress_${userData?.email || "guest"}`;
   const [currentSection, setCurrentSection] = useState(0);
   const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
+  const hasRestoredProgress = useRef(false);
 
   const isInterestQuestion = (question: Question) => question.category === "Interests";
 
@@ -80,6 +82,50 @@ export function Assessment() {
 
     initializeAssessment();
   }, [userData, updateEnrollmentProgress]);
+
+  useEffect(() => {
+    if (loading || assessmentCompleted || sections.length === 0 || hasRestoredProgress.current) return;
+
+    try {
+      const savedProgress = localStorage.getItem(assessmentProgressKey);
+      if (!savedProgress) {
+        hasRestoredProgress.current = true;
+        return;
+      }
+
+      const parsedProgress = JSON.parse(savedProgress);
+      if (parsedProgress?.answers && typeof parsedProgress.answers === "object") {
+        setAnswers(parsedProgress.answers);
+      }
+
+      if (Number.isInteger(parsedProgress?.currentSection)) {
+        setCurrentSection(Math.min(Math.max(parsedProgress.currentSection, 0), sections.length - 1));
+      }
+    } catch (error) {
+      console.error("Failed to restore assessment progress:", error);
+    } finally {
+      hasRestoredProgress.current = true;
+    }
+  }, [assessmentProgressKey, assessmentCompleted, loading, sections.length]);
+
+  useEffect(() => {
+    if (loading || assessmentCompleted || sections.length === 0 || !hasRestoredProgress.current) return;
+
+    localStorage.setItem(
+      assessmentProgressKey,
+      JSON.stringify({
+        answers,
+        currentSection,
+        updatedAt: new Date().toISOString(),
+      })
+    );
+  }, [answers, assessmentCompleted, assessmentProgressKey, currentSection, loading, sections.length]);
+
+  useEffect(() => {
+    if (!loading && sections.length > 0) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [currentSection, loading, sections.length]);
 
   useEffect(() => {
     const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
@@ -344,14 +390,12 @@ export function Assessment() {
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
   const handlePrevious = () => {
     if (currentSection > 0) {
       setCurrentSection(currentSection - 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
 
@@ -468,6 +512,7 @@ export function Assessment() {
     try {
       await saveAssessmentResult(userEmail, assessmentResult);
       console.log("✅ Assessment result saved to Supabase");
+      localStorage.removeItem(assessmentProgressKey);
     } catch (error) {
       console.error("❌ Error saving assessment result:", error);
     }

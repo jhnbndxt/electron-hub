@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { 
   FileText, 
   Upload, 
@@ -147,6 +147,7 @@ export function EnrollmentForm() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { updateEnrollmentProgress, userData, logout } = useAuth();
+  const enrollmentDraftKey = `enrollmentFormDraft_${userData?.email || "guest"}`;
   const [currentPage, setCurrentPage] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [aiRecommendation, setAiRecommendation] = useState<{
@@ -162,6 +163,7 @@ export function EnrollmentForm() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
+  const hasRestoredDraft = useRef(false);
 
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
@@ -224,6 +226,35 @@ export function EnrollmentForm() {
     diploma: null,
     escCertificate: null,
   });
+
+  const stripFileFields = (data: Partial<FormData>) => {
+    const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = data;
+    return restData;
+  };
+
+  const applyRegistrationData = (source: any = {}) => {
+    setFormData(prev => ({
+      ...prev,
+      firstName: prev.firstName || source.firstName || source.first_name || "",
+      lastName: prev.lastName || source.lastName || source.last_name || "",
+      middleName: prev.middleName || source.middleName || source.middle_name || "",
+      suffix: prev.suffix && prev.suffix !== "None" ? prev.suffix : source.suffix || "None",
+      sex: prev.sex || source.sex || "",
+      birthday: prev.birthday || source.birthDate || source.birth_date || "",
+      email: prev.email || source.email || userData?.email || "",
+      contactNumber: prev.contactNumber || source.contactNumber || source.contact_number || "",
+      nationality: prev.nationality || source.nationality || "Filipino",
+      religion: prev.religion || source.religion || "",
+      civilStatus: prev.civilStatus || source.civilStatus || source.civil_status || "",
+      region: prev.region || source.region || "",
+      province: prev.province || source.province || "",
+      city: prev.city || source.city || "",
+      barangay: prev.barangay || source.barangay || "",
+      homeAddress: prev.homeAddress || source.homeAddress || source.home_address || "",
+      facebookName: prev.facebookName || source.facebookName || source.facebook_name || "",
+      lrn: prev.lrn || source.lrn || "",
+    }));
+  };
 
   const normalizeSubmittedRecord = (record: any) => {
     const source = record?.form_data || record || {};
@@ -315,13 +346,60 @@ export function EnrollmentForm() {
             return;
           }
         }
+
+        let restoredDraftData: any = null;
+
+        try {
+          const localDraft = localStorage.getItem(enrollmentDraftKey);
+          if (localDraft) {
+            const parsedDraft = JSON.parse(localDraft);
+            restoredDraftData = parsedDraft.formData || null;
+
+            if (restoredDraftData) {
+              setFormData(prev => ({ ...prev, ...restoredDraftData }));
+            }
+
+            if (Number.isInteger(parsedDraft.currentPage)) {
+              setCurrentPage(Math.min(Math.max(parsedDraft.currentPage, 1), 7));
+            }
+
+            if (typeof parsedDraft.certificationChecked === "boolean") {
+              setCertificationChecked(parsedDraft.certificationChecked);
+            }
+
+            console.log("Enrollment draft restored from local storage");
+          }
+        } catch (error) {
+          console.error("Failed to restore local enrollment draft:", error);
+        }
+
+        try {
+          const { data: registrationData } = await supabase
+            .from("users")
+            .select("*")
+            .eq("email", userEmail)
+            .single();
+
+          applyRegistrationData(registrationData || userData || {});
+        } catch (error) {
+          console.error("Failed to fetch registration data:", error);
+          applyRegistrationData(userData || {});
+        }
         
         // Try to restore autosaved draft
         const { data: draftData } = await loadDraft(userEmail);
-        if (draftData) {
+        if (draftData && !restoredDraftData) {
           try {
-            const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...restData } = draftData;
+            const { currentPage: draftPage, certificationChecked: draftCertification, lastSaved, ...rawDraftData } = draftData;
+            const restData = stripFileFields(rawDraftData as Partial<FormData>);
             setFormData(prev => ({ ...prev, ...restData }));
+            if (Number.isInteger(draftPage)) {
+              setCurrentPage(Math.min(Math.max(draftPage, 1), 7));
+            }
+            if (typeof draftCertification === "boolean") {
+              setCertificationChecked(draftCertification);
+            }
+            restoredDraftData = restData;
             console.log("✅ Enrollment draft restored from Supabase");
           } catch (error) {
             console.error("Failed to restore draft:", error);
@@ -339,7 +417,7 @@ export function EnrollmentForm() {
             });
             
             // Only set default values if no draft exists
-            if (!draftData) {
+            if (!restoredDraftData && !draftData) {
               setFormData(prev => ({
                 ...prev,
                 preferredTrack: result.track,
@@ -356,6 +434,7 @@ export function EnrollmentForm() {
           setHasAssessment(false);
         }
       } finally {
+        hasRestoredDraft.current = true;
         setIsInitializing(false);
       }
     };
@@ -398,25 +477,16 @@ export function EnrollmentForm() {
 
   // Auto-fill form with user data from AuthContext
   useEffect(() => {
-    if (userData && userData.firstName) {
+    if (userData) {
       console.log("[EnrollmentForm] Auto-filling form with user data:", userData);
-      setFormData(prev => ({
-        ...prev,
-        firstName: userData.firstName || "",
-        lastName: userData.lastName || "",
-        middleName: userData.middleName || "",
-        sex: userData.sex || "",
-        birthday: userData.birthDate || "",
-        email: userData.email || "",
-        contactNumber: userData.contactNumber || "",
-      }));
+      applyRegistrationData(userData);
     }
   }, [userData?.email, userData?.firstName]);
 
   // Autosave effect - save draft on every form data change
   useEffect(() => {
     const userEmail = userData?.email;
-    if (!userEmail) return;
+    if (!userEmail || isInitializing || isSubmittedEnrollment || !hasRestoredDraft.current) return;
 
     // Don't save if form is completely empty
     const hasData = Object.values(formData).some(value => {
@@ -427,14 +497,33 @@ export function EnrollmentForm() {
 
     if (hasData) {
       // Save draft (excluding File objects)
-      const { form138, form137, goodMoral, birthCertificate, idPicture, diploma, escCertificate, ...dataToSave } = formData;
+      const dataToSave = stripFileFields(formData);
       const draft = {
         ...dataToSave,
+        currentPage,
+        certificationChecked,
         lastSaved: new Date().toISOString()
       };
+      localStorage.setItem(
+        enrollmentDraftKey,
+        JSON.stringify({
+          formData: dataToSave,
+          currentPage,
+          certificationChecked,
+          lastSaved: draft.lastSaved,
+        })
+      );
       saveDraft(userEmail, draft);
     }
-  }, [formData, userData]);
+  }, [
+    certificationChecked,
+    currentPage,
+    enrollmentDraftKey,
+    formData,
+    isInitializing,
+    isSubmittedEnrollment,
+    userData,
+  ]);
 
   // Handle re-upload navigation from notification
   useEffect(() => {
@@ -735,6 +824,7 @@ export function EnrollmentForm() {
         enrollment_documents: uploadedDocuments,
         form_data: enrollmentData,
       }));
+      localStorage.removeItem(enrollmentDraftKey);
       setIsSubmittedEnrollment(true);
       setCurrentPage(7);
       navigate("/dashboard/payment");

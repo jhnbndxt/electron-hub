@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase } from "lucide-react";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
@@ -47,8 +47,10 @@ export function PublicAssessment() {
   const [results, setResults] = useState<AssessmentResult | null>(null);
   const [assessmentStarted, setAssessmentStarted] = useState(false);
   const [userInfo, setUserInfo] = useState({ fullName: "", email: "" });
+  const assessmentProgressKey = `publicAssessmentProgress_${userInfo.email || "guest"}`;
   const [agreeToPrivacy, setAgreeToPrivacy] = useState(false);
   const [errors, setErrors] = useState({ fullName: "", email: "", privacy: "" });
+  const hasRestoredProgress = useRef(false);
   const publicAssessmentShellStyle = {
     background:
       "radial-gradient(circle at top left, rgba(37, 99, 235, 0.16) 0%, transparent 26%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.1) 0%, transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f8fafc 100%)",
@@ -86,6 +88,80 @@ export function PublicAssessment() {
 
     initializeAssessment();
   }, []);
+
+  useEffect(() => {
+    if (loading || assessmentCompleted || sections.length === 0 || hasRestoredProgress.current) return;
+
+    try {
+      const savedProgress = localStorage.getItem(assessmentProgressKey) || localStorage.getItem("publicAssessmentProgress_guest");
+      if (!savedProgress) {
+        hasRestoredProgress.current = true;
+        return;
+      }
+
+      const parsedProgress = JSON.parse(savedProgress);
+      if (parsedProgress?.answers && typeof parsedProgress.answers === "object") {
+        setAnswers(parsedProgress.answers);
+      }
+
+      if (Number.isInteger(parsedProgress?.currentSection)) {
+        setCurrentSection(Math.min(Math.max(parsedProgress.currentSection, 0), sections.length - 1));
+      }
+
+      if (parsedProgress?.userInfo) {
+        setUserInfo((currentUserInfo) => ({
+          ...currentUserInfo,
+          ...parsedProgress.userInfo,
+        }));
+      }
+
+      if (typeof parsedProgress?.agreeToPrivacy === "boolean") {
+        setAgreeToPrivacy(parsedProgress.agreeToPrivacy);
+      }
+
+      if (typeof parsedProgress?.assessmentStarted === "boolean") {
+        setAssessmentStarted(parsedProgress.assessmentStarted);
+      }
+    } catch (error) {
+      console.error("Failed to restore public assessment progress:", error);
+    } finally {
+      hasRestoredProgress.current = true;
+    }
+  }, [assessmentCompleted, assessmentProgressKey, loading, sections.length]);
+
+  useEffect(() => {
+    if (loading || assessmentCompleted || sections.length === 0 || !hasRestoredProgress.current) return;
+
+    const progressPayload = JSON.stringify({
+      answers,
+      currentSection,
+      assessmentStarted,
+      userInfo,
+      agreeToPrivacy,
+      updatedAt: new Date().toISOString(),
+    });
+
+    localStorage.setItem(assessmentProgressKey, progressPayload);
+    if (assessmentProgressKey !== "publicAssessmentProgress_guest") {
+      localStorage.removeItem("publicAssessmentProgress_guest");
+    }
+  }, [
+    agreeToPrivacy,
+    answers,
+    assessmentCompleted,
+    assessmentProgressKey,
+    assessmentStarted,
+    currentSection,
+    loading,
+    sections.length,
+    userInfo,
+  ]);
+
+  useEffect(() => {
+    if (!loading && sections.length > 0 && assessmentStarted) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [assessmentStarted, currentSection, loading, sections.length]);
 
   const loadQuestionsFromSupabase = async () => {
     try {
@@ -541,7 +617,6 @@ export function PublicAssessment() {
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -654,6 +729,8 @@ export function PublicAssessment() {
 
     localStorage.setItem("publicAssessmentResults", JSON.stringify(assessmentResult));
     localStorage.setItem("publicAssessmentUserInfo", JSON.stringify(userInfo));
+    localStorage.removeItem(assessmentProgressKey);
+    localStorage.removeItem("publicAssessmentProgress_guest");
 
     const emailKey = `publicAssessment_${userInfo.email}`;
     localStorage.setItem(emailKey, JSON.stringify({ ...assessmentResult, userInfo, timestamp: new Date().toISOString() }));
