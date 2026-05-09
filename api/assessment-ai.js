@@ -1,12 +1,12 @@
-import OpenAI from "openai";
+import Groq from "groq-sdk";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 console.log(
   "ENV:",
-  process.env.GROQ_API_KEY
+  process.env.GROQ_API_KEY ? "GROQ_API_KEY is set" : "GROQ_API_KEY is missing"
 );
 
 const jsonHeaders = {
@@ -49,8 +49,8 @@ export default async function handler(request, response) {
     return sendJson(response, 405, { error: "Method not allowed" });
   }
 
-  if (!process.env.OPENAI_API_KEY) {
-    return sendJson(response, 500, { error: "OPENAI_API_KEY is not configured" });
+  if (!process.env.GROQ_API_KEY) {
+    return sendJson(response, 500, { error: "GROQ_API_KEY is not configured" });
   }
 
   try {
@@ -243,14 +243,24 @@ Requirements:
       });
     }
 
-    const result = await client.responses.create({
-      model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
-      instructions:
-        "You are Electron Hub's AI assessment assistant. Return only valid JSON with no markdown formatting.",
-      input,
+    const completion = await groq.chat.completions.create({
+      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      messages: [
+        {
+          role: "system",
+          content:
+            "You are Electron Hub's AI assessment assistant. Return only valid JSON with no markdown formatting.",
+        },
+        {
+          role: "user",
+          content: input,
+        },
+      ],
+      temperature: 0.2,
+      response_format: { type: "json_object" },
     });
 
-    const reply = String(result.output_text || "")
+    const reply = String(completion.choices?.[0]?.message?.content || "")
       .trim()
       .replace(/```json/g, "")
       .replace(/```/g, "");
