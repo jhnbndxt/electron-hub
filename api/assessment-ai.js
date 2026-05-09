@@ -1,9 +1,3 @@
-import Groq from "groq-sdk";
-
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 console.log(
   "ENV:",
   process.env.GROQ_API_KEY ? "GROQ_API_KEY is set" : "GROQ_API_KEY is missing"
@@ -243,22 +237,39 @@ Requirements:
       });
     }
 
-    const completion = await groq.chat.completions.create({
-      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
-      messages: [
-        {
-          role: "system",
-          content:
-            "You are Electron Hub's AI assessment assistant. Return only valid JSON with no markdown formatting.",
-        },
-        {
-          role: "user",
-          content: input,
-        },
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" },
+    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are Electron Hub's AI assessment assistant. Return only valid JSON with no markdown formatting.",
+          },
+          {
+            role: "user",
+            content: input,
+          },
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" },
+      }),
     });
+
+    const completion = await groqResponse.json();
+
+    if (!groqResponse.ok) {
+      console.error("Groq API error:", completion);
+      return sendJson(response, groqResponse.status, {
+        success: false,
+        error: completion?.error?.message || "Groq API request failed",
+      });
+    }
 
     const reply = String(completion.choices?.[0]?.message?.content || "")
       .trim()
