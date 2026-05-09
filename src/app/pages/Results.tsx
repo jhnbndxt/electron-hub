@@ -19,6 +19,23 @@ import { getLatestAssessmentResult } from "../../services/assessmentResultServic
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 
+type SuggestedCollegeCourse = string | {
+  course?: string;
+  description?: string;
+};
+
+interface AiRecommendation {
+  recommendedTrack?: string;
+  trackExplanation?: string;
+  elective1?: string;
+  elective1Explanation?: string;
+  elective2?: string;
+  elective2Explanation?: string;
+  overallAnalysis?: string;
+  suggestedCollegeCourses?: SuggestedCollegeCourse[];
+  raw?: string;
+}
+
 interface AssessmentResults {
   track: string;
   electives: string[];
@@ -30,6 +47,7 @@ interface AssessmentResults {
   };
   topDomains: string[];
   topInterests: string[];
+  aiRecommendation?: AiRecommendation | null;
 }
 
 export function Results() {
@@ -46,24 +64,28 @@ export function Results() {
       const userEmail = userData?.email || "student@gmail.com";
 
       try {
+        const assessmentKey = `assessmentResults_${userEmail}`;
+        const storedResults = localStorage.getItem(assessmentKey);
+        const localResults = storedResults ? JSON.parse(storedResults) : null;
         const latestResult = await getLatestAssessmentResult(userEmail);
 
         if (latestResult) {
           setResults({
-            track: latestResult.track,
-            electives: latestResult.electives,
+            ...latestResult,
+            ...localResults,
+            track: localResults?.track || latestResult.track,
+            electives: localResults?.electives?.length ? localResults.electives : latestResult.electives,
             scores: latestResult.scores,
-            topDomains: latestResult.topDomains,
-            topInterests: latestResult.topInterests,
+            topDomains: localResults?.topDomains || latestResult.topDomains,
+            topInterests: localResults?.topInterests || latestResult.topInterests,
+            aiRecommendation: localResults?.aiRecommendation || latestResult.aiRecommendation || null,
           });
           setLoading(false);
           return;
         }
 
-        const assessmentKey = `assessmentResults_${userEmail}`;
-        const storedResults = localStorage.getItem(assessmentKey);
-        if (storedResults) {
-          setResults(JSON.parse(storedResults));
+        if (localResults) {
+          setResults(localResults);
         } else {
           setResults(null);
         }
@@ -108,6 +130,11 @@ export function Results() {
   }
 
   const { track, electives, scores, topDomains, topInterests } = results;
+  const aiRecommendation = results.aiRecommendation && !results.aiRecommendation.raw ? results.aiRecommendation : null;
+  const electiveExplanations = [
+    aiRecommendation?.elective1Explanation,
+    aiRecommendation?.elective2Explanation,
+  ];
 
   // Calculate overall score (average of all domains)
   const overallScore = Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
@@ -156,11 +183,13 @@ export function Results() {
           "Technical college and vocational degree pathways",
           "Industry certifications and skills-based career advancement",
         ];
-  const recommendationSummary = `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
+  const fallbackRecommendationSummary = `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
+  const recommendationSummary = aiRecommendation?.overallAnalysis || fallbackRecommendationSummary;
   const trackExplanation =
-    track === "Academic"
+    aiRecommendation?.trackExplanation ||
+    (track === "Academic"
       ? "The Academic Track provides a solid foundation for higher education. It supports students who perform well in structured academic work and want to build toward university courses and professional careers."
-      : "The Technical-Professional Track emphasizes applied learning and practical competencies. It is well-suited for students who thrive in skill-based environments and want strong preparation for employment, entrepreneurship, or technical degree programs.";
+      : "The Technical-Professional Track emphasizes applied learning and practical competencies. It is well-suited for students who thrive in skill-based environments and want strong preparation for employment, entrepreneurship, or technical degree programs.");
 
   const getScoreInterpretation = (score: number) => {
     if (score >= 85) {
@@ -325,7 +354,21 @@ export function Results() {
   );
 
   // Remove duplicates
-  const uniqueCourses = Array.from(new Set(allSuggestedCourses));
+  const getCourseName = (course: SuggestedCollegeCourse) =>
+    typeof course === "string" ? course : course.course || "";
+  const aiSuggestedCourses = Array.isArray(aiRecommendation?.suggestedCollegeCourses)
+    ? aiRecommendation.suggestedCollegeCourses.filter((course) => getCourseName(course).trim())
+    : [];
+  const uniqueCourses = aiSuggestedCourses.length > 0
+    ? Array.from(new Set(aiSuggestedCourses.map((course) => getCourseName(course).trim()).filter(Boolean)))
+    : Array.from(new Set(allSuggestedCourses));
+  const courseDescriptions = aiSuggestedCourses.reduce<Record<string, string>>((descriptions, course) => {
+    if (typeof course !== "string" && course.course && course.description) {
+      descriptions[course.course] = course.description;
+    }
+
+    return descriptions;
+  }, {});
 
   // Get career pathways from all electives
   const allCareerPathways = electives.flatMap(elective =>
@@ -904,7 +947,7 @@ export function Results() {
                 {electives.map((elective, index) => (
                   <div
                     key={index}
-                    className="portal-glass-panel flex items-center gap-3 rounded-lg border-l-4 p-4"
+                    className="portal-glass-panel flex items-start gap-3 rounded-lg border-l-4 p-4"
                     style={{
                       borderColor: index === 0 ? "var(--electron-blue)" : "var(--electron-red)",
                     }}
@@ -920,6 +963,11 @@ export function Results() {
                       <h4 className="text-lg font-bold" style={{ color: "var(--electron-dark-gray)" }}>
                         {elective}
                       </h4>
+                      {electiveExplanations[index] && (
+                        <p className="mt-2 text-sm leading-6 text-gray-700">
+                          {electiveExplanations[index]}
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -943,14 +991,12 @@ export function Results() {
                     AI Analysis & Explanation
                   </h3>
                   <p className="text-lg leading-relaxed text-gray-800 mb-4">
-                    Based on your assessment results, we recommend the <strong style={{ color: "var(--electron-blue)" }}>{track} Track</strong> due to your exceptional performance in <strong>{topDomains.join(" and ")}</strong> and demonstrated interests in <strong>{topInterests.join(" and ")}</strong>. This track aligns perfectly with your cognitive strengths and personal passions, positioning you for academic excellence and career success.
+                    {recommendationSummary}
                   </p>
                   <div className="portal-glass-panel mt-4 rounded-lg p-4">
                     <h4 className="font-bold text-gray-900 mb-2">Why This Track?</h4>
                     <p className="text-gray-700 leading-relaxed">
-                      {track === "Academic"
-                        ? "The Academic Track prepares you for college and university education with a strong foundation in academic subjects. You'll develop critical thinking, research skills, and subject mastery that will serve you well in higher education and professional careers requiring advanced knowledge."
-                        : "The Technical-Professional Track equips you with practical, hands-on skills for immediate employment or entrepreneurship. You'll gain industry-relevant competencies, certifications, and real-world experience that prepare you for the workforce or starting your own business."}
+                      {trackExplanation}
                     </p>
                   </div>
                 </div>
@@ -1084,6 +1130,11 @@ export function Results() {
                   <p className="font-semibold" style={{ color: "var(--electron-dark-gray)" }}>
                     {course}
                   </p>
+                  {courseDescriptions[course] && (
+                    <p className="mt-2 text-sm leading-6 text-gray-600">
+                      {courseDescriptions[course]}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>

@@ -392,6 +392,7 @@ export function Assessment() {
     const technicalInterest = assessmentResult.interestClusters?.tech || 0;
     const socialInterest = assessmentResult.interestClusters?.helping || 0;
     const recommendedTrack = assessmentResult.track;
+    let aiRecommendation: any = null;
 
     try {
       const response =
@@ -429,8 +430,19 @@ export function Assessment() {
         await response.json();
 
       console.log(aiData);
+      aiRecommendation = aiData?.result || null;
     } catch (error) {
       console.error("Assessment AI request failed:", error);
+    }
+
+    if (aiRecommendation && !aiRecommendation.raw) {
+      const aiElectives = [aiRecommendation.elective1, aiRecommendation.elective2].filter(Boolean);
+
+      assessmentResult.track = aiRecommendation.recommendedTrack || assessmentResult.track;
+      assessmentResult.recommended_track = aiRecommendation.recommendedTrack || assessmentResult.recommended_track;
+      assessmentResult.electives = aiElectives.length > 0 ? aiElectives : assessmentResult.electives;
+      assessmentResult.elective_1 = aiElectives[0] || assessmentResult.elective_1;
+      assessmentResult.elective_2 = aiElectives[1] || assessmentResult.elective_2;
     }
 
     const userEmail = userData?.email || "student@gmail.com";
@@ -449,6 +461,7 @@ export function Assessment() {
         topDomains: assessmentResult.topDomains,
         topInterests: assessmentResult.topInterests,
         overallScore: assessmentResult.scores.overall_score,
+        aiRecommendation,
       })
     );
 

@@ -34,6 +34,7 @@ interface AssessmentResult {
   topDomains: string[];
   topInterests: string[];
   overallScore: number;
+  aiRecommendation?: any;
 }
 
 export function PublicAssessment() {
@@ -583,6 +584,7 @@ export function PublicAssessment() {
     const technicalInterest = formattedResult.interestClusters?.tech || 0;
     const socialInterest = formattedResult.interestClusters?.helping || 0;
     const recommendedTrack = formattedResult.track;
+    let aiRecommendation: any = null;
 
     try {
       const response =
@@ -620,8 +622,19 @@ export function PublicAssessment() {
         await response.json();
 
       console.log(aiData);
+      aiRecommendation = aiData?.result || null;
     } catch (error) {
       console.error("Assessment AI request failed:", error);
+    }
+
+    if (aiRecommendation && !aiRecommendation.raw) {
+      const aiElectives = [aiRecommendation.elective1, aiRecommendation.elective2].filter(Boolean);
+
+      formattedResult.track = aiRecommendation.recommendedTrack || formattedResult.track;
+      formattedResult.recommended_track = aiRecommendation.recommendedTrack || formattedResult.recommended_track;
+      formattedResult.electives = aiElectives.length > 0 ? aiElectives : formattedResult.electives;
+      formattedResult.elective_1 = aiElectives[0] || formattedResult.elective_1;
+      formattedResult.elective_2 = aiElectives[1] || formattedResult.elective_2;
     }
 
     const assessmentResult: AssessmentResult = {
@@ -636,6 +649,7 @@ export function PublicAssessment() {
       topDomains: formattedResult.topDomains,
       topInterests: formattedResult.topInterests,
       overallScore: formattedResult.scores.overall_score,
+      aiRecommendation,
     };
 
     localStorage.setItem("publicAssessmentResults", JSON.stringify(assessmentResult));
