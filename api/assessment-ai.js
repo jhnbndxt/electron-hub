@@ -216,7 +216,14 @@ Do not add explanations outside JSON.
 
   "overallAnalysis": "",
 
-  "suggestedCollegeCourses": []
+  "suggestedCollegeCourses": [],
+
+  "careerPathways": [
+    {
+      "course": "",
+      "careers": []
+    }
+  ]
 }
 
 Requirements:
@@ -224,6 +231,8 @@ Requirements:
 - elective1Explanation must explain WHY elective 1 matches the student's strengths and interests.
 - elective2Explanation must explain WHY elective 2 matches the student's strengths and interests.
 - overallAnalysis must provide a longer career/academic assessment summary.
+- suggestedCollegeCourses must list college programs aligned with the track and electives.
+- careerPathways must list possible career titles grouped by the most relevant college course or pathway.
 - Make explanations detailed, professional, student-friendly, and guidance-oriented.
 - Use the student's aptitude scores and interest scores in the reasoning.
 - Ensure explanations are not generic.

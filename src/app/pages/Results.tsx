@@ -24,6 +24,11 @@ type SuggestedCollegeCourse = string | {
   description?: string;
 };
 
+interface CareerPathway {
+  course: string;
+  careers: string[];
+}
+
 interface AiRecommendation {
   recommendedTrack?: string;
   trackExplanation?: string;
@@ -33,6 +38,7 @@ interface AiRecommendation {
   elective2Explanation?: string;
   overallAnalysis?: string;
   suggestedCollegeCourses?: SuggestedCollegeCourse[];
+  careerPathways?: CareerPathway[];
   raw?: string;
 }
 
@@ -370,10 +376,16 @@ export function Results() {
     return descriptions;
   }, {});
 
-  // Get career pathways from all electives
-  const allCareerPathways = electives.flatMap(elective =>
+  // Get career pathways from the AI result, with elective-based fallback for older assessments.
+  const fallbackCareerPathways = electives.flatMap(elective =>
     getCareerPathways(track, elective)
   );
+  const aiCareerPathways = Array.isArray(aiRecommendation?.careerPathways)
+    ? aiRecommendation.careerPathways.filter(
+        (pathway) => pathway?.course && Array.isArray(pathway.careers) && pathway.careers.length > 0
+      )
+    : [];
+  const allCareerPathways = aiCareerPathways.length > 0 ? aiCareerPathways : fallbackCareerPathways;
   const recommendedBranches = getRecommendedElectronBranches({
     track,
     electives,
