@@ -380,6 +380,59 @@ export function Assessment() {
 
     console.log("📊 Assessment Result:", assessmentResult);
 
+    const VA = assessmentResult.scores.verbal_ability_score;
+    const MA = assessmentResult.scores.mathematical_ability_score;
+    const SA = assessmentResult.scores.spatial_ability_score;
+    const LRA = assessmentResult.scores.logical_reasoning_score;
+    const academicInterest = assessmentResult.interestClusters?.academic || 0;
+    const communicationInterest =
+      Math.round(((assessmentResult.interestClusters?.creative || 0) + (assessmentResult.interestClusters?.helping || 0)) / 2);
+    const creativeInterest = assessmentResult.interestClusters?.creative || 0;
+    const leadershipInterest = assessmentResult.interestClusters?.business || 0;
+    const technicalInterest = assessmentResult.interestClusters?.tech || 0;
+    const socialInterest = assessmentResult.interestClusters?.helping || 0;
+    const recommendedTrack = assessmentResult.track;
+
+    try {
+      const response =
+        await fetch(
+          "/api/assessment-ai",
+
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+
+              track:
+                recommendedTrack,
+
+              VA,
+              MA,
+              SA,
+              LRA,
+
+              academicInterest,
+              communicationInterest,
+              creativeInterest,
+              leadershipInterest,
+              technicalInterest,
+              socialInterest,
+            }),
+          });
+
+      const aiData =
+        await response.json();
+
+      console.log(aiData);
+    } catch (error) {
+      console.error("Assessment AI request failed:", error);
+    }
+
     const userEmail = userData?.email || "student@gmail.com";
 
     localStorage.setItem(

@@ -571,6 +571,59 @@ export function PublicAssessment() {
       return;
     }
 
+    const VA = formattedResult.scores.verbal_ability_score;
+    const MA = formattedResult.scores.mathematical_ability_score;
+    const SA = formattedResult.scores.spatial_ability_score;
+    const LRA = formattedResult.scores.logical_reasoning_score;
+    const academicInterest = formattedResult.interestClusters?.academic || 0;
+    const communicationInterest =
+      Math.round(((formattedResult.interestClusters?.creative || 0) + (formattedResult.interestClusters?.helping || 0)) / 2);
+    const creativeInterest = formattedResult.interestClusters?.creative || 0;
+    const leadershipInterest = formattedResult.interestClusters?.business || 0;
+    const technicalInterest = formattedResult.interestClusters?.tech || 0;
+    const socialInterest = formattedResult.interestClusters?.helping || 0;
+    const recommendedTrack = formattedResult.track;
+
+    try {
+      const response =
+        await fetch(
+          "/api/assessment-ai",
+
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+
+              track:
+                recommendedTrack,
+
+              VA,
+              MA,
+              SA,
+              LRA,
+
+              academicInterest,
+              communicationInterest,
+              creativeInterest,
+              leadershipInterest,
+              technicalInterest,
+              socialInterest,
+            }),
+          });
+
+      const aiData =
+        await response.json();
+
+      console.log(aiData);
+    } catch (error) {
+      console.error("Assessment AI request failed:", error);
+    }
+
     const assessmentResult: AssessmentResult = {
       track: formattedResult.track,
       electives: formattedResult.electives,
