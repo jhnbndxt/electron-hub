@@ -21,12 +21,17 @@ function sendJson(response, status, payload) {
 function parseAiJson(text = "") {
   const cleanedText = String(text)
     .trim()
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/```$/i, "")
+    .replace(/```json/g, "")
+    .replace(/```/g, "")
     .trim();
 
-  return JSON.parse(cleanedText);
+  try {
+    return JSON.parse(cleanedText);
+  } catch {
+    return {
+      raw: cleanedText,
+    };
+  }
 }
 
 export default async function handler(request, response) {
@@ -191,6 +196,12 @@ INDUSTRIAL TECHNOLOGIES:
 
 Return ONLY VALID JSON using this exact format:
 
+IMPORTANT:
+Return ONLY raw JSON.
+Do not use markdown.
+Do not wrap in triple backticks.
+Do not add explanations outside JSON.
+
 {
   "recommendedTrack": "",
 
@@ -234,9 +245,17 @@ Requirements:
       input,
     });
 
-    const aiData = parseAiJson(result.output_text);
+    const reply = String(result.output_text || "")
+      .trim()
+      .replace(/```json/g, "")
+      .replace(/```/g, "");
 
-    return sendJson(response, 200, aiData);
+    const parsedResult = parseAiJson(reply);
+
+    return sendJson(response, 200, {
+      success: true,
+      result: parsedResult,
+    });
   } catch (error) {
     console.error("Assessment AI error:", error);
     return sendJson(response, 500, {
