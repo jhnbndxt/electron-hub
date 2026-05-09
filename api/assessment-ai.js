@@ -4,6 +4,11 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+console.log(
+  "ENV:",
+  process.env.GROQ_API_KEY
+);
+
 const jsonHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
