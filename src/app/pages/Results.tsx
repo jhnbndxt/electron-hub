@@ -25,7 +25,8 @@ type SuggestedCollegeCourse = string | {
 };
 
 interface CareerPathway {
-  course: string;
+  course?: string;
+  category?: string;
   careers: string[];
 }
 
@@ -380,9 +381,10 @@ export function Results() {
   const fallbackCareerPathways = electives.flatMap(elective =>
     getCareerPathways(track, elective)
   );
+  const getPathwayLabel = (pathway: CareerPathway) => pathway.category || pathway.course || "";
   const aiCareerPathways = Array.isArray(aiRecommendation?.careerPathways)
     ? aiRecommendation.careerPathways.filter(
-        (pathway) => pathway?.course && Array.isArray(pathway.careers) && pathway.careers.length > 0
+        (pathway) => getPathwayLabel(pathway).trim() && Array.isArray(pathway.careers) && pathway.careers.length > 0
       )
     : [];
   const allCareerPathways = aiCareerPathways.length > 0 ? aiCareerPathways : fallbackCareerPathways;
@@ -669,9 +671,9 @@ export function Results() {
         autoTable(doc, {
           startY: cursorY,
           margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
-          head: [["College Course", "Career Opportunities"]],
+          head: [["Specialization", "Career Opportunities"]],
           body: allCareerPathways.map((pathway) => [
-            pathway.course,
+            getPathwayLabel(pathway),
             pathway.careers.join(", "),
           ]),
           theme: "grid",
@@ -1266,7 +1268,7 @@ export function Results() {
                       className="px-4 py-2 rounded-lg text-white font-bold"
                       style={{ backgroundColor: "var(--electron-blue)" }}
                     >
-                      {pathway.course}
+                      {getPathwayLabel(pathway)}
                     </div>
                     <ArrowRight className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-600 font-medium">Career Opportunities</span>

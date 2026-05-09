@@ -253,7 +253,7 @@ export function getRecommendedElectronBranches({
   track: string;
   electives: string[];
   suggestedCourses: string[];
-  careerPathways: Array<{ course: string; careers: string[] }>;
+  careerPathways: Array<{ course?: string; category?: string; careers: string[] }>;
   topDomains: string[];
   topInterests: string[];
 }): BranchRecommendation[] {
@@ -262,7 +262,7 @@ export function getRecommendedElectronBranches({
     track,
     ...electives,
     ...suggestedCourses,
-    ...careerPathways.flatMap((pathway) => [pathway.course, ...pathway.careers]),
+    ...careerPathways.flatMap((pathway) => [pathway.category || pathway.course || "", ...pathway.careers]),
     ...topDomains,
     ...topInterests,
   ]);
