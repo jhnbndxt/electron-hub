@@ -73,8 +73,14 @@ export const checkExistingEnrollment = async (userId) => {
       return { error: error.message, data: null };
     }
 
-    const hasEnrollment = data && data.length > 0;
-    return { error: null, data: hasEnrollment ? data[0] : null };
+    const latestEnrollment = data?.[0] || null;
+    const inactiveStatuses = new Set(['rejected', 'dropped', 'unenrolled', 'removed']);
+
+    if (!latestEnrollment || inactiveStatuses.has(String(latestEnrollment.status || '').toLowerCase())) {
+      return { error: null, data: null };
+    }
+
+    return { error: null, data: latestEnrollment };
   } catch (error) {
     console.error('Check enrollment error:', error);
     return { error: error.message, data: null };
@@ -156,7 +162,14 @@ export const getUserEnrollment = async (userId) => {
       return { error: error.message, data: null };
     }
 
-    return { error: null, data: data?.[0] || null };
+    const latestEnrollment = data?.[0] || null;
+    const inactiveStatuses = new Set(['rejected', 'dropped', 'unenrolled', 'removed']);
+
+    if (!latestEnrollment || inactiveStatuses.has(String(latestEnrollment.status || '').toLowerCase())) {
+      return { error: null, data: null };
+    }
+
+    return { error: null, data: latestEnrollment };
   } catch (error) {
     console.error('Get enrollment error:', error);
     return { error: error.message, data: null };

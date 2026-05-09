@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { triggerNotification } from './notificationService';
 
 /**
  * Admin Service
@@ -8,6 +9,7 @@ import { supabase } from '../supabase';
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FINALIZED_PAYMENT_STATUSES = new Set(['completed', 'verified', 'approved', 'paid']);
+const INACTIVE_ENROLLMENT_STATUSES = new Set(['rejected', 'dropped', 'unenrolled', 'removed']);
 
 const normalizeAuditSeverity = (status = 'success') => {
   const normalizedStatus = String(status || 'success').trim().toLowerCase();
@@ -177,6 +179,16 @@ export const upsertEnrollmentProgress = async (studentId, steps = []) => {
   } catch (error) {
     console.error('Upsert progress error:', error);
     return { error: error.message, data: null };
+  }
+};
+
+const notifyStudent = async (userReference, trigger, additionalData = {}) => {
+  try {
+    if (!userReference) return null;
+    return await triggerNotification(userReference, trigger, additionalData);
+  } catch (error) {
+    console.error('Student notification error:', error);
+    return null;
   }
 };
 
@@ -372,6 +384,83 @@ export const getEnrolledStudents = async () => {
   }
 };
 
+export const getStudentProfileByEnrollmentId = async (enrollmentId) => {
+  try {
+    const { data: enrollment, error: enrollmentError } = await supabase
+      .from('enrollments')
+      .select(
+        `
+        *,
+        enrollment_documents(*)
+      `
+      )
+      .eq('id', enrollmentId)
+      .maybeSingle();
+
+    if (enrollmentError) {
+      console.error('Get student profile enrollment error:', enrollmentError);
+      return { error: enrollmentError.message, data: null };
+    }
+
+    if (!enrollment) {
+      return { error: 'Student enrollment not found', data: null };
+    }
+
+    const studentEmail = enrollment.user_id || enrollment.form_data?.email || null;
+    const resolvedStudentId = await resolveUserId(studentEmail);
+    const [paymentsResult, progressResult, assessmentResult] = await Promise.all([
+      resolvedStudentId
+        ? supabase
+            .from('payments')
+            .select('*')
+            .eq('student_id', resolvedStudentId)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      resolvedStudentId
+        ? supabase
+            .from('enrollment_progress')
+            .select('*')
+            .eq('student_id', resolvedStudentId)
+            .order('created_at', { ascending: true })
+        : Promise.resolve({ data: [], error: null }),
+      resolvedStudentId
+        ? supabase
+            .from('assessment_results')
+            .select('*')
+            .eq('student_id', resolvedStudentId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (paymentsResult.error) {
+      console.error('Get student profile payments error:', paymentsResult.error);
+    }
+
+    if (progressResult.error) {
+      console.error('Get student profile progress error:', progressResult.error);
+    }
+
+    if (assessmentResult.error && assessmentResult.error.code !== 'PGRST116') {
+      console.error('Get student profile assessment error:', assessmentResult.error);
+    }
+
+    return {
+      error: null,
+      data: {
+        enrollment,
+        payments: paymentsResult.data || [],
+        progress: progressResult.data || [],
+        assessment: assessmentResult.data || null,
+      },
+    };
+  } catch (error) {
+    console.error('Get student profile error:', error);
+    return { error: error.message, data: null };
+  }
+};
+
 export const getEnrollmentManagementStudents = async () => {
   try {
     await syncVerifiedPaymentsToEnrollments();
@@ -460,6 +549,14 @@ export const updateEnrollmentStatus = async (enrollmentId, newStatus, notes = nu
       return { error: error.message, data: null };
     }
 
+    if (!INACTIVE_ENROLLMENT_STATUSES.has(String(newStatus || '').toLowerCase())) {
+      await notifyStudent(data?.user_id, 'ENROLLMENT_STATUS_CHANGED', {
+        status: newStatus,
+        message: notes || `Your enrollment status has been updated to ${newStatus}.`,
+        enrollmentId,
+      });
+    }
+
     return { error: null, data };
   } catch (error) {
     console.error('Update status error:', error);
@@ -492,6 +589,11 @@ export const approveEnrollment = async (enrollmentId, approvedBy = 'admin') => {
       `Approved enrollment: ${enrollmentId}`,
       'success'
     );
+
+    await notifyStudent(data?.user_id, 'ENROLLMENT_APPROVED', {
+      status: data?.status,
+      enrollmentId,
+    });
 
     return { error: null, data };
   } catch (error) {
@@ -527,6 +629,11 @@ export const rejectEnrollment = async (enrollmentId, reason, rejectedBy = 'admin
       'warning'
     );
 
+    await notifyStudent(data?.user_id, 'ENROLLMENT_REJECTED', {
+      reason,
+      enrollmentId,
+    });
+
     return { error: null, data };
   } catch (error) {
     console.error('Reject enrollment error:', error);
@@ -540,6 +647,10 @@ export const enrollStudent = async (enrollmentId, userId, enrolledBy = 'admin') 
     const enrollmentRecord = await resolveEnrollmentRecord(enrollmentId, userId);
     if (!enrollmentRecord) {
       return { error: 'Enrollment record not found', data: null };
+    }
+
+    if (INACTIVE_ENROLLMENT_STATUSES.has(String(enrollmentRecord.status || '').toLowerCase())) {
+      return { error: 'Enrollment is inactive and cannot be automatically enrolled', data: null };
     }
 
     const wasAlreadyEnrolled = enrollmentRecord.status === 'enrolled';
@@ -584,11 +695,92 @@ export const enrollStudent = async (enrollmentId, userId, enrolledBy = 'admin') 
         `Student enrolled: ${enrollmentRecord.user_id || userId} (Enrollment: ${enrollmentRecord.id})`,
         'success'
       );
+
+      await notifyStudent(enrollmentRecord.user_id || userId, 'ENROLLMENT_APPROVED', {
+        status: 'enrolled',
+        enrollmentId: enrollmentRecord.id,
+      });
     }
 
     return { error: null, data: enrolledRecord };
   } catch (error) {
     console.error('Enroll student error:', error);
+    return { error: error.message, data: null };
+  }
+};
+
+export const unenrollStudent = async (enrollmentId, reason, removedBy = 'admin') => {
+  try {
+    const trimmedReason = String(reason || '').trim();
+
+    if (!trimmedReason) {
+      return { error: 'A reason is required to unenroll a student.', data: null };
+    }
+
+    const { data: enrollmentRecord, error: lookupError } = await supabase
+      .from('enrollments')
+      .select('id, user_id, status')
+      .eq('id', enrollmentId)
+      .maybeSingle();
+
+    if (lookupError) {
+      console.error('Unenroll student lookup error:', lookupError);
+      return { error: lookupError.message, data: null };
+    }
+
+    if (!enrollmentRecord) {
+      return { error: 'Enrollment record not found', data: null };
+    }
+
+    const studentId = await resolveUserId(enrollmentRecord.user_id);
+    const { data, error } = await supabase
+      .from('enrollments')
+      .update({
+        status: 'dropped',
+        updated_at: new Date().toISOString(),
+        notes: `Unenrolled by ${removedBy}. Reason: ${trimmedReason}`,
+        rejection_reason: trimmedReason,
+      })
+      .eq('id', enrollmentId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Unenroll student error:', error);
+      return { error: error.message, data: null };
+    }
+
+    if (studentId) {
+      const [progressReset, draftReset] = await Promise.all([
+        supabase.from('enrollment_progress').delete().eq('student_id', studentId),
+        supabase.from('enrollment_drafts').delete().eq('user_id', enrollmentRecord.user_id),
+      ]);
+
+      if (progressReset.error) {
+        console.error('Unenroll progress reset error:', progressReset.error);
+      }
+
+      if (draftReset.error) {
+        console.error('Unenroll draft reset error:', draftReset.error);
+      }
+    }
+
+    await notifyStudent(enrollmentRecord.user_id, 'ENROLLMENT_UNENROLLED', {
+      reason: trimmedReason,
+      enrollmentId,
+      status: 'dropped',
+    });
+
+    await createAuditLog(
+      removedBy,
+      'STUDENT_UNENROLLED',
+      `Student unenrolled: ${enrollmentRecord.user_id} (Enrollment: ${enrollmentId}) - Reason: ${trimmedReason}`,
+      'warning'
+    );
+
+    return { error: null, data };
+  } catch (error) {
+    console.error('Unenroll student error:', error);
     return { error: error.message, data: null };
   }
 };
@@ -618,6 +810,19 @@ export const updateDocumentStatus = async (documentId, status, notes = null) => 
       console.error('Update document status error:', error);
       return { error: error.message, data: null };
     }
+
+    const { data: enrollment } = await supabase
+      .from('enrollments')
+      .select('user_id')
+      .eq('id', data.enrollment_id)
+      .maybeSingle();
+
+    await notifyStudent(enrollment?.user_id, 'DOCUMENT_STATUS_UPDATED', {
+      status,
+      documentName: data.document_type,
+      notes,
+      documentId,
+    });
 
     return { error: null, data };
   } catch (error) {
@@ -913,6 +1118,11 @@ export const updatePaymentStatus = async (paymentId, status, verifiedBy) => {
         console.error('Post-payment enrollment sync error:', enrollmentError);
       }
     }
+
+    await notifyStudent(data?.student_id, FINALIZED_PAYMENT_STATUSES.has(status) ? 'PAYMENT_VERIFIED' : status === 'rejected' ? 'PAYMENT_REJECTED' : 'PAYMENT_UPDATED', {
+      status,
+      paymentId,
+    });
 
     // Create audit log
     await createAuditLog(

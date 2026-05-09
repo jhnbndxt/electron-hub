@@ -228,7 +228,12 @@ const COURSE_PROGRAM_KEYWORDS: Record<string, string[]> = {
 };
 
 function normalizeCourseName(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/^(bs|ba|bachelor of science in|bachelor of arts in|bachelor in)\s+/, "")
+    .trim();
 }
 
 function programMatchesSuggestedCourse(program: string, course: string) {
@@ -257,7 +262,6 @@ export function getRecommendedElectronBranches({
   topDomains: string[];
   topInterests: string[];
 }): BranchRecommendation[] {
-  const hasSuggestedCourseFilter = suggestedCourses.length > 0;
   const assessmentCategories = getAssessmentCategories([
     track,
     ...electives,
@@ -276,8 +280,8 @@ export function getRecommendedElectronBranches({
       suggestedCourses.some((course) => programMatchesSuggestedCourse(program, course))
     );
     const categoryMatchedPrograms = branch.programs.filter((program) => programMatchesCategories(program, activeCategories));
-    const matchedPrograms = hasSuggestedCourseFilter ? courseMatchedPrograms : categoryMatchedPrograms;
-    const matchScore = matchedPrograms.length * 4 + matchedCategories.length;
+    const matchedPrograms = Array.from(new Set([...courseMatchedPrograms, ...categoryMatchedPrograms]));
+    const matchScore = courseMatchedPrograms.length * 4 + categoryMatchedPrograms.length * 2 + matchedCategories.length;
 
     return {
       ...branch,
@@ -287,7 +291,7 @@ export function getRecommendedElectronBranches({
       isBestMatch: false,
     };
   })
-    .filter((branch) => (hasSuggestedCourseFilter ? branch.matchedPrograms.length > 0 : branch.matchScore > 0))
+    .filter((branch) => branch.matchScore > 0)
     .sort((left, right) => right.matchScore - left.matchScore);
 
   if (recommendations.length > 0) {

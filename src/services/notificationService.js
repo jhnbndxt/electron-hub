@@ -59,6 +59,11 @@ const NOTIFICATION_MAP = {
     title: 'Payment Rejected',
     message: 'Your payment was rejected. Please try again.',
   },
+  PAYMENT_UPDATED: {
+    title: 'Payment Status Updated',
+    message: additionalData =>
+      additionalData.message || `Your payment status has been updated to ${additionalData.status || 'a new status'}.`,
+  },
   DOCUMENTS_VERIFIED: {
     title: 'Documents Verified',
     message: 'All your documents have been verified and approved.',
@@ -78,6 +83,16 @@ const NOTIFICATION_MAP = {
     title: 'Enrollment Rejected',
     message: 'Your enrollment was not approved. Please review the feedback.',
   },
+  ENROLLMENT_STATUS_CHANGED: {
+    title: 'Enrollment Status Updated',
+    message: additionalData =>
+      additionalData.message || `Your enrollment status has been updated to ${additionalData.status || 'a new status'}.`,
+  },
+  ENROLLMENT_UNENROLLED: {
+    title: 'Enrollment Removed',
+    message: additionalData =>
+      `Your enrollment has been removed. Official reason: ${additionalData.reason || 'No reason provided'}. If you believe this was a mistake or want to appeal, please contact the office.`,
+  },
   DOCUMENTS_REJECTED: {
     title: 'Documents Rejected',
     message: (additionalData) =>
@@ -87,6 +102,16 @@ const NOTIFICATION_MAP = {
     title: 'Document Rejected',
     message: (additionalData) =>
       additionalData.message || 'A document was rejected. Please review and reupload.',
+  },
+  DOCUMENT_STATUS_UPDATED: {
+    title: 'Document Status Updated',
+    message: additionalData =>
+      additionalData.message || `Your ${additionalData.documentName || 'document'} status has been updated to ${additionalData.status || 'a new status'}.`,
+  },
+  ASSESSMENT_UPDATED: {
+    title: 'Assessment Updated',
+    message: additionalData =>
+      additionalData.message || 'Your assessment result has been recorded or updated.',
   },
   ENROLLMENT_CLOSED: {
     title: 'Enrollment Closed',

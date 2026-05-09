@@ -8,6 +8,7 @@
  */
 
 import { supabase } from '../supabase';
+import { triggerNotification } from './notificationService';
 
 function normalizeScores(assessmentData = {}) {
   const scoreSource = assessmentData.scores || {};
@@ -189,6 +190,16 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
     if (error) throw error;
 
     console.log('✅ Assessment result saved:', userEmail);
+    try {
+      await triggerNotification(userEmail, 'ASSESSMENT_UPDATED', {
+        track,
+        electives,
+        assessmentResultId: data[0]?.id,
+      });
+    } catch (notificationError) {
+      console.error('Error creating assessment notification:', notificationError);
+    }
+
     return data[0];
   } catch (error) {
     console.error('Error saving assessment result:', error);

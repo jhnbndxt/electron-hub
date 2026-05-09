@@ -33,13 +33,14 @@ import {
 } from "../../services/enrollmentService";
 import { triggerNotification } from "../../services/notificationService";
 import { supabase } from "../../supabase";
+import electivesDataset from "../../data/electives";
 import {
-  regions,
-  getProvincesByRegion,
+  getBarangays,
+  getCities,
   getCitiesByProvince,
-  getCitiesByRegion,
-  getBarangaysByCity,
-} from "../utils/philippineAddress";
+  getProvinces,
+  getRegions,
+} from "../../services/addressService";
 
 // Academic electives
 const academicElectives = [
@@ -69,6 +70,16 @@ const technicalElectives = [
   "Fitness Training",
   "Coaching"
 ];
+
+const allElectives = Array.from(
+  new Set(
+    [
+      ...academicElectives,
+      ...technicalElectives,
+      ...((electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[]),
+    ].sort((first, second) => first.localeCompare(second))
+  )
+);
 
 interface FormData {
   // Page 1: Basic Information
@@ -163,6 +174,17 @@ export function EnrollmentForm() {
   const [isInitializing, setIsInitializing] = useState(true);
   const [isSettingsLoading, setIsSettingsLoading] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
+  const [regions, setRegions] = useState<any[]>([]);
+  const [availableProvinces, setAvailableProvinces] = useState<any[]>([]);
+  const [availableCities, setAvailableCities] = useState<any[]>([]);
+  const [availableBarangays, setAvailableBarangays] = useState<any[]>([]);
+  const [addressLoading, setAddressLoading] = useState({
+    regions: false,
+    provinces: false,
+    cities: false,
+    barangays: false,
+  });
+  const [addressError, setAddressError] = useState("");
   const hasRestoredDraft = useRef(false);
 
   const [formData, setFormData] = useState<FormData>({
@@ -239,7 +261,7 @@ export function EnrollmentForm() {
       lastName: prev.lastName || source.lastName || source.last_name || "",
       middleName: prev.middleName || source.middleName || source.middle_name || "",
       suffix: prev.suffix && prev.suffix !== "None" ? prev.suffix : source.suffix || "None",
-      sex: prev.sex || source.sex || "",
+      sex: prev.sex || source.sex || source.gender || "",
       birthday: prev.birthday || source.birthDate || source.birth_date || "",
       email: prev.email || source.email || userData?.email || "",
       contactNumber: prev.contactNumber || source.contactNumber || source.contact_number || "",
@@ -474,6 +496,166 @@ export function EnrollmentForm() {
 
   const isEnrollmentOpen = systemSettings?.enrollment_open !== false;
   const isLoading = isInitializing || isSettingsLoading;
+  const selectedRegion = regions.find((region) => region.name === formData.region);
+  const selectedProvince = availableProvinces.find((province) => province.name === formData.province);
+  const selectedCity = availableCities.find((city) => city.name === formData.city);
+
+  const mergeCurrentOption = (items: any[], value: string) => {
+    if (!value || items.some((item) => item.name === value)) {
+      return items;
+    }
+
+    return [{ code: value, name: value }, ...items];
+  };
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPsgcRegions() {
+      setAddressLoading((state) => ({ ...state, regions: true }));
+      setAddressError("");
+
+      try {
+        const data = await getRegions();
+        if (active) {
+          setRegions(data);
+        }
+      } catch (error) {
+        console.error("Failed to load PSGC regions:", error);
+        if (active) {
+          setAddressError("Unable to load Philippine address data. Please check your connection and try again.");
+        }
+      } finally {
+        if (active) {
+          setAddressLoading((state) => ({ ...state, regions: false }));
+        }
+      }
+    }
+
+    void loadPsgcRegions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadRegionAddresses() {
+      setAvailableProvinces([]);
+      setAvailableCities([]);
+      setAvailableBarangays([]);
+
+      if (!selectedRegion?.code) {
+        return;
+      }
+
+      setAddressLoading((state) => ({ ...state, provinces: true, cities: true }));
+      setAddressError("");
+
+      try {
+        const [provinceData, cityData] = await Promise.all([
+          getProvinces(selectedRegion.code),
+          getCities(selectedRegion.code),
+        ]);
+
+        if (active) {
+          setAvailableProvinces(provinceData);
+          setAvailableCities(provinceData.length === 0 ? cityData : []);
+        }
+      } catch (error) {
+        console.error("Failed to load PSGC region addresses:", error);
+        if (active) {
+          setAddressError("Unable to load provinces or cities for the selected region.");
+        }
+      } finally {
+        if (active) {
+          setAddressLoading((state) => ({ ...state, provinces: false, cities: false }));
+        }
+      }
+    }
+
+    void loadRegionAddresses();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedRegion?.code]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadProvinceCities() {
+      if (!selectedProvince?.code) {
+        return;
+      }
+
+      setAvailableCities([]);
+      setAvailableBarangays([]);
+      setAddressLoading((state) => ({ ...state, cities: true }));
+      setAddressError("");
+
+      try {
+        const cityData = await getCitiesByProvince(selectedProvince.code);
+        if (active) {
+          setAvailableCities(cityData);
+        }
+      } catch (error) {
+        console.error("Failed to load PSGC province cities:", error);
+        if (active) {
+          setAddressError("Unable to load cities or municipalities for the selected province.");
+        }
+      } finally {
+        if (active) {
+          setAddressLoading((state) => ({ ...state, cities: false }));
+        }
+      }
+    }
+
+    void loadProvinceCities();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedProvince?.code]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadCityBarangays() {
+      setAvailableBarangays([]);
+
+      if (!selectedCity?.code) {
+        return;
+      }
+
+      setAddressLoading((state) => ({ ...state, barangays: true }));
+      setAddressError("");
+
+      try {
+        const barangayData = await getBarangays(selectedCity.code);
+        if (active) {
+          setAvailableBarangays(barangayData);
+        }
+      } catch (error) {
+        console.error("Failed to load PSGC barangays:", error);
+        if (active) {
+          setAddressError("Unable to load barangays for the selected city or municipality.");
+        }
+      } finally {
+        if (active) {
+          setAddressLoading((state) => ({ ...state, barangays: false }));
+        }
+      }
+    }
+
+    void loadCityBarangays();
+
+    return () => {
+      active = false;
+    };
+  }, [selectedCity?.code]);
 
   // Auto-fill form with user data from AuthContext
   useEffect(() => {
@@ -616,8 +798,9 @@ export function EnrollmentForm() {
 
   // Phone number validation
   const validatePhoneNumber = (phone: string): boolean => {
-    const phoneRegex = /^09\d{9}$/;
-    return phoneRegex.test(phone);
+    const normalizedPhone = phone.trim().replace(/[\s-]/g, "");
+    const phoneRegex = /^(09\d{9}|\+639\d{9})$/;
+    return phoneRegex.test(normalizedPhone);
   };
 
   // Birthday validation (no future dates)
@@ -658,14 +841,14 @@ export function EnrollmentForm() {
       if (!formData.contactNumber) {
         newErrors.contactNumber = "This field is required";
       } else if (!validatePhoneNumber(formData.contactNumber)) {
-        newErrors.contactNumber = "Please enter a valid Philippine mobile number (09XXXXXXXXX).";
+        newErrors.contactNumber = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
       }
       if (!formData.facebookName) newErrors.facebookName = "This field is required";
     }
 
     if (page === 2) {
       if (!formData.region) newErrors.region = "This field is required";
-      if (formData.region !== "National Capital Region (NCR)" && !formData.province) {
+      if (availableProvinces.length > 0 && !formData.province) {
         newErrors.province = "This field is required";
       }
       if (!formData.city) newErrors.city = "This field is required";
@@ -680,7 +863,7 @@ export function EnrollmentForm() {
       if (!formData.fatherContact) {
         newErrors.fatherContact = "This field is required";
       } else if (!validatePhoneNumber(formData.fatherContact)) {
-        newErrors.fatherContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX).";
+        newErrors.fatherContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
       }
       if (!formData.motherMaidenName) newErrors.motherMaidenName = "This field is required";
       if (!formData.motherLastName) newErrors.motherLastName = "This field is required";
@@ -689,7 +872,7 @@ export function EnrollmentForm() {
       if (!formData.motherContact) {
         newErrors.motherContact = "This field is required";
       } else if (!validatePhoneNumber(formData.motherContact)) {
-        newErrors.motherContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX).";
+        newErrors.motherContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
       }
       
       if (!formData.guardianSource) {
@@ -699,7 +882,7 @@ export function EnrollmentForm() {
         if (!formData.guardianContact) {
           newErrors.guardianContact = "This field is required";
         } else if (!validatePhoneNumber(formData.guardianContact)) {
-          newErrors.guardianContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX).";
+          newErrors.guardianContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
         }
       }
     }
@@ -837,23 +1020,8 @@ export function EnrollmentForm() {
   };
 
   const getAvailableElectives = () => {
-    return formData.preferredTrack === "Academic" ? academicElectives : technicalElectives;
+    return allElectives;
   };
-
-  // Get available provinces, cities, barangays
-  const availableProvinces = formData.region === "National Capital Region (NCR)" 
-    ? [] 
-    : getProvincesByRegion(regions.find(r => r.name === formData.region)?.code || "");
-
-  const availableCities = formData.region === "National Capital Region (NCR)"
-    ? getCitiesByRegion("NCR")
-    : formData.province
-    ? getCitiesByProvince(availableProvinces.find(p => p.name === formData.province)?.code || "")
-    : [];
-
-  const availableBarangays = formData.city
-    ? getBarangaysByCity(availableCities.find(c => c.name === formData.city)?.code || "")
-    : [];
 
   const renderPageIndicator = () => {
     const pages = [
@@ -1116,7 +1284,7 @@ export function EnrollmentForm() {
       {renderInput("Birthday", "birthday", "date")}
 
       {renderInput("Email Address", "email", "email", true, "example@gmail.com")}
-      {renderInput("Contact Number", "contactNumber", "tel", true, "09XXXXXXXXX")}
+      {renderInput("Contact Number", "contactNumber", "tel", true, "09XXXXXXXXX or +639XXXXXXXXX")}
       {renderInput("Facebook / Messenger Name", "facebookName")}
     </motion.div>
   );
@@ -1135,18 +1303,40 @@ export function EnrollmentForm() {
         <h2 className="text-2xl font-bold text-gray-800">Address</h2>
       </div>
 
-      {renderSelect("Region", "region", regions)}
-      
-      {formData.region && formData.region !== "National Capital Region (NCR)" && (
-        renderSelect("Province", "province", availableProvinces.map(p => p.name))
+      {addressError && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          {addressError}
+        </div>
+      )}
+
+      {renderSelect(
+        addressLoading.regions ? "Region (loading...)" : "Region",
+        "region",
+        mergeCurrentOption(regions, formData.region)
       )}
       
-      {((formData.region === "National Capital Region (NCR)") || formData.province) && (
-        renderSelect("Municipality / City", "city", availableCities.map(c => c.name))
+      {formData.region && (addressLoading.provinces || availableProvinces.length > 0 || formData.province) && (
+        renderSelect(
+          addressLoading.provinces ? "Province (loading...)" : "Province",
+          "province",
+          mergeCurrentOption(availableProvinces, formData.province)
+        )
+      )}
+      
+      {formData.region && (availableProvinces.length === 0 || formData.province) && (
+        renderSelect(
+          addressLoading.cities ? "Municipality / City (loading...)" : "Municipality / City",
+          "city",
+          mergeCurrentOption(availableCities, formData.city)
+        )
       )}
       
       {formData.city && (
-        renderSelect("Barangay", "barangay", availableBarangays.map(b => b.name))
+        renderSelect(
+          addressLoading.barangays ? "Barangay (loading...)" : "Barangay",
+          "barangay",
+          mergeCurrentOption(availableBarangays, formData.barangay)
+        )
       )}
       
       {renderInput("Home / Street Address", "homeAddress", "text", true, "House No., Street, etc.")}
@@ -1179,7 +1369,7 @@ export function EnrollmentForm() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {renderInput("Occupation", "fatherOccupation")}
-        {renderInput("Contact Number", "fatherContact", "tel", true, "09XXXXXXXXX")}
+        {renderInput("Contact Number", "fatherContact", "tel", true, "09XXXXXXXXX or +639XXXXXXXXX")}
       </div>
 
       <div className="bg-pink-50 border-l-4 border-pink-600 p-4 rounded mt-8">
@@ -1196,7 +1386,7 @@ export function EnrollmentForm() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {renderInput("Occupation", "motherOccupation")}
-        {renderInput("Contact Number", "motherContact", "tel", true, "09XXXXXXXXX")}
+        {renderInput("Contact Number", "motherContact", "tel", true, "09XXXXXXXXX or +639XXXXXXXXX")}
       </div>
 
       <div className="bg-gray-50 border-l-4 border-gray-600 p-4 rounded mt-8">
@@ -1238,7 +1428,7 @@ export function EnrollmentForm() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {renderInput("Occupation", "guardianOccupation")}
-            {renderInput("Contact Number", "guardianContact", "tel", true, "09XXXXXXXXX")}
+            {renderInput("Contact Number", "guardianContact", "tel", true, "09XXXXXXXXX or +639XXXXXXXXX")}
           </div>
         </>
       )}

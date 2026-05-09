@@ -1,26 +1,50 @@
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, useLocation } from "react-router";
-import { ArrowLeft, Mail, GraduationCap, Award, FileText, Image } from "lucide-react";
-import { RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer } from "recharts";
+import {
+  ArrowLeft,
+  Mail,
+  GraduationCap,
+  FileText,
+  Image,
+  CreditCard,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+} from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { LoadingState } from "../../components/LoadingState";
+import { getStudentProfileByEnrollmentId } from "../../../services/adminService";
 
-interface StudentData {
-  id: number;
-  name: string;
-  email: string;
-  studentId: string;
-  course: string;
-  yearLevel: string;
-  enrollmentDate: string;
-  aiTestScore: number;
-  documents: {
-    psaBirthCertificate: string;
-    form138: string;
-  };
-  aptitudeScores: {
-    subject: string;
-    score: number;
-  }[];
+const DOCUMENT_LABELS: Record<string, string> = {
+  form138: "Form 138 (Report Card)",
+  form137: "Form 137",
+  goodMoral: "Certificate of Good Moral",
+  birthCertificate: "Birth Certificate",
+  idPicture: "ID Picture",
+  diploma: "Grade 10 Diploma",
+  escCertificate: "ESC Certificate",
+};
+
+function valueOrDash(value: unknown) {
+  return value ? String(value) : "Not provided";
+}
+
+function formatDate(value: unknown) {
+  if (!value) return "Not provided";
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime())
+    ? String(value)
+    : date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
+function DetailItem({ label, value }: { label: string; value: unknown }) {
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</p>
+      <p className="mt-1 text-sm font-semibold text-gray-900">{valueOrDash(value)}</p>
+    </div>
+  );
 }
 
 export function StudentProfile() {
@@ -28,313 +52,260 @@ export function StudentProfile() {
   const { id } = useParams();
   const location = useLocation();
   const { userRole } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  // Determine if we're in super admin or regular admin context
-  const isSuperAdmin = userRole === "superadmin" || location.pathname.startsWith("/superadmin");
+  const isSuperAdmin = userRole === "superadmin" || location.pathname.startsWith("/branchcoordinator");
+  const recordsPath = isSuperAdmin ? "/branchcoordinator/students" : "/registrar/students";
 
-  // Mock student data (in real app, fetch based on id)
-  const student: StudentData = {
-    id: parseInt(id || "1"),
-    name: "Carlos Manuel Lopez",
-    email: "carlos.lopez@electronhub.edu.ph",
-    studentId: "2026-00123",
-    course: "STEM - Science, Technology, Engineering and Mathematics",
-    yearLevel: "Grade 11",
-    enrollmentDate: "2026-03-18",
-    aiTestScore: 95,
-    documents: {
-      psaBirthCertificate: "https://images.unsplash.com/photo-1586075010923-b1f29fe04b1f?w=400&h=300&fit=crop",
-      form138: "https://images.unsplash.com/photo-1554224311-beee4c201f77?w=400&h=300&fit=crop",
-    },
-    aptitudeScores: [
-      { subject: "Math", score: 95 },
-      { subject: "Science", score: 92 },
-      { subject: "Language", score: 88 },
-      { subject: "Technical", score: 94 },
-      { subject: "Analytical", score: 90 },
-      { subject: "Creative", score: 85 },
-    ],
-  };
+  useEffect(() => {
+    let active = true;
+
+    async function loadProfile() {
+      if (!id) {
+        setError("Student profile not found.");
+        setIsLoading(false);
+        return;
+      }
+
+      setIsLoading(true);
+      const { data, error: profileError } = await getStudentProfileByEnrollmentId(id);
+
+      if (!active) return;
+
+      if (profileError || !data) {
+        setError(profileError || "Student profile not found.");
+        setProfile(null);
+      } else {
+        setProfile(data);
+        setError("");
+      }
+
+      setIsLoading(false);
+    }
+
+    void loadProfile();
+
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+        <LoadingState message="Loading student profile..." subtext="Retrieving enrollment details, documents, and payments." />
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+        <button
+          onClick={() => navigate(recordsPath)}
+          className="mb-4 flex items-center gap-2 text-sm font-medium text-blue-700 hover:opacity-75"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Student Records
+        </button>
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">{error}</div>
+      </div>
+    );
+  }
+
+  const enrollment = profile.enrollment || {};
+  const formData = enrollment.form_data || {};
+  const documents = enrollment.enrollment_documents || [];
+  const payments = profile.payments || [];
+  const progress = profile.progress || [];
+  const assessment = profile.assessment || null;
+  const studentName =
+    formData.studentName ||
+    `${formData.firstName || formData.first_name || ""} ${formData.middleName || formData.middle_name || ""} ${formData.lastName || formData.last_name || ""}`
+      .replace(/\s+/g, " ")
+      .trim() ||
+    enrollment.user_id ||
+    location.state?.student?.name ||
+    "Student";
+
+  const initials = studentName
+    .split(" ")
+    .map((part: string) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
-      {/* Header with Back Button */}
       <div className="mb-8">
         <button
-          onClick={() => navigate(isSuperAdmin ? "/branchcoordinator/students" : "/registrar/students")}
-          className="flex items-center gap-2 mb-4 text-sm font-medium hover:opacity-70 transition-opacity"
-          style={{ color: isSuperAdmin ? "#7C3AED" : "#10B981" }}
+          onClick={() => navigate(recordsPath)}
+          className="mb-4 flex items-center gap-2 text-sm font-medium text-blue-700 hover:opacity-75"
         >
-          <ArrowLeft className="w-4 h-4" />
+          <ArrowLeft className="h-4 w-4" />
           Back to Student Records
         </button>
         <DashboardPageHeader
           badge="Student Management"
           title="Student Profile"
-          subtitle={`Detailed information and records for ${student.name}`}
+          subtitle={`Complete enrollment record for ${studentName}`}
           icon={GraduationCap}
         />
       </div>
 
-      {/* Profile Overview Card */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-8 mb-6">
-        <div className="flex items-start gap-8">
-          {/* Avatar */}
-          <div
-            className="w-32 h-32 rounded-full flex items-center justify-center flex-shrink-0 text-4xl font-bold text-white"
-            style={{ backgroundColor: "#1E3A8A" }}
-          >
-            {student.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+      <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+          <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full bg-blue-900 text-3xl font-bold text-white">
+            {initials}
           </div>
-
-          {/* Student Info */}
           <div className="flex-1">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">
-              {student.name}
-            </h2>
-            <p className="text-sm font-medium mb-6" style={{ color: "#1E3A8A" }}>
-              {student.studentId}
-            </p>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: "#DBEAFE" }}
-                >
-                  <Mail className="w-5 h-5" style={{ color: "#1E3A8A" }} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Email Address</p>
-                  <p className="text-sm font-medium text-gray-900">{student.email}</p>
-                </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{studentName}</h2>
+                <p className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                  <Mail className="h-4 w-4" />
+                  {enrollment.user_id || formData.email || "No email recorded"}
+                </p>
               </div>
-
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: "#EEF2FF" }}
-                >
-                  <GraduationCap className="w-5 h-5" style={{ color: "#4F46E5" }} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Course</p>
-                  <p className="text-sm font-medium text-gray-900">{student.course}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: "#D1FAE5" }}
-                >
-                  <Award className="w-5 h-5" style={{ color: "#10B981" }} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Year Level</p>
-                  <p className="text-sm font-medium text-gray-900">{student.yearLevel}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: "#FEF3C7" }}
-                >
-                  <FileText className="w-5 h-5" style={{ color: "#D97706" }} />
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Enrollment Date</p>
-                  <p className="text-sm font-medium text-gray-900">
-                    {new Date(student.enrollmentDate).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* AI Test Results */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Award className="w-6 h-6" style={{ color: "#1E3A8A" }} />
-            <h3 className="text-xl font-semibold text-gray-900">
-              AI Test Results
-            </h3>
-          </div>
-
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Overall Score</span>
-              <span className="text-2xl font-bold" style={{ color: "#1E3A8A" }}>
-                {student.aiTestScore}%
+              <span className="inline-flex w-fit rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
+                {enrollment.status || "Not provided"}
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className="h-3 rounded-full transition-all"
-                style={{
-                  width: `${student.aiTestScore}%`,
-                  backgroundColor: "#1E3A8A",
-                }}
-              />
-            </div>
-          </div>
-
-          <div className="mb-4">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">
-              Aptitude Breakdown
-            </h4>
-            <div className="space-y-3">
-              {student.aptitudeScores.map((score) => (
-                <div key={score.subject}>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-xs text-gray-600">{score.subject}</span>
-                    <span className="text-xs font-semibold text-gray-900">
-                      {score.score}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="h-2 rounded-full"
-                      style={{
-                        width: `${score.score}%`,
-                        backgroundColor: score.score >= 90 ? "#10B981" : "#1E3A8A",
-                      }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <ResponsiveContainer width="100%" height={250}>
-            <RadarChart data={student.aptitudeScores}>
-              <PolarGrid key="student-polar-grid" />
-              <PolarAngleAxis key="student-polar-angle" dataKey="subject" />
-              <PolarRadiusAxis key="student-polar-radius" angle={90} domain={[0, 100]} />
-              <Radar
-                key="student-radar"
-                name="Scores"
-                dataKey="score"
-                stroke="#1E3A8A"
-                fill="#1E3A8A"
-                fillOpacity={0.6}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Uploaded Documents */}
-        <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Image className="w-6 h-6" style={{ color: "#1E3A8A" }} />
-            <h3 className="text-xl font-semibold text-gray-900">
-              Uploaded Documents
-            </h3>
-          </div>
-
-          <div className="space-y-6">
-            {/* PSA Birth Certificate */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    PSA Birth Certificate
-                  </span>
-                </div>
-                <span
-                  className="text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}
-                >
-                  Verified
-                </span>
-              </div>
-              <div
-                className="w-full h-48 rounded-lg border-2 border-gray-200 overflow-hidden cursor-pointer hover:border-blue-500 transition-colors"
-                onClick={() => window.open(student.documents.psaBirthCertificate, "_blank")}
-              >
-                <img
-                  src={student.documents.psaBirthCertificate}
-                  alt="PSA Birth Certificate"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Click to view full document
-              </p>
-            </div>
-
-            {/* Form 138 */}
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-gray-600" />
-                  <span className="text-sm font-semibold text-gray-900">
-                    Form 138 (Report Card)
-                  </span>
-                </div>
-                <span
-                  className="text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ backgroundColor: "#D1FAE5", color: "#065F46" }}
-                >
-                  Verified
-                </span>
-              </div>
-              <div
-                className="w-full h-48 rounded-lg border-2 border-gray-200 overflow-hidden cursor-pointer hover:border-blue-500 transition-colors"
-                onClick={() => window.open(student.documents.form138, "_blank")}
-              >
-                <img
-                  src={student.documents.form138}
-                  alt="Form 138 Report Card"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-2">
-                Click to view full document
-              </p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <DetailItem label="Enrollment Date" value={formatDate(enrollment.enrollment_date || enrollment.created_at)} />
+              <DetailItem label="Current Status" value={enrollment.status} />
+              <DetailItem label="Track" value={formData.preferredTrack || formData.preferred_track || formData.track} />
+              <DetailItem label="Year Level" value={formData.yearLevel || formData.year_level} />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm p-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-1">
-              Student Actions
-            </h3>
-            <p className="text-sm text-gray-600">
-              Manage student record and status
-            </p>
+      <div className="mb-6 grid gap-6 xl:grid-cols-2">
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <FileText className="h-5 w-5 text-blue-800" />
+            <h3 className="text-lg font-bold text-gray-900">Enrollment Form Details</h3>
           </div>
-          <div className="flex gap-3">
-            <button
-              onClick={() => navigate(isSuperAdmin ? "/branchcoordinator/students" : "/registrar/students")}
-              className="px-6 py-3 rounded-lg font-medium transition-all hover:bg-gray-100 border-2"
-              style={{ borderColor: "#D1D5DB", color: "#374151" }}
-            >
-              Back to Records
-            </button>
-            <button
-              onClick={() => alert("Export functionality coming soon")}
-              className="px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90"
-              style={{ backgroundColor: isSuperAdmin ? "#7C3AED" : "#10B981" }}
-            >
-              Export Profile
-            </button>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <DetailItem label="Admission Type" value={formData.admissionType || formData.admission_type} />
+            <DetailItem label="LRN" value={formData.lrn} />
+            <DetailItem label="Sex" value={formData.sex || formData.gender} />
+            <DetailItem label="Birthday" value={formData.birthday || formData.birth_date} />
+            <DetailItem label="Contact Number" value={formData.contactNumber || formData.contact_number} />
+            <DetailItem label="Civil Status" value={formData.civilStatus || formData.civil_status} />
+            <DetailItem label="Elective 1" value={formData.elective1 || formData.elective_1} />
+            <DetailItem label="Elective 2" value={formData.elective2 || formData.elective_2} />
+            <DetailItem label="Address" value={[formData.homeAddress || formData.home_address, formData.barangay, formData.city, formData.province].filter(Boolean).join(", ")} />
+            <DetailItem label="Guardian" value={[formData.guardianFirstName || formData.guardian_first_name, formData.guardianLastName || formData.guardian_last_name].filter(Boolean).join(" ")} />
           </div>
-        </div>
+        </section>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <Image className="h-5 w-5 text-blue-800" />
+            <h3 className="text-lg font-bold text-gray-900">Uploaded Documents / Files</h3>
+          </div>
+          <div className="space-y-3">
+            {documents.length === 0 ? (
+              <p className="text-sm text-gray-500">No uploaded documents found.</p>
+            ) : (
+              documents.map((document: any) => (
+                <div key={document.id || document.document_type} className="flex flex-col gap-3 rounded-lg border border-gray-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {DOCUMENT_LABELS[document.document_type] || document.document_type || "Document"}
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">{document.file_name || document.status || "Uploaded file"}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-700">
+                      {document.status || (document.verified ? "approved" : "pending")}
+                    </span>
+                    {(document.file_path || document.file_url) && (
+                      <a
+                        href={document.file_url || document.file_path}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-800"
+                      >
+                        View File
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <CreditCard className="h-5 w-5 text-blue-800" />
+            <h3 className="text-lg font-bold text-gray-900">Payment History</h3>
+          </div>
+          <div className="space-y-3">
+            {payments.length === 0 ? (
+              <p className="text-sm text-gray-500">No payment records found.</p>
+            ) : (
+              payments.map((payment: any) => (
+                <div key={payment.id} className="rounded-lg border border-gray-200 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">
+                        {payment.payment_method || "Payment"} - PHP {Number(payment.amount || 0).toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Reference: {payment.reference_number || payment.queue_number || "Not provided"}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      {payment.status}
+                    </span>
+                  </div>
+                  <p className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {formatDate(payment.submitted_at || payment.created_at)}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-5 flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-blue-800" />
+            <h3 className="text-lg font-bold text-gray-900">Progress and Assessment</h3>
+          </div>
+          <div className="mb-5 grid gap-4 sm:grid-cols-2">
+            <DetailItem label="Recommended Track" value={assessment?.recommended_track} />
+            <DetailItem label="Overall Score" value={assessment?.overall_score ? `${assessment.overall_score}%` : ""} />
+          </div>
+          <div className="space-y-3">
+            {progress.length === 0 ? (
+              <p className="text-sm text-gray-500">No enrollment progress records found.</p>
+            ) : (
+              progress.map((step: any) => (
+                <div key={step.id || step.step_name} className="flex items-center justify-between rounded-lg border border-gray-200 p-3">
+                  <div className="flex items-center gap-2">
+                    {step.status === "completed" ? (
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <Clock className="h-4 w-4 text-amber-600" />
+                    )}
+                    <span className="text-sm font-semibold text-gray-900">{step.step_name}</span>
+                  </div>
+                  <span className="text-xs font-semibold text-gray-600">{step.status}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

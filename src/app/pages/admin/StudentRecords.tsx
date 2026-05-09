@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { Search, Filter, Download, Users, Eye, Edit2 } from "lucide-react";
+import { Search, Download, Users, Eye, Edit2, AlertTriangle, X } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
-import { getEnrolledStudents } from "../../../services/adminService";
+import { getEnrolledStudents, unenrollStudent } from "../../../services/adminService";
 import { useNavigate } from "react-router";
+import { useAuth } from "../../context/AuthContext";
 
 interface Student {
   id: string;
@@ -40,10 +41,15 @@ const normalizeTrack = (value: unknown): string => {
 
 export function StudentRecords() {
   const navigate = useNavigate();
+  const { userData, userRole } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTrack, setFilterTrack] = useState("all");
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [unenrollReason, setUnenrollReason] = useState("");
+  const [unenrollError, setUnenrollError] = useState("");
+  const [isUnenrolling, setIsUnenrolling] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -121,10 +127,49 @@ export function StudentRecords() {
   const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
 
   const handleViewStudent = (student: Student) => {
-    const isSuperAdmin = false; // You may need to get this from auth context
-    navigate(isSuperAdmin ? `/branchcoordinator/students/${student.id}` : `/registrar/students/${student.id}`, {
+    const isSuperAdmin = userRole === "superadmin";
+    navigate(isSuperAdmin ? `/branchcoordinator/student-profile/${student.id}` : `/registrar/student-profile/${student.id}`, {
       state: { student }
     });
+  };
+
+  const openUnenrollModal = (student: Student) => {
+    setSelectedStudent(student);
+    setUnenrollReason("");
+    setUnenrollError("");
+  };
+
+  const closeUnenrollModal = () => {
+    if (isUnenrolling) return;
+    setSelectedStudent(null);
+    setUnenrollReason("");
+    setUnenrollError("");
+  };
+
+  const handleUnenrollStudent = async () => {
+    const reason = unenrollReason.trim();
+
+    if (!selectedStudent) return;
+
+    if (!reason) {
+      setUnenrollError("A reason is required before removing a student.");
+      return;
+    }
+
+    setIsUnenrolling(true);
+    setUnenrollError("");
+
+    const { error } = await unenrollStudent(selectedStudent.id, reason, userData?.email || "admin");
+
+    if (error) {
+      setUnenrollError(error);
+      setIsUnenrolling(false);
+      return;
+    }
+
+    setAllStudents((students) => students.filter((student) => student.id !== selectedStudent.id));
+    setIsUnenrolling(false);
+    closeUnenrollModal();
   };
 
   const getStatusStyle = (status: string) => {
@@ -316,9 +361,9 @@ export function StudentRecords() {
                             <Eye className="w-3 h-3" />
                           </button>
                           <button
-                            onClick={() => handleViewStudent(student)}
+                            onClick={() => openUnenrollModal(student)}
                             className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-blue-600"
-                            title="Edit student"
+                            title="Edit / unenroll student"
                           >
                             <Edit2 className="w-3 h-3" />
                           </button>
@@ -374,6 +419,70 @@ export function StudentRecords() {
           </div>
         </div>
       </div>
+
+      {selectedStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-red-50 p-3 text-red-600">
+                  <AlertTriangle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Unenroll student?</h3>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    This will remove {selectedStudent.name} from the enrolled student list, reset their enrollment progress, and notify them with the official reason.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={closeUnenrollModal}
+                className="rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                aria-label="Close unenroll dialog"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <label className="mb-2 block text-sm font-semibold text-gray-700">
+              Reason for unenrollment <span className="text-red-600">*</span>
+            </label>
+            <textarea
+              value={unenrollReason}
+              onChange={(event) => {
+                setUnenrollReason(event.target.value);
+                if (unenrollError) setUnenrollError("");
+              }}
+              rows={4}
+              className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-100"
+              placeholder="Explain why this student is being unenrolled or removed."
+            />
+            {unenrollError && (
+              <p className="mt-2 text-sm font-medium text-red-600">{unenrollError}</p>
+            )}
+
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={closeUnenrollModal}
+                disabled={isUnenrolling}
+                className="rounded-xl border border-gray-300 px-5 py-3 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleUnenrollStudent}
+                disabled={isUnenrolling}
+                className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isUnenrolling ? "Removing..." : "Confirm Unenrollment"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
