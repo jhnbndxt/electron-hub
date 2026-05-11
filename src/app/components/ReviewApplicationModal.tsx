@@ -97,6 +97,16 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
 
   // Get student name from either field
   const studentName = reviewingStudent.studentName || reviewingStudent.name || 'Unknown Student';
+  const studentEmail =
+    reviewingStudent.email ||
+    reviewingStudent.enrollmentData?.email ||
+    reviewingStudent.enrollmentData?.user_email ||
+    'No email provided';
+  const studentId =
+    reviewingStudent.id ||
+    reviewingStudent.enrollmentData?.id ||
+    reviewingStudent.enrollmentData?.enrollment_id ||
+    '—';
 
   // Get enrollment documents
   const enrollmentDocs = reviewingStudent.enrollment_documents || [];
@@ -222,317 +232,287 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      <div className="relative flex w-full max-w-[min(1100px,92vw)] max-h-[90vh] flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-5">
+      <div className="relative flex w-full max-w-[min(1180px,96vw)] max-h-[94vh] flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.16)]">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-200 bg-gradient-to-r from-sky-50 to-cyan-50 px-6 py-5">
           <div className="min-w-0">
-            <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Review application</p>
-            <h2 className="mt-2 text-2xl font-semibold text-gray-900">Document Verification</h2>
-            <p className="mt-1 text-sm text-gray-600">{studentName}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Review application</p>
+            <h2 className="mt-2 text-3xl font-semibold text-slate-900">Document Verification</h2>
+            <p className="mt-1 text-sm text-slate-600">{studentName}</p>
           </div>
           <button
             onClick={onClose}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-400 transition hover:bg-gray-50 hover:text-gray-600"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
             aria-label="Close document review modal"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 min-h-0 overflow-y-auto">
-          <div className="px-6 py-5">
-            {/* Stats Cards */}
-            <div className="mb-6 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.16em] text-gray-500">Total documents</p>
-                <p className="mt-3 text-2xl font-semibold text-gray-900">{docKeys.length}</p>
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <div className="grid min-h-0 gap-6 px-6 py-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <aside className="space-y-6 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Applicant summary</p>
+                <p className="mt-2 text-sm text-slate-600">Track student details, document progress, and approval requirements.</p>
               </div>
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.16em] text-gray-500">Approved</p>
-                <p className="mt-3 text-2xl font-semibold text-gray-900">{approved}</p>
-              </div>
-              <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-                <p className="text-xs uppercase tracking-[0.24em] text-gray-500">Pending / rejected</p>
-                <p className="mt-3 text-2xl font-semibold text-gray-900">{docKeys.length - approved}</p>
-              </div>
-            </div>
 
-            {/* Enrollment Form Section */}
-            <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-900">Enrollment form</p>
-                  <p className="mt-1 text-sm text-gray-500">Review the student's submitted enrollment details.</p>
+              <div className="space-y-3">
+                <div className="rounded-[24px] bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Student ID</p>
+                  <p className="mt-2 text-base font-semibold text-slate-900">{studentId}</p>
                 </div>
+                <div className="rounded-[24px] bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Email</p>
+                  <p className="mt-2 text-base font-semibold text-slate-900 truncate">{studentEmail}</p>
+                </div>
+                <div className="rounded-[24px] bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Documents approved</p>
+                  <p className="mt-2 text-2xl font-semibold text-slate-900">{approved} / {docKeys.length}</p>
+                </div>
+                <div className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Status</p>
+                  <p className={`mt-2 inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold ${allDocumentsApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>
+                    {allDocumentsApproved ? 'Ready for final approval' : 'Pending review'}
+                  </p>
+                </div>
+              </div>
+
+              {formData && (
                 <button
                   type="button"
                   onClick={() => setShowFormData(!showFormData)}
-                  className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
                 >
                   <Eye className="h-4 w-4" />
-                  View enrollment form
+                  {showFormData ? 'Hide enrollment form' : 'View enrollment form'}
                 </button>
-              </div>
-            </div>
+              )}
+            </aside>
 
-            {/* Enrollment Form Data */}
-            {showFormData && formData && (
-              <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Enrollment Form Details</h3>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {/* Personal Information */}
-                  <div>
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Personal Information</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Admission Type:</span> <span className="font-medium">{formData.admissionType}</span></div>
-                      <div><span className="text-gray-500">Previous Student ID:</span> <span className="font-medium">{formData.previousStudentId || 'N/A'}</span></div>
-                      <div><span className="text-gray-500">LRN:</span> <span className="font-medium">{formData.lrn}</span></div>
-                      <div><span className="text-gray-500">Full Name:</span> <span className="font-medium">{`${formData.lastName || ''}, ${formData.firstName || ''} ${formData.middleName || ''}`.trim()}</span></div>
-                      <div><span className="text-gray-500">Suffix:</span> <span className="font-medium">{formData.suffix || 'None'}</span></div>
-                      <div><span className="text-gray-500">Sex:</span> <span className="font-medium">{formData.sex}</span></div>
-                      <div><span className="text-gray-500">Civil Status:</span> <span className="font-medium">{formData.civilStatus}</span></div>
-                      <div><span className="text-gray-500">Religion:</span> <span className="font-medium">{formData.religion}</span></div>
-                      <div><span className="text-gray-500">Nationality:</span> <span className="font-medium">{formData.nationality}</span></div>
-                      <div><span className="text-gray-500">Disability:</span> <span className="font-medium">{formData.disability}{formData.disability === 'Others' && formData.disabilityOther ? ` — ${formData.disabilityOther}` : ''}</span></div>
-                      <div><span className="text-gray-500">Indigenous Group:</span> <span className="font-medium">{formData.indigenousGroup}{formData.indigenousGroup === 'Others' && formData.indigenousGroupOther ? ` — ${formData.indigenousGroupOther}` : ''}</span></div>
-                      <div><span className="text-gray-500">Birthday:</span> <span className="font-medium">{formData.birthday}</span></div>
-                      <div><span className="text-gray-500">Email:</span> <span className="font-medium">{formData.email}</span></div>
-                      <div><span className="text-gray-500">Contact Number:</span> <span className="font-medium">{formData.contactNumber}</span></div>
-                      <div><span className="text-gray-500">Facebook / Messenger:</span> <span className="font-medium">{formData.facebookName}</span></div>
-                      <div><span className="text-gray-500">Working Student:</span> <span className="font-medium">{formatBool(formData.isWorkingStudent)}</span></div>
-                    </div>
-                  </div>
-
-                  {/* Address */}
-                  <div className="pt-3 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Address</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Region:</span> <span className="font-medium">{formData.region}</span></div>
-                      <div><span className="text-gray-500">Province:</span> <span className="font-medium">{formData.province || 'N/A'}</span></div>
-                      <div><span className="text-gray-500">City / Municipality:</span> <span className="font-medium">{formData.city}</span></div>
-                      <div><span className="text-gray-500">Barangay:</span> <span className="font-medium">{formData.barangay}</span></div>
-                      <div className="col-span-2"><span className="text-gray-500">Home Address:</span> <span className="font-medium">{formData.homeAddress}</span></div>
-                    </div>
-                  </div>
-
-                  {/* Parents and Guardian */}
-                  <div className="pt-3 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Parents & Guardian</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Father's Name:</span> <span className="font-medium">{`${formData.fatherLastName || ''}, ${formData.fatherFirstName || ''} ${formData.fatherMiddleName || ''}`.trim()}</span></div>
-                      <div><span className="text-gray-500">Father's Occupation:</span> <span className="font-medium">{formData.fatherOccupation}</span></div>
-                      <div><span className="text-gray-500">Father's Contact:</span> <span className="font-medium">{formData.fatherContact}</span></div>
-                      <div><span className="text-gray-500">Mother's Maiden Name:</span> <span className="font-medium">{formData.motherMaidenName}</span></div>
-                      <div><span className="text-gray-500">Mother's Name:</span> <span className="font-medium">{`${formData.motherLastName || ''}, ${formData.motherFirstName || ''} ${formData.motherMiddleName || ''}`.trim()}</span></div>
-                      <div><span className="text-gray-500">Mother's Occupation:</span> <span className="font-medium">{formData.motherOccupation}</span></div>
-                      <div><span className="text-gray-500">Mother's Contact:</span> <span className="font-medium">{formData.motherContact}</span></div>
-                      <div><span className="text-gray-500">Guardian Relationship:</span> <span className="font-medium">{guardianSourceLabel}</span></div>
-                      <div><span className="text-gray-500">Guardian Name:</span> <span className="font-medium">{`${formData.guardianLastName || ''}, ${formData.guardianFirstName || ''} ${formData.guardianMiddleName || ''}`.trim() || 'N/A'}</span></div>
-                      <div><span className="text-gray-500">Guardian Occupation:</span> <span className="font-medium">{formData.guardianOccupation || 'N/A'}</span></div>
-                      <div><span className="text-gray-500">Guardian Contact:</span> <span className="font-medium">{formData.guardianContact || 'N/A'}</span></div>
-                      <div className="col-span-2"><span className="text-gray-500">4Ps Member:</span> <span className="font-medium">{formatBool(formData.is4PsMember)}</span></div>
-                    </div>
-                  </div>
-
-                  {/* Enrollment Information */}
-                  <div className="pt-3 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Enrollment Information</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Preferred Track:</span> <span className="font-medium">{formData.preferredTrack}</span></div>
-                      <div><span className="text-gray-500">Elective 1:</span> <span className="font-medium">{formData.elective1}</span></div>
-                      <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{formData.elective2}</span></div>
-                      <div><span className="text-gray-500">Year Level:</span> <span className="font-medium">{formData.yearLevel}</span></div>
-                    </div>
-                  </div>
-
-                  {/* Educational Background */}
-                  <div className="pt-3 border-t border-gray-300/50">
-                    <h4 className="text-sm font-bold text-gray-900 mb-2">Educational Background</h4>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div><span className="text-gray-500">Primary School:</span> <span className="font-medium">{formData.primarySchool}</span></div>
-                      <div><span className="text-gray-500">Year Graduated:</span> <span className="font-medium">{formData.primaryYearGraduated}</span></div>
-                      <div><span className="text-gray-500">Secondary School:</span> <span className="font-medium">{formData.secondarySchool}</span></div>
-                      <div><span className="text-gray-500">Year Graduated:</span> <span className="font-medium">{formData.secondaryYearGraduated}</span></div>
-                      <div className="col-span-2"><span className="text-gray-500">Grade 10 Adviser:</span> <span className="font-medium">{formData.grade10Adviser || 'N/A'}</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Progress Section */}
-            <div className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <main className="space-y-6 overflow-hidden rounded-[28px] border border-slate-200 bg-white p-5">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-sm text-gray-500">Overall progress</p>
-                  <p className="mt-1 text-base font-semibold text-gray-900">
-                    {approved} of {docKeys.length} documents approved
-                  </p>
+                  <p className="text-sm font-semibold text-slate-900">Document checklist</p>
+                  <p className="mt-1 text-sm text-slate-500">Approve or reject each document before finalizing the application.</p>
                 </div>
-                {approved === docKeys.length && (
-                  <span className="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-2 text-sm font-semibold text-green-800">
-                    <CheckCircle className="h-4 w-4" />
-                    All documents approved
-                  </span>
-                )}
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                  <span>{docKeys.length} documents</span>
+                  <span className="inline-flex h-1.5 w-1.5 rounded-full bg-slate-400" />
+                  <span>{approved} approved</span>
+                </div>
               </div>
-            </div>
 
-            {/* Document Table */}
-            <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-                {/* Bulk Actions Header */}
-                <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-6 py-4">
-                  <div className="flex items-center gap-4">
+              <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-4 py-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Bulk actions</p>
+                    <p className="text-sm text-slate-500">Select multiple documents to approve them in one step.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       onClick={handleSelectAll}
-                      className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 border border-gray-300 bg-white px-3 py-2 rounded-md hover:bg-gray-50 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400"
                     >
-                      {selectedDocuments.length === docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected").length && docKeys.filter(key => docs[key].status === "pending" || docs[key].status === "rejected").length > 0 ? (
+                      {selectedDocuments.length === docKeys.filter(key => docs[key].status === 'pending' || docs[key].status === 'rejected').length && docKeys.filter(key => docs[key].status === 'pending' || docs[key].status === 'rejected').length > 0 ? (
                         <CheckSquare className="h-4 w-4 text-blue-600" />
                       ) : (
-                        <Square className="h-4 w-4 text-gray-400" />
+                        <Square className="h-4 w-4 text-slate-400" />
                       )}
-                      Select All Pending/Rejected
+                      Select all pending/rejected
                     </button>
                     {selectedDocuments.length > 0 && (
                       <button
                         onClick={handleBulkApproveSelected}
-                        className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                        className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                       >
                         <CheckCircle className="h-4 w-4" />
-                        Approve Selected ({selectedDocuments.length})
+                        Approve selected ({selectedDocuments.length})
                       </button>
                     )}
                   </div>
-                  <div className="text-sm text-gray-500">
-                    {selectedDocuments.length} of {docKeys.filter(key => docs[key].status !== "approved").length} selectable selected
-                  </div>
-                </div>
-
-                {/* Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Select
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Document
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Uploaded
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {docKeys.map((key) => {
-                        const doc = docs[key];
-                        const isPending = doc.status === "pending";
-                        const isProcessed = doc.status === "approved";
-                        const isImage = doc.fileUrl && doc.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                        return (
-                          <tr
-                            key={key}
-                            className="hover:bg-gray-50"
-                          >
-                            <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              {doc.status !== "approved" ? (
-                                <button
-                                  onClick={() => handleSelectDocument(key)}
-                                  className="flex items-center justify-center w-6 h-6 rounded border border-gray-300 bg-white hover:bg-gray-50 transition-colors"
-                                >
-                                  {selectedDocuments.includes(key) ? (
-                                    <CheckSquare className="h-4 w-4 text-blue-600" />
-                                  ) : (
-                                    <Square className="h-4 w-4 text-gray-400" />
-                                  )}
-                                </button>
-                              ) : (
-                                <div className="w-6 h-6"></div>
-                              )}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center gap-3">
-                                <FileText className="h-5 w-5 text-gray-400" />
-                                <div
-                                  className="cursor-pointer"
-                                  onClick={() => handleRowClick(key)}
-                                >
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {documentNames[key] || key}
-                                  </div>
-                                  <div className="text-sm text-gray-500 truncate max-w-xs">
-                                    {doc.fileName}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
-                                doc.status === "approved"
-                                  ? "bg-green-100 text-green-800"
-                                  : doc.status === "rejected"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-amber-100 text-amber-800"
-                              }`}>
-                                {doc.status.toUpperCase()}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                              {doc.uploadDate}
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center gap-2">
-                                {doc.status !== "approved" ? (
-                                  <>
-                                    <button
-                                      onClick={() => handleApproveFromTableLocal(key)}
-                                      className="inline-flex items-center gap-1 rounded-full bg-green-600 px-3 py-1 text-xs font-semibold text-white hover:bg-green-700"
-                                    >
-                                      <CheckCircle className="h-3 w-3" />
-                                      {doc.status === "rejected" ? "Re-approve" : "Approve"}
-                                    </button>
-                                    {doc.status !== "approved" && (
-                                      <button
-                                        onClick={() => handleRejectFromTable(key)}
-                                        className="inline-flex items-center gap-1 rounded-full bg-red-600 px-3 py-1 text-xs font-semibold text-white hover:bg-red-700"
-                                      >
-                                        <XCircle className="h-3 w-3" />
-                                        Reject
-                                      </button>
-                                    )}
-                                  </>
-                                ) : (
-                                  <span className="text-gray-400 text-xs">
-                                    Approved
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
                 </div>
               </div>
+
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-slate-50 text-slate-500">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.18em]">Select</th>
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.18em]">Document</th>
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.18em]">Status</th>
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.18em]">Uploaded</th>
+                      <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.18em]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {docKeys.map((key) => {
+                      const doc = docs[key];
+                      return (
+                        <tr key={key} className="hover:bg-slate-50">
+                          <td className="px-4 py-4 align-top" onClick={(e) => e.stopPropagation()}>
+                            {doc.status !== 'approved' ? (
+                              <button
+                                onClick={() => handleSelectDocument(key)}
+                                className="flex h-7 w-7 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 transition hover:bg-slate-100"
+                              >
+                                {selectedDocuments.includes(key) ? (
+                                  <CheckSquare className="h-4 w-4 text-blue-600" />
+                                ) : (
+                                  <Square className="h-4 w-4 text-slate-400" />
+                                )}
+                              </button>
+                            ) : (
+                              <div className="h-7 w-7" />
+                            )}
+                          </td>
+                          <td className="px-4 py-4 align-top">
+                            <button
+                              type="button"
+                              onClick={() => handleRowClick(key)}
+                              className="text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <FileText className="h-5 w-5 text-slate-400" />
+                                <div>
+                                  <div className="text-sm font-semibold text-slate-900">{documentNames[key] || key}</div>
+                                  <div className="text-xs text-slate-500 truncate max-w-[16rem]">{doc.fileName}</div>
+                                </div>
+                              </div>
+                            </button>
+                          </td>
+                          <td className="px-4 py-4 align-top">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              doc.status === 'approved'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : doc.status === 'rejected'
+                                ? 'bg-rose-100 text-rose-800'
+                                : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {doc.status.toUpperCase()}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 align-top text-sm text-slate-500">{doc.uploadDate}</td>
+                          <td className="px-4 py-4 align-top text-sm">
+                            <div className="flex flex-wrap gap-2">
+                              {doc.status !== 'approved' ? (
+                                <>
+                                  <button
+                                    onClick={() => handleApproveFromTableLocal(key)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                                  >
+                                    <CheckCircle className="h-3 w-3" />
+                                    {doc.status === 'rejected' ? 'Re-approve' : 'Approve'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleRejectFromTable(key)}
+                                    className="inline-flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1 text-xs font-semibold text-white transition hover:bg-rose-700"
+                                  >
+                                    <XCircle className="h-3 w-3" />
+                                    Reject
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="text-slate-500 text-xs">Approved</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {showFormData && formData && (
+                <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50 p-5">
+                  <h3 className="text-lg font-semibold text-slate-900 mb-4">Enrollment Form Details</h3>
+                  <div className="space-y-4 max-h-96 overflow-y-auto">
+                    {/* Personal Information */}
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">Personal Information</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-slate-500">Admission Type:</span> <span className="font-medium text-slate-900">{formData.admissionType}</span></div>
+                        <div><span className="text-slate-500">Previous Student ID:</span> <span className="font-medium text-slate-900">{formData.previousStudentId || 'N/A'}</span></div>
+                        <div><span className="text-slate-500">LRN:</span> <span className="font-medium text-slate-900">{formData.lrn}</span></div>
+                        <div><span className="text-slate-500">Full Name:</span> <span className="font-medium text-slate-900">{`${formData.lastName || ''}, ${formData.firstName || ''} ${formData.middleName || ''}`.trim()}</span></div>
+                        <div><span className="text-slate-500">Suffix:</span> <span className="font-medium text-slate-900">{formData.suffix || 'None'}</span></div>
+                        <div><span className="text-slate-500">Sex:</span> <span className="font-medium text-slate-900">{formData.sex}</span></div>
+                        <div><span className="text-slate-500">Civil Status:</span> <span className="font-medium text-slate-900">{formData.civilStatus}</span></div>
+                        <div><span className="text-slate-500">Religion:</span> <span className="font-medium text-slate-900">{formData.religion}</span></div>
+                        <div><span className="text-slate-500">Nationality:</span> <span className="font-medium text-slate-900">{formData.nationality}</span></div>
+                        <div><span className="text-slate-500">Disability:</span> <span className="font-medium text-slate-900">{formData.disability}{formData.disability === 'Others' && formData.disabilityOther ? ` — ${formData.disabilityOther}` : ''}</span></div>
+                        <div><span className="text-slate-500">Indigenous Group:</span> <span className="font-medium text-slate-900">{formData.indigenousGroup}{formData.indigenousGroup === 'Others' && formData.indigenousGroupOther ? ` — ${formData.indigenousGroupOther}` : ''}</span></div>
+                        <div><span className="text-slate-500">Birthday:</span> <span className="font-medium text-slate-900">{formData.birthday}</span></div>
+                        <div><span className="text-slate-500">Email:</span> <span className="font-medium text-slate-900">{formData.email}</span></div>
+                        <div><span className="text-slate-500">Contact Number:</span> <span className="font-medium text-slate-900">{formData.contactNumber}</span></div>
+                        <div><span className="text-slate-500">Facebook / Messenger:</span> <span className="font-medium text-slate-900">{formData.facebookName}</span></div>
+                        <div><span className="text-slate-500">Working Student:</span> <span className="font-medium text-slate-900">{formatBool(formData.isWorkingStudent)}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-300/50">
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">Address</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-slate-500">Region:</span> <span className="font-medium text-slate-900">{formData.region}</span></div>
+                        <div><span className="text-slate-500">Province:</span> <span className="font-medium text-slate-900">{formData.province || 'N/A'}</span></div>
+                        <div><span className="text-slate-500">City / Municipality:</span> <span className="font-medium text-slate-900">{formData.city}</span></div>
+                        <div><span className="text-slate-500">Barangay:</span> <span className="font-medium text-slate-900">{formData.barangay}</span></div>
+                        <div className="col-span-2"><span className="text-slate-500">Home Address:</span> <span className="font-medium text-slate-900">{formData.homeAddress}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-300/50">
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">Parents & Guardian</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-slate-500">Father's Name:</span> <span className="font-medium text-slate-900">{`${formData.fatherLastName || ''}, ${formData.fatherFirstName || ''} ${formData.fatherMiddleName || ''}`.trim()}</span></div>
+                        <div><span className="text-slate-500">Father's Occupation:</span> <span className="font-medium text-slate-900">{formData.fatherOccupation}</span></div>
+                        <div><span className="text-slate-500">Father's Contact:</span> <span className="font-medium text-slate-900">{formData.fatherContact}</span></div>
+                        <div><span className="text-slate-500">Mother's Maiden Name:</span> <span className="font-medium text-slate-900">{formData.motherMaidenName}</span></div>
+                        <div><span className="text-slate-500">Mother's Name:</span> <span className="font-medium text-slate-900">{`${formData.motherLastName || ''}, ${formData.motherFirstName || ''} ${formData.motherMiddleName || ''}`.trim()}</span></div>
+                        <div><span className="text-slate-500">Mother's Occupation:</span> <span className="font-medium text-slate-900">{formData.motherOccupation}</span></div>
+                        <div><span className="text-slate-500">Mother's Contact:</span> <span className="font-medium text-slate-900">{formData.motherContact}</span></div>
+                        <div><span className="text-slate-500">Guardian Relationship:</span> <span className="font-medium text-slate-900">{guardianSourceLabel}</span></div>
+                        <div><span className="text-slate-500">Guardian Name:</span> <span className="font-medium text-slate-900">{`${formData.guardianLastName || ''}, ${formData.guardianFirstName || ''} ${formData.guardianMiddleName || ''}`.trim() || 'N/A'}</span></div>
+                        <div><span className="text-slate-500">Guardian Occupation:</span> <span className="font-medium text-slate-900">{formData.guardianOccupation || 'N/A'}</span></div>
+                        <div><span className="text-slate-500">Guardian Contact:</span> <span className="font-medium text-slate-900">{formData.guardianContact || 'N/A'}</span></div>
+                        <div className="col-span-2"><span className="text-slate-500">4Ps Member:</span> <span className="font-medium text-slate-900">{formatBool(formData.is4PsMember)}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-300/50">
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">Enrollment Information</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-slate-500">Preferred Track:</span> <span className="font-medium text-slate-900">{formData.preferredTrack}</span></div>
+                        <div><span className="text-slate-500">Elective 1:</span> <span className="font-medium text-slate-900">{formData.elective1}</span></div>
+                        <div><span className="text-slate-500">Elective 2:</span> <span className="font-medium text-slate-900">{formData.elective2}</span></div>
+                        <div><span className="text-slate-500">Year Level:</span> <span className="font-medium text-slate-900">{formData.yearLevel}</span></div>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-300/50">
+                      <h4 className="text-sm font-bold text-slate-900 mb-2">Educational Background</h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div><span className="text-slate-500">Primary School:</span> <span className="font-medium text-slate-900">{formData.primarySchool}</span></div>
+                        <div><span className="text-slate-500">Year Graduated:</span> <span className="font-medium text-slate-900">{formData.primaryYearGraduated}</span></div>
+                        <div><span className="text-slate-500">Secondary School:</span> <span className="font-medium text-slate-900">{formData.secondarySchool}</span></div>
+                        <div><span className="text-slate-500">Year Graduated:</span> <span className="font-medium text-slate-900">{formData.secondaryYearGraduated}</span></div>
+                        <div className="col-span-2"><span className="text-slate-500">Grade 10 Adviser:</span> <span className="font-medium text-slate-900">{formData.grade10Adviser || 'N/A'}</span></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </main>
           </div>
         </div>
-        <div className="shrink-0 border-t border-gray-200 bg-white px-6 py-4">
+
+        <div className="shrink-0 border-t border-slate-200 bg-white px-6 py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className={`text-sm font-medium ${allDocumentsApproved ? 'text-green-700' : 'text-gray-500'}`}>
+            <p className={`text-sm font-medium ${allDocumentsApproved ? 'text-emerald-700' : 'text-slate-500'}`}>
               {allDocumentsApproved
                 ? 'All documents approved. Ready for final approval.'
                 : 'Approve all documents first to continue.'}
@@ -541,7 +521,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
               <button
                 type="button"
                 onClick={handleRejectApplication}
-                className="inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition bg-red-600 hover:bg-red-700"
+                className="inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition bg-rose-600 hover:bg-rose-700"
               >
                 <XCircle className="mr-2 h-4 w-4" />
                 Reject Application
@@ -550,7 +530,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
                 type="button"
                 onClick={handleFinalApprove}
                 disabled={!allDocumentsApproved}
-                className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-300 cursor-not-allowed'}`}
+                className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold text-white transition ${allDocumentsApproved ? 'bg-slate-900 hover:bg-slate-800' : 'bg-slate-300 cursor-not-allowed'}`}
               >
                 <CheckCircle className="mr-2 h-4 w-4" />
                 Approve Application
