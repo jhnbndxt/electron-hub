@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import logo from "../../assets/electronLogo";
+import { PageTransition } from "../components/PageTransition";
 
 export function PublicLayout() {
   const location = useLocation();
@@ -352,7 +353,11 @@ export function PublicLayout() {
 
       {/* Main Content */}
       <main className="flex-1">
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <PageTransition key={location.pathname}>
+            <Outlet />
+          </PageTransition>
+        </AnimatePresence>
       </main>
 
       {/* Footer */}

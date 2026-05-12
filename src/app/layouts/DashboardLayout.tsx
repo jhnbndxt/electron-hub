@@ -31,6 +31,8 @@ import { loadProfileImageUrl } from "../utils/profileImage";
 import { supabase } from "../../supabase";
 import logo from "../../assets/electronLogo";
 import { Button } from "../components/ui/button";
+import { AnimatePresence } from "motion/react";
+import { PageTransition } from "../components/PageTransition";
 
 function NotificationTimestamp({ timestamp }: { timestamp: string }) {
   const formattedTimestamp = formatNotificationTimestamp(timestamp);
@@ -940,7 +942,11 @@ function DashboardLayoutContent() {
 
         {/* Page Content */}
         <main className="portal-glass-main min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-20">
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname} className="min-h-full">
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
         </main>
       </div>
 

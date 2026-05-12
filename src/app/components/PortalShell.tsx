@@ -1,10 +1,11 @@
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { ArrowLeft, LogOut, Menu, X, type LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { AnimatePresence } from "motion/react";
 import { useAuth } from "../context/AuthContext";
 import logo from "../../assets/electronLogo";
 import { Button } from "./ui/button";
+import { PageTransition } from "./PageTransition";
 
 export interface PortalNavItem {
   path: string;
@@ -183,7 +184,11 @@ export function PortalShell({
         </header>
 
         <main className="portal-glass-main min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-0">
-          <Outlet />
+          <AnimatePresence mode="wait">
+            <PageTransition key={location.pathname} className="min-h-full">
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
         </main>
       </div>
 

@@ -219,26 +219,36 @@ export function About() {
       </section>
 
       {/* Call to Action Section */}
-      <section className="py-16" style={{ backgroundColor: "#1E3A8A" }}>
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-white mb-6">
+      <section
+        className="relative overflow-hidden py-20 text-center text-white"
+        style={{
+          background: "linear-gradient(135deg, #1E3A8A 0%, #1e40af 50%, #2563eb 100%)",
+        }}
+      >
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-10 right-20 h-64 w-64 rounded-full bg-white blur-3xl"></div>
+          <div className="absolute bottom-10 left-20 h-80 w-80 rounded-full bg-white blur-3xl"></div>
+        </div>
+
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-4xl md:text-5xl font-bold mb-6">
             Join the Electron College Family
           </h2>
-          <p className="text-xl text-blue-100 mb-8 leading-relaxed">
+          <p className="text-xl md:text-2xl text-blue-100 mb-10 leading-relaxed font-light">
             Be part of a community that values excellence, innovation, and holistic development. 
             Start your journey with us today.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <a
               href="/enrollment-info"
-              className="px-8 py-4 rounded-lg font-semibold text-lg transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="smooth-button px-10 py-4 rounded-xl font-semibold text-lg shadow-lg hover:shadow-2xl"
               style={{ backgroundColor: "#B91C1C", color: "white" }}
             >
               Learn About Enrollment
             </a>
             <a
               href="/contact"
-              className="px-8 py-4 bg-white rounded-lg font-semibold text-lg transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 border-2 border-white"
+              className="smooth-button px-10 py-4 bg-white rounded-xl font-semibold text-lg shadow-lg hover:shadow-2xl border-2 border-white"
               style={{ color: "#1E3A8A" }}
             >
               Contact Us

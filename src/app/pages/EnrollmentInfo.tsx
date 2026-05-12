@@ -190,7 +190,7 @@ export function EnrollmentInfo() {
               {enrollmentSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <div key={step.title} className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-950/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                  <div key={step.title} className="smooth-hover relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-950/5 hover:shadow-xl">
                     <div className="mb-5 flex items-center justify-between gap-3">
                       <div
                         className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-md"
@@ -538,7 +538,7 @@ export function EnrollmentInfo() {
             <Link
               to="/login"
               state={{ fromPublicLogin: true }}
-              className="px-8 py-3 rounded-md text-white transition-colors hover:opacity-90"
+              className="smooth-button px-8 py-3 rounded-md text-white hover:shadow-lg"
               style={{ backgroundColor: "var(--electron-blue)" }}
             >
               Login to Continue
@@ -546,7 +546,7 @@ export function EnrollmentInfo() {
             <Link
               to={userRole === "student" ? "/dashboard/assessment" : "/login?from=assessment"}
               state={userRole === "student" ? undefined : { fromPublicLogin: true }}
-              className="px-8 py-3 rounded-md text-white transition-colors hover:opacity-90"
+              className="smooth-button px-8 py-3 rounded-md text-white hover:shadow-lg"
               style={{ backgroundColor: "var(--electron-blue)" }}
               preventScrollReset={false}
             >

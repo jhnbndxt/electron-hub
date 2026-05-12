@@ -323,19 +323,18 @@ export function Home() {
               </div>
               
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight">
-                Electron Hub
+                Find the strand that fits the future you want.
               </h1>
               <p className="text-lg sm:text-xl md:text-2xl text-blue-100 mb-4 font-light">
-                Senior High School Online Enrollment and Assessment Portal
+                Electron Hub guides Senior High applicants from assessment to enrollment in one clear, online flow.
               </p>
               <p className="text-lg text-blue-50 mb-8 leading-relaxed">
-                Discover your path to success with our AI-assisted strand recommendation system.
-                Make informed decisions about your academic future.
+                Answer the assessment, get AI-assisted strand guidance, submit requirements, and move toward your first day at Electron College with confidence.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 w-full">
                 <Link
                   to="/assessment"
-                  className="px-8 py-4 rounded-lg text-white transition-all hover:scale-105 hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold w-full sm:w-auto"
+                  className="smooth-button px-8 py-4 rounded-lg text-white hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold w-full sm:w-auto"
                   style={{ backgroundColor: "rgba(255, 255, 255, 0.15)", backdropFilter: "blur(10px)", border: "2px solid white" }}
                 >
                   Start Assessment
@@ -343,7 +342,7 @@ export function Home() {
                 </Link>
                 <Link
                   to="/enrollment-info"
-                  className="px-8 py-4 rounded-lg text-white transition-all hover:scale-105 hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold w-full sm:w-auto"
+                  className="smooth-button px-8 py-4 rounded-lg text-white hover:shadow-xl inline-flex items-center justify-center gap-2 font-semibold w-full sm:w-auto"
                   style={{ backgroundColor: "var(--electron-red)" }}
                 >
                   Enroll Now
@@ -388,7 +387,7 @@ export function Home() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-            <div className="text-center p-8 rounded-xl bg-gradient-to-br from-blue-50 to-white border border-blue-100 hover:shadow-xl transition-all hover:-translate-y-1">
+            <div className="smooth-hover text-center p-8 rounded-xl bg-gradient-to-br from-blue-50 to-white border border-blue-100 hover:shadow-xl">
               <div
                 className="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg"
                 style={{ backgroundColor: "var(--electron-blue)" }}
@@ -402,7 +401,7 @@ export function Home() {
                 AI-powered evaluation of your academic skills, interests, and strengths
               </p>
             </div>
-            <div className="text-center p-8 rounded-xl bg-gradient-to-br from-red-50 to-white border border-red-100 hover:shadow-xl transition-all hover:-translate-y-1">
+            <div className="smooth-hover text-center p-8 rounded-xl bg-gradient-to-br from-red-50 to-white border border-red-100 hover:shadow-xl">
               <div
                 className="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg"
                 style={{ backgroundColor: "var(--electron-red)" }}
@@ -416,7 +415,7 @@ export function Home() {
                 Receive tailored strand suggestions based on your unique profile
               </p>
             </div>
-            <div className="text-center p-8 rounded-xl bg-gradient-to-br from-blue-50 to-white border border-blue-100 hover:shadow-xl transition-all hover:-translate-y-1">
+            <div className="smooth-hover text-center p-8 rounded-xl bg-gradient-to-br from-blue-50 to-white border border-blue-100 hover:shadow-xl">
               <div
                 className="w-20 h-20 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg"
                 style={{ backgroundColor: "var(--electron-blue)" }}
@@ -452,7 +451,7 @@ export function Home() {
               {processSteps.map((step, index) => {
                 const Icon = step.icon;
                 return (
-                  <div key={step.number} className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-950/5 transition-all hover:-translate-y-1 hover:shadow-xl">
+                  <div key={step.number} className="smooth-hover relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-950/5 hover:shadow-xl">
                     <div className="mb-5 flex items-center justify-between">
                       <div
                         className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg"
@@ -503,7 +502,7 @@ export function Home() {
             {strands.map((strand) => (
               <div
                 key={strand.name}
-                className="border-2 rounded-2xl p-8 hover:shadow-2xl transition-all hover:-translate-y-1 bg-white"
+                className="smooth-hover border-2 rounded-2xl p-8 hover:shadow-2xl bg-white"
                 style={{ borderColor: strand.color }}
               >
                 <div className="flex items-start gap-6">
@@ -722,7 +721,7 @@ export function Home() {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                               <div className="min-w-0 flex-1">
-                                <div className="mb-3 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-center ${accentStyles.badgeClassName}">
+                                <div className={`mb-3 inline-flex rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-center ${accentStyles.badgeClassName}`}>
                                   {announcement.accentColor === "red" ? "Priority Update" : "System Update"}
                                 </div>
                                 <h3 className="text-2xl font-bold mb-3" style={{ color: "var(--electron-dark-gray)" }}>
@@ -790,14 +789,14 @@ export function Home() {
             <Link
               to="/login"
               state={{ fromPublicLogin: true }}
-              className="px-10 py-4 bg-white rounded-xl transition-all hover:scale-105 hover:shadow-2xl font-semibold text-lg"
+              className="smooth-button px-10 py-4 bg-white rounded-xl hover:shadow-2xl font-semibold text-lg"
               style={{ color: "var(--electron-blue)" }}
             >
               Get Started
             </Link>
             <Link
               to="/about"
-              className="px-10 py-4 rounded-xl text-white transition-all hover:scale-105 hover:shadow-2xl font-semibold text-lg border-2 border-white"
+              className="smooth-button px-10 py-4 rounded-xl text-white hover:shadow-2xl font-semibold text-lg border-2 border-white"
               style={{ backgroundColor: "var(--electron-red)" }}
             >
               Learn More
