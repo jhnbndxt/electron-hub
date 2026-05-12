@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   CheckCircle,
-  ClipboardCheck,
   Eye,
   FileText,
   Maximize2,
@@ -365,10 +364,52 @@ export function ApplicationReviewPage() {
     navigate(`${basePath}/pending`);
   };
 
-  const renderFormValue = (label: string, value: any) => (
-    <div className="rounded-lg border border-slate-200 bg-white/80 px-4 py-3">
-      <p className="text-xs font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-sm font-semibold text-slate-900">{value || "Not provided"}</p>
+  const moveToNextApplicant = async () => {
+    const { data, error } = await supabase
+      .from("enrollments")
+      .select("id, status, enrollment_date")
+      .neq("status", "enrolled")
+      .neq("status", "rejected")
+      .order("enrollment_date", { ascending: false });
+
+    if (error || !data?.length) {
+      toast.error(error?.message || "No other applicants found.");
+      return;
+    }
+
+    const currentIndex = data.findIndex((item: any) => String(item.id) === String(enrollment.id));
+    const next = data[currentIndex + 1] || data.find((item: any) => String(item.id) !== String(enrollment.id));
+
+    if (!next) {
+      toast.error("No next applicant available.");
+      return;
+    }
+
+    navigate(`${basePath}/review/${next.id}`);
+  };
+
+  const formatFieldLabel = (key: string) =>
+    key
+      .replace(/([A-Z])/g, " $1")
+      .replace(/_/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^./, (char) => char.toUpperCase());
+
+  const formatFieldValue = (value: any): string => {
+    if (value === null || value === undefined || value === "") return "Not provided";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (Array.isArray(value)) return value.length ? value.join(", ") : "Not provided";
+    if (typeof value === "object") return Object.entries(value).map(([key, item]) => `${formatFieldLabel(key)}: ${formatFieldValue(item)}`).join(" | ");
+    return String(value);
+  };
+
+  const submittedFormEntries = Object.entries(formData || {}).filter(([_, value]) => value !== undefined && value !== null && value !== "");
+
+  const renderFormValue = ([key, value]: [string, any]) => (
+    <div key={key} className="rounded-lg border border-slate-200/80 bg-white/75 px-3 py-2 shadow-sm">
+      <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{formatFieldLabel(key)}</p>
+      <p className="mt-1 break-words text-xs font-semibold text-slate-900">{formatFieldValue(value)}</p>
     </div>
   );
 
@@ -392,7 +433,7 @@ export function ApplicationReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/40 to-white p-4 text-slate-900 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-white p-3 text-slate-900 sm:p-4">
       <Toaster position="top-right" />
 
       {isProcessing && (
@@ -404,256 +445,267 @@ export function ApplicationReviewPage() {
         </div>
       )}
 
-      <header className="rounded-xl border border-white/70 bg-white/75 p-5 shadow-lg backdrop-blur-md">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-center">
+      <div className="mx-auto max-w-[1320px] rounded-xl border border-white/70 bg-white/60 p-4 shadow-xl shadow-blue-950/10 backdrop-blur-xl">
+        <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h1 className="text-lg font-black text-slate-950">Pending Application Review</h1>
+            <p className="mt-1 text-xs font-medium text-slate-500">Review and verify documents before approving the application.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => navigate(`${basePath}/pending`)}
-              className="inline-flex w-fit items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300/80 bg-white/80 px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-white"
             >
               <ArrowLeft className="h-4 w-4" />
-              Back to Applications
+              Back
             </button>
-            <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-blue-100 text-lg font-black text-blue-800">
-                {studentProfile?.profile_picture_url ? (
-                  <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  initials
-                )}
-              </div>
-              <div className="min-w-0">
-                <h1 className="truncate text-2xl font-black text-slate-950">{studentName}</h1>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
-                  <span className="rounded-full bg-slate-100 px-3 py-1">Student ID: {String(enrollment.id).slice(0, 8)}</span>
-                  <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">Track/Strand: {formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</span>
-                  <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-700">Status: {String(enrollment.status || "pending").replace(/_/g, " ")}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setShowForm((current) => !current)}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-800"
-          >
-            <Eye className="h-4 w-4" />
-            View Full Enrollment Form
-          </button>
-        </div>
-      </header>
-
-      {showForm && (
-        <section className="mt-5 rounded-xl border border-white/70 bg-white/75 p-5 shadow-lg backdrop-blur-md">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-black text-slate-950">Full Enrollment Form</h2>
-            <button onClick={() => setShowForm(false)} className="rounded-lg p-2 text-slate-500 hover:bg-slate-100">
-              <X className="h-4 w-4" />
+            <button
+              onClick={moveToNextApplicant}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-800"
+            >
+              Move to Next Applicant
             </button>
           </div>
-          <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {renderFormValue("Full Name", `${formData.lastName || ""}, ${formData.firstName || ""} ${formData.middleName || ""}`.trim())}
-            {renderFormValue("LRN", formData.lrn)}
-            {renderFormValue("Email", formData.email || enrollment.user_id)}
-            {renderFormValue("Contact Number", formData.contactNumber)}
-            {renderFormValue("Birthday", formData.birthday || formData.birthDate)}
-            {renderFormValue("Sex", formData.sex)}
-            {renderFormValue("Preferred Track", formData.preferredTrack || formData.track)}
-            {renderFormValue("Year Level", formData.yearLevel)}
-            {renderFormValue("Address", [formData.homeAddress, formData.barangay, formData.city, formData.province].filter(Boolean).join(", "))}
-            {renderFormValue("Guardian", `${formData.guardianFirstName || ""} ${formData.guardianLastName || ""}`.trim())}
-            {renderFormValue("Guardian Contact", formData.guardianContact)}
-            {renderFormValue("4Ps Member", formData.is4PsMember ? "Yes" : "No")}
-          </div>
-        </section>
-      )}
+        </header>
 
-      <main className="mt-5 grid gap-5 xl:grid-cols-[390px_minmax(0,1fr)]">
-        <aside className="space-y-5">
-          <section className="rounded-xl border border-white/70 bg-white/80 p-5 shadow-lg backdrop-blur-md">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Document Checklist</p>
-                <h2 className="mt-1 text-lg font-black text-slate-950">{uploadedDocuments.length} uploaded</h2>
-              </div>
-              <ClipboardCheck className="h-6 w-6 text-blue-700" />
-            </div>
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                onClick={() => setSelectedDocs(pendingDocuments.map((doc) => doc.key))}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-              >
-                Select pending
-              </button>
-              <button
-                onClick={() => setSelectedDocs([])}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50"
-              >
-                Clear
-              </button>
-              <button
-                onClick={approveSelectedDocuments}
-                disabled={selectedDocs.length === 0 || isProcessing}
-                className="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-bold text-white hover:bg-emerald-700 disabled:bg-slate-300"
-              >
-                Approve selected ({selectedDocs.length})
-              </button>
-            </div>
-
-            <div className="mt-4 space-y-2">
-              {documents.map((doc) => (
-                <button
-                  key={doc.key}
-                  onClick={() => setSelectedDocKey(doc.key)}
-                  className={`w-full rounded-lg border p-3 text-left transition ${
-                    selectedDocKey === doc.key ? "border-blue-400 bg-blue-50 shadow-sm" : "border-slate-200 bg-white hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedDocs.includes(doc.key)}
-                      disabled={!doc.id || doc.status === "approved"}
-                      onClick={(event) => event.stopPropagation()}
-                      onChange={(event) => {
-                        setSelectedDocs((current) =>
-                          event.target.checked ? [...current, doc.key] : current.filter((key) => key !== doc.key)
-                        );
-                      }}
-                      className="mt-1 h-4 w-4 accent-blue-700"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="truncate text-sm font-black text-slate-900">{doc.label}</p>
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
-                            doc.status === "approved"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : doc.status === "rejected"
-                              ? "bg-rose-100 text-rose-700"
-                              : doc.status === "missing"
-                              ? "bg-slate-100 text-slate-500"
-                              : "bg-amber-100 text-amber-700"
-                          }`}
-                        >
-                          {doc.status}
-                        </span>
-                      </div>
-                      <p className="mt-1 truncate text-xs text-slate-500">{doc.fileName}</p>
-                      {doc.rejectionComment && <p className="mt-2 text-xs font-semibold text-rose-700">{doc.rejectionComment}</p>}
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-xl border border-white/70 bg-white/80 p-5 shadow-lg backdrop-blur-md">
-            <p className="text-xs font-bold uppercase tracking-wide text-blue-700">Voucher Eligibility</p>
-            <p className="mt-1 text-sm text-slate-600">Required before application approval.</p>
-            <div className="mt-4 grid gap-2">
-              <label className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 ${voucherEligibility === "eligible" ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white"}`}>
-                <input type="radio" checked={voucherEligibility === "eligible"} onChange={() => setVoucherEligibility("eligible")} className="h-4 w-4 accent-blue-700" />
-                <span className="text-sm font-black text-slate-900">Yes, Eligible</span>
-              </label>
-              <label className={`flex cursor-pointer items-center gap-3 rounded-lg border px-4 py-3 ${voucherEligibility === "not_eligible" ? "border-rose-500 bg-rose-50" : "border-slate-200 bg-white"}`}>
-                <input type="radio" checked={voucherEligibility === "not_eligible"} onChange={() => setVoucherEligibility("not_eligible")} className="h-4 w-4 accent-rose-600" />
-                <span className="text-sm font-black text-slate-900">No, Not Eligible</span>
-              </label>
-            </div>
-            {existingVoucherStatus && <p className="mt-3 text-xs font-semibold text-slate-500">Saved decision: {String(existingVoucherStatus).replace("_", " ")}</p>}
-          </section>
-        </aside>
-
-        <section className="flex min-h-[720px] flex-col overflow-hidden rounded-xl border border-slate-200 bg-slate-950 shadow-xl">
-          <div className="flex flex-col gap-3 border-b border-slate-800 bg-slate-900 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-xs font-bold uppercase tracking-wide text-blue-300">Document Viewer</p>
-              <h2 className="truncate text-base font-black text-white">{selectedDocument?.label || "Select a document"}</h2>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button onClick={() => setZoom((current) => Math.max(50, current - 10))} className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20" title="Zoom out">
-                <Minus className="h-4 w-4" />
-              </button>
-              <span className="rounded-lg bg-white px-3 py-2 text-xs font-black text-slate-900">{zoom}%</span>
-              <button onClick={() => setZoom((current) => Math.min(180, current + 10))} className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20" title="Zoom in">
-                <Plus className="h-4 w-4" />
-              </button>
-              {selectedDocument?.fileUrl && (
-                <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-white/10 p-2 text-white hover:bg-white/20" title="Fullscreen">
-                  <Maximize2 className="h-4 w-4" />
-                </a>
+        <section className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+          <div className="grid gap-3 lg:grid-cols-[92px_1fr] lg:items-center">
+            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xl font-black text-blue-800 ring-1 ring-white/80">
+              {studentProfile?.profile_picture_url ? (
+                <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
               )}
             </div>
-          </div>
 
-          <div className="flex flex-wrap gap-2 border-b border-slate-800 bg-slate-900/80 px-4 py-3">
-            <button
-              onClick={() => approveDocument()}
-              disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
-              className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-black text-white hover:bg-emerald-700 disabled:bg-slate-600"
-            >
-              <CheckCircle className="h-4 w-4" />
-              Approve Document
-            </button>
-            <button
-              onClick={() => {
-                setDocRejectKey(selectedDocument?.key || null);
-                setDocRejectReason(selectedDocument?.rejectionComment || "");
-              }}
-              disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
-              className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-black text-white hover:bg-rose-700 disabled:bg-slate-600"
-            >
-              <XCircle className="h-4 w-4" />
-              Reject Document
-            </button>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-auto p-4">
-            {selectedDocument?.fileUrl ? (
-              selectedDocument.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                <div className="flex min-h-full items-start justify-center p-8">
-                  <img
-                    src={selectedDocument.fileUrl}
-                    alt={selectedDocument.label}
-                    style={{ transform: `scale(${zoom / 100})` }}
-                    className="max-h-none max-w-full origin-top rounded-lg bg-white object-contain shadow-2xl transition-transform"
-                  />
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-black text-slate-950">{studentName}</h2>
+              <div className="mt-3 grid gap-3 text-xs text-slate-600 md:grid-cols-3">
+                <div className="border-l border-slate-200 pl-4">
+                  <p className="font-black text-slate-900">{formData.email || enrollment.user_id || "No email provided"}</p>
+                  <p className="mt-1 text-[11px] font-medium text-slate-500">Email Address</p>
                 </div>
-              ) : (
-                <iframe
-                  src={selectedDocument.fileUrl}
-                  title={selectedDocument.label}
-                  style={{ width: `${zoom}%` }}
-                  className="mx-auto h-full min-h-[760px] rounded-lg bg-white"
-                />
-              )
-            ) : (
-              <div className="flex h-full min-h-[560px] items-center justify-center text-center text-slate-300">
-                <div>
-                  <FileText className="mx-auto h-16 w-16 text-slate-500" />
-                  <p className="mt-3 text-lg font-black">No uploaded file</p>
-                  <p className="mt-1 text-sm text-slate-400">Select another document or ask the student to upload this requirement.</p>
+                <div className="border-l border-slate-200 pl-4">
+                  <p className="font-black text-slate-900">{String(enrollment.id)}</p>
+                  <p className="mt-1 text-[11px] font-medium text-slate-500">Student ID</p>
+                </div>
+                <div className="border-l border-slate-200 pl-4">
+                  <p className="font-black text-slate-900">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
+                  <p className="mt-1 text-[11px] font-medium text-slate-500">Academic Track / Strand</p>
                 </div>
               </div>
-            )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex justify-center">
+            <button
+              onClick={() => setShowForm((current) => !current)}
+              className="inline-flex min-w-[280px] items-center justify-center gap-2 rounded-lg border border-blue-500/70 bg-white/60 px-4 py-2 text-xs font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
+            >
+              <Eye className="h-4 w-4" />
+              {showForm ? "Hide Full Enrollment Form" : "View Full Enrollment Form"}
+            </button>
           </div>
         </section>
-      </main>
 
-      <footer className="sticky bottom-0 z-20 mt-5 rounded-xl border border-white/70 bg-white/90 p-4 shadow-xl backdrop-blur-md">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="grid gap-2 text-xs font-bold text-slate-600 sm:grid-cols-4">
-            <span>{uploadedDocuments.length} uploaded</span>
-            <span>{pendingDocuments.length} pending</span>
-            <span>{rejectedDocuments.length} rejected</span>
-            <span>{requiredApproved ? "Required docs complete" : "Required docs pending"}</span>
+        {showForm && (
+          <section className="mt-3 rounded-lg border border-blue-100 bg-blue-50/45 p-3 shadow-sm backdrop-blur-md">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-sm font-black text-slate-950">Submitted Enrollment Form Details</h2>
+              <button onClick={() => setShowForm(false)} className="rounded-lg border border-slate-300 bg-white/70 px-3 py-1.5 text-xs font-black text-slate-700">
+                Hide Form
+              </button>
+            </div>
+            <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
+              {submittedFormEntries.length > 0 ? submittedFormEntries.map(renderFormValue) : (
+                <p className="text-sm font-semibold text-slate-500">No submitted form data found.</p>
+              )}
+            </div>
+          </section>
+        )}
+
+        <section className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Document Verification</p>
+          <div className="mt-2 grid gap-3 lg:grid-cols-[455px_minmax(0,1fr)]">
+            <aside className="rounded-lg border border-slate-200 bg-white/65 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={selectedDocs.length > 0 && selectedDocs.length === pendingDocuments.length}
+                    onChange={(event) => setSelectedDocs(event.target.checked ? pendingDocuments.map((doc) => doc.key) : [])}
+                    className="h-4 w-4 accent-blue-700"
+                  />
+                  Select all documents ({pendingDocuments.length})
+                </label>
+                <button
+                  onClick={approveSelectedDocuments}
+                  disabled={selectedDocs.length === 0 || isProcessing}
+                  className="rounded-md bg-blue-700 px-3 py-1.5 text-[11px] font-black text-white disabled:bg-slate-300"
+                >
+                  Bulk Approve
+                </button>
+                <button
+                  onClick={() => selectedDocs[0] && setDocRejectKey(selectedDocs[0])}
+                  disabled={selectedDocs.length === 0 || isProcessing}
+                  className="rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-black text-white disabled:bg-slate-300"
+                >
+                  Bulk Reject
+                </button>
+              </div>
+
+              <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                <div className="grid grid-cols-[32px_1fr_86px] bg-slate-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-500">
+                  <span />
+                  <span>Document Name</span>
+                  <span>Status</span>
+                </div>
+                <div className="max-h-[365px] divide-y divide-slate-100 overflow-y-auto bg-white/70">
+                  {documents.map((doc) => (
+                    <button
+                      key={doc.key}
+                      onClick={() => setSelectedDocKey(doc.key)}
+                      className={`grid w-full grid-cols-[32px_1fr_86px] items-center gap-2 px-3 py-2 text-left transition ${
+                        selectedDocKey === doc.key ? "bg-blue-50" : "hover:bg-slate-50"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDocs.includes(doc.key)}
+                        disabled={!doc.id || doc.status === "approved"}
+                        onClick={(event) => event.stopPropagation()}
+                        onChange={(event) => {
+                          setSelectedDocs((current) =>
+                            event.target.checked ? [...current, doc.key] : current.filter((key) => key !== doc.key)
+                          );
+                        }}
+                        className="h-4 w-4 accent-blue-700"
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black text-slate-900">{doc.label}</p>
+                        <p className="truncate text-[11px] font-medium text-slate-500">{doc.fileName}</p>
+                      </div>
+                      <span
+                        className={`justify-self-start rounded-full px-2 py-1 text-[10px] font-black ${
+                          doc.status === "approved"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : doc.status === "rejected"
+                            ? "bg-rose-100 text-rose-700"
+                            : doc.status === "missing"
+                            ? "bg-slate-100 text-slate-500"
+                            : "bg-amber-100 text-amber-700"
+                        }`}
+                      >
+                        {doc.status}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => approveDocument()}
+                  disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  Approve
+                </button>
+                <button
+                  onClick={() => {
+                    setDocRejectKey(selectedDocument?.key || null);
+                    setDocRejectReason(selectedDocument?.rejectionComment || "");
+                  }}
+                  disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Reject
+                </button>
+              </div>
+            </aside>
+
+            <section className="flex min-h-[448px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/70 px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black text-slate-900">Document Preview</p>
+                  <p className="truncate text-[11px] font-medium text-slate-500">{selectedDocument?.label || "Select a document"}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => setZoom((current) => Math.max(50, current - 10))} className="rounded-md border border-slate-200 bg-white p-2 text-slate-700" title="Zoom out">
+                    <Minus className="h-4 w-4" />
+                  </button>
+                  <span className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] font-black">{zoom}%</span>
+                  <button onClick={() => setZoom((current) => Math.min(180, current + 10))} className="rounded-md border border-slate-200 bg-white p-2 text-slate-700" title="Zoom in">
+                    <Plus className="h-4 w-4" />
+                  </button>
+                  {selectedDocument?.fileUrl && (
+                    <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700" title="Fullscreen">
+                      <Maximize2 className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto bg-white p-2">
+                {selectedDocument?.fileUrl ? (
+                  selectedDocument.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                    <div className="flex min-h-full items-start justify-center">
+                      <img
+                        src={selectedDocument.fileUrl}
+                        alt={selectedDocument.label}
+                        style={{ transform: `scale(${zoom / 100})` }}
+                        className="max-h-none max-w-full origin-top rounded bg-white object-contain transition-transform"
+                      />
+                    </div>
+                  ) : (
+                    <iframe
+                      src={selectedDocument.fileUrl}
+                      title={selectedDocument.label}
+                      style={{ width: `${zoom}%` }}
+                      className="mx-auto h-full min-h-[420px] rounded bg-white"
+                    />
+                  )
+                ) : (
+                  <div className="flex h-full min-h-[360px] items-center justify-center text-center text-slate-400">
+                    <div>
+                      <FileText className="mx-auto h-12 w-12 text-slate-300" />
+                      <p className="mt-2 text-sm font-black">No uploaded file</p>
+                      <p className="mt-1 text-xs">Select another document or ask the student to upload this requirement.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        </section>
+
+        <section className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+          <div className="grid gap-3 lg:grid-cols-[1fr_350px] lg:items-center">
+            <div>
+              <p className="text-xs font-black text-slate-900">Is the student eligible for the voucher program? <span className="text-rose-600">*</span></p>
+              <p className="mt-1 text-[11px] font-medium text-slate-500">This is required before approving the application.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/70 p-2">
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input type="radio" checked={voucherEligibility === "eligible"} onChange={() => setVoucherEligibility("eligible")} className="h-4 w-4 accent-blue-700" />
+                Yes, Eligible
+              </label>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                <input type="radio" checked={voucherEligibility === "not_eligible"} onChange={() => setVoucherEligibility("not_eligible")} className="h-4 w-4 accent-blue-700" />
+                No, Not Eligible
+              </label>
+            </div>
+          </div>
+          {existingVoucherStatus && <p className="mt-2 text-[11px] font-semibold text-slate-500">Saved decision: {String(existingVoucherStatus).replace("_", " ")}</p>}
+        </section>
+
+        <footer className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+          <div className="grid gap-3 lg:grid-cols-2">
             <button
               onClick={() => setShowApplicationReject(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-5 py-3 text-sm font-black text-white shadow-md hover:bg-rose-700"
+              className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white/70 px-4 py-3 text-sm font-black text-rose-700 shadow-sm hover:bg-rose-50"
             >
               <XCircle className="h-4 w-4" />
               Reject Application
@@ -661,14 +713,17 @@ export function ApplicationReviewPage() {
             <button
               onClick={approveApplication}
               disabled={!requiredApproved || !voucherEligibility || isProcessing}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 py-3 text-sm font-black text-white shadow-md hover:bg-blue-800 disabled:bg-slate-300"
+              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-800 disabled:bg-slate-300"
             >
               <ShieldCheck className="h-4 w-4" />
               Approve Application
             </button>
           </div>
-        </div>
-      </footer>
+          <p className="mt-2 text-center text-[11px] font-medium text-slate-500">
+            Please ensure all documents are verified and eligibility is selected before approving.
+          </p>
+        </footer>
+      </div>
 
       {docRejectKey && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
