@@ -6,11 +6,11 @@
   
   /* Electron Hub Color System */
   --electron-blue: #234095;
-  --electron-red: #a70d20;
+  --electron-red: #a11a0d;
   --electron-blue-deep: #1b337c;
   --electron-blue-ink: #142762;
-  --electron-crimson: #a70d20;
-  --electron-crimson-deep: #850a19;
+  --electron-crimson: #a11a0d;
+  --electron-crimson-deep: #7f160d;
   --electron-white: #FFFFFF;
   --electron-light-gray: #F5F5F5;
   --electron-dark-gray: #374151;
@@ -375,7 +375,7 @@
   min-height: 100vh;
   background:
     radial-gradient(circle at 8% 8%, rgba(35, 64, 149, 0.1), transparent 28rem),
-    radial-gradient(circle at 94% 22%, rgba(167, 13, 32, 0.08), transparent 24rem),
+    radial-gradient(circle at 94% 22%, rgba(161, 26, 13, 0.08), transparent 24rem),
     linear-gradient(180deg, #eaf0fb 0%, #f8fafc 42%, #eef3f9 100%);
   color: #0f172a;
 }
@@ -389,13 +389,13 @@
 }
 
 .public-page-shell .public-nav-cta {
-  background: rgba(167, 13, 32, 0.9) !important;
+  background: rgba(161, 26, 13, 0.9) !important;
   border-color: rgba(255, 255, 255, 0.22) !important;
 }
 
 .public-page-shell .public-nav-cta:hover,
 .public-page-shell .public-nav-cta:focus-visible {
-  background: rgba(133, 10, 25, 0.94) !important;
+  background: rgba(127, 22, 13, 0.94) !important;
 }
 
 .public-page-shell main {
@@ -425,9 +425,16 @@
 
 .public-page-shell main section.text-white {
   background:
-    linear-gradient(135deg, rgba(20, 39, 98, 0.96), rgba(35, 64, 149, 0.9) 56%, rgba(133, 10, 25, 0.86)) !important;
+    linear-gradient(135deg, rgba(20, 39, 98, 0.96), rgba(35, 64, 149, 0.9) 56%, rgba(127, 22, 13, 0.9)) !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.16);
   box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.public-page-shell main section.text-white h1,
+.public-page-shell main section.text-white h2,
+.public-page-shell main section.text-white h3,
+.public-page-shell main section.text-white p {
+  color: rgba(255, 255, 255, 0.96) !important;
 }
 
 .public-page-shell main section > .absolute.inset-0.opacity-10 {
@@ -487,7 +494,7 @@
   -webkit-backdrop-filter: blur(16px) saturate(145%);
   position: relative;
   overflow: hidden;
-  transition: transform 0.24s ease, box-shadow 0.24s ease, border-color 0.24s ease, background-color 0.24s ease;
+  transition: box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1), border-color 0.32s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .public-page-shell main .bg-white.rounded-lg::before,
@@ -555,8 +562,8 @@
 .public-page-shell main button,
 .public-page-shell main a {
   transition-property: color, background-color, border-color, box-shadow, transform, opacity;
-  transition-duration: 220ms;
-  transition-timing-function: ease;
+  transition-duration: 280ms;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .public-page-shell main button:hover,
@@ -813,7 +820,7 @@
   background:
     linear-gradient(180deg, rgba(3, 7, 18, 0.08) 0%, rgba(3, 7, 18, 0.28) 100%),
     radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.14) 0%, transparent 25%),
-    radial-gradient(circle at 90% 88%, rgba(167, 13, 32, 0.16) 0%, transparent 28%);
+    radial-gradient(circle at 90% 88%, rgba(161, 26, 13, 0.16) 0%, transparent 28%);
 }
 
 .auth-shell-bg::after {
@@ -882,7 +889,7 @@
 .auth-primary-button {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #142762 0%, #234095 58%, #a70d20 128%);
+  background: linear-gradient(135deg, #142762 0%, #234095 58%, #a11a0d 128%);
   box-shadow: 0 20px 40px -22px rgba(15, 23, 42, 0.6);
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
