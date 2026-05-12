@@ -2,35 +2,24 @@ import {
   Search,
   FileCheck,
   FileText,
-  Award,
   Download,
   Filter,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
-import toast, { Toaster } from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
-import {
-  getPendingApplications,
-  getAssessmentResultByStudentId,
-  getStudentPaymentStatus,
-} from "../../../services/adminService";
+import { getStudentPaymentStatus } from "../../../services/adminService";
+import { supabase } from "../../../supabase";
 
 interface Student {
   id: number | string;
   name: string;
   applicationDate: string;
-  aiTestScore: number | null;
-  status: "pending" | "incomplete" | "approved" | "rejected";
+  status: "pending" | "re-submit" | "approved" | "rejected";
   currentStatus: string;
   strandApplied: string;
-  documents: {
-    psaBirthCertificate: boolean;
-    form138: boolean;
-    goodMoralCertificate: boolean;
-  };
-  rejectionReason?: string;
   email?: string;
   enrollmentData?: any;
 }
@@ -46,7 +35,7 @@ const getCurrentEnrollmentStatus = ({
   documentsUploaded,
   documentsApproved,
 }: {
-  hasAssessment: boolean;
+  hasAssessment?: boolean;
   enrollmentStatus?: string | null;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
@@ -91,8 +80,7 @@ export function PendingApplications() {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const [strandFilter, setStrandFilter] = useState("all");
-  const [documentFilter, setDocumentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const reviewBasePath = location.pathname.startsWith("/branchcoordinator")
@@ -110,7 +98,11 @@ export function PendingApplications() {
 
   const loadApplications = async () => {
     setIsLoading(true);
-    const { data: applications, error } = await getPendingApplications();
+    const { data: applications, error } = await supabase
+      .from("enrollments")
+      .select("id, user_id, form_data, status, enrollment_date, enrollment_documents(*)")
+      .neq("status", "enrolled")
+      .order("enrollment_date", { ascending: false });
     
     if (error) {
       console.error('Error loading applications:', error);
@@ -126,26 +118,30 @@ export function PendingApplications() {
       return;
     }
     
-    // Format applications from Supabase with assessment results
     const formattedApps = await Promise.all(applications.map(async (app: any) => {
       const formData = app.form_data || {};
-      const [aiTestScore, paymentStatusResponse] = await Promise.all([
-        getAssessmentResultByStudentId(app.user_id),
-        getStudentPaymentStatus(app.user_id),
-      ]);
+      const paymentStatusResponse = await getStudentPaymentStatus(app.user_id);
       const docs = app.enrollment_documents || [];
       const approvedDocuments = docs.filter((doc: any) => doc.status === "approved" || doc.verified === true).length;
+      const rejectedDocuments = docs.filter((doc: any) => doc.status === "rejected").length;
       const payment = paymentStatusResponse?.data;
+      const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
+      const applicationStatus: Student["status"] =
+        normalizedEnrollmentStatus === "rejected"
+          ? "rejected"
+          : normalizedEnrollmentStatus === "documents_verified" || normalizedEnrollmentStatus === "approved"
+          ? "approved"
+          : rejectedDocuments > 0
+          ? "re-submit"
+          : "pending";
       
       return {
         id: app.id,
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
         email: app.user_id || formData.email,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
-        aiTestScore: aiTestScore, // Will be null if not taken
-        status: app.status === "documents_verified" ? "approved" : "pending",
+        status: applicationStatus,
         currentStatus: getCurrentEnrollmentStatus({
-          hasAssessment: aiTestScore !== null,
           enrollmentStatus: app.status,
           paymentStatus: payment?.status,
           paymentMethod: payment?.payment_method,
@@ -153,11 +149,6 @@ export function PendingApplications() {
           documentsApproved: approvedDocuments,
         }),
         strandApplied: formData.preferredTrack || formData.track || app.preferred_track || 'Not Set',
-        documents: {
-          psaBirthCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'birthCertificate') || false,
-          form138: app.enrollment_documents?.some((d: any) => d.document_type === 'form138') || false,
-          goodMoralCertificate: app.enrollment_documents?.some((d: any) => d.document_type === 'goodMoral') || false,
-        },
         enrollmentId: app.id,
         enrollmentData: app,
       };
@@ -188,56 +179,13 @@ export function PendingApplications() {
     };
   };
 
-  const getMissingDocuments = (student: Student): string[] => {
-    const missing: string[] = [];
-    if (!student.documents.psaBirthCertificate) missing.push("PSA Birth Certificate");
-    if (!student.documents.form138) missing.push("Form 138");
-    if (!student.documents.goodMoralCertificate) missing.push("Good Moral Certificate");
-    return missing;
-  };
-
-  // Map strands to tracks
-  const getTrack = (strand: string): string => {
-    const academicStrands = ['STEM', 'ABM', 'HUMSS', 'GAS'];
-    const technicalStrands = ['TVL-ICT', 'TVL', 'ICT'];
-    
-    if (academicStrands.includes(strand)) return 'academic';
-    if (technicalStrands.includes(strand)) return 'technical-professional';
-    return 'all';
-  };
-
   let filteredStudents = students.filter((student) =>
     student.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (strandFilter !== "all") {
-    filteredStudents = filteredStudents.filter(
-      (student) => getTrack(student.strandApplied) === strandFilter
-    );
+  if (statusFilter !== "all") {
+    filteredStudents = filteredStudents.filter((student) => student.status === statusFilter);
   }
-
-  if (documentFilter !== "all") {
-    filteredStudents = filteredStudents.filter((student) => {
-      const missing = getMissingDocuments(student);
-      if (documentFilter === "complete") {
-        return missing.length === 0;
-      } else {
-        return missing.includes(documentFilter);
-      }
-    });
-  }
-
-  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Bulk selection removed
-  };
-
-  const handleSelectStudent = (id: number | string) => {
-    // Individual selection removed
-  };
-
-  const handleExportPDF = () => {
-    alert(`Exporting student record(s) to PDF...`);
-  };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -247,7 +195,7 @@ export function PendingApplications() {
           text: "#92400E",
           border: "#FCD34D",
         };
-      case "incomplete":
+      case "re-submit":
         return {
           bg: "#FEE2E2",
           text: "#991B1B",
@@ -329,29 +277,18 @@ export function PendingApplications() {
           <div className="flex w-full items-center gap-2 sm:w-auto">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
-              value={strandFilter}
-              onChange={(e) => setStrandFilter(e.target.value)}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
               style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
             >
-              <option value="all">All Tracks</option>
-              <option value="academic">Academic</option>
-              <option value="technical-professional">Technical-Professional</option>
+              <option value="all">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="re-submit">Re-submit</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
-
-          <select
-            value={documentFilter}
-            onChange={(e) => setDocumentFilter(e.target.value)}
-            className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            style={{ color: "#374151" }}
-          >
-            <option value="all">All Documents</option>
-            <option value="complete">Complete Documents</option>
-            <option value="PSA Birth Certificate">Missing PSA Birth Certificate</option>
-            <option value="Form 138">Missing Form 138</option>
-            <option value="Good Moral Certificate">Missing Good Moral Certificate</option>
-          </select>
 
           <button
             onClick={loadApplications}
@@ -375,7 +312,7 @@ export function PendingApplications() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1120px]">
+          <table className="w-full min-w-[860px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
@@ -388,16 +325,10 @@ export function PendingApplications() {
                   Application Date
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  AI Test Score
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Current Status
-                </th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Missing Documents
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Action
@@ -407,7 +338,7 @@ export function PendingApplications() {
             <tbody className="divide-y divide-gray-200">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center">
+                  <td colSpan={6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                       <FileText className="w-12 h-12 text-gray-400" />
                       <div>
@@ -422,7 +353,6 @@ export function PendingApplications() {
               ) : (
                 filteredStudents.map((student) => {
                   const statusStyle = getStatusStyle(student.status);
-                  const missingDocs = getMissingDocuments(student);
                   const docStatus = getDocumentStatus(student);
                   
                   return (
@@ -461,17 +391,6 @@ export function PendingApplications() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Award
-                            className="w-4 h-4"
-                            style={{ color: "#1E3A8A" }}
-                          />
-                          <span className="text-sm font-semibold text-gray-900">
-                            {student.aiTestScore !== null ? `${student.aiTestScore}%` : "Not Taken"}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
                         <span
                           className="inline-flex px-3 py-1 rounded-full text-xs font-semibold border"
                           style={{
@@ -488,31 +407,6 @@ export function PendingApplications() {
                         <span className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${getCurrentStatusStyle(student.currentStatus)}`}>
                           {student.currentStatus}
                         </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        {missingDocs.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {missingDocs.map((doc, idx) => (
-                              <span
-                                key={idx}
-                                className="inline-flex px-2 py-1 rounded text-xs"
-                                style={{
-                                  backgroundColor: "#FEE2E2",
-                                  color: "#991B1B",
-                                }}
-                              >
-                                {doc}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span
-                            className="text-xs font-medium"
-                            style={{ color: "#10B981" }}
-                          >
-                            Complete
-                          </span>
-                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
