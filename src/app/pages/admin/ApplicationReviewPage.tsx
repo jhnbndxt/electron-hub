@@ -1,17 +1,23 @@
 import {
   ArrowLeft,
+  BookOpen,
   CheckCircle,
   Eye,
+  FileCheck,
   FileText,
+  GraduationCap,
+  MapPin,
   Maximize2,
   Minus,
   Plus,
   RefreshCw,
   ShieldCheck,
+  User,
+  Users,
   X,
   XCircle,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentType, type ReactNode, useEffect, useMemo, useState } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
@@ -33,9 +39,9 @@ type VoucherEligibility = "eligible" | "not_eligible" | null;
 const DOCUMENTS = [
   { key: "form138", label: "Form 138", required: true },
   { key: "birthCertificate", label: "PSA Birth Certificate", required: true },
-  { key: "goodMoral", label: "Good Moral Certificate", required: true },
+  { key: "goodMoral", label: "Good Moral Certificate", required: false },
   { key: "idPicture", label: "2x2 ID Picture", required: true },
-  { key: "diploma", label: "Grade 10 Diploma", required: false },
+  { key: "diploma", label: "Grade 10 Diploma", required: true },
   { key: "form137", label: "Form 137", required: false },
   { key: "escCertificate", label: "ESC Certificate", required: false },
 ];
@@ -83,6 +89,7 @@ export function ApplicationReviewPage() {
   const [showForm, setShowForm] = useState(false);
   const [voucherEligibility, setVoucherEligibility] = useState<VoucherEligibility>(null);
   const [docRejectKey, setDocRejectKey] = useState<string | null>(null);
+  const [docRejectKeys, setDocRejectKeys] = useState<string[]>([]);
   const [docRejectReason, setDocRejectReason] = useState("");
   const [showApplicationReject, setShowApplicationReject] = useState(false);
   const [applicationRejectReason, setApplicationRejectReason] = useState("");
@@ -120,6 +127,7 @@ export function ApplicationReviewPage() {
   const selectedDocument = documents.find((doc) => doc.key === selectedDocKey) || documents[0];
   const uploadedDocuments = documents.filter((doc) => doc.id);
   const pendingDocuments = documents.filter((doc) => doc.id && doc.status === "pending");
+  const actionableDocuments = documents.filter((doc) => doc.id && doc.status !== "approved");
   const rejectedDocuments = documents.filter((doc) => doc.id && doc.status === "rejected");
   const requiredApproved = documents.filter((doc) => doc.required).every((doc) => doc.status === "approved");
   const existingVoucherStatus = enrollment?.voucher_status || formData?.voucher?.voucher_status;
@@ -225,42 +233,69 @@ export function ApplicationReviewPage() {
   };
 
   const confirmDocumentReject = async () => {
-    if (!docRejectKey || !docRejectReason.trim()) {
+    const targetKeys = docRejectKeys.length > 0 ? docRejectKeys : docRejectKey ? [docRejectKey] : [];
+    if (targetKeys.length === 0 || !docRejectReason.trim()) {
       toast.error("Rejection notes are required.");
       return;
     }
 
-    const doc = documents.find((item) => item.key === docRejectKey);
-    if (!doc?.id) return;
-
     setIsProcessing(true);
-    const { data, error } = await updateDocumentStatus(doc.id, "rejected", docRejectReason.trim());
-    setIsProcessing(false);
+    for (const key of targetKeys) {
+      const doc = documents.find((item) => item.key === key);
+      if (!doc?.id || doc.status === "approved") continue;
 
-    if (error) {
-      toast.error(error);
-      return;
+      const { data, error } = await updateDocumentStatus(doc.id, "rejected", docRejectReason.trim());
+      if (error) {
+        setIsProcessing(false);
+        toast.error(error);
+        return;
+      }
+
+      updateLocalDocument(doc.id, { ...(data || {}), status: "rejected", rejection_comment: docRejectReason.trim() });
+      await triggerNotification(enrollment.user_id, "DOCUMENT_REJECTED", {
+        documentName: doc.label,
+        reason: docRejectReason.trim(),
+        actionUrl: `/dashboard/my-documents?document=${doc.key}`,
+      });
+      await createAuditLog(actorReference, "DOCUMENT_REJECTED", `Rejected ${doc.label} for ${studentName}`, "warning");
     }
 
-    updateLocalDocument(doc.id, { ...(data || {}), status: "rejected", rejection_comment: docRejectReason.trim() });
-    await triggerNotification(enrollment.user_id, "DOCUMENT_REJECTED", {
-      documentName: doc.label,
-      reason: docRejectReason.trim(),
-      actionUrl: `/dashboard/my-documents?document=${doc.key}`,
-    });
-    await createAuditLog(actorReference, "DOCUMENT_REJECTED", `Rejected ${doc.label} for ${studentName}`, "warning");
-    toast.success(`${doc.label} rejected. Student notified.`);
+    setIsProcessing(false);
+    toast.success(`${targetKeys.length} document${targetKeys.length === 1 ? "" : "s"} rejected. Student notified.`);
     setDocRejectKey(null);
+    setDocRejectKeys([]);
+    setSelectedDocs([]);
     setDocRejectReason("");
-    goToNextPendingDocument(doc.key);
+    goToNextPendingDocument(targetKeys[0]);
   };
 
   const approveSelectedDocuments = async () => {
-    const keys = [...selectedDocs];
-    for (const key of keys) {
-      await approveDocument(key);
+    const keys = selectedDocs.filter((key) => {
+      const doc = documents.find((item) => item.key === key);
+      return doc?.id && doc.status !== "approved";
+    });
+    if (keys.length === 0) {
+      toast.error("Select at least one pending or rejected document.");
+      return;
     }
+
+    setIsProcessing(true);
+    for (const key of keys) {
+      const doc = documents.find((item) => item.key === key);
+      if (!doc?.id) continue;
+      const { data, error } = await updateDocumentStatus(doc.id, "approved");
+      if (error) {
+        setIsProcessing(false);
+        toast.error(error);
+        return;
+      }
+      updateLocalDocument(doc.id, { ...(data || {}), status: "approved", rejection_comment: null });
+      await createAuditLog(actorReference, "DOCUMENT_APPROVED", `Approved ${doc.label} for ${studentName}`, "success");
+    }
+    setIsProcessing(false);
     setSelectedDocs([]);
+    toast.success(`${keys.length} document${keys.length === 1 ? "" : "s"} approved.`);
+    goToNextPendingDocument(keys[0]);
   };
 
   const saveVoucherDecision = async () => {
@@ -404,13 +439,37 @@ export function ApplicationReviewPage() {
     return String(value);
   };
 
-  const submittedFormEntries = Object.entries(formData || {}).filter(([_, value]) => value !== undefined && value !== null && value !== "");
+  const fullName = `${formData.lastName || ""}, ${formData.firstName || ""} ${formData.middleName || ""}`.trim();
+  const fatherName = `${formData.fatherLastName || ""}, ${formData.fatherFirstName || ""} ${formData.fatherMiddleName || ""}`.trim();
+  const motherName = `${formData.motherLastName || ""}, ${formData.motherFirstName || ""} ${formData.motherMiddleName || ""}`.trim();
+  const guardianName = `${formData.guardianLastName || ""}, ${formData.guardianFirstName || ""} ${formData.guardianMiddleName || ""}`.trim();
+  const hasDocument = (documentKey: string) => documents.some((doc) => doc.key === documentKey && doc.id);
 
-  const renderFormValue = ([key, value]: [string, any]) => (
-    <div key={key} className="rounded-lg border border-slate-200/80 bg-white/75 px-3 py-2 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-wide text-slate-500">{formatFieldLabel(key)}</p>
-      <p className="mt-1 break-words text-xs font-semibold text-slate-900">{formatFieldValue(value)}</p>
+  const renderSubmittedField = (label: string, value: any, className = "") => (
+    <div className={className}>
+      <span className="text-slate-500">{label}:</span>{" "}
+      <span className="font-medium text-slate-900">{formatFieldValue(value)}</span>
     </div>
+  );
+
+  const renderEnrollmentSection = (
+    title: string,
+    Icon: ComponentType<{ className?: string }>,
+    children: ReactNode,
+    subtitle?: string
+  ) => (
+    <section className="rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-sm">
+      <div className="mb-3 flex items-center gap-3">
+        <div className="rounded-full bg-blue-900 p-2.5 text-white">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+          {subtitle && <p className="text-xs text-gray-600">{subtitle}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
   );
 
   if (isLoading) {
@@ -433,7 +492,7 @@ export function ApplicationReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-blue-50 to-white p-3 text-slate-900 sm:p-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(135deg,#f8fafc_0%,#eff6ff_48%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
       <Toaster position="top-right" />
 
       {isProcessing && (
@@ -445,7 +504,7 @@ export function ApplicationReviewPage() {
         </div>
       )}
 
-      <div className="mx-auto max-w-[1320px] rounded-xl border border-white/70 bg-white/60 p-4 shadow-xl shadow-blue-950/10 backdrop-blur-xl">
+      <div className="mx-auto w-full max-w-[min(1780px,calc(100vw-1rem))] rounded-2xl border border-white/75 bg-white/55 p-4 shadow-2xl shadow-blue-950/10 backdrop-blur-xl">
         <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-lg font-black text-slate-950">Pending Application Review</h1>
@@ -509,34 +568,127 @@ export function ApplicationReviewPage() {
         </section>
 
         {showForm && (
-          <section className="mt-3 rounded-lg border border-blue-100 bg-blue-50/45 p-3 shadow-sm backdrop-blur-md">
+          <section className="mt-3 rounded-2xl border border-white/70 bg-white/65 p-4 shadow-lg backdrop-blur-xl">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-slate-950">Submitted Enrollment Form Details</h2>
+              <div>
+                <h2 className="text-xl font-bold text-blue-950">Enrollment Review</h2>
+                <p className="text-sm text-slate-600">Submitted application form details</p>
+              </div>
               <button onClick={() => setShowForm(false)} className="rounded-lg border border-slate-300 bg-white/70 px-3 py-1.5 text-xs font-black text-slate-700">
                 Hide Form
               </button>
             </div>
-            <div className="mt-3 grid max-h-[260px] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-4">
-              {submittedFormEntries.length > 0 ? submittedFormEntries.map(renderFormValue) : (
-                <p className="text-sm font-semibold text-slate-500">No submitted form data found.</p>
-              )}
+            <div className="mt-4 grid max-h-[68vh] gap-4 overflow-y-auto pr-1 xl:grid-cols-2">
+              {renderEnrollmentSection("Basic Information", User, (
+                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                  {renderSubmittedField("Admission Type", formData.admissionType)}
+                  {renderSubmittedField("Previous Student ID", formData.previousStudentId || "N/A")}
+                  {renderSubmittedField("LRN", formData.lrn)}
+                  {renderSubmittedField("Name", fullName)}
+                  {renderSubmittedField("Suffix", formData.suffix || "None")}
+                  {renderSubmittedField("Sex", formData.sex)}
+                  {renderSubmittedField("Civil Status", formData.civilStatus)}
+                  {renderSubmittedField("Birthday", formData.birthday || formData.birthDate)}
+                  {renderSubmittedField("Religion", formData.religion)}
+                  {renderSubmittedField("Nationality", formData.nationality)}
+                  {renderSubmittedField("Disability", formData.disability === "Others" ? `${formData.disability} - ${formData.disabilityOther || ""}` : formData.disability)}
+                  {renderSubmittedField("Indigenous Group", formData.indigenousGroup === "Others" ? `${formData.indigenousGroup} - ${formData.indigenousGroupOther || ""}` : formData.indigenousGroup)}
+                  {renderSubmittedField("Email", formData.email || enrollment.user_id)}
+                  {renderSubmittedField("Contact Number", formData.contactNumber)}
+                  {renderSubmittedField("Facebook / Messenger Name", formData.facebookName)}
+                  {renderSubmittedField("Working Student", Boolean(formData.isWorkingStudent))}
+                </div>
+              ), "Submitted student details")}
+
+              {renderEnrollmentSection("Address", MapPin, (
+                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                  {renderSubmittedField("Region", formData.region)}
+                  {renderSubmittedField("Province", formData.province)}
+                  {renderSubmittedField("City / Municipality", formData.city)}
+                  {renderSubmittedField("Barangay", formData.barangay)}
+                  {renderSubmittedField("Home Address", formData.homeAddress, "sm:col-span-2")}
+                </div>
+              ))}
+
+              {renderEnrollmentSection("Parents & Guardians", Users, (
+                <div className="space-y-4 text-sm text-slate-700">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {renderSubmittedField("Father's Name", fatherName)}
+                    {renderSubmittedField("Occupation", formData.fatherOccupation)}
+                    {renderSubmittedField("Contact Number", formData.fatherContact)}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                    {renderSubmittedField("Mother's Maiden Name", formData.motherMaidenName)}
+                    {renderSubmittedField("Mother's Name", motherName)}
+                    {renderSubmittedField("Occupation", formData.motherOccupation)}
+                    {renderSubmittedField("Contact Number", formData.motherContact)}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                    {renderSubmittedField("Guardian Relationship", formData.guardianSource || "N/A")}
+                    {renderSubmittedField("Guardian Name", guardianName || (formData.guardianSource === "father" ? fatherName : formData.guardianSource === "mother" ? motherName : ""))}
+                    {renderSubmittedField("Occupation", formData.guardianOccupation)}
+                    {renderSubmittedField("Contact Number", formData.guardianContact)}
+                  </div>
+                  {renderSubmittedField("4Ps Member", Boolean(formData.is4PsMember))}
+                </div>
+              ))}
+
+              {renderEnrollmentSection("Enrollment Details", GraduationCap, (
+                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                  {renderSubmittedField("Preferred Track", formData.preferredTrack || formData.track)}
+                  {renderSubmittedField("Year Level", formData.yearLevel)}
+                  {renderSubmittedField("Elective 1", formData.elective1)}
+                  {renderSubmittedField("Elective 2", formData.elective2)}
+                </div>
+              ))}
+
+              {renderEnrollmentSection("Educational Background", BookOpen, (
+                <div className="space-y-4 text-sm text-slate-700">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {renderSubmittedField("Primary School", formData.primarySchool)}
+                    {renderSubmittedField("Year Graduated", formData.primaryYearGraduated)}
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
+                    {renderSubmittedField("Secondary School", formData.secondarySchool)}
+                    {renderSubmittedField("Year Graduated", formData.secondaryYearGraduated)}
+                  </div>
+                  {renderSubmittedField("Grade 10 Adviser", formData.grade10Adviser)}
+                </div>
+              ))}
+
+              {renderEnrollmentSection("Documents Summary", FileCheck, (
+                <div className="grid gap-2 text-sm text-slate-700">
+                  {DOCUMENTS.map((doc) => (
+                    <div key={doc.key} className="flex items-center gap-2">
+                      {hasDocument(doc.key) ? (
+                        <CheckCircle className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <X className="h-4 w-4 text-gray-400" />
+                      )}
+                      <span className={hasDocument(doc.key) ? "text-slate-700" : "text-gray-400"}>
+                        {doc.label}{doc.required ? " (Required)" : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ))}
             </div>
           </section>
         )}
 
-        <section className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+        <section className="mt-3 rounded-2xl border border-white/70 bg-white/55 p-4 shadow-lg backdrop-blur-xl">
           <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Document Verification</p>
-          <div className="mt-2 grid gap-3 lg:grid-cols-[455px_minmax(0,1fr)]">
+          <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(360px,31%)_minmax(0,1fr)]">
             <aside className="rounded-lg border border-slate-200 bg-white/65 p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                   <input
                     type="checkbox"
-                    checked={selectedDocs.length > 0 && selectedDocs.length === pendingDocuments.length}
-                    onChange={(event) => setSelectedDocs(event.target.checked ? pendingDocuments.map((doc) => doc.key) : [])}
+                    checked={actionableDocuments.length > 0 && selectedDocs.length === actionableDocuments.length}
+                    onChange={(event) => setSelectedDocs(event.target.checked ? actionableDocuments.map((doc) => doc.key) : [])}
                     className="h-4 w-4 accent-blue-700"
                   />
-                  Select all documents ({pendingDocuments.length})
+                  Select all documents ({actionableDocuments.length})
                 </label>
                 <button
                   onClick={approveSelectedDocuments}
@@ -546,7 +698,19 @@ export function ApplicationReviewPage() {
                   Bulk Approve
                 </button>
                 <button
-                  onClick={() => selectedDocs[0] && setDocRejectKey(selectedDocs[0])}
+                  onClick={() => {
+                    const keys = selectedDocs.filter((key) => {
+                      const doc = documents.find((item) => item.key === key);
+                      return doc?.id && doc.status !== "approved";
+                    });
+                    if (keys.length === 0) {
+                      toast.error("Select at least one pending or rejected document.");
+                      return;
+                    }
+                    setDocRejectKey(null);
+                    setDocRejectKeys(keys);
+                    setDocRejectReason("");
+                  }}
                   disabled={selectedDocs.length === 0 || isProcessing}
                   className="rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-black text-white disabled:bg-slate-300"
                 >
@@ -560,7 +724,7 @@ export function ApplicationReviewPage() {
                   <span>Document Name</span>
                   <span>Status</span>
                 </div>
-                <div className="max-h-[365px] divide-y divide-slate-100 overflow-y-auto bg-white/70">
+                <div className="max-h-[52vh] divide-y divide-slate-100 overflow-y-auto bg-white/70">
                   {documents.map((doc) => (
                     <button
                       key={doc.key}
@@ -615,6 +779,7 @@ export function ApplicationReviewPage() {
                 <button
                   onClick={() => {
                     setDocRejectKey(selectedDocument?.key || null);
+                    setDocRejectKeys([]);
                     setDocRejectReason(selectedDocument?.rejectionComment || "");
                   }}
                   disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
@@ -626,7 +791,7 @@ export function ApplicationReviewPage() {
               </div>
             </aside>
 
-            <section className="flex min-h-[448px] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70">
+            <section className="flex min-h-[62vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70">
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/70 px-3 py-2">
                 <div className="min-w-0">
                   <p className="text-[11px] font-black text-slate-900">Document Preview</p>
@@ -664,11 +829,11 @@ export function ApplicationReviewPage() {
                       src={selectedDocument.fileUrl}
                       title={selectedDocument.label}
                       style={{ width: `${zoom}%` }}
-                      className="mx-auto h-full min-h-[420px] rounded bg-white"
+                      className="mx-auto h-full min-h-[58vh] rounded bg-white"
                     />
                   )
                 ) : (
-                  <div className="flex h-full min-h-[360px] items-center justify-center text-center text-slate-400">
+                  <div className="flex h-full min-h-[52vh] items-center justify-center text-center text-slate-400">
                     <div>
                       <FileText className="mx-auto h-12 w-12 text-slate-300" />
                       <p className="mt-2 text-sm font-black">No uploaded file</p>
@@ -725,12 +890,25 @@ export function ApplicationReviewPage() {
         </footer>
       </div>
 
-      {docRejectKey && (
+      {(docRejectKey || docRejectKeys.length > 0) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
           <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50 px-5 py-4">
-              <h2 className="text-lg font-black text-slate-950">Reject Document</h2>
-              <button onClick={() => setDocRejectKey(null)} className="rounded-lg p-2 text-slate-500 hover:bg-white">
+              <div>
+                <h2 className="text-lg font-black text-slate-950">
+                  Reject {docRejectKeys.length > 1 ? `${docRejectKeys.length} Documents` : "Document"}
+                </h2>
+                {docRejectKeys.length > 1 && (
+                  <p className="mt-1 text-xs font-semibold text-rose-700">The same rejection note will be applied to all selected documents.</p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setDocRejectKey(null);
+                  setDocRejectKeys([]);
+                }}
+                className="rounded-lg p-2 text-slate-500 hover:bg-white"
+              >
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -744,8 +922,18 @@ export function ApplicationReviewPage() {
                 placeholder="Explain what needs to be corrected or re-uploaded."
               />
               <div className="mt-4 flex justify-end gap-2">
-                <button onClick={() => setDocRejectKey(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
-                <button onClick={confirmDocumentReject} disabled={!docRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">Reject Document</button>
+                <button
+                  onClick={() => {
+                    setDocRejectKey(null);
+                    setDocRejectKeys([]);
+                  }}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button onClick={confirmDocumentReject} disabled={!docRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">
+                  Reject {docRejectKeys.length > 1 ? "Documents" : "Document"}
+                </button>
               </div>
             </div>
           </div>
