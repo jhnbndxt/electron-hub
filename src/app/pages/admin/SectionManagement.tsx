@@ -1151,11 +1151,11 @@ export function SectionManagement() {
 
       {/* Debug Info & Unsectioned Students */}
       {enrolledStudents.length === 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-          <p className="text-sm text-yellow-800 mb-2">
+        <div className="mb-6 rounded-2xl border border-blue-100 bg-white/65 p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/70 backdrop-blur-xl">
+          <p className="text-sm text-slate-800 mb-2">
             <strong>No enrolled students found.</strong> Students will appear here after:
           </p>
-          <ul className="text-sm text-yellow-700 ml-4 space-y-1">
+          <ul className="text-sm text-slate-600 ml-4 space-y-1">
             <li>• Completing the enrollment form</li>
             <li>• Uploading and getting documents approved</li>
             <li>• Submitting and having payment verified</li>

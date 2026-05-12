@@ -102,7 +102,7 @@ export function PendingApplications() {
       .from("enrollments")
       .select("id, user_id, form_data, status, enrollment_date, enrollment_documents(*)")
       .neq("status", "enrolled")
-      .order("enrollment_date", { ascending: false });
+      .order("enrollment_date", { ascending: true });
     
     if (error) {
       console.error('Error loading applications:', error);
@@ -154,7 +154,13 @@ export function PendingApplications() {
       };
     }));
     
-    setStudents(formattedApps);
+    setStudents(
+      formattedApps.sort((a, b) => {
+        const firstDate = new Date(a.enrollmentData?.enrollment_date || 0).getTime();
+        const secondDate = new Date(b.enrollmentData?.enrollment_date || 0).getTime();
+        return firstDate - secondDate;
+      })
+    );
     setIsLoading(false);
     console.log('📋 Loaded', formattedApps.length, 'pending applications from Supabase');
   };

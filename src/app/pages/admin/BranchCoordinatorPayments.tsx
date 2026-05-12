@@ -199,14 +199,14 @@ export function BranchCoordinatorPayments() {
     });
   }
 
-  // Stats
-  const totalTransactions = filteredPayments.length;
-  const totalRevenue = filteredPayments
+  // Stats stay global so table filters do not change the summary cards.
+  const totalTransactions = payments.length;
+  const totalRevenue = payments
     .filter((p) => normalizePaymentStatus(p.status) === "approved")
     .reduce((sum, p) => sum + p.amount, 0);
-  const pendingCount = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === "pending").length;
-  const approvedCount = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === "approved").length;
-  const rejectedCount = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === "rejected").length;
+  const pendingCount = payments.filter((p) => normalizePaymentStatus(p.status) === "pending").length;
+  const approvedCount = payments.filter((p) => normalizePaymentStatus(p.status) === "approved").length;
+  const rejectedCount = payments.filter((p) => normalizePaymentStatus(p.status) === "rejected").length;
 
   const handleExportCSV = () => {
     const csvHeaders = ["Transaction ID", "Date", "Student Name", "Email", "Payment Method", "Reference/Queue", "Amount", "Status"];

@@ -16,6 +16,16 @@ interface AuditLog {
   status?: "success" | "failed" | "warning" | "info";
 }
 
+const getLocalDateKey = (value: string | Date) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export function AdminAuditLogs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -23,9 +33,7 @@ export function AdminAuditLogs() {
   const [isLoading, setIsLoading] = useState(true);
   // Date filter state (default: today)
   const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return today.toISOString().slice(0, 10);
+    return getLocalDateKey(new Date());
   });
 
   // Load audit logs from Supabase
@@ -52,6 +60,11 @@ export function AdminAuditLogs() {
       status: log.status || 'success',
     }));
     setAllLogs(formatted);
+    const todayKey = getLocalDateKey(new Date());
+    const availableDates = Array.from(
+      new Set(formatted.map((log) => getLocalDateKey(log.timestamp)).filter(Boolean))
+    ).sort((a, b) => b.localeCompare(a));
+    setSelectedDate(availableDates.includes(todayKey) ? todayKey : availableDates[0] || todayKey);
     setIsLoading(false);
   };
 
@@ -59,8 +72,7 @@ export function AdminAuditLogs() {
   // Filter logs by selected date
   let filteredLogs = allLogs.filter((log) => {
     // Date match
-    const logDate = new Date(log.timestamp);
-    const logDateStr = logDate.toISOString().slice(0, 10);
+    const logDateStr = getLocalDateKey(log.timestamp);
     return (
       logDateStr === selectedDate &&
       (

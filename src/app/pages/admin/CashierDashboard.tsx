@@ -69,6 +69,7 @@ interface OnlinePayment {
   amount: number;
   status: "pending" | "approved" | "rejected";
   submittedDate: string;
+  submittedAt: string;
   enrollmentData: any;
   notes?: string;
   rejectionComment?: string;
@@ -82,9 +83,16 @@ interface CashPayment {
   schedule: { date: string; time: string };
   status: "pending" | "paid" | "cancelled";
   generatedDate: string;
+  submittedAt: string;
   enrollmentData: any;
   paidDate?: string;
 }
+
+const getPaymentSubmissionTime = (payment: any) => {
+  const timestamp = payment?.submitted_at || payment?.created_at || "";
+  const time = new Date(timestamp).getTime();
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+};
 
 export function CashierDashboard() {
   const { userData } = useAuth();
@@ -152,6 +160,7 @@ export function CashierDashboard() {
     // Separate online vs cash payments
     const onlinePending = allPayments
       .filter((p: any) => (p.payment_method === 'bank' || p.payment_method === 'gcash') && p.status === 'pending')
+      .sort((a: any, b: any) => getPaymentSubmissionTime(a) - getPaymentSubmissionTime(b))
       .map((p: any) => {
         const receiptFiles = p.receipt_file_url
           ? String(p.receipt_file_url)
@@ -173,6 +182,7 @@ export function CashierDashboard() {
           submittedDate: p.submitted_at
             ? new Date(p.submitted_at).toLocaleString()
             : new Date(p.created_at).toLocaleString(),
+          submittedAt: p.submitted_at || p.created_at || "",
           enrollmentData: {},
           notes: p.notes || '',
         };
@@ -180,6 +190,7 @@ export function CashierDashboard() {
 
     const cashPending = allPayments
       .filter((p: any) => p.payment_method === 'cash' && p.status === 'pending')
+      .sort((a: any, b: any) => getPaymentSubmissionTime(a) - getPaymentSubmissionTime(b))
       .map((p: any) => ({
         id: p.id,
         queueNumber: p.queue_number || '',
@@ -193,6 +204,7 @@ export function CashierDashboard() {
         },
         status: 'pending' as const,
         generatedDate: new Date(p.created_at).toLocaleDateString(),
+        submittedAt: p.submitted_at || p.created_at || "",
         enrollmentData: {},
       }));
 
