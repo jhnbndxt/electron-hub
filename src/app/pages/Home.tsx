@@ -351,17 +351,21 @@ export function Home() {
               </div>
             </div>
             <div className="hidden lg:block">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-white/5 rounded-2xl backdrop-blur-sm"></div>
-                <div className="relative rounded-2xl w-full h-96 bg-white/10 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-2xl overflow-hidden">
+              <div className="relative mx-auto max-w-xl">
+                <div className="absolute -inset-5 rounded-[2rem] border border-white/18 bg-white/10 backdrop-blur-xl shadow-2xl shadow-slate-950/20"></div>
+                <div className="absolute -right-4 top-8 h-48 w-2 rounded-full bg-white/45 shadow-[0_0_40px_rgba(255,255,255,0.35)]"></div>
+                <div className="relative overflow-hidden rounded-[1.75rem] border border-white/25 bg-white/14 p-3 shadow-2xl shadow-slate-950/25">
+                  <div className="absolute left-6 top-6 z-20 rounded-full border border-white/25 bg-white/20 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-md">
+                    Malanday Campus
+                  </div>
                   <img
                     src={campusPreview}
                     alt="Electron College Campus Preview"
-                    className="object-cover w-full h-full rounded-2xl border border-white/10 shadow-lg"
-                    style={{ maxHeight: '24rem' }}
+                    className="h-[25rem] w-full rounded-[1.35rem] border border-white/10 object-cover shadow-lg"
                   />
-                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-white/80 px-4 py-2 rounded-full shadow text-blue-900 font-semibold text-base">
-                    Campus Preview
+                  <div className="absolute bottom-6 left-6 right-6 z-20 rounded-2xl border border-white/20 bg-slate-950/42 px-5 py-4 text-white shadow-xl backdrop-blur-md">
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100">Campus Preview</p>
+                    <p className="mt-1 text-base font-semibold">Electron College of Technical Education</p>
                   </div>
                 </div>
               </div>
