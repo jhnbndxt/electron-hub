@@ -64,11 +64,13 @@ interface OnlinePayment {
   studentName: string;
   paymentMode: "bank" | "gcash";
   referenceNumber: string;
-  receiptData: string;
+  receiptFiles: string[];
   receiptFileName: string;
+  amount: number;
   status: "pending" | "approved" | "rejected";
   submittedDate: string;
   enrollmentData: any;
+  notes?: string;
   rejectionComment?: string;
 }
 
@@ -107,6 +109,14 @@ export function CashierDashboard() {
     loadPayments();
   }, []);
 
+  useEffect(() => {
+    if (selectedPayment) {
+      setZoom(100);
+      setVerificationNotes("");
+      setSelectedReceiptIndex(0);
+    }
+  }, [selectedPayment]);
+
   const loadPayments = async () => {
     setIsLoading(true);
     // Load all payments from Supabase
@@ -142,20 +152,31 @@ export function CashierDashboard() {
     // Separate online vs cash payments
     const onlinePending = allPayments
       .filter((p: any) => (p.payment_method === 'bank' || p.payment_method === 'gcash') && p.status === 'pending')
-      .map((p: any) => ({
-        id: p.id,
-        studentEmail: userMap[p.student_id]?.email || p.student_id,
-        studentName: userMap[p.student_id]?.name || 'Unknown Student',
-        paymentMode: p.payment_method as "bank" | "gcash",
-        referenceNumber: p.reference_number || '',
-        receiptData: p.receipt_file_url || '',
-        receiptFileName: p.receipt_file_path?.split('/').pop() || 'receipt',
-        status: 'pending' as const,
-        submittedDate: p.submitted_at
-          ? new Date(p.submitted_at).toLocaleDateString()
-          : new Date(p.created_at).toLocaleDateString(),
-        enrollmentData: {},
-      }));
+      .map((p: any) => {
+        const receiptFiles = p.receipt_file_url
+          ? String(p.receipt_file_url)
+              .split(/[;,]/)
+              .map((item: string) => item.trim())
+              .filter(Boolean)
+          : [];
+
+        return {
+          id: p.id,
+          studentEmail: userMap[p.student_id]?.email || p.student_id,
+          studentName: userMap[p.student_id]?.name || 'Unknown Student',
+          paymentMode: p.payment_method as "bank" | "gcash",
+          referenceNumber: p.reference_number || '',
+          receiptFiles,
+          receiptFileName: p.receipt_file_path?.split('/').pop() || 'receipt',
+          amount: Number(p.amount) || 0,
+          status: 'pending' as const,
+          submittedDate: p.submitted_at
+            ? new Date(p.submitted_at).toLocaleString()
+            : new Date(p.created_at).toLocaleString(),
+          enrollmentData: {},
+          notes: p.notes || '',
+        };
+      });
 
     const cashPending = allPayments
       .filter((p: any) => p.payment_method === 'cash' && p.status === 'pending')
@@ -313,6 +334,11 @@ export function CashierDashboard() {
   const onlineApproved = onlinePayments.filter((p) => p.status === "approved").length;
   const cashPending = cashPayments.filter((p) => p.status === "pending").length;
   const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
+
+  const selectedReceiptUrls = selectedPayment?.receiptFiles?.length ? selectedPayment.receiptFiles : [];
+  const isPaymentReferenceDuplicate = selectedPayment
+    ? onlinePayments.filter((p) => p.referenceNumber && p.referenceNumber === selectedPayment.referenceNumber).length > 1
+    : false;
 
   if (isLoading) {
     return (
@@ -654,70 +680,81 @@ export function CashierDashboard() {
             {/* Split Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
               {/* Left Side: Receipt Viewer */}
-              <div className="bg-slate-50 p-6 flex flex-col">
-                <h3 className="text-lg font-semibold text-slate-900 mb-4">Receipt Viewer</h3>
-                {/* Receipt Preview Container */}
-                <div className="flex-1 bg-white rounded-xl border border-slate-200 overflow-hidden mb-4 relative receipt-preview">
+                      <div className="bg-slate-50 p-6 flex flex-col">
+                <div className="flex flex-col gap-2 mb-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Payment Receipt</p>
+                      <p className="text-xs text-slate-500">Inspect screenshot authenticity and transaction details</p>
+                    </div>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {selectedReceiptIndex + 1} of {selectedReceiptUrls.length || 1}
+                    </span>
+                  </div>
+                  <div className="rounded-3xl bg-slate-900 p-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 text-slate-100">
+                      <button
+                        onClick={() => setZoom(Math.max(50, zoom - 25))}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700"
+                      >
+                        <ZoomOut className="w-4 h-4" />
+                      </button>
+                      <span className="text-sm font-semibold">{zoom}%</span>
+                      <button
+                        onClick={() => setZoom(Math.min(300, zoom + 25))}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700"
+                      >
+                        <ZoomIn className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => setZoom(100)}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700"
+                      >
+                        <RotateCcw className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const container = document.querySelector('.receipt-preview') as HTMLElement;
+                          if (container?.requestFullscreen) container.requestFullscreen();
+                        }}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100"
+                      >
+                        <Maximize className="w-4 h-4" />
+                      </button>
+                      <a
+                        href={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
+                        download={selectedPayment.receiptFileName}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm receipt-preview">
                   <img
-                    src={selectedPayment.receiptData}
+                    src={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
                     alt="Payment Receipt"
-                    className="w-full h-full object-contain"
+                    className="w-full h-[calc(100%-1rem)] object-contain bg-slate-950"
                     style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
                   />
                 </div>
-                {/* Controls */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setZoom(Math.max(50, zoom - 25))}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                    >
-                      <ZoomOut className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm text-slate-600">{zoom}%</span>
-                    <button
-                      onClick={() => setZoom(Math.min(300, zoom + 25))}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                    >
-                      <ZoomIn className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => setZoom(100)}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <a
-                      href={selectedPayment.receiptData}
-                      download={selectedPayment.receiptFileName}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                    >
-                      <Download className="w-4 h-4" />
-                    </a>
-                    <button
-                      onClick={() => {
-                        const container = document.querySelector('.receipt-preview') as HTMLElement;
-                        if (container) container.requestFullscreen();
-                      }}
-                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                    >
-                      <Maximize className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                {/* Thumbnail Selector */}
-                <div className="mt-4">
-                  <p className="text-sm text-slate-600 mb-2">Receipt Images</p>
-                  <div className="flex gap-2">
-                    <button
-                      className={`w-16 h-16 rounded-lg border-2 overflow-hidden ${selectedReceiptIndex === 0 ? 'border-blue-500' : 'border-slate-200'}`}
-                      onClick={() => setSelectedReceiptIndex(0)}
-                    >
-                      <img src={selectedPayment.receiptData} alt="Receipt 1" className="w-full h-full object-cover" />
-                    </button>
-                    {/* Add more thumbnails if multiple */}
+
+                <div className="mt-4 rounded-3xl bg-white border border-slate-200 p-4">
+                  <p className="text-sm font-semibold text-slate-900 mb-3">Receipt thumbnails</p>
+                  <div className="flex gap-3 overflow-x-auto pb-1">
+                    {(selectedReceiptUrls.length > 0 ? selectedReceiptUrls : ['']).map((url, index) => (
+                      <button
+                        key={`receipt-thumb-${index}`}
+                        onClick={() => setSelectedReceiptIndex(index)}
+                        className={`min-w-[86px] h-20 rounded-3xl overflow-hidden border-2 ${selectedReceiptIndex === index ? 'border-blue-500' : 'border-slate-200'} bg-slate-50`}
+                      >
+                        <img src={url} alt={`Receipt ${index + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -769,18 +806,26 @@ export function CashierDashboard() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-slate-600">Amount Paid</span>
-                      <span className="text-lg font-bold text-blue-600">₱15,000.00</span>
+                      <span className="text-lg font-bold text-blue-600">
+                        {selectedPayment.amount.toLocaleString("en-PH", {
+                          style: "currency",
+                          currency: "PHP",
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 {/* Validation Warnings */}
-                <div className="mb-6">
-                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                    <AlertTriangle className="w-4 h-4 text-amber-600" />
-                    <span className="text-sm text-amber-800">Possible Duplicate Reference Number</span>
+                {isPaymentReferenceDuplicate && (
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm text-amber-800">Possible duplicate reference number detected</span>
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Verification Notes */}
                 <div className="mb-6">
