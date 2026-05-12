@@ -1,8 +1,8 @@
 import {
   ArrowLeft,
   BookOpen,
+  ChevronDown,
   CheckCircle,
-  Eye,
   FileCheck,
   FileText,
   GraduationCap,
@@ -458,9 +458,9 @@ export function ApplicationReviewPage() {
     children: ReactNode,
     subtitle?: string
   ) => (
-    <section className="rounded-2xl border border-slate-200 bg-white/75 p-4 shadow-sm">
+    <section className="rounded-2xl border border-white/70 bg-white/55 p-4 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/40 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/70 hover:shadow-xl">
       <div className="mb-3 flex items-center gap-3">
-        <div className="rounded-full bg-blue-900 p-2.5 text-white">
+        <div className="rounded-full bg-gradient-to-br from-blue-800 to-sky-600 p-2.5 text-white shadow-lg shadow-blue-700/20">
           <Icon className="h-4 w-4" />
         </div>
         <div>
@@ -492,7 +492,7 @@ export function ApplicationReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_32%),linear-gradient(135deg,#f8fafc_0%,#eff6ff_48%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.24),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(14,165,233,0.18),transparent_30%),linear-gradient(135deg,#f8fafc_0%,#eef6ff_45%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
       <Toaster position="top-right" />
 
       {isProcessing && (
@@ -504,7 +504,7 @@ export function ApplicationReviewPage() {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-[min(1780px,calc(100vw-1rem))] rounded-2xl border border-white/75 bg-white/55 p-4 shadow-2xl shadow-blue-950/10 backdrop-blur-xl">
+      <div className="mx-auto w-full max-w-[min(1780px,calc(100vw-1rem))] rounded-3xl border border-white/70 bg-white/40 p-4 shadow-[0_28px_90px_-45px_rgba(15,23,42,0.55)] ring-1 ring-blue-100/70 backdrop-blur-2xl">
         <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h1 className="text-lg font-black text-slate-950">Pending Application Review</h1>
@@ -513,68 +513,68 @@ export function ApplicationReviewPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => navigate(`${basePath}/pending`)}
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300/80 bg-white/80 px-3 py-2 text-xs font-black text-slate-700 shadow-sm transition hover:bg-white"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-700 shadow-sm shadow-slate-950/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
             <button
               onClick={moveToNextApplicant}
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-800"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-sky-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-700/25"
             >
               Move to Next Applicant
             </button>
           </div>
         </header>
 
-        <section className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
-          <div className="grid gap-3 lg:grid-cols-[92px_1fr] lg:items-center">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xl font-black text-blue-800 ring-1 ring-white/80">
-              {studentProfile?.profile_picture_url ? (
-                <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                initials
-              )}
+        <section className="mt-3 overflow-hidden rounded-2xl border border-white/70 bg-white/45 p-4 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/60 backdrop-blur-2xl transition hover:bg-white/55">
+          <div className="grid gap-4 lg:grid-cols-[190px_1fr] lg:items-stretch">
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 bg-gradient-to-br from-white/70 to-blue-50/55 p-3 shadow-inner shadow-white/80 backdrop-blur-xl">
+              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 to-sky-100 text-2xl font-black text-blue-800 ring-4 ring-white/80 shadow-lg shadow-blue-900/10">
+                {studentProfile?.profile_picture_url ? (
+                  <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              <button
+                onClick={() => setShowForm((current) => !current)}
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-300/70 bg-white/70 px-3 py-2 text-xs font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md"
+              >
+                <FileText className="h-4 w-4" />
+                View Enrollment Form
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5 ${showForm ? "rotate-180" : ""}`} />
+              </button>
             </div>
 
-            <div className="min-w-0">
+            <div className="min-w-0 rounded-2xl border border-white/60 bg-white/45 p-4 shadow-sm backdrop-blur-xl">
               <h2 className="truncate text-lg font-black text-slate-950">{studentName}</h2>
               <div className="mt-3 grid gap-3 text-xs text-slate-600 md:grid-cols-3">
-                <div className="border-l border-slate-200 pl-4">
+                <div className="rounded-xl border border-white/70 bg-white/65 p-3 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md">
                   <p className="font-black text-slate-900">{formData.email || enrollment.user_id || "No email provided"}</p>
                   <p className="mt-1 text-[11px] font-medium text-slate-500">Email Address</p>
                 </div>
-                <div className="border-l border-slate-200 pl-4">
+                <div className="rounded-xl border border-white/70 bg-white/65 p-3 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md">
                   <p className="font-black text-slate-900">{String(enrollment.id)}</p>
                   <p className="mt-1 text-[11px] font-medium text-slate-500">Student ID</p>
                 </div>
-                <div className="border-l border-slate-200 pl-4">
+                <div className="rounded-xl border border-white/70 bg-white/65 p-3 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md">
                   <p className="font-black text-slate-900">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
                   <p className="mt-1 text-[11px] font-medium text-slate-500">Academic Track / Strand</p>
                 </div>
               </div>
             </div>
           </div>
-
-          <div className="mt-3 flex justify-center">
-            <button
-              onClick={() => setShowForm((current) => !current)}
-              className="inline-flex min-w-[280px] items-center justify-center gap-2 rounded-lg border border-blue-500/70 bg-white/60 px-4 py-2 text-xs font-black text-blue-700 shadow-sm transition hover:bg-blue-50"
-            >
-              <Eye className="h-4 w-4" />
-              {showForm ? "Hide Full Enrollment Form" : "View Full Enrollment Form"}
-            </button>
-          </div>
         </section>
 
         {showForm && (
-          <section className="mt-3 rounded-2xl border border-white/70 bg-white/65 p-4 shadow-lg backdrop-blur-xl">
+          <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-4 shadow-xl shadow-blue-950/10 ring-1 ring-blue-100/60 backdrop-blur-2xl">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h2 className="text-xl font-bold text-blue-950">Enrollment Review</h2>
                 <p className="text-sm text-slate-600">Submitted application form details</p>
               </div>
-              <button onClick={() => setShowForm(false)} className="rounded-lg border border-slate-300 bg-white/70 px-3 py-1.5 text-xs font-black text-slate-700">
+              <button onClick={() => setShowForm(false)} className="rounded-xl border border-white/80 bg-white/70 px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:bg-white hover:shadow-md">
                 Hide Form
               </button>
             </div>
@@ -676,10 +676,10 @@ export function ApplicationReviewPage() {
           </section>
         )}
 
-        <section className="mt-3 rounded-2xl border border-white/70 bg-white/55 p-4 shadow-lg backdrop-blur-xl">
+        <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-4 shadow-xl shadow-blue-950/10 ring-1 ring-blue-100/60 backdrop-blur-2xl">
           <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Document Verification</p>
           <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(360px,31%)_minmax(0,1fr)]">
-            <aside className="rounded-lg border border-slate-200 bg-white/65 p-3">
+            <aside className="rounded-2xl border border-white/70 bg-white/55 p-3 shadow-inner shadow-white/60 backdrop-blur-xl">
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                   <input
@@ -693,7 +693,7 @@ export function ApplicationReviewPage() {
                 <button
                   onClick={approveSelectedDocuments}
                   disabled={selectedDocs.length === 0 || isProcessing}
-                  className="rounded-md bg-blue-700 px-3 py-1.5 text-[11px] font-black text-white disabled:bg-slate-300"
+                  className="rounded-lg bg-gradient-to-r from-blue-700 to-sky-600 px-3 py-1.5 text-[11px] font-black text-white shadow-md shadow-blue-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
                 >
                   Bulk Approve
                 </button>
@@ -712,25 +712,25 @@ export function ApplicationReviewPage() {
                     setDocRejectReason("");
                   }}
                   disabled={selectedDocs.length === 0 || isProcessing}
-                  className="rounded-md bg-rose-600 px-3 py-1.5 text-[11px] font-black text-white disabled:bg-slate-300"
+                  className="rounded-lg bg-gradient-to-r from-rose-600 to-red-500 px-3 py-1.5 text-[11px] font-black text-white shadow-md shadow-rose-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
                 >
                   Bulk Reject
                 </button>
               </div>
 
-              <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
-                <div className="grid grid-cols-[32px_1fr_86px] bg-slate-50 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-500">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-white/70 bg-white/45 shadow-sm backdrop-blur-xl">
+                <div className="grid grid-cols-[32px_1fr_86px] bg-white/70 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-500 backdrop-blur-xl">
                   <span />
                   <span>Document Name</span>
                   <span>Status</span>
                 </div>
-                <div className="max-h-[52vh] divide-y divide-slate-100 overflow-y-auto bg-white/70">
+                <div className="max-h-[52vh] divide-y divide-white/60 overflow-y-auto bg-white/45">
                   {documents.map((doc) => (
                     <button
                       key={doc.key}
                       onClick={() => setSelectedDocKey(doc.key)}
                       className={`grid w-full grid-cols-[32px_1fr_86px] items-center gap-2 px-3 py-2 text-left transition ${
-                        selectedDocKey === doc.key ? "bg-blue-50" : "hover:bg-slate-50"
+                        selectedDocKey === doc.key ? "bg-blue-100/70 shadow-inner" : "hover:bg-white/70"
                       }`}
                     >
                       <input
@@ -771,7 +771,7 @@ export function ApplicationReviewPage() {
                 <button
                   onClick={() => approveDocument()}
                   disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-sky-600 px-3 py-2 text-xs font-black text-white shadow-md shadow-blue-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
                 >
                   <CheckCircle className="h-4 w-4" />
                   Approve
@@ -783,7 +783,7 @@ export function ApplicationReviewPage() {
                     setDocRejectReason(selectedDocument?.rejectionComment || "");
                   }}
                   disabled={!selectedDocument?.id || selectedDocument.status === "approved" || isProcessing}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-rose-600 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 px-3 py-2 text-xs font-black text-white shadow-md shadow-rose-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
                 >
                   <XCircle className="h-4 w-4" />
                   Reject
@@ -791,29 +791,29 @@ export function ApplicationReviewPage() {
               </div>
             </aside>
 
-            <section className="flex min-h-[62vh] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white/70">
-              <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white/70 px-3 py-2">
+            <section className="flex min-h-[62vh] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/65 px-3 py-2 backdrop-blur-xl">
                 <div className="min-w-0">
                   <p className="text-[11px] font-black text-slate-900">Document Preview</p>
                   <p className="truncate text-[11px] font-medium text-slate-500">{selectedDocument?.label || "Select a document"}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => setZoom((current) => Math.max(50, current - 10))} className="rounded-md border border-slate-200 bg-white p-2 text-slate-700" title="Zoom out">
+                  <button onClick={() => setZoom((current) => Math.max(50, current - 10))} className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Zoom out">
                     <Minus className="h-4 w-4" />
                   </button>
-                  <span className="rounded-md border border-slate-200 bg-white px-3 py-2 text-[11px] font-black">{zoom}%</span>
-                  <button onClick={() => setZoom((current) => Math.min(180, current + 10))} className="rounded-md border border-slate-200 bg-white p-2 text-slate-700" title="Zoom in">
+                  <span className="rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-[11px] font-black shadow-sm">{zoom}%</span>
+                  <button onClick={() => setZoom((current) => Math.min(180, current + 10))} className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Zoom in">
                     <Plus className="h-4 w-4" />
                   </button>
                   {selectedDocument?.fileUrl && (
-                    <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-md border border-slate-200 bg-white p-2 text-slate-700" title="Fullscreen">
+                    <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Fullscreen">
                       <Maximize2 className="h-4 w-4" />
                     </a>
                   )}
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-auto bg-white p-2">
+              <div className="min-h-0 flex-1 overflow-auto bg-white/60 p-2 backdrop-blur-xl">
                 {selectedDocument?.fileUrl ? (
                   selectedDocument.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
                     <div className="flex min-h-full items-start justify-center">
@@ -846,13 +846,13 @@ export function ApplicationReviewPage() {
           </div>
         </section>
 
-        <section className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+        <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
           <div className="grid gap-3 lg:grid-cols-[1fr_350px] lg:items-center">
             <div>
               <p className="text-xs font-black text-slate-900">Is the student eligible for the voucher program? <span className="text-rose-600">*</span></p>
               <p className="mt-1 text-[11px] font-medium text-slate-500">This is required before approving the application.</p>
             </div>
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-white/70 p-2">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/70 bg-white/60 p-2 shadow-inner backdrop-blur-xl">
               <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
                 <input type="radio" checked={voucherEligibility === "eligible"} onChange={() => setVoucherEligibility("eligible")} className="h-4 w-4 accent-blue-700" />
                 Yes, Eligible
@@ -866,11 +866,11 @@ export function ApplicationReviewPage() {
           {existingVoucherStatus && <p className="mt-2 text-[11px] font-semibold text-slate-500">Saved decision: {String(existingVoucherStatus).replace("_", " ")}</p>}
         </section>
 
-        <footer className="mt-3 rounded-lg border border-slate-200/70 bg-white/55 p-3 shadow-sm backdrop-blur-md">
+        <footer className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
           <div className="grid gap-3 lg:grid-cols-2">
             <button
               onClick={() => setShowApplicationReject(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-rose-300 bg-white/70 px-4 py-3 text-sm font-black text-rose-700 shadow-sm hover:bg-rose-50"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300/80 bg-white/65 px-4 py-3 text-sm font-black text-rose-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md"
             >
               <XCircle className="h-4 w-4" />
               Reject Application
@@ -878,7 +878,7 @@ export function ApplicationReviewPage() {
             <button
               onClick={approveApplication}
               disabled={!requiredApproved || !voucherEligibility || isProcessing}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-blue-800 disabled:bg-slate-300"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-sky-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:bg-slate-300 disabled:shadow-none"
             >
               <ShieldCheck className="h-4 w-4" />
               Approve Application
