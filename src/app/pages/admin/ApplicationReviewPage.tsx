@@ -125,6 +125,7 @@ export function ApplicationReviewPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [approvalChoice, setApprovalChoice] = useState<ApprovalChoice>(null);
   const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [showVoucherChecklist, setShowVoucherChecklist] = useState(false);
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [pendingRejectDocKey, setPendingRejectDocKey] = useState<string | null>(null);
@@ -331,6 +332,15 @@ export function ApplicationReviewPage() {
   }, [id]);
 
   useEffect(() => {
+    const status = String(enrollment?.voucher_status || formData?.voucher?.voucher_status || "");
+    if (status === "eligible" || status === "not_eligible") {
+      setVoucherEligibility(status);
+    } else {
+      setVoucherEligibility(null);
+    }
+  }, [enrollment?.id, enrollment?.voucher_status, formData?.voucher?.voucher_status]);
+
+  useEffect(() => {
     if (!id) return;
 
     const docChannel = supabase
@@ -527,8 +537,12 @@ export function ApplicationReviewPage() {
       toast.error("Required documents must be approved first.");
       return;
     }
-    // Show voucher checklist instead of modal
-    setShowVoucherChecklist(true);
+    if (!voucherEligibility) {
+      toast.error("Please select voucher eligibility before approving.");
+      return;
+    }
+    setApprovalChoice(voucherEligibility);
+    void finishApproval(voucherEligibility === "eligible");
   };
 
   const finishApproval = async (eligible: boolean) => {
@@ -721,7 +735,7 @@ export function ApplicationReviewPage() {
       )}
 
       {!focusMode && (
-        <aside className="flex min-h-0 flex-col rounded-xl border border-slate-200/60 bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 shadow-lg backdrop-blur-sm overflow-hidden">
+        <aside className="flex min-h-0 flex-col rounded-xl border border-slate-200/60 bg-gradient-to-br from-white via-slate-50/50 to-blue-50/30 shadow-lg backdrop-blur-sm overflow-hidden lg:order-1">
           <div className="border-b border-slate-200/60 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-4 py-4 shadow-sm">
             <p className="text-xs font-bold uppercase tracking-wide text-blue-100">Application Queue</p>
             <p className="text-sm font-semibold text-white">{prioritizedQueue.length} active</p>
@@ -824,7 +838,7 @@ export function ApplicationReviewPage() {
         </aside>
       )}
 
-      <main className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200/60 bg-gradient-to-br from-white via-slate-50/30 to-blue-50/20 shadow-lg backdrop-blur-sm">
+      <main className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200/60 bg-gradient-to-br from-white via-slate-50/30 to-blue-50/20 shadow-lg backdrop-blur-sm lg:order-3">
         <header className="border-b border-slate-200 px-4 py-3">
           <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
             <div className="flex min-w-0 items-center gap-3">
@@ -841,13 +855,22 @@ export function ApplicationReviewPage() {
                   <span className="rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">#{String(enrollment.id).slice(0, 8)}</span>
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
-                  <span>{getTrack(enrollment)}</span>
+                  <span>Student ID: {String(enrollment.id).slice(0, 8)}</span>
+                  <span>Academic Track/Strand: {getTrack(enrollment)}</span>
                   <span>Assessment: {assessmentScore !== null ? `${assessmentScore}%` : "Not taken"}</span>
-                  <span>Status: {String(enrollment.status || "pending").replace(/_/g, " ")}</span>
+                  <span>Application Status: {String(enrollment.status || "pending").replace(/_/g, " ")}</span>
                 </div>
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button onClick={() => navigate(`${basePath}/pending`)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Applications
+              </button>
+              <button onClick={() => setActiveTab("form")} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                <Eye className="h-4 w-4" />
+                View Full Enrollment Form
+              </button>
               <button onClick={() => setFocusMode((current) => !current)} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
                 <Zap className="h-4 w-4" />
                 {focusMode ? "Exit Focus" : "Focus Mode"}
@@ -1057,7 +1080,7 @@ export function ApplicationReviewPage() {
         </div>
       </main>
 
-      <aside className="flex min-h-0 flex-col rounded-xl border border-slate-200/60 bg-gradient-to-br from-white via-emerald-50/30 to-blue-50/20 shadow-lg backdrop-blur-sm overflow-hidden">
+      <aside className="flex min-h-0 flex-col rounded-xl border border-slate-200/60 bg-gradient-to-br from-white via-emerald-50/30 to-blue-50/20 shadow-lg backdrop-blur-sm overflow-hidden lg:order-2">
         <div className="border-b border-slate-200/60 bg-gradient-to-r from-emerald-600 via-emerald-700 to-teal-700 px-4 py-4 shadow-sm">
           <p className="text-xs font-bold uppercase tracking-wide text-emerald-100">Document Tracking</p>
           <h2 className="mt-1 text-base font-bold text-white">Review Status</h2>
@@ -1170,17 +1193,48 @@ export function ApplicationReviewPage() {
             </div>
           </section>
 
+          <section className="rounded-xl border border-blue-100 bg-white/85 p-4 shadow-lg backdrop-blur-sm">
+            <p className="text-sm font-bold uppercase tracking-wide text-slate-600">Voucher Eligibility</p>
+            <p className="mt-1 text-xs text-slate-500">Required before final application approval.</p>
+            <div className="mt-4 space-y-2">
+              <label className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-3 transition ${
+                voucherEligibility === "eligible" ? "border-blue-500 bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}>
+                <input
+                  type="radio"
+                  name="voucherEligibilityInline"
+                  checked={voucherEligibility === "eligible"}
+                  onChange={() => setVoucherEligibility("eligible")}
+                  className="h-4 w-4 accent-blue-600"
+                />
+                <span className="text-sm font-bold text-slate-800">Yes, Eligible</span>
+              </label>
+              <label className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-3 transition ${
+                voucherEligibility === "not_eligible" ? "border-rose-500 bg-rose-50" : "border-slate-200 bg-white hover:bg-slate-50"
+              }`}>
+                <input
+                  type="radio"
+                  name="voucherEligibilityInline"
+                  checked={voucherEligibility === "not_eligible"}
+                  onChange={() => setVoucherEligibility("not_eligible")}
+                  className="h-4 w-4 accent-rose-600"
+                />
+                <span className="text-sm font-bold text-slate-800">No, Not Eligible</span>
+              </label>
+            </div>
+          </section>
+
           {/* Application Actions */}
           <div className="space-y-3 pt-2">
             <button
               onClick={() => startApproval()}
-              disabled={!requiredApproved}
+              disabled={!requiredApproved || !voucherEligibility}
               className={`w-full flex items-center justify-center gap-3 rounded-xl px-4 py-4 text-sm font-bold text-white transition-all duration-200 hover:scale-105 ${
-                requiredApproved
+                requiredApproved && voucherEligibility
                   ? "bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 hover:from-blue-700 hover:via-blue-800 hover:to-indigo-800 shadow-lg hover:shadow-xl"
                   : "bg-slate-300 cursor-not-allowed shadow-sm"
               }`}
-              title={!requiredApproved ? "Approve all required documents first." : "Review voucher and approve"}
+              title={!requiredApproved ? "Approve all required documents first." : !voucherEligibility ? "Select voucher eligibility first." : "Approve application"}
             >
               <ShieldCheck className="h-5 w-5" />
               Approve Application

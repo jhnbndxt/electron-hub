@@ -29,6 +29,7 @@ import { StudentAccount } from "./pages/StudentAccount";
 import { PublicAssessment } from "./pages/PublicAssessment";
 import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { PendingApplications } from "./pages/admin/PendingApplications";
+import { ApplicationReviewPage } from "./pages/admin/ApplicationReviewPage";
 import { DocumentVerification } from "./pages/admin/DocumentVerification";
 import { EnrollmentManagement } from "./pages/admin/EnrollmentManagement";
 import { StudentRecords } from "./pages/admin/StudentRecords";
@@ -138,6 +139,8 @@ export default function App() {
           children: [
             { index: true, Component: AdminDashboard },
             { path: "pending", Component: PendingApplications },
+            { path: "review", Component: ApplicationReviewPage },
+            { path: "review/:id", Component: ApplicationReviewPage },
             { path: "enrollment", Component: EnrollmentManagement },
             { path: "students", Component: StudentRecords },
             { path: "student-profile/:id", Component: StudentProfile },
@@ -160,6 +163,8 @@ export default function App() {
           children: [
             { index: true, Component: SuperAdminDashboard },
             { path: "pending", Component: PendingApplications },
+            { path: "review", Component: ApplicationReviewPage },
+            { path: "review/:id", Component: ApplicationReviewPage },
             { path: "enrollment", element: <Navigate to="/branchcoordinator" replace /> },
             { path: "payments", Component: BranchCoordinatorPayments },
             { path: "cashier-dashboard", Component: CashierDashboard },

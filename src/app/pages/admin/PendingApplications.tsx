@@ -1,35 +1,21 @@
 import {
   Search,
-  X,
   FileCheck,
   FileText,
   Award,
-  CheckCircle,
-  AlertCircle,
   Download,
   Filter,
-  XCircle,
-  Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router";
 import toast, { Toaster } from "react-hot-toast";
-import { useAuth } from "../../context/AuthContext";
-import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
-import ReviewApplicationModal from "../../components/ReviewApplicationModal";
 import {
   getPendingApplications,
-  approveEnrollment,
-  rejectEnrollment,
-  resolveUserId,
-  updateDocumentStatus,
-  upsertEnrollmentProgress,
   getAssessmentResultByStudentId,
   getStudentPaymentStatus,
 } from "../../../services/adminService";
-import { triggerNotification } from "../../../services/notificationService";
-import { supabase } from "../../../supabase";
 
 interface Student {
   id: number | string;
@@ -102,27 +88,16 @@ const getCurrentEnrollmentStatus = ({
 };
 
 export function PendingApplications() {
-  const { userData } = useAuth();
-  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [strandFilter, setStrandFilter] = useState("all");
   const [documentFilter, setDocumentFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
-  const [showApproveModal, setShowApproveModal] = useState(false);
-  const [showRejectModal, setShowRejectModal] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
-  const [actionStudentId, setActionStudentId] = useState<number | string | null>(null);
-
-  // Document review modal states
-  const [showDocumentModal, setShowDocumentModal] = useState(false);
-  const [reviewingStudent, setReviewingStudent] = useState<any>(null);
-  const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
-  const [documentRejectionComment, setDocumentRejectionComment] = useState("");
-  const [showFormData, setShowFormData] = useState(false);
-  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
-  const actorReference = userData?.id || userData?.email || 'registrar';
+  const reviewBasePath = location.pathname.startsWith("/branchcoordinator")
+    ? "/branchcoordinator"
+    : "/registrar";
   const alert = (message: string) => {
     const text = String(message || "");
     if (text.includes("âœ…") || text.includes("✅")) return;
@@ -193,15 +168,6 @@ export function PendingApplications() {
     console.log('📋 Loaded', formattedApps.length, 'pending applications from Supabase');
   };
 
-  const documentNames: Record<string, string> = {
-    psaBirthCertificate: "PSA Birth Certificate",
-    form138: "Form 138 (Report Card)",
-    form137: "Form 137",
-    goodMoral: "Good Moral Certificate",
-    idPicture: "2x2 ID Picture",
-    diploma: "Grade 10 Diploma",
-  };
-
   const getDocumentStatus = (student: Student) => {
     const docs = student.enrollmentData?.enrollment_documents || [];
     const uploaded = docs.length;
@@ -220,413 +186,6 @@ export function PendingApplications() {
       pending,
       allApproved: approved === uploaded,
     };
-  };
-
-  const updateStudentDocumentState = (
-    enrollmentId: number | string | undefined,
-    documentType: string,
-    updates: Record<string, any>
-  ) => {
-    if (!enrollmentId) return;
-
-    setStudents((prevStudents) =>
-      prevStudents.map((student) => {
-        if (student.id !== enrollmentId) return student;
-
-        const nextDocuments = (student.enrollmentData?.enrollment_documents || []).map((doc: any) =>
-          doc.document_type === documentType ? { ...doc, ...updates } : doc
-        );
-        const approvedDocuments = nextDocuments.filter(
-          (doc: any) => doc.status === "approved" || doc.verified === true
-        ).length;
-
-        return {
-          ...student,
-          currentStatus: getCurrentEnrollmentStatus({
-            hasAssessment: student.aiTestScore !== null,
-            enrollmentStatus: student.enrollmentData?.status,
-            documentsUploaded: nextDocuments.length,
-            documentsApproved: approvedDocuments,
-          }),
-          enrollmentData: {
-            ...student.enrollmentData,
-            enrollment_documents: nextDocuments,
-          },
-        };
-      })
-    );
-
-    setReviewingStudent((prev: any) => {
-      if (!prev || prev.id !== enrollmentId) return prev;
-
-      const nextDocuments = (prev.enrollment_documents || []).map((doc: any) =>
-        doc.document_type === documentType ? { ...doc, ...updates } : doc
-      );
-
-      return {
-        ...prev,
-        enrollment_documents: nextDocuments,
-        enrollmentData: {
-          ...prev.enrollmentData,
-          enrollment_documents: nextDocuments,
-        },
-      };
-    });
-  };
-
-  const updateStudentEnrollmentState = (
-    enrollmentId: number | string | undefined,
-    updates: Record<string, any>
-  ) => {
-    if (!enrollmentId) return;
-
-    setStudents((prevStudents) =>
-      prevStudents
-        .map((student) => {
-          if (student.id !== enrollmentId) return student;
-
-          const nextEnrollmentData = {
-            ...student.enrollmentData,
-            ...updates,
-          };
-          const docs = nextEnrollmentData.enrollment_documents || [];
-          const approvedDocuments = docs.filter(
-            (doc: any) => doc.status === "approved" || doc.verified === true
-          ).length;
-
-          return {
-            ...student,
-            status: nextEnrollmentData.status === "documents_verified" ? "approved" : student.status,
-            currentStatus: getCurrentEnrollmentStatus({
-              hasAssessment: student.aiTestScore !== null,
-              enrollmentStatus: nextEnrollmentData.status,
-              documentsUploaded: docs.length,
-              documentsApproved: approvedDocuments,
-            }),
-            enrollmentData: nextEnrollmentData,
-          };
-        })
-        .filter((student) => student.enrollmentData?.status !== "enrolled")
-    );
-
-    setReviewingStudent((prev: any) =>
-      prev && prev.id === enrollmentId
-        ? { ...prev, enrollmentData: { ...prev.enrollmentData, ...updates } }
-        : prev
-    );
-  };
-
-  const handleReviewDocuments = async (student: Student) => {
-    try {
-      // Fetch full enrollment data including form_data
-      const { data: enrollmentData, error } = await supabase
-        .from('enrollments')
-        .select(`
-          *,
-          enrollment_documents (*),
-          form_data
-        `)
-        .eq('id', student.id)
-        .single();
-
-      if (error) throw error;
-
-      setReviewingStudent({
-        ...student,
-        enrollmentData,
-        formData: enrollmentData?.form_data,
-        enrollment_documents: enrollmentData?.enrollment_documents || [],
-      });
-      setShowDocumentModal(true);
-      setSelectedDocument(null);
-    } catch (error) {
-      console.error('Error loading student data:', error);
-      alert('Failed to load student data');
-    }
-  };
-
-  const handleViewDocument = (docKey: string) => {
-    if (!reviewingStudent) return;
-    const docs: any[] = reviewingStudent.enrollment_documents || [];
-    const doc = docs.find((d: any) => d.document_type === docKey);
-    if (!doc) {
-      alert("This document has not been uploaded yet.");
-      return;
-    }
-    setSelectedDocument({
-      key: docKey,
-      name: documentNames[docKey] || docKey,
-      data: {
-        ...doc,
-        fileUrl: doc.file_path || doc.file_url,
-        status: doc.status,
-        rejectionComment: doc.rejection_comment || doc.rejection_reason || "",
-      },
-    });
-    setDocumentRejectionComment(doc.rejection_comment || doc.rejection_reason || "");
-  };
-
-  const handleApproveDocument = async () => {
-    if (!reviewingStudent || !selectedDocument) return;
-
-    // Find the document in the enrollment
-    const documentId = reviewingStudent.enrollment_documents?.find(
-      (d: any) => d.document_type === selectedDocument.key
-    )?.id;
-
-    if (!documentId) {
-      alert("Document not found");
-      return;
-    }
-
-    const { data, error } = await updateDocumentStatus(documentId, 'approved');
-
-    if (error) {
-      alert(`Error approving document: ${error}`);
-      return;
-    }
-
-    updateStudentDocumentState(reviewingStudent.id, selectedDocument.key, {
-      ...(data || {}),
-      status: "approved",
-      rejection_comment: null,
-    });
-
-    // Create notification for document approval
-    try {
-      await triggerNotification(
-        reviewingStudent.user_id || reviewingStudent.email || "",
-        'DOCUMENT_APPROVED',
-        { documentName: selectedDocument.name }
-      );
-    } catch (error) {
-      console.error('Error creating notification:', error);
-    }
-
-    alert("✅ Document approved successfully!");
-    toast.success(`${selectedDocument.name} approved.`);
-    setSelectedDocument(null);
-    setDocumentRejectionComment("");
-  };
-
-  const handleRejectDocument = async (documentKey?: string, rejectionComment?: string) => {
-    const activeDocumentKey = documentKey || selectedDocument?.key;
-    const activeDocumentName = documentNames[activeDocumentKey || ""] || selectedDocument?.name || "Document";
-    const activeRejectionComment = rejectionComment || documentRejectionComment;
-
-    if (!reviewingStudent || !activeDocumentKey) return;
-    
-    if (!activeRejectionComment.trim()) {
-      alert("❌ Rejection reason is required. Please provide a clear explanation.");
-      return;
-    }
-
-    if (activeRejectionComment.trim().length < 10) {
-      alert("❌ Please provide a more detailed rejection reason (at least 10 characters).");
-      return;
-    }
-
-    // Find the document in the enrollment
-    const documentId = reviewingStudent.enrollment_documents?.find(
-      (d: any) => d.document_type === activeDocumentKey
-    )?.id;
-
-    if (!documentId) {
-      alert("Document not found");
-      return;
-    }
-
-    const { data, error } = await updateDocumentStatus(documentId, 'rejected', activeRejectionComment.trim());
-
-    if (error) {
-      alert(`Error rejecting document: ${error}`);
-      return;
-    }
-
-    updateStudentDocumentState(reviewingStudent.id, activeDocumentKey, {
-      ...(data || {}),
-      status: "rejected",
-      rejection_comment: activeRejectionComment.trim(),
-    });
-
-    // Create notification
-    try {
-      await triggerNotification(
-        reviewingStudent.user_id || reviewingStudent.email || "",
-        'DOCUMENTS_REJECTED',
-        { message: activeRejectionComment.trim() }
-      );
-    } catch (error) {
-      console.error('Error creating notification:', error);
-    }
-
-    alert(`✅ Document rejected. Student has been notified.`);
-    toast.success(`${activeDocumentName} rejected. Student notified.`);
-    setSelectedDocument(null);
-    setDocumentRejectionComment("");
-  };
-
-  const handleBulkApprove = async (documentKeys: string[]) => {
-    if (!reviewingStudent || documentKeys.length === 0) return;
-
-    try {
-      // Approve each document
-      for (const docKey of documentKeys) {
-        const documentId = reviewingStudent.enrollment_documents?.find(
-          (d: any) => d.document_type === docKey
-        )?.id;
-
-        if (documentId) {
-          const { data, error } = await updateDocumentStatus(documentId, 'approved');
-          if (error) {
-            console.error(`Error approving document ${docKey}:`, error);
-            alert(`Error approving ${documentNames[docKey] || docKey}`);
-            return;
-          }
-
-          updateStudentDocumentState(reviewingStudent.id, docKey, {
-            ...(data || {}),
-            status: "approved",
-            rejection_comment: null,
-          });
-        }
-      }
-
-      // Create notification for bulk approval
-      try {
-        await triggerNotification(
-          reviewingStudent.user_id || reviewingStudent.email || "",
-          'DOCUMENTS_APPROVED',
-          { documentCount: documentKeys.length, documents: documentKeys.map(key => documentNames[key] || key) }
-        );
-      } catch (error) {
-        console.error('Error creating notification:', error);
-      }
-
-      alert(`✅ ${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved successfully!`);
-      toast.success(`${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved.`);
-    } catch (error) {
-      console.error('Bulk approve error:', error);
-      alert('Error during bulk approval. Please try again.');
-    }
-  };
-
-  const handleApproveFromTable = async (docKey: string) => {
-    if (!reviewingStudent) return;
-
-    const documentId = reviewingStudent.enrollment_documents?.find(
-      (d: any) => d.document_type === docKey
-    )?.id;
-
-    if (!documentId) {
-      alert("Document not found");
-      return;
-    }
-
-    const { data, error } = await updateDocumentStatus(documentId, 'approved');
-
-    if (error) {
-      alert(`Error approving document: ${error}`);
-      return;
-    }
-
-    updateStudentDocumentState(reviewingStudent.id, docKey, {
-      ...(data || {}),
-      status: "approved",
-      rejection_comment: null,
-    });
-
-    // Create notification for document approval
-    try {
-      await triggerNotification(
-        reviewingStudent.user_id || reviewingStudent.email || "",
-        'DOCUMENT_APPROVED',
-        { documentName: documentNames[docKey] || docKey }
-      );
-    } catch (error) {
-      console.error('Error creating notification:', error);
-    }
-
-    alert("✅ Document approved successfully!");
-    toast.success(`${documentNames[docKey] || docKey} approved.`);
-  };
-
-  const handleFinalApproveApplication = async () => {
-    if (!reviewingStudent) return;
-
-    const { error } = await approveEnrollment(reviewingStudent.id, actorReference);
-    if (error) {
-      alert(`❌ Error approving application: ${error}`);
-      return;
-    }
-
-    const studentUserId = await resolveUserId(
-      reviewingStudent.email || reviewingStudent.enrollmentData?.user_id || ""
-    );
-
-    if (studentUserId) {
-      await upsertEnrollmentProgress(studentUserId, [
-        { step_name: 'Documents Submitted', status: 'completed' },
-        { step_name: 'Documents Verified', status: 'completed' },
-        { step_name: 'Payment Submitted', status: 'current' },
-      ]);
-    }
-
-    alert(`✅ Documents verified. Student can now proceed to payment.`);
-    updateStudentEnrollmentState(reviewingStudent.id, { status: "documents_verified" });
-    toast.success("Application approved. Student can proceed to payment.");
-    setShowDocumentModal(false);
-    setSelectedDocument(null);
-    setReviewingStudent(null);
-    setShowFormData(false);
-  };
-
-  const handleRejectApplication = async () => {
-    if (!reviewingStudent) return;
-
-    // Show confirmation before rejecting the entire application
-    const confirmReject = window.confirm(
-      `Are you sure you want to REJECT the entire application for ${reviewingStudent.studentName || reviewingStudent.name || 'this student'}?\n\nThis action will:\n- Mark the application as REJECTED\n- Notify the student\n- Prevent further modifications\n\nThis action cannot be undone easily.`
-    );
-
-    if (!confirmReject) return;
-
-    try {
-      // Reject the entire enrollment
-      const { error } = await rejectEnrollment(
-        reviewingStudent.id,
-        "Application rejected during document review.",
-        actorReference
-      );
-
-      if (error) {
-        alert(`❌ Error rejecting application: ${error}`);
-        return;
-      }
-
-      // Notify the student
-      try {
-        await triggerNotification(
-          reviewingStudent.user_id || reviewingStudent.email || "",
-          'ENROLLMENT_REJECTED',
-          { reason: "Your application was rejected during the document review process." }
-        );
-      } catch (notificationError) {
-        console.error('Error creating notification:', notificationError);
-      }
-
-      alert(`✅ Application REJECTED. Student has been notified.`);
-      setStudents((prevStudents) => prevStudents.filter((student) => student.id !== reviewingStudent.id));
-      toast.success("Application rejected. Student notified.");
-      setShowDocumentModal(false);
-      setSelectedDocument(null);
-      setReviewingStudent(null);
-      setShowFormData(false);
-      setDocumentRejectionComment("");
-    } catch (error) {
-      console.error('Error rejecting application:', error);
-      alert(`❌ Error rejecting application: ${error}`);
-    }
   };
 
   const getMissingDocuments = (student: Student): string[] => {
@@ -678,98 +237,6 @@ export function PendingApplications() {
 
   const handleExportPDF = () => {
     alert(`Exporting student record(s) to PDF...`);
-  };
-
-  const handleApproveClick = (id: number | string) => {
-    const student = students.find(s => s.id === id);
-    if (!student) return;
-
-    const docStatus = getDocumentStatus(student);
-    if (!docStatus.allApproved) {
-      alert("❌ Cannot approve application. All documents must be approved first! Please click 'Review Docs' to verify documents.");
-      return;
-    }
-
-    setActionStudentId(id);
-    setShowApproveModal(true);
-  };
-
-  const handleRejectClick = (id: number | string) => {
-    setActionStudentId(id);
-    setRejectionReason("");
-    setShowRejectModal(true);
-  };
-
-  const confirmApprove = async () => {
-    if (actionStudentId) {
-      const student = students.find(s => s.id === actionStudentId);
-      
-      if (student) {
-        // Approve enrollment in Supabase
-        const { error } = await approveEnrollment(actionStudentId, actorReference);
-        
-        if (error) {
-          alert(`❌ Error approving application: ${error}`);
-          setShowApproveModal(false);
-          return;
-        }
-
-        const studentUserId = await resolveUserId(student.email || "");
-        if (studentUserId) {
-          await upsertEnrollmentProgress(studentUserId, [
-            { step_name: 'Documents Submitted', status: 'completed' },
-            { step_name: 'Documents Verified', status: 'completed' },
-            { step_name: 'Payment Submitted', status: 'current' },
-          ]);
-        }
-
-        // Create notification for student
-        try {
-          await triggerNotification(student.email || "", 'DOCUMENTS_VERIFIED');
-        } catch (error) {
-          console.error('Error creating notification:', error);
-        }
-
-        alert(`✅ ${student.name}'s documents are verified. Payment is now unlocked.`);
-        updateStudentEnrollmentState(student.id, { status: "documents_verified" });
-        toast.success(`${student.name}'s documents are verified.`);
-        setShowApproveModal(false);
-        setActionStudentId(null);
-      }
-    }
-  };
-
-  const confirmReject = async () => {
-    if (actionStudentId && rejectionReason.trim()) {
-      const student = students.find(s => s.id === actionStudentId);
-      
-      if (student) {
-        // Reject enrollment in Supabase
-        const { error } = await rejectEnrollment(actionStudentId, rejectionReason.trim(), actorReference);
-        
-        if (error) {
-          alert(`❌ Error rejecting application: ${error}`);
-          setShowRejectModal(false);
-          return;
-        }
-
-        // Create notification for student
-        try {
-          await triggerNotification(student.email || "", 'ENROLLMENT_REJECTED');
-        } catch (error) {
-          console.error('Error creating notification:', error);
-        }
-
-        alert(`✅ ${student.name}'s application has been rejected.`);
-        setStudents((prevStudents) => prevStudents.filter((item) => item.id !== student.id));
-        toast.success(`${student.name}'s application rejected.`);
-        setShowRejectModal(false);
-        setActionStudentId(null);
-        setRejectionReason("");
-      }
-    } else {
-      alert("❌ Please provide a rejection reason.");
-    }
   };
 
   const getStatusStyle = (status: string) => {
@@ -1049,11 +516,11 @@ export function PendingApplications() {
                       </td>
                       <td className="px-6 py-4 text-center">
                         <button
-                          onClick={() => handleReviewDocuments(student)}
+                          onClick={() => navigate(`${reviewBasePath}/review/${student.id}`)}
                           className="mx-auto inline-flex items-center justify-center rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                           title="Review Application"
                         >
-                          Review
+                          Review Application
                         </button>
                       </td>
                     </tr>
@@ -1072,129 +539,6 @@ export function PendingApplications() {
           </p>
         </div>
       </div>
-
-      {/* Approve Modal */}
-      {showApproveModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div
-            className="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden"
-          >
-            <div className="p-8 bg-gradient-to-br from-green-50 to-emerald-50 text-center">
-              <h3 className="text-2xl font-bold text-gray-900">
-                Application Approved
-              </h3>
-              <p className="text-gray-600 mt-2 text-sm">
-                The student has been notified and added to enrolled students.
-              </p>
-            </div>
-            <div className="p-6 pt-0">
-              <button
-                onClick={confirmApprove}
-                className="w-full py-3 rounded-lg text-white font-bold transition-all hover:opacity-90"
-                style={{ backgroundColor: "#10B981" }}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Reject Modal */}
-      {showRejectModal && (
-        <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
-        >
-          <div
-            className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden"
-          >
-            <div className="p-8 bg-gradient-to-br from-slate-50 to-slate-100">
-              <h3 className="text-2xl font-bold mb-2" style={{ color: "var(--electron-blue)" }}>
-                Reject Application
-              </h3>
-              <p className="text-gray-600">
-                Please provide a reason for rejection.
-              </p>
-            </div>
-            <div className="p-6 pt-4">
-              <textarea
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="Enter rejection reason..."
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent resize-none"
-                style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
-                rows={4}
-              />
-            </div>
-            <div className="p-6 pt-2 flex gap-3 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowRejectModal(false);
-                  setRejectionReason("");
-                }}
-                className="flex-1 py-3 rounded-lg font-bold transition-all"
-                style={{
-                  backgroundColor: "#E5E7EB",
-                  color: "#374151",
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = "#D1D5DB"}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = "#E5E7EB"}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmReject}
-                disabled={!rejectionReason.trim()}
-                className="flex-1 py-3 rounded-lg text-white font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-                style={{ backgroundColor: "var(--electron-red)" }}
-              >
-                Confirm Reject
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Document Review Modal */}
-      <ReviewApplicationModal
-        isOpen={showDocumentModal}
-        onClose={() => {
-          setShowDocumentModal(false);
-          setSelectedDocument(null);
-          setSelectedDocuments([]);
-        }}
-        reviewingStudent={reviewingStudent}
-        setReviewingStudent={setReviewingStudent}
-        documentRejectionComment={documentRejectionComment}
-        setDocumentRejectionComment={setDocumentRejectionComment}
-        handleViewDocument={handleViewDocument}
-        handleApproveDocument={handleApproveDocument}
-        handleRejectDocument={handleRejectDocument}
-        handleBackToDocuments={() => {
-          setSelectedDocument(null);
-          setDocumentRejectionComment("");
-          setSelectedDocuments([]);
-        }}
-        handleFinalApprove={handleFinalApproveApplication}
-        handleRejectApplication={handleRejectApplication}
-        documentNames={documentNames}
-        showFormData={showFormData}
-        setShowFormData={setShowFormData}
-        selectedDocuments={selectedDocuments}
-        setSelectedDocuments={setSelectedDocuments}
-        handleBulkApprove={handleBulkApprove}
-        handleApproveFromTable={handleApproveFromTable}
-      />
     </div>
   );
 }
