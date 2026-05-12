@@ -6,7 +6,6 @@ import {
   Filter,
   CheckCircle,
   RotateCcw,
-  Archive,
   Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -32,7 +31,7 @@ interface Student {
 
 const COMPLETED_PAYMENT_STATUSES = new Set(["verified", "approved", "completed", "paid"]);
 const PENDING_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
-const COMPLETED_ENROLLMENT_STATUSES = new Set(["documents_verified", "approved", "enrolled"]);
+const APPROVED_MONITORING_STATUSES = new Set(["documents_verified", "approved"]);
 const ARCHIVED_ENROLLMENT_STATUSES = new Set(["rejected", "dropped", "unenrolled", "removed"]);
 
 const getRecordTimestamp = (record: any) => {
@@ -156,7 +155,12 @@ export function PendingApplications() {
       return;
     }
     
-    const formattedApps = await Promise.all(applications.map(async (app: any) => {
+    const visibleApplications = applications.filter((app: any) => {
+      const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
+      return normalizedEnrollmentStatus !== "enrolled" && !ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus);
+    });
+
+    const formattedApps = await Promise.all(visibleApplications.map(async (app: any) => {
       const formData = app.form_data || {};
       const paymentStatusResponse = await getStudentPaymentStatus(app.user_id);
       const docs = app.enrollment_documents || [];
@@ -167,9 +171,7 @@ export function PendingApplications() {
       const hasReuploadedDocuments = hasReuploadedRejectedDocument(docs);
       const isPaymentComplete = COMPLETED_PAYMENT_STATUSES.has(String(payment?.status || "").toLowerCase());
       const applicationStatus: Student["status"] =
-        ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus)
-          ? "rejected"
-          : COMPLETED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus) || isPaymentComplete
+        APPROVED_MONITORING_STATUSES.has(normalizedEnrollmentStatus) || isPaymentComplete
           ? "approved"
           : hasReuploadedDocuments || rejectedDocuments > 0
           ? "re-submit"
@@ -251,8 +253,7 @@ export function PendingApplications() {
 
   const activeStudents = filteredStudents.filter((student) => student.status === "pending" || student.status === "re-submit");
   const completedStudents = filteredStudents.filter((student) => student.status === "approved");
-  const archivedStudents = filteredStudents.filter((student) => student.status === "rejected");
-  const visibleStudents = [...activeStudents, ...completedStudents, ...archivedStudents];
+  const visibleStudents = [...activeStudents, ...completedStudents];
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -306,152 +307,105 @@ export function PendingApplications() {
   };
 
   const renderStatusLabel = (student: Student) => {
-    if (student.status === "approved") return "Approved";
+    if (student.status === "approved") return "Monitoring";
     if (student.hasReuploadedDocuments) return "Re-uploaded";
     if (student.status === "re-submit") return "Needs Corrections";
-    if (student.status === "rejected") return "Archived";
     return "Pending Review";
   };
 
-  const renderQueueSection = (title: string, description: string, sectionStudents: Student[], icon: typeof FileCheck, emptyText: string) => {
-    const SectionIcon = icon;
+  const renderStudentRow = (student: Student) => {
+    const statusStyle = getStatusStyle(student.status);
+    const docStatus = getDocumentStatus(student);
+    const isApproved = student.status === "approved";
 
     return (
-      <div className="border-t border-gray-200 first:border-t-0">
-        <div className="bg-slate-50/80 px-4 py-4 sm:px-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border border-white bg-white text-slate-600 shadow-sm">
-                <SectionIcon className="h-4 w-4" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-                <p className="mt-1 text-xs text-slate-500">{description}</p>
-              </div>
-            </div>
-            <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
-              {sectionStudents.length} record{sectionStudents.length === 1 ? "" : "s"}
-            </span>
-          </div>
-        </div>
-
-        <table className="w-full min-w-[900px]">
-          <tbody className="divide-y divide-gray-200">
-            {sectionStudents.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-8 text-center">
-                  <p className="text-sm font-medium text-slate-500">{emptyText}</p>
-                </td>
-              </tr>
-            ) : (
-              sectionStudents.map((student) => {
-                const statusStyle = getStatusStyle(student.status);
-                const docStatus = getDocumentStatus(student);
-                const isApproved = student.status === "approved";
-                const isArchived = student.status === "rejected";
-
-                return (
-                  <tr
-                    key={student.id}
-                    className={`transition-colors ${
-                      isApproved
-                        ? "bg-emerald-50/25 opacity-75 hover:bg-emerald-50/40"
-                        : isArchived
-                        ? "bg-slate-50/70 opacity-70 hover:bg-slate-100/70"
-                        : student.hasReuploadedDocuments
-                        ? "bg-amber-50/35 hover:bg-amber-50/60"
-                        : "hover:bg-gray-50"
-                    }`}
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-start gap-3">
-                        {isApproved && (
-                          <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
-                        )}
-                        {student.hasReuploadedDocuments && !isApproved && (
-                          <RotateCcw className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
-                        )}
-                        <div className="min-w-0">
-                          <p className={`text-sm font-medium ${isApproved || isArchived ? "text-slate-700" : "text-gray-900"}`}>
-                            {student.name}
-                          </p>
-                          {docStatus.uploaded > 0 && (
-                            <p className="mt-1 text-xs text-gray-500">
-                              Docs: {docStatus.approved}/{docStatus.uploaded} approved
-                            </p>
-                          )}
-                          {student.hasReuploadedDocuments && !isApproved && (
-                            <p className="mt-1 text-xs font-semibold text-amber-700">Updated documents need review</p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="inline-flex px-2 py-1 rounded text-xs font-medium"
-                        style={{ backgroundColor: isApproved || isArchived ? "#F8FAFC" : "#EEF2FF", color: isApproved || isArchived ? "#64748B" : "#4338CA" }}
-                      >
-                        {student.strandApplied}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-gray-600">
-                        {new Date(student.applicationDate).toLocaleDateString(
-                          "en-US",
-                          {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                          }
-                        )}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border"
-                        style={{
-                          backgroundColor: statusStyle.bg,
-                          color: statusStyle.text,
-                          borderColor: statusStyle.border,
-                        }}
-                      >
-                        {isApproved && <CheckCircle className="h-3.5 w-3.5" />}
-                        {student.hasReuploadedDocuments && !isApproved && <RotateCcw className="h-3.5 w-3.5" />}
-                        {renderStatusLabel(student)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${getCurrentStatusStyle(isApproved ? "Enrolled" : student.currentStatus)}`}>
-                        {isApproved ? "Enrollment Complete" : student.currentStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-center">
-                      {isArchived ? (
-                        <span className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-500">
-                          Archived
-                        </span>
-                      ) : (
-                        <button
-                          onClick={() => navigate(`${reviewBasePath}/review/${student.id}`)}
-                          className={`mx-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 ${
-                            isApproved
-                              ? "border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300"
-                              : "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-400"
-                          }`}
-                          title={isApproved ? "View Enrollment Status" : "Review Application"}
-                        >
-                          {isApproved ? <Eye className="h-4 w-4" /> : null}
-                          {isApproved ? "View Enrollment Status" : "Review Application"}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })
+      <tr
+        key={student.id}
+        className={`transition-colors ${
+          isApproved
+            ? "bg-emerald-50/25 opacity-75 hover:bg-emerald-50/40"
+            : student.hasReuploadedDocuments
+            ? "bg-amber-50/35 hover:bg-amber-50/60"
+            : "hover:bg-gray-50"
+        }`}
+      >
+        <td className="px-6 py-4">
+          <div className="flex items-start gap-3">
+            {isApproved && (
+              <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
             )}
-          </tbody>
-        </table>
-      </div>
+            {student.hasReuploadedDocuments && !isApproved && (
+              <RotateCcw className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-600" />
+            )}
+            <div className="min-w-0">
+              <p className={`text-sm font-medium ${isApproved ? "text-slate-700" : "text-gray-900"}`}>
+                {student.name}
+              </p>
+              {docStatus.uploaded > 0 && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Docs: {docStatus.approved}/{docStatus.uploaded} approved
+                </p>
+              )}
+              {student.hasReuploadedDocuments && !isApproved && (
+                <p className="mt-1 text-xs font-semibold text-amber-700">Updated documents need review</p>
+              )}
+            </div>
+          </div>
+        </td>
+        <td className="px-6 py-4">
+          <span
+            className="inline-flex px-2 py-1 rounded text-xs font-medium"
+            style={{
+              backgroundColor: isApproved ? "#F8FAFC" : "#EEF2FF",
+              color: isApproved ? "#64748B" : "#4338CA",
+            }}
+          >
+            {student.strandApplied}
+          </span>
+        </td>
+        <td className="px-6 py-4">
+          <p className="text-sm text-gray-600">
+            {new Date(student.applicationDate).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            })}
+          </p>
+        </td>
+        <td className="px-6 py-4">
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border"
+            style={{
+              backgroundColor: statusStyle.bg,
+              color: statusStyle.text,
+              borderColor: statusStyle.border,
+            }}
+          >
+            {isApproved && <CheckCircle className="h-3.5 w-3.5" />}
+            {student.hasReuploadedDocuments && !isApproved && <RotateCcw className="h-3.5 w-3.5" />}
+            {renderStatusLabel(student)}
+          </span>
+        </td>
+        <td className="px-6 py-4">
+          <span className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${getCurrentStatusStyle(student.currentStatus)}`}>
+            {isApproved ? "Progress Monitoring" : student.currentStatus}
+          </span>
+        </td>
+        <td className="px-6 py-4 text-center">
+          <button
+            onClick={() => navigate(`${reviewBasePath}/review/${student.id}`)}
+            className={`mx-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 ${
+              isApproved
+                ? "border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300"
+                : "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-400"
+            }`}
+            title={isApproved ? "View Enrollment Status" : "Review Application"}
+          >
+            {isApproved ? <Eye className="h-4 w-4" /> : null}
+            {isApproved ? "View Enrollment Status" : "Review Application"}
+          </button>
+        </td>
+      </tr>
     );
   };
 
@@ -503,7 +457,6 @@ export function PendingApplications() {
               <option value="pending">Pending</option>
               <option value="re-submit">Re-submit</option>
               <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
             </select>
           </div>
 
@@ -527,7 +480,7 @@ export function PendingApplications() {
                 Application Queue
               </h2>
               <p className="mt-1 text-sm text-slate-500">
-                Re-uploaded submissions stay first, pending reviews stay next, completed applications stay visible below.
+                Re-uploaded submissions stay first, pending reviews stay next, and approved applications stay below for monitoring until enrollment.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-[360px]">
@@ -541,7 +494,7 @@ export function PendingApplications() {
               </div>
               <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-emerald-800">
                 <p className="font-bold">{completedStudents.length}</p>
-                <p>Complete</p>
+                <p>Monitoring</p>
               </div>
             </div>
           </div>
@@ -571,6 +524,9 @@ export function PendingApplications() {
                 </th>
               </tr>
             </thead>
+            <tbody className="divide-y divide-gray-200">
+              {visibleStudents.map(renderStudentRow)}
+            </tbody>
           </table>
           {visibleStudents.length === 0 ? (
             <div className="px-6 py-12 text-center">
@@ -584,31 +540,7 @@ export function PendingApplications() {
                 </div>
               </div>
             </div>
-          ) : (
-            <>
-              {renderQueueSection(
-                "Active Tasks",
-                "Re-uploaded applications appear first, followed by regular pending reviews.",
-                activeStudents,
-                RotateCcw,
-                "No active applications need registrar review."
-              )}
-              {renderQueueSection(
-                "Completed Applications",
-                "Approved or enrolled students remain visible for monitoring without competing with active tasks.",
-                completedStudents,
-                CheckCircle,
-                "No completed applications match the current filters."
-              )}
-              {renderQueueSection(
-                "Archived / Rejected Records",
-                "Fully rejected applications are separated from the active queue for audit reference.",
-                archivedStudents,
-                Archive,
-                "No archived or rejected records match the current filters."
-              )}
-            </>
-          )}
+          ) : null}
         </div>
 
         <div className="px-4 sm:px-6 py-4 border-t border-gray-200 bg-gray-50">
@@ -616,8 +548,7 @@ export function PendingApplications() {
             Showing{" "}
             <span className="font-medium">{visibleStudents.length}</span> matching
             applications: <span className="font-medium">{activeStudents.length}</span> active,{" "}
-            <span className="font-medium">{completedStudents.length}</span> completed,{" "}
-            <span className="font-medium">{archivedStudents.length}</span> archived
+            <span className="font-medium">{completedStudents.length}</span> monitoring
           </p>
         </div>
       </div>
