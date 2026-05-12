@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import {
   Search,
   Download,
@@ -12,6 +12,10 @@ import {
   FileText,
   Eye,
   AlertCircle,
+  X,
+  Printer,
+  Maximize2,
+  ZoomIn,
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
@@ -20,15 +24,20 @@ import { supabase } from "../../../supabase";
 
 interface PaymentRecord {
   id: string;
+  studentId?: string;
   studentEmail: string;
   studentName: string;
+  academicTrack?: string;
   paymentMode: string;
   referenceNumber?: string;
   queueNumber?: string;
   amount: number;
   status: string;
   submittedDate: string;
+  processedDate?: string;
   processedBy?: string;
+  receiptUrl?: string;
+  receiptFileName?: string;
   rejectionComment?: string;
 }
 
@@ -71,6 +80,57 @@ const getPaymentModeLabel = (mode?: string) => {
 
 const isValidDate = (date: Date) => !Number.isNaN(date.getTime());
 
+const formatCurrency = (amount: number) => `₱${amount.toLocaleString()}`;
+
+const formatTransactionDate = (value?: string) => {
+  if (!value) return "Not processed";
+  const date = new Date(value);
+  if (!isValidDate(date)) return "Not processed";
+
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const getReceiptUrl = (payment: any) => {
+  const rawUrl = payment?.receipt_file_url || payment?.receipt_url || payment?.proof_of_payment_url || "";
+  return String(rawUrl).split(/[;,]/).map((item) => item.trim()).filter(Boolean)[0] || "";
+};
+
+const getReceiptFileName = (payment: any) => {
+  const path = payment?.receipt_file_path || payment?.receipt_file_url || payment?.reference_number || "receipt";
+  return String(path).split("/").pop() || "receipt";
+};
+
+function TransactionDetailRow({
+  label,
+  value,
+  emphasized = false,
+  mono = false,
+}: {
+  label: string;
+  value: ReactNode;
+  emphasized?: boolean;
+  mono?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-[150px_1fr] gap-4 border-b border-slate-100 py-3 last:border-b-0">
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</p>
+      <div
+        className={`min-w-0 text-sm font-semibold text-slate-900 ${
+          mono ? "font-mono break-all" : ""
+        } ${emphasized ? "text-2xl font-bold text-blue-700" : ""}`}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export function BranchCoordinatorPayments() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -80,6 +140,7 @@ export function BranchCoordinatorPayments() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [receiptZoom, setReceiptZoom] = useState(100);
 
   useEffect(() => {
     loadPayments();
@@ -112,11 +173,11 @@ export function BranchCoordinatorPayments() {
         return;
       }
 
-      // Fetch user details for students
+      // Fetch user details for students and processors
       const userIds = [
         ...new Set(
           allPayments
-            .map((payment: any) => payment.student_id)
+            .flatMap((payment: any) => [payment.student_id, payment.verified_by, payment.processed_by, payment.updated_by])
             .filter(Boolean)
         ),
       ];
@@ -130,16 +191,50 @@ export function BranchCoordinatorPayments() {
         userMap[u.id] = { name: u.full_name, email: u.email };
       });
 
+      const enrollmentIds = [
+        ...new Set(allPayments.map((payment: any) => payment.enrollment_id).filter(Boolean)),
+      ];
+      const { data: enrollments } = enrollmentIds.length
+        ? await supabase
+            .from("enrollments")
+            .select("id, form_data")
+            .in("id", enrollmentIds)
+        : { data: [] };
+
+      const enrollmentMap: Record<string, any> = {};
+      enrollments?.forEach((enrollment: any) => {
+        enrollmentMap[enrollment.id] = enrollment.form_data || {};
+      });
+
       const paymentsList: PaymentRecord[] = allPayments.map((p: any) => ({
         id: p.id,
+        studentId: enrollmentMap[p.enrollment_id]?.studentId || p.student_id || p.enrollment_id || undefined,
         studentEmail: userMap[p.student_id]?.email || p.student_id,
-        studentName: userMap[p.student_id]?.name || "Unknown Student",
+        studentName:
+          userMap[p.student_id]?.name ||
+          enrollmentMap[p.enrollment_id]?.studentName ||
+          [enrollmentMap[p.enrollment_id]?.firstName, enrollmentMap[p.enrollment_id]?.lastName].filter(Boolean).join(" ") ||
+          "Unknown Student",
+        academicTrack:
+          enrollmentMap[p.enrollment_id]?.preferredTrack ||
+          enrollmentMap[p.enrollment_id]?.preferred_track ||
+          enrollmentMap[p.enrollment_id]?.track ||
+          "Not Set",
         paymentMode: p.payment_method || "cash",
         referenceNumber: p.reference_number || undefined,
         queueNumber: p.queue_number || undefined,
         amount: Number(p.amount) || 15000,
         status: p.status || "pending",
         submittedDate: p.submitted_at || p.created_at,
+        processedDate: p.verified_at || p.paid_at || p.updated_at || undefined,
+        processedBy:
+          userMap[p.verified_by]?.name ||
+          userMap[p.processed_by]?.name ||
+          userMap[p.updated_by]?.name ||
+          p.processed_by ||
+          undefined,
+        receiptUrl: getReceiptUrl(p) || undefined,
+        receiptFileName: getReceiptFileName(p),
         rejectionComment: p.notes || undefined,
       }));
 
@@ -150,6 +245,16 @@ export function BranchCoordinatorPayments() {
       setPayments([]);
       setIsLoading(false);
     }
+  };
+
+  const closeDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedPayment(null);
+    setReceiptZoom(100);
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
   };
 
   // Filter logic
@@ -491,6 +596,7 @@ export function BranchCoordinatorPayments() {
                       <button
                         onClick={() => {
                           setSelectedPayment(payment);
+                          setReceiptZoom(100);
                           setShowDetailsModal(true);
                         }}
                         className="inline-flex items-center gap-2 px-3 py-1.5 text-blue-600 hover:text-blue-800 font-medium transition-colors"
@@ -515,6 +621,173 @@ export function BranchCoordinatorPayments() {
 
       {/* Details Modal */}
       {showDetailsModal && selectedPayment && (
+        <div className="fixed inset-0 z-50 overflow-y-auto" onClick={closeDetailsModal}>
+          <div className="fixed inset-0 bg-gradient-to-br from-slate-950/35 via-blue-950/25 to-slate-900/35 backdrop-blur-md" />
+          <div className="relative flex min-h-full items-center justify-center p-4">
+            <div
+              className="w-full max-w-6xl overflow-hidden rounded-3xl border border-white/60 bg-white/75 shadow-2xl shadow-blue-950/20 ring-1 ring-blue-100/50 backdrop-blur-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="border-b border-white/70 bg-gradient-to-br from-white/95 via-blue-50/80 to-white/70 px-6 py-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white/80 text-blue-700 shadow-sm">
+                      {normalizePaymentMode(selectedPayment.paymentMode) === "cash" ? <Banknote className="h-7 w-7" /> : <CreditCard className="h-7 w-7" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-700">Transaction Review</p>
+                      <h2 className="mt-1 text-2xl font-bold text-slate-950">Payment Transaction Details</h2>
+                      <p className="mt-1 text-sm text-slate-600">Review payment record, processing trail, and submitted proof of payment.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="rounded-2xl border border-white/70 bg-white/70 px-4 py-3 shadow-sm">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Amount Paid</p>
+                      <p className="text-xl font-bold text-blue-700">{formatCurrency(selectedPayment.amount)}</p>
+                    </div>
+                    <span
+                      className={`inline-flex rounded-full border px-4 py-2 text-sm font-bold ${
+                        normalizePaymentStatus(selectedPayment.status) === "pending"
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : normalizePaymentStatus(selectedPayment.status) === "approved"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : "border-red-200 bg-red-50 text-red-700"
+                      }`}
+                    >
+                      {String(selectedPayment.status || "pending").replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase())}
+                    </span>
+                    <button
+                      onClick={closeDetailsModal}
+                      className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-500 transition-all hover:border-slate-300 hover:bg-white"
+                      aria-label="Close transaction details"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-5 p-5 xl:grid-cols-[0.95fr_1.05fr]">
+                <section className="rounded-2xl border border-white/70 bg-white/70 p-5 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-950">Transaction Information</h3>
+                      <p className="text-sm text-slate-500">Complete registrar and accounting review fields.</p>
+                    </div>
+                    <div className="rounded-xl bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">
+                      {getPaymentModeLabel(selectedPayment.paymentMode)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-white/80 px-4">
+                    <TransactionDetailRow label="Student Name" value={selectedPayment.studentName} />
+                    <TransactionDetailRow label="Student ID" value={selectedPayment.studentId || "Not provided"} mono />
+                    <TransactionDetailRow label="Academic Track / Strand" value={selectedPayment.academicTrack || "Not Set"} />
+                    <TransactionDetailRow label="Payment Method" value={getPaymentModeLabel(selectedPayment.paymentMode)} />
+                    <TransactionDetailRow label="Reference Number" value={selectedPayment.referenceNumber || selectedPayment.queueNumber || "Not provided"} mono />
+                    <TransactionDetailRow label="Transaction ID" value={selectedPayment.id} mono />
+                    <TransactionDetailRow label="Amount Due" value={formatCurrency(selectedPayment.amount)} />
+                    <TransactionDetailRow label="Amount Paid" value={formatCurrency(selectedPayment.amount)} emphasized />
+                    <TransactionDetailRow label="Date Processed" value={formatTransactionDate(selectedPayment.processedDate || selectedPayment.submittedDate)} />
+                    <TransactionDetailRow label="Processed By" value={selectedPayment.processedBy || "Pending processing"} />
+                  </div>
+
+                  {selectedPayment.rejectionComment && (
+                    <div className="mt-4 rounded-2xl border border-red-100 bg-red-50/80 p-4 text-sm text-red-700">
+                      <p className="font-bold">Rejection Reason</p>
+                      <p className="mt-1 leading-6">{selectedPayment.rejectionComment}</p>
+                    </div>
+                  )}
+                </section>
+
+                <section className="flex min-h-[540px] flex-col rounded-2xl border border-white/70 bg-white/70 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+                  <div className="flex flex-col gap-3 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-950">Receipt / Proof of Payment</h3>
+                      <p className="text-sm text-slate-500">
+                        {normalizePaymentMode(selectedPayment.paymentMode) === "cash"
+                          ? "Cash payments use queue confirmation instead of uploaded receipt files."
+                          : selectedPayment.receiptUrl
+                          ? selectedPayment.receiptFileName || "Uploaded receipt"
+                          : "No uploaded receipt was found for this transaction."}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setReceiptZoom((current) => Math.min(current + 15, 160))}
+                        disabled={!selectedPayment.receiptUrl}
+                        className="rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                        title="Zoom receipt"
+                      >
+                        <ZoomIn className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => selectedPayment.receiptUrl && window.open(selectedPayment.receiptUrl, "_blank", "noopener,noreferrer")}
+                        disabled={!selectedPayment.receiptUrl}
+                        className="rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                        title="Open full screen"
+                      >
+                        <Maximize2 className="h-4 w-4" />
+                      </button>
+                      <a
+                        href={selectedPayment.receiptUrl || undefined}
+                        download={selectedPayment.receiptFileName || "receipt"}
+                        className={`rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white ${
+                          selectedPayment.receiptUrl ? "" : "pointer-events-none opacity-45"
+                        }`}
+                        title="Download receipt"
+                      >
+                        <Download className="h-4 w-4" />
+                      </a>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-1 items-center justify-center overflow-auto bg-slate-50/70 p-5">
+                    {selectedPayment.receiptUrl ? (
+                      <div className="flex min-h-full w-full items-start justify-center rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-inner">
+                        <img
+                          src={selectedPayment.receiptUrl}
+                          alt="Uploaded receipt preview"
+                          className="max-h-[620px] max-w-full rounded-xl object-contain shadow-sm transition-transform"
+                          style={{ transform: `scale(${receiptZoom / 100})`, transformOrigin: "top center" }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="max-w-md rounded-2xl border border-dashed border-slate-300 bg-white/75 p-8 text-center">
+                        <FileText className="mx-auto h-12 w-12 text-slate-400" />
+                        <p className="mt-3 text-sm font-bold text-slate-800">No receipt preview available</p>
+                        <p className="mt-1 text-sm leading-6 text-slate-500">
+                          This record may be a cash queue transaction or the online receipt file was not attached.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
+
+              <div className="flex flex-col gap-3 border-t border-white/70 bg-white/60 px-6 py-4 sm:flex-row sm:items-center sm:justify-end">
+                <button
+                  onClick={closeDetailsModal}
+                  className="rounded-2xl border border-slate-200 bg-white/75 px-5 py-3 text-sm font-semibold text-slate-600 transition-all hover:bg-white"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handlePrintReceipt}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-700 px-6 py-3 text-sm font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-blue-800"
+                >
+                  <Printer className="h-4 w-4" />
+                  Print Receipt
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Legacy details modal retained inactive after redesign */}
+      {false && showDetailsModal && selectedPayment && (
         <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setShowDetailsModal(false)}>
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
           <div className="fixed inset-0 flex items-center justify-center p-4">
