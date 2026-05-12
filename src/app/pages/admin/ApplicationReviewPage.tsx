@@ -529,10 +529,10 @@ export function ApplicationReviewPage() {
           </div>
         </header>
 
-        <section className="mt-3 overflow-hidden rounded-[2rem] border border-white/80 bg-white/50 p-6 shadow-[0_26px_80px_-48px_rgba(30,58,138,0.65)] ring-1 ring-blue-100/70 backdrop-blur-2xl transition hover:bg-white/60">
-          <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:items-center">
-            <div className="flex items-center justify-center border-b border-blue-100/80 pb-6 lg:h-full lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
-              <div className="flex h-44 w-44 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-sky-100 text-5xl font-black text-blue-700 ring-[10px] ring-white/80 shadow-[0_26px_60px_-32px_rgba(30,58,138,0.65)]">
+        <section className="mt-3 overflow-hidden rounded-2xl border border-white/80 bg-white/50 p-4 shadow-[0_22px_70px_-48px_rgba(30,58,138,0.65)] ring-1 ring-blue-100/70 backdrop-blur-2xl transition hover:bg-white/60">
+          <div className="grid gap-4 lg:grid-cols-[180px_minmax(0,1fr)_260px] lg:items-center">
+            <div className="flex items-center justify-center border-b border-blue-100/80 pb-4 lg:h-full lg:border-b-0 lg:border-r lg:pb-0 lg:pr-5">
+              <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-sky-100 text-3xl font-black text-blue-700 ring-[6px] ring-white/80 shadow-[0_20px_48px_-32px_rgba(30,58,138,0.65)]">
                 {studentProfile?.profile_picture_url ? (
                   <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -542,36 +542,36 @@ export function ApplicationReviewPage() {
             </div>
 
             <div className="min-w-0">
-              <h2 className="truncate text-4xl font-black tracking-tight text-slate-950">{studentName}</h2>
-              <div className="mt-8 space-y-6 text-slate-700">
-                <div className="grid gap-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center">
-                  <div className="flex items-center gap-4 text-lg font-bold text-slate-500">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
-                      <Mail className="h-5 w-5" />
+              <h2 className="truncate text-2xl font-black tracking-tight text-slate-950">{studentName}</h2>
+              <div className="mt-4 space-y-3 text-slate-700">
+                <div className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
+                  <div className="flex items-center gap-3 text-sm font-bold text-slate-500">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
+                      <Mail className="h-4 w-4" />
                     </span>
                     Email Address:
                   </div>
-                  <p className="min-w-0 break-words text-lg font-black text-slate-950">{formData.email || enrollment.user_id || "No email provided"}</p>
+                  <p className="min-w-0 break-words text-sm font-black text-slate-950">{formData.email || enrollment.user_id || "No email provided"}</p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center">
-                  <div className="flex items-center gap-4 text-lg font-bold text-slate-500">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
-                      <IdCard className="h-5 w-5" />
+                <div className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
+                  <div className="flex items-center gap-3 text-sm font-bold text-slate-500">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
+                      <IdCard className="h-4 w-4" />
                     </span>
                     Student ID:
                   </div>
-                  <p className="min-w-0 break-words text-lg font-black text-slate-950">{String(enrollment.id)}</p>
+                  <p className="min-w-0 break-words text-sm font-black text-slate-950">{String(enrollment.id)}</p>
                 </div>
 
-                <div className="grid gap-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center">
-                  <div className="flex items-center gap-4 text-lg font-bold text-slate-500">
-                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
-                      <GraduationCap className="h-5 w-5" />
+                <div className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)] sm:items-center">
+                  <div className="flex items-center gap-3 text-sm font-bold text-slate-500">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
+                      <GraduationCap className="h-4 w-4" />
                     </span>
                     Track:
                   </div>
-                  <p className="min-w-0 break-words text-lg font-black text-slate-950">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
+                  <p className="min-w-0 break-words text-sm font-black text-slate-950">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
                 </div>
               </div>
             </div>
@@ -579,11 +579,11 @@ export function ApplicationReviewPage() {
             <div className="flex justify-center lg:justify-end lg:self-start">
               <button
                 onClick={() => setShowForm((current) => !current)}
-                className="group inline-flex min-h-20 w-full max-w-[320px] items-center justify-center gap-4 rounded-2xl border-2 border-blue-200/90 bg-white/65 px-6 py-4 text-lg font-black text-blue-700 shadow-lg shadow-blue-950/5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-blue-400 hover:bg-blue-50/80 hover:shadow-xl"
+                className="group inline-flex min-h-14 w-full max-w-[230px] items-center justify-center gap-3 rounded-xl border-2 border-blue-200/90 bg-white/65 px-4 py-3 text-sm font-black text-blue-700 shadow-lg shadow-blue-950/5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-blue-400 hover:bg-blue-50/80 hover:shadow-xl"
               >
-                <FileText className="h-8 w-8" />
+                <FileText className="h-5 w-5" />
                 View Enrollment Form
-                <ChevronDown className={`h-5 w-5 transition-transform duration-200 group-hover:translate-y-0.5 ${showForm ? "rotate-180" : ""}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5 ${showForm ? "rotate-180" : ""}`} />
               </button>
             </div>
           </div>
