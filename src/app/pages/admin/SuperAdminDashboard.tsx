@@ -55,7 +55,7 @@ interface AuditLog {
   details: string;
 }
 
-const PRESENCE_CHANNEL = "electron-system-presence";
+const PRESENCE_EVENT = "electron-system-presence-change";
 
 const buildActivityTrendData = (logs: any[]) => {
   const dayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
@@ -123,36 +123,22 @@ export function SuperAdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const channel = supabase.channel(PRESENCE_CHANNEL);
-
-    const updatePresenceState = () => {
-      const presenceState = channel.presenceState();
-      const roleCounts: Record<string, number> = {};
-      const activeKeys = Object.keys(presenceState);
-
-      activeKeys.forEach((presenceKey) => {
-        const metas = presenceState[presenceKey] as Array<{ role?: string; visible?: boolean }>;
-        const latestMeta = metas?.[metas.length - 1] || {};
-        const role = latestMeta.role || "visitor";
-        roleCounts[role] = (roleCounts[role] || 0) + 1;
-      });
-
-      setActiveUsers(activeKeys.length);
-      setActiveUserRoles(roleCounts);
+    const handlePresenceChange = (event: Event) => {
+      const detail = (event as CustomEvent<{ activeUsers?: number; activeUserRoles?: Record<string, number> }>).detail;
+      setActiveUsers(detail?.activeUsers || 0);
+      setActiveUserRoles(detail?.activeUserRoles || {});
     };
 
-    channel
-      .on("presence", { event: "sync" }, updatePresenceState)
-      .on("presence", { event: "join" }, updatePresenceState)
-      .on("presence", { event: "leave" }, updatePresenceState)
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          updatePresenceState();
-        }
-      });
+    const existingPresence = (window as any).__electronSystemPresence;
+    if (existingPresence) {
+      setActiveUsers(existingPresence.activeUsers || 0);
+      setActiveUserRoles(existingPresence.activeUserRoles || {});
+    }
+
+    window.addEventListener(PRESENCE_EVENT, handlePresenceChange);
 
     return () => {
-      void supabase.removeChannel(channel);
+      window.removeEventListener(PRESENCE_EVENT, handlePresenceChange);
     };
   }, []);
 
