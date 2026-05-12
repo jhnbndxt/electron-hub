@@ -331,7 +331,7 @@ export function BranchCoordinatorPayments() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `branch-payments-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `payment-history-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
@@ -350,8 +350,8 @@ export function BranchCoordinatorPayments() {
     <div className="p-4 sm:p-6 lg:p-8">
       <DashboardPageHeader
         badge="Payment Administration"
-        title="Payment Management"
-        subtitle="View and manage all student payments - pending, approved, and rejected"
+        title="Payment History"
+        subtitle="View all student payment transactions - pending, approved, paid, and rejected"
         icon={Banknote}
       />
 

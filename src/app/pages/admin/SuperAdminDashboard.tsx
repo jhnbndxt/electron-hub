@@ -217,8 +217,8 @@ export function SuperAdminDashboard() {
       link: "/branchcoordinator/pending",
     },
     {
-      label: "Approve Payments",
-      description: "Review payment approvals",
+      label: "Payment History",
+      description: "Review payment transactions",
       icon: DollarSign,
       color: "#EF4444",
       link: "/branchcoordinator/payments",
