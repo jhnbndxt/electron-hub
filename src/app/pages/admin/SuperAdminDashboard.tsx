@@ -55,6 +55,31 @@ interface AuditLog {
   details: string;
 }
 
+const PRESENCE_CHANNEL = "electron-system-presence";
+
+const buildActivityTrendData = (logs: any[]) => {
+  const dayFormatter = new Intl.DateTimeFormat("en-US", { weekday: "short" });
+  const dayBuckets = new Map<string, number>();
+
+  for (let index = 6; index >= 0; index -= 1) {
+    const date = new Date();
+    date.setDate(date.getDate() - index);
+    dayBuckets.set(dayFormatter.format(date), 0);
+  }
+
+  logs.forEach((log) => {
+    const date = new Date(log.created_at || log.timestamp);
+    if (Number.isNaN(date.getTime())) return;
+
+    const day = dayFormatter.format(date);
+    if (dayBuckets.has(day)) {
+      dayBuckets.set(day, (dayBuckets.get(day) || 0) + 1);
+    }
+  });
+
+  return Array.from(dayBuckets.entries()).map(([day, activities]) => ({ day, activities }));
+};
+
 export function SuperAdminDashboard() {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -70,6 +95,8 @@ export function SuperAdminDashboard() {
     rejectedEnrollments: 0,
   });
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [activeUserRoles, setActiveUserRoles] = useState<Record<string, number>>({});
   const [paymentCollectionData, setPaymentCollectionData] = useState([
     { day: "Mon", amount: 4200 },
     { day: "Tue", amount: 5100 },
@@ -79,11 +106,54 @@ export function SuperAdminDashboard() {
     { day: "Sat", amount: 5600 },
     { day: "Sun", amount: 4500 },
   ]);
+  const [activityTrendData, setActivityTrendData] = useState([
+    { day: "Mon", activities: 0 },
+    { day: "Tue", activities: 0 },
+    { day: "Wed", activities: 0 },
+    { day: "Thu", activities: 0 },
+    { day: "Fri", activities: 0 },
+    { day: "Sat", activities: 0 },
+    { day: "Sun", activities: 0 },
+  ]);
 
   useEffect(() => {
     loadStats();
     loadRecentActivity();
     loadPaymentData();
+  }, []);
+
+  useEffect(() => {
+    const channel = supabase.channel(PRESENCE_CHANNEL);
+
+    const updatePresenceState = () => {
+      const presenceState = channel.presenceState();
+      const roleCounts: Record<string, number> = {};
+      const activeKeys = Object.keys(presenceState);
+
+      activeKeys.forEach((presenceKey) => {
+        const metas = presenceState[presenceKey] as Array<{ role?: string; visible?: boolean }>;
+        const latestMeta = metas?.[metas.length - 1] || {};
+        const role = latestMeta.role || "visitor";
+        roleCounts[role] = (roleCounts[role] || 0) + 1;
+      });
+
+      setActiveUsers(activeKeys.length);
+      setActiveUserRoles(roleCounts);
+    };
+
+    channel
+      .on("presence", { event: "sync" }, updatePresenceState)
+      .on("presence", { event: "join" }, updatePresenceState)
+      .on("presence", { event: "leave" }, updatePresenceState)
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          updatePresenceState();
+        }
+      });
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadStats = async () => {
@@ -119,7 +189,7 @@ export function SuperAdminDashboard() {
   };
 
   const loadRecentActivity = async () => {
-    const { data: logs, error } = await getAuditLogs(5);
+    const { data: logs, error } = await getAuditLogs(100);
 
     if (error) {
       console.error("Error loading activity logs:", error);
@@ -128,7 +198,9 @@ export function SuperAdminDashboard() {
     }
 
     if (logs) {
-      const recentLogs = logs.map((log: any) => {
+      setActivityTrendData(buildActivityTrendData(logs));
+
+      const recentLogs = logs.slice(0, 5).map((log: any) => {
         const timeDiff = Date.now() - new Date(log.timestamp).getTime();
         const minutesAgo = Math.floor(timeDiff / 60000);
         const hoursAgo = Math.floor(timeDiff / 3600000);
@@ -201,69 +273,10 @@ export function SuperAdminDashboard() {
       color: "#10B981",
     },
     {
-      label: "Active Users/Admins",
-      value: stats.activeUsersAdmins.toString(),
+      label: "Active Users Now",
+      value: activeUsers.toString(),
       icon: Activity,
       color: "#8B5CF6",
-    },
-  ];
-
-  const quickActions = [
-    {
-      label: "Review Applications",
-      description: "Manage pending enrollments",
-      icon: FileCheck,
-      color: "#1E3A8A",
-      link: "/branchcoordinator/pending",
-    },
-    {
-      label: "Payment History",
-      description: "Review payment transactions",
-      icon: DollarSign,
-      color: "#EF4444",
-      link: "/branchcoordinator/payments",
-    },
-    {
-      label: "Student Records",
-      description: "View all enrolled students",
-      icon: BookOpen,
-      color: "#8B5CF6",
-      link: "/branchcoordinator/students",
-    },
-    {
-      label: "Section Management",
-      description: "Update class sections and assignments",
-      icon: FileText,
-      color: "#F59E0B",
-      link: "/branchcoordinator/sections",
-    },
-    {
-      label: "Assessment Management",
-      description: "Manage assessment questions",
-      icon: Award,
-      color: "#1E40AF",
-      link: "/branchcoordinator/assessment-management",
-    },
-    {
-      label: "User Management",
-      description: "Manage admin roles and access",
-      icon: UserCheck,
-      color: "#10B981",
-      link: "/branchcoordinator/users",
-    },
-    {
-      label: "Audit Logs",
-      description: "Review system activity and events",
-      icon: ClipboardCheck,
-      color: "#F97316",
-      link: "/branchcoordinator/audit-logs",
-    },
-    {
-      label: "System Configuration",
-      description: "Configure portal settings",
-      icon: Settings,
-      color: "#0EA5E9",
-      link: "/branchcoordinator/system-configuration",
     },
   ];
 
@@ -273,15 +286,10 @@ export function SuperAdminDashboard() {
     { status: "Rejected", count: stats.rejectedEnrollments, color: "#EF4444" },
   ];
 
-  const dailyActivityData = [
-    { time: "12 AM", users: 45 },
-    { time: "4 AM", users: 32 },
-    { time: "8 AM", users: 120 },
-    { time: "12 PM", users: 280 },
-    { time: "4 PM", users: 350 },
-    { time: "8 PM", users: 220 },
-    { time: "11 PM", users: 85 },
-  ];
+  const activeUserRoleData = Object.entries(activeUserRoles).map(([role, count]) => ({
+    role: role === "branchcoordinator" ? "Coordinator" : role.charAt(0).toUpperCase() + role.slice(1),
+    count,
+  }));
 
   return (
     <div
@@ -334,33 +342,60 @@ export function SuperAdminDashboard() {
           </div>
         </section>
 
-        <section className="mb-10">
-          <h2 className="text-2xl font-bold mb-6 text-gray-900">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {quickActions.map((action, index) => {
-              const Icon = action.icon;
-              return (
-                <Link
-                  key={index}
-                  to={action.link}
-                  className="group rounded-2xl border border-white/50 bg-white p-4 shadow-md transition-all hover:shadow-xl"
-                >
-                  <div
-                    className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl"
-                    style={{ backgroundColor: `${action.color}20` }}
-                  >
-                    <Icon className="w-6 h-6" style={{ color: action.color }} />
-                  </div>
-                  <p className="text-base font-semibold text-gray-900 mb-1">{action.label}</p>
-                  <p className="text-sm text-gray-500">{action.description}</p>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
-
         <section>
           <h2 className="text-2xl font-bold mb-6 text-gray-900">Charts & Reports</h2>
+          <div className="mb-6 rounded-2xl border border-white/50 bg-white p-6 shadow-lg">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-100 bg-violet-50 px-3 py-1 text-xs font-bold text-violet-700">
+                  <Activity className="h-3.5 w-3.5" />
+                  Live User Monitor
+                </div>
+                <h3 className="mt-3 text-lg font-semibold text-gray-900">Current website users</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  Live count from active browser sessions connected to the portal.
+                </p>
+              </div>
+              <div className="flex items-end gap-3 rounded-2xl border border-violet-100 bg-violet-50/70 px-5 py-4">
+                <p className="text-5xl font-black text-violet-700">{activeUsers}</p>
+                <p className="pb-2 text-sm font-semibold text-violet-700">active now</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1.4fr]">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Role breakdown</p>
+                <div className="mt-3 space-y-2">
+                  {activeUserRoleData.length === 0 ? (
+                    <p className="text-sm text-slate-500">Waiting for live sessions...</p>
+                  ) : (
+                    activeUserRoleData.map((item) => (
+                      <div key={item.role} className="flex items-center justify-between rounded-xl bg-white px-3 py-2 text-sm">
+                        <span className="font-medium text-slate-700">{item.role}</span>
+                        <span className="font-bold text-slate-900">{item.count}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={activeUserRoleData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.08)" />
+                  <XAxis dataKey="role" stroke="#6B7280" />
+                  <YAxis allowDecimals={false} stroke="#6B7280" />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "rgba(255, 255, 255, 0.94)",
+                      border: "1px solid rgba(203, 213, 225, 0.6)",
+                    }}
+                  />
+                  <Bar dataKey="count" name="Active users" fill="#8B5CF6" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
             <div className="xl:col-span-2 rounded-2xl border border-white/50 bg-white p-6 shadow-lg">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Collection Summary</h3>
@@ -411,12 +446,12 @@ export function SuperAdminDashboard() {
           </div>
 
           <div className="rounded-2xl border border-white/50 bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Activity Count</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">System Activity Trend</h3>
             <ResponsiveContainer width="100%" height={320}>
-              <BarChart data={dailyActivityData}>
+              <BarChart data={activityTrendData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.08)" />
-                <XAxis dataKey="time" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
+                <XAxis dataKey="day" stroke="#6B7280" />
+                <YAxis allowDecimals={false} stroke="#6B7280" />
                 <Tooltip
                   contentStyle={{
                     backgroundColor: "rgba(255, 255, 255, 0.94)",
@@ -424,14 +459,14 @@ export function SuperAdminDashboard() {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="users" fill="#1E3A8A" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="activities" name="Audit activities" fill="#1E3A8A" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </section>
       </div>
 
-      <div className="w-full flex-shrink-0 xl:w-80 mt-8 xl:mt-0">
+      <div className="w-full flex-shrink-0 xl:w-80 mt-8 xl:sticky xl:top-6 xl:self-start xl:mt-0">
         <div className="rounded-2xl border border-white/50 bg-white shadow-lg">
           <div className="p-6 border-b border-gray-200 bg-[#EFF6FF] rounded-t-2xl">
             <div className="flex items-center gap-2">

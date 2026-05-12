@@ -49,6 +49,7 @@ import { BranchCoordinatorPayments } from "./pages/admin/BranchCoordinatorPaymen
 import { AssessmentManagement } from "./pages/admin/AssessmentManagement";
 import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { SystemPresenceTracker } from "./components/SystemPresenceTracker";
 
 export default function App() {
   // Initialize test users on app load
@@ -207,6 +208,7 @@ export default function App() {
 
   return (
     <AuthProvider>
+      <SystemPresenceTracker />
       <RouterProvider router={router} />
     </AuthProvider>
   );
