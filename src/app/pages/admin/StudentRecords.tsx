@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { Search, Download, Users, Eye, Edit2, AlertTriangle, X } from "lucide-react";
+import { Search, Download, Users, Eye, AlertTriangle, X, Trash2 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { getEnrolledStudents, unenrollStudent } from "../../../services/adminService";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 
 interface Student {
@@ -41,6 +41,7 @@ const normalizeTrack = (value: unknown): string => {
 
 export function StudentRecords() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { userData, userRole } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTrack, setFilterTrack] = useState("all");
@@ -127,8 +128,12 @@ export function StudentRecords() {
   const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
 
   const handleViewStudent = (student: Student) => {
-    const isSuperAdmin = userRole === "superadmin";
-    navigate(isSuperAdmin ? `/branchcoordinator/student-profile/${student.id}` : `/registrar/student-profile/${student.id}`, {
+    const recordsBasePath =
+      location.pathname.startsWith("/branchcoordinator") || userRole === "superadmin"
+        ? "/branchcoordinator"
+        : "/registrar";
+
+    navigate(`${recordsBasePath}/student-profile/${student.id}`, {
       state: { student }
     });
   };
@@ -286,7 +291,7 @@ export function StudentRecords() {
                   Status
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Action
+                  Actions
                 </th>
               </tr>
             </thead>
@@ -352,20 +357,22 @@ export function StudentRecords() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-2">
                           <button
                             onClick={() => handleViewStudent(student)}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-blue-600"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50/80 px-3 py-1.5 text-xs font-semibold text-blue-700 transition-all hover:border-blue-200 hover:bg-blue-100"
                             title="View student"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="h-3.5 w-3.5" />
+                            Profile
                           </button>
                           <button
                             onClick={() => openUnenrollModal(student)}
-                            className="p-1 hover:bg-gray-100 rounded transition-colors text-gray-600 hover:text-blue-600"
-                            title="Edit / unenroll student"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 bg-red-50/80 px-3 py-1.5 text-xs font-semibold text-red-700 transition-all hover:border-red-200 hover:bg-red-100"
+                            title="Unenroll student"
                           >
-                            <Edit2 className="w-3 h-3" />
+                            <Trash2 className="h-3.5 w-3.5" />
+                            Unenroll
                           </button>
                         </div>
                       </td>

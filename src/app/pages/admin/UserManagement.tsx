@@ -3,7 +3,6 @@ import { Search, Filter, Plus, Edit2, Trash2, X, Shield, User, Users, CheckCircl
 import bcrypt from "bcryptjs";
 import { LoadingState } from "../../components/LoadingState";
 import { useAuth } from "../../context/AuthContext";
-import { useLocation } from "react-router";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
@@ -20,6 +19,7 @@ interface UserAccount {
 }
 
 type CreatableRole = "student" | "registrar" | "branchcoordinator" | "cashier";
+type EditableRole = CreatableRole;
 
 type AddUserForm = {
   firstName: string;
@@ -53,6 +53,13 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CONTACT_NUMBER_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'.-]*$/u;
 const STAFF_ROLES: CreatableRole[] = ["registrar", "branchcoordinator", "cashier"];
+const EDITABLE_ROLE_OPTIONS: Array<{ value: EditableRole; label: string; description: string }> = [
+  { value: "student", label: "Student", description: "Student dashboard, enrollment, and assessment access" },
+  { value: "cashier", label: "Cashier", description: "Payment processing and transaction review access" },
+  { value: "registrar", label: "Registrar", description: "Application review and student records access" },
+  { value: "branchcoordinator", label: "Branch Coordinator", description: "Branch administration and user management access" },
+];
+const EDITABLE_ROLE_VALUES = EDITABLE_ROLE_OPTIONS.map((role) => role.value);
 
 const getPasswordRequirements = (password: string) => {
   const missingRequirements: string[] = [];
@@ -147,7 +154,11 @@ export function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
-  const [selectedRole, setSelectedRole] = useState<"student" | "registrar" | "branchcoordinator" | "cashier" | "superadmin">("student");
+  const [selectedRole, setSelectedRole] = useState<EditableRole>("student");
+  const [branchCoordinatorPassword, setBranchCoordinatorPassword] = useState("");
+  const [showEditPassword, setShowEditPassword] = useState(false);
+  const [editRoleError, setEditRoleError] = useState("");
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
@@ -159,13 +170,10 @@ export function UserManagement() {
   const [showPassword, setShowPassword] = useState(false);
   const [touchedAddUserFields, setTouchedAddUserFields] = useState<Partial<Record<AddUserField, boolean>>>({});
   const { userRole, userData } = useAuth();
-  const location = useLocation();
 
   // Form state for adding new user
   const [newUserForm, setNewUserForm] = useState<AddUserForm>(initialAddUserForm);
 
-  // Determine if we're in super admin context
-  const isSuperAdmin = userRole === "superadmin" || location.pathname.startsWith("/superadmin");
   const canCreateUsers = userRole === "branchcoordinator";
   const isStudentAddForm = newUserForm.role === "student";
   const addUserErrors = (Object.keys(initialAddUserForm) as AddUserField[]).reduce((errors, field) => {
@@ -271,11 +279,68 @@ export function UserManagement() {
 
   const handleEditClick = (user: UserAccount) => {
     setEditingUser(user);
-    setSelectedRole(user.role as "student" | "registrar" | "branchcoordinator" | "cashier" | "superadmin");
+    setSelectedRole(EDITABLE_ROLE_VALUES.includes(user.role as EditableRole) ? (user.role as EditableRole) : "student");
+    setBranchCoordinatorPassword("");
+    setShowEditPassword(false);
+    setEditRoleError("");
+  };
+
+  const closeEditModal = () => {
+    if (isSavingEdit) return;
+    setEditingUser(null);
+    setBranchCoordinatorPassword("");
+    setShowEditPassword(false);
+    setEditRoleError("");
   };
 
   const handleSaveChanges = async () => {
     if (editingUser) {
+      const password = branchCoordinatorPassword.trim();
+      setEditRoleError("");
+
+      if (!EDITABLE_ROLE_VALUES.includes(selectedRole)) {
+        setEditRoleError("Select a valid role before saving.");
+        return;
+      }
+
+      if (!password) {
+        setEditRoleError("Branch Coordinator password is required before saving role changes.");
+        return;
+      }
+
+      setIsSavingEdit(true);
+
+      const currentAccountQuery = supabase
+        .from("users")
+        .select("id, email, role, password_hash")
+        .limit(1);
+
+      const { data: currentAccount, error: currentAccountError } = userData?.id
+        ? await currentAccountQuery.eq("id", userData.id).maybeSingle()
+        : await currentAccountQuery.eq("email", userData?.email || "").maybeSingle();
+
+      if (currentAccountError || !currentAccount) {
+        setEditRoleError("Unable to verify the Branch Coordinator account.");
+        setIsSavingEdit(false);
+        return;
+      }
+
+      if (currentAccount.role !== "branchcoordinator") {
+        setEditRoleError("Only the Branch Coordinator password can authorize role changes.");
+        setIsSavingEdit(false);
+        return;
+      }
+
+      const passwordMatches = currentAccount.password_hash
+        ? await bcrypt.compare(password, currentAccount.password_hash)
+        : false;
+
+      if (!passwordMatches) {
+        setEditRoleError("The Branch Coordinator password is incorrect.");
+        setIsSavingEdit(false);
+        return;
+      }
+
       // Update role in Supabase
       const { error } = await supabase
         .from('users')
@@ -284,19 +349,39 @@ export function UserManagement() {
 
       if (error) {
         console.error('Error updating user role:', error);
-        alert('Failed to update user role');
+        setEditRoleError(error.message || "Failed to update user role.");
+        setIsSavingEdit(false);
         return;
       }
+
+      await createAuditLog(
+        userData?.id || userData?.email || "system",
+        "USER_ROLE_UPDATED",
+        `Updated ${editingUser.email} role to ${getRoleLabel(selectedRole)}.`,
+        "success",
+        {
+          resourceType: "user",
+          resourceId: editingUser.id,
+          changes: {
+            previous_role: editingUser.role,
+            new_role: selectedRole,
+            authorized_by: currentAccount.email,
+            updated_at: new Date().toISOString(),
+          },
+        }
+      );
 
       // Update UI
       const updatedUsers = users.map((user) =>
         user.id === editingUser.id ? { ...user, role: selectedRole } : user
       );
       setUsers(updatedUsers);
+      setIsSavingEdit(false);
       setEditingUser(null);
-      setShowSuccessToast(true);
-      setSuccessMessage("User role updated successfully!");
-      setTimeout(() => setShowSuccessToast(false), 3000);
+      setBranchCoordinatorPassword("");
+      setShowEditPassword(false);
+      setEditRoleError("");
+      showSuccess("User role updated successfully!");
     }
   };
 
@@ -630,7 +715,6 @@ export function UserManagement() {
               <option value="registrar">Registrar</option>
               <option value="branchcoordinator">Branch Coordinator</option>
               <option value="cashier">Cashier</option>
-              {isSuperAdmin && <option value="superadmin">Super Admin</option>}
             </select>
           </div>
         </div>
@@ -737,204 +821,146 @@ export function UserManagement() {
       {/* Edit Role Modal */}
       {editingUser && (
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)"
+            background: "linear-gradient(135deg, rgba(15, 23, 42, 0.32), rgba(30, 58, 138, 0.22))",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
           }}
-          onClick={() => setEditingUser(null)}
+          onClick={closeEditModal}
         >
           <div
-            className="bg-white shadow-2xl max-w-md w-full"
-            style={{ borderRadius: "12px" }}
+            className="w-full max-w-xl overflow-hidden rounded-3xl border border-white/60 bg-white/75 shadow-2xl shadow-blue-950/20 backdrop-blur-2xl"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Modal Header */}
-            <div
-              className="p-6 border-b border-gray-200"
-              style={{ backgroundColor: "#F8FAFC" }}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">
-                    Edit User Role
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {editingUser.name}
-                  </p>
+            <div className="border-b border-white/70 bg-gradient-to-br from-white/95 via-blue-50/80 to-white/70 px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white/80 text-blue-700 shadow-sm">
+                    <Shield className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-[0.24em] text-blue-700">Account Control</p>
+                    <h2 className="mt-1 text-2xl font-bold text-slate-950">Edit Account</h2>
+                    <p className="mt-1 text-sm text-slate-600">Update access role with Branch Coordinator confirmation.</p>
+                  </div>
                 </div>
                 <button
-                  onClick={() => setEditingUser(null)}
-                  className="w-10 h-10 rounded-lg hover:bg-gray-200 flex items-center justify-center transition-colors"
+                  onClick={closeEditModal}
+                  disabled={isSavingEdit}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-500 transition-all hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Close edit account"
                 >
-                  <X className="w-5 h-5 text-gray-500" />
+                  <X className="h-5 w-5" />
                 </button>
               </div>
             </div>
-            {/* Modal Body */}
-            <div className="p-6">
-              {/* User Info */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Email Address</p>
-                <p className="text-sm font-medium text-gray-900">
-                  {editingUser.email}
-                </p>
-              </div>
 
-              {/* Role Selection */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-900 mb-4">
-                  Select Role
-                </h3>
-                <div className="space-y-3">
-                  {/* Student Option */}
-                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="student"
-                      checked={selectedRole === "student"}
-                      onChange={(e) =>
-                        setSelectedRole(e.target.value as any)
-                      }
-                      className="w-4 h-4"
-                      style={{ accentColor: "#1E3A8A" }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-blue-600" />
-                        <span className="text-sm font-medium text-gray-900">
-                          Student
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Basic access to dashboard and assessment
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Registrar Option */}
-                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="registrar"
-                      checked={selectedRole === "registrar"}
-                      onChange={(e) =>
-                        setSelectedRole(e.target.value as any)
-                      }
-                      className="w-4 h-4"
-                      style={{ accentColor: "#1E3A8A" }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-yellow-600" />
-                        <span className="text-sm font-medium text-gray-900">
-                          Registrar
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Manage applications and verify documents
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Branch Coordinator Option */}
-                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="branchcoordinator"
-                      checked={selectedRole === "branchcoordinator"}
-                      onChange={(e) =>
-                        setSelectedRole(e.target.value as any)
-                      }
-                      className="w-4 h-4"
-                      style={{ accentColor: "#1E3A8A" }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-indigo-600" />
-                        <span className="text-sm font-medium text-gray-900">
-                          Branch Coordinator
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Full branch access and user management
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Cashier Option */}
-                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="cashier"
-                      checked={selectedRole === "cashier"}
-                      onChange={(e) =>
-                        setSelectedRole(e.target.value as any)
-                      }
-                      className="w-4 h-4"
-                      style={{ accentColor: "#1E3A8A" }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-green-600" />
-                        <span className="text-sm font-medium text-gray-900">
-                          Cashier
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Process payments and manage transactions
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Superadmin Option */}
-                  <label className="flex items-center gap-3 p-4 border-2 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer">
-                    <input
-                      type="radio"
-                      name="role"
-                      value="superadmin"
-                      checked={selectedRole === "superadmin"}
-                      onChange={(e) =>
-                        setSelectedRole(e.target.value as any)
-                      }
-                      className="w-4 h-4"
-                      style={{ accentColor: "#1E3A8A" }}
-                    />
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-4 h-4 text-red-600" />
-                        <span className="text-sm font-medium text-gray-900">
-                          Super Admin
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Full system access across all branches
-                      </p>
-                    </div>
-                  </label>
+            <div className="space-y-5 p-6">
+              <div className="rounded-2xl border border-white/70 bg-white/70 p-4 shadow-sm">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-sm font-bold text-blue-700">
+                    {editingUser.name
+                      .split(" ")
+                      .map((part) => part[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-slate-950">{editingUser.name}</p>
+                    <p className="truncate text-xs text-slate-600">{editingUser.email}</p>
+                  </div>
+                  <span className="ml-auto rounded-full border border-blue-100 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    {getRoleLabel(editingUser.role)}
+                  </span>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3">
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-800">Select Role</label>
+                <select
+                  value={selectedRole}
+                  onChange={(event) => setSelectedRole(event.target.value as EditableRole)}
+                  className="w-full rounded-2xl border border-blue-100 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-800 outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                >
+                  {EDITABLE_ROLE_OPTIONS.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {EDITABLE_ROLE_OPTIONS.map((role) => {
+                    const isSelected = selectedRole === role.value;
+                    return (
+                      <button
+                        key={role.value}
+                        type="button"
+                        onClick={() => setSelectedRole(role.value)}
+                        className={`rounded-2xl border p-3 text-left transition-all ${
+                          isSelected
+                            ? "border-blue-300 bg-blue-50/90 shadow-sm ring-4 ring-blue-100"
+                            : "border-white/70 bg-white/55 hover:border-blue-100 hover:bg-white/85"
+                        }`}
+                      >
+                        <p className="text-sm font-bold text-slate-900">{role.label}</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">{role.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-red-100 bg-red-50/70 p-4">
+                <label className="mb-2 block text-sm font-bold text-slate-800">
+                  Branch Coordinator Password <span className="text-red-600">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showEditPassword ? "text" : "password"}
+                    value={branchCoordinatorPassword}
+                    onChange={(event) => {
+                      setBranchCoordinatorPassword(event.target.value);
+                      setEditRoleError("");
+                    }}
+                    className="w-full rounded-2xl border border-red-100 bg-white/90 py-3 pl-4 pr-12 text-sm text-slate-800 outline-none transition-all focus:border-red-300 focus:ring-4 focus:ring-red-100"
+                    placeholder="Confirm authorization before saving"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowEditPassword((current) => !current)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                    aria-label={showEditPassword ? "Hide password" : "Show password"}
+                  >
+                    {showEditPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-red-700">
+                  Role changes are protected and must be confirmed by the logged-in Branch Coordinator.
+                </p>
+                {editRoleError && (
+                  <p className="mt-2 rounded-xl border border-red-200 bg-white/80 px-3 py-2 text-xs font-semibold text-red-700">
+                    {editRoleError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
                 <button
-                  onClick={() => setEditingUser(null)}
-                  className="flex-1 px-6 py-3 rounded-lg font-medium transition-all hover:bg-gray-100 border border-gray-300"
-                  style={{ color: "#475569" }}
+                  onClick={closeEditModal}
+                  disabled={isSavingEdit}
+                  className="flex-1 rounded-2xl border border-slate-200 bg-white/75 px-6 py-3 font-semibold text-slate-600 transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveChanges}
-                  className="flex-1 px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90 shadow-md"
-                  style={{ backgroundColor: "#1E3A8A" }}
+                  disabled={isSavingEdit}
+                  className="flex-1 rounded-2xl bg-blue-700 px-6 py-3 font-semibold text-white shadow-lg shadow-blue-900/20 transition-all hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  Save Changes
+                  {isSavingEdit ? "Verifying..." : "Save Changes"}
                 </button>
               </div>
             </div>

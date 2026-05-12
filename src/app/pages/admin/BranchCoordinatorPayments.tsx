@@ -22,15 +22,54 @@ interface PaymentRecord {
   id: string;
   studentEmail: string;
   studentName: string;
-  paymentMode: "bank" | "gcash" | "cash";
+  paymentMode: string;
   referenceNumber?: string;
   queueNumber?: string;
   amount: number;
-  status: "pending" | "approved" | "rejected" | "paid";
+  status: string;
   submittedDate: string;
   processedBy?: string;
   rejectionComment?: string;
 }
+
+const normalizePaymentStatus = (status?: string) => {
+  const normalized = String(status || "pending").trim().toLowerCase();
+
+  if (["approved", "paid", "verified", "completed", "complete", "success", "successful"].includes(normalized)) {
+    return "approved";
+  }
+
+  if (["rejected", "declined", "denied", "failed"].includes(normalized)) {
+    return "rejected";
+  }
+
+  return "pending";
+};
+
+const normalizePaymentMode = (mode?: string) => {
+  const normalized = String(mode || "cash").trim().toLowerCase().replace(/[\s-]+/g, "_");
+
+  if (normalized.includes("gcash")) return "gcash";
+  if (normalized.includes("bank")) return "bank";
+  if (normalized.includes("cash")) return "cash";
+
+  return normalized || "cash";
+};
+
+const getPaymentModeLabel = (mode?: string) => {
+  switch (normalizePaymentMode(mode)) {
+    case "bank":
+      return "Bank Transfer";
+    case "gcash":
+      return "GCash";
+    case "cash":
+      return "Cash";
+    default:
+      return String(mode || "Payment").replace(/_/g, " ");
+  }
+};
+
+const isValidDate = (date: Date) => !Number.isNaN(date.getTime());
 
 export function BranchCoordinatorPayments() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -95,13 +134,11 @@ export function BranchCoordinatorPayments() {
         id: p.id,
         studentEmail: userMap[p.student_id]?.email || p.student_id,
         studentName: userMap[p.student_id]?.name || "Unknown Student",
-        paymentMode: p.payment_method as "bank" | "gcash" | "cash",
+        paymentMode: p.payment_method || "cash",
         referenceNumber: p.reference_number || undefined,
         queueNumber: p.queue_number || undefined,
         amount: Number(p.amount) || 15000,
-        status: p.status === "verified" || p.status === "completed" || p.status === "approved"
-          ? "approved"
-          : (p.status as "pending" | "approved" | "rejected" | "paid"),
+        status: p.status || "pending",
         submittedDate: p.submitted_at || p.created_at,
         rejectionComment: p.notes || undefined,
       }));
@@ -116,27 +153,35 @@ export function BranchCoordinatorPayments() {
   };
 
   // Filter logic
-  let filteredPayments = payments.filter(
-    (payment) =>
-      payment.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.studentEmail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.referenceNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      payment.queueNumber?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+  let filteredPayments = payments.filter((payment) => {
+    if (!normalizedSearchQuery) return true;
+
+    return [
+      payment.id,
+      payment.studentName,
+      payment.studentEmail,
+      payment.referenceNumber,
+      payment.queueNumber,
+      getPaymentModeLabel(payment.paymentMode),
+      payment.status,
+    ].some((value) => String(value || "").toLowerCase().includes(normalizedSearchQuery));
+  });
 
   if (statusFilter !== "all") {
-    filteredPayments = filteredPayments.filter((p) => p.status === statusFilter);
+    filteredPayments = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === statusFilter);
   }
 
   if (paymentTypeFilter !== "all") {
-    filteredPayments = filteredPayments.filter((p) => p.paymentMode === paymentTypeFilter);
+    filteredPayments = filteredPayments.filter((p) => normalizePaymentMode(p.paymentMode) === paymentTypeFilter);
   }
 
   if (dateFilter !== "all") {
     const today = new Date();
     filteredPayments = filteredPayments.filter((p) => {
       const paymentDate = new Date(p.submittedDate);
+      if (!isValidDate(paymentDate)) return false;
+
       switch (dateFilter) {
         case "today":
           return paymentDate.toDateString() === today.toDateString();
@@ -157,11 +202,11 @@ export function BranchCoordinatorPayments() {
   // Stats
   const totalTransactions = filteredPayments.length;
   const totalRevenue = filteredPayments
-    .filter((p) => p.status === "approved" || p.status === "paid")
+    .filter((p) => normalizePaymentStatus(p.status) === "approved")
     .reduce((sum, p) => sum + p.amount, 0);
-  const pendingCount = filteredPayments.filter((p) => p.status === "pending").length;
-  const approvedCount = filteredPayments.filter((p) => p.status === "approved" || p.status === "paid").length;
-  const rejectedCount = filteredPayments.filter((p) => p.status === "rejected").length;
+  const pendingCount = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === "pending").length;
+  const approvedCount = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === "approved").length;
+  const rejectedCount = filteredPayments.filter((p) => normalizePaymentStatus(p.status) === "rejected").length;
 
   const handleExportCSV = () => {
     const csvHeaders = ["Transaction ID", "Date", "Student Name", "Email", "Payment Method", "Reference/Queue", "Amount", "Status"];
@@ -170,7 +215,7 @@ export function BranchCoordinatorPayments() {
       new Date(p.submittedDate).toLocaleDateString(),
       p.studentName,
       p.studentEmail,
-      p.paymentMode === "bank" ? "Bank Transfer" : p.paymentMode === "gcash" ? "GCash" : "Cash",
+      getPaymentModeLabel(p.paymentMode),
       p.referenceNumber || p.queueNumber || "N/A",
       `₱${p.amount.toLocaleString()}`,
       p.status.toUpperCase(),
@@ -389,22 +434,28 @@ export function BranchCoordinatorPayments() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-2">
-                        {payment.paymentMode === "bank" && (
+                        {normalizePaymentMode(payment.paymentMode) === "bank" && (
                           <>
                             <CreditCard className="w-4 h-4 text-blue-600" />
                             <span className="text-sm text-gray-900">Bank Transfer</span>
                           </>
                         )}
-                        {payment.paymentMode === "gcash" && (
+                        {normalizePaymentMode(payment.paymentMode) === "gcash" && (
                           <>
                             <CreditCard className="w-4 h-4 text-blue-600" />
                             <span className="text-sm text-gray-900">GCash</span>
                           </>
                         )}
-                        {payment.paymentMode === "cash" && (
+                        {normalizePaymentMode(payment.paymentMode) === "cash" && (
                           <>
                             <Banknote className="w-4 h-4 text-green-600" />
                             <span className="text-sm text-gray-900">Cash</span>
+                          </>
+                        )}
+                        {!["bank", "gcash", "cash"].includes(normalizePaymentMode(payment.paymentMode)) && (
+                          <>
+                            <CreditCard className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm text-gray-900">{getPaymentModeLabel(payment.paymentMode)}</span>
                           </>
                         )}
                       </div>
@@ -420,17 +471,17 @@ export function BranchCoordinatorPayments() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {payment.status === "pending" && (
+                      {normalizePaymentStatus(payment.status) === "pending" && (
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
                           Pending
                         </span>
                       )}
-                      {(payment.status === "approved" || payment.status === "paid") && (
+                      {normalizePaymentStatus(payment.status) === "approved" && (
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {payment.status === "paid" ? "Paid" : "Approved"}
+                          {String(payment.status).toLowerCase() === "paid" ? "Paid" : "Approved"}
                         </span>
                       )}
-                      {payment.status === "rejected" && (
+                      {normalizePaymentStatus(payment.status) === "rejected" && (
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
                           Rejected
                         </span>
