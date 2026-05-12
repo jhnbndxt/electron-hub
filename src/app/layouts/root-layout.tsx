@@ -96,6 +96,7 @@ export function RootLayout() {
               </Link>
               <Link
                 to="/login"
+                state={{ fromPublicLogin: true }}
                 className="bg-[#B91C1C] hover:bg-[#991B1B] px-4 py-2 rounded transition-colors"
               >
                 Login
@@ -190,6 +191,7 @@ export function RootLayout() {
             <div className="mt-6 border-t border-white/15 pt-6">
               <Link
                 to="/login"
+                state={{ fromPublicLogin: true }}
                 className="block rounded-xl bg-[#B91C1C] px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-[#991B1B]"
               >
                 Login

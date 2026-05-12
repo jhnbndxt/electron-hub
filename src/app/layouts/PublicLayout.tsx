@@ -211,6 +211,7 @@ export function PublicLayout() {
                   ) : !userData ? (
                     <Link
                       to="/login"
+                      state={{ fromPublicLogin: true }}
                       className="public-nav-cta text-white"
                       style={{ backgroundColor: "var(--electron-red)" }}
                     >
@@ -324,6 +325,7 @@ export function PublicLayout() {
                   ) : !userData ? (
                     <Link
                       to="/login"
+                      state={{ fromPublicLogin: true }}
                       className="public-mobile-nav-link block text-center text-white"
                       style={{ backgroundColor: "var(--electron-red)" }}
                     >

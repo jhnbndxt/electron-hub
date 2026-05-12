@@ -559,6 +559,7 @@ export function PublicAssessment() {
               </Link>
               <Link
                 to="/login"
+                state={{ fromPublicLogin: true }}
                 className="w-full sm:w-auto px-6 sm:px-8 py-4 rounded-lg font-semibold transition-all shadow-md flex items-center justify-center gap-2"
                 style={{
                   backgroundColor: "white",

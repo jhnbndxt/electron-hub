@@ -167,7 +167,7 @@ export function EnrollmentInfoPage() {
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link to="/login">
+            <Link to="/login" state={{ fromPublicLogin: true }}>
               <Button
                 size="lg"
                 className="border-2 border-[#1E3A8A] text-[#1E3A8A] bg-white hover:bg-gray-50 w-full sm:w-auto"

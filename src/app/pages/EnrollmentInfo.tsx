@@ -537,6 +537,7 @@ export function EnrollmentInfo() {
           <div className="flex justify-center gap-4">
             <Link
               to="/login"
+              state={{ fromPublicLogin: true }}
               className="px-8 py-3 rounded-md text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: "var(--electron-blue)" }}
             >
@@ -544,6 +545,7 @@ export function EnrollmentInfo() {
             </Link>
             <Link
               to={userRole === "student" ? "/dashboard/assessment" : "/login?from=assessment"}
+              state={userRole === "student" ? undefined : { fromPublicLogin: true }}
               className="px-8 py-3 rounded-md text-white transition-colors hover:opacity-90"
               style={{ backgroundColor: "var(--electron-blue)" }}
               preventScrollReset={false}

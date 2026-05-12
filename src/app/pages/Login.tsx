@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { MaintenanceNotice } from "../components/MaintenanceNotice";
@@ -18,8 +18,10 @@ export function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [showMaintenanceNotice, setShowMaintenanceNotice] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
   const [searchParams] = useSearchParams();
+  const shouldAnimateEntry = Boolean((location.state as { fromPublicLogin?: boolean } | null)?.fromPublicLogin);
 
   // Check if user came from assessment link
   useEffect(() => {
@@ -136,7 +138,7 @@ export function Login() {
   }
 
   return (
-    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-4 sm:px-6 lg:px-8">
+    <div className={`auth-shell-bg flex min-h-screen items-center justify-center px-4 py-4 sm:px-6 lg:px-8 ${shouldAnimateEntry ? "auth-shell-enter" : ""}`}>
       <div className="relative z-10 flex w-full max-w-6xl items-center justify-center">
         {/* Assessment Banner */}
         <div className="w-full max-w-[27rem]">

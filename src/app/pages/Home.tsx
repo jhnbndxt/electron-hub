@@ -787,6 +787,7 @@ export function Home() {
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link
               to="/login"
+              state={{ fromPublicLogin: true }}
               className="px-10 py-4 bg-white rounded-xl transition-all hover:scale-105 hover:shadow-2xl font-semibold text-lg"
               style={{ color: "var(--electron-blue)" }}
             >
