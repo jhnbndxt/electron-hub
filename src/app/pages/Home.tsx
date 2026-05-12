@@ -351,22 +351,20 @@ export function Home() {
               </div>
             </div>
             <div className="hidden lg:block">
-              <div className="relative mx-auto max-w-xl">
-                <div className="absolute -inset-5 rounded-[2rem] border border-white/18 bg-white/10 backdrop-blur-xl shadow-2xl shadow-slate-950/20"></div>
-                <div className="absolute -right-4 top-8 h-48 w-2 rounded-full bg-white/45 shadow-[0_0_40px_rgba(255,255,255,0.35)]"></div>
-                <div className="relative overflow-hidden rounded-[1.75rem] border border-white/25 bg-white/14 p-3 shadow-2xl shadow-slate-950/25">
-                  <div className="absolute left-6 top-6 z-20 rounded-full border border-white/25 bg-white/20 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur-md">
-                    Malanday Campus
-                  </div>
+              <div className="relative mx-auto max-w-2xl">
+                <div className="absolute -inset-8 rounded-[2.35rem] border border-white/16 bg-white/8 backdrop-blur-xl shadow-2xl shadow-slate-950/20"></div>
+                <div className="absolute -left-7 top-10 h-24 w-24 rounded-3xl border border-white/18 bg-white/12 backdrop-blur-md"></div>
+                <div className="absolute -right-6 bottom-12 h-36 w-3 rounded-full bg-white/38 shadow-[0_0_44px_rgba(255,255,255,0.32)]"></div>
+                <div className="absolute -right-2 -top-5 h-16 w-16 rounded-2xl border border-white/18 bg-blue-100/14 backdrop-blur-md"></div>
+                <div className="relative overflow-hidden rounded-[2rem] border border-white/25 bg-white/14 p-3 shadow-2xl shadow-slate-950/25">
                   <img
                     src={campusPreview}
                     alt="Electron College Campus Preview"
-                    className="h-[25rem] w-full rounded-[1.35rem] border border-white/10 object-cover shadow-lg"
+                    className="h-[29rem] w-full rounded-[1.55rem] border border-white/10 object-cover shadow-lg"
                   />
-                  <div className="absolute bottom-6 left-6 right-6 z-20 rounded-2xl border border-white/20 bg-slate-950/42 px-5 py-4 text-white shadow-xl backdrop-blur-md">
-                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-100">Campus Preview</p>
-                    <p className="mt-1 text-base font-semibold">Electron College of Technical Education</p>
-                  </div>
+                  <div className="pointer-events-none absolute inset-3 rounded-[1.55rem] ring-1 ring-inset ring-white/20"></div>
+                  <div className="pointer-events-none absolute inset-x-6 top-6 h-px bg-white/45"></div>
+                  <div className="pointer-events-none absolute inset-y-8 right-6 w-px bg-white/35"></div>
                 </div>
               </div>
             </div>
@@ -771,7 +769,7 @@ export function Home() {
 
       {/* CTA Section */}
       <section
-        className="py-20 text-white text-center relative overflow-hidden"
+        className="public-home-final-cta py-20 text-center relative overflow-hidden"
         style={{ 
           background: "linear-gradient(135deg, #1E3A8A 0%, #1e40af 50%, #2563eb 100%)"
         }}
