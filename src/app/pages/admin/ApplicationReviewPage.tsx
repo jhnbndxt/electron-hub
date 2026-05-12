@@ -6,6 +6,8 @@ import {
   FileCheck,
   FileText,
   GraduationCap,
+  IdCard,
+  Mail,
   MapPin,
   Maximize2,
   Minus,
@@ -527,42 +529,62 @@ export function ApplicationReviewPage() {
           </div>
         </header>
 
-        <section className="mt-3 overflow-hidden rounded-2xl border border-white/70 bg-white/45 p-4 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/60 backdrop-blur-2xl transition hover:bg-white/55">
-          <div className="grid gap-4 lg:grid-cols-[190px_1fr] lg:items-stretch">
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-white/70 bg-gradient-to-br from-white/70 to-blue-50/55 p-3 shadow-inner shadow-white/80 backdrop-blur-xl">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 to-sky-100 text-2xl font-black text-blue-800 ring-4 ring-white/80 shadow-lg shadow-blue-900/10">
+        <section className="mt-3 overflow-hidden rounded-[2rem] border border-white/80 bg-white/50 p-6 shadow-[0_26px_80px_-48px_rgba(30,58,138,0.65)] ring-1 ring-blue-100/70 backdrop-blur-2xl transition hover:bg-white/60">
+          <div className="grid gap-6 lg:grid-cols-[300px_minmax(0,1fr)_340px] lg:items-center">
+            <div className="flex items-center justify-center border-b border-blue-100/80 pb-6 lg:h-full lg:border-b-0 lg:border-r lg:pb-0 lg:pr-8">
+              <div className="flex h-44 w-44 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-blue-100 via-white to-sky-100 text-5xl font-black text-blue-700 ring-[10px] ring-white/80 shadow-[0_26px_60px_-32px_rgba(30,58,138,0.65)]">
                 {studentProfile?.profile_picture_url ? (
                   <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
                 ) : (
                   initials
                 )}
               </div>
-              <button
-                onClick={() => setShowForm((current) => !current)}
-                className="group inline-flex w-full items-center justify-center gap-2 rounded-xl border border-blue-300/70 bg-white/70 px-3 py-2 text-xs font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-blue-400 hover:bg-blue-50 hover:shadow-md"
-              >
-                <FileText className="h-4 w-4" />
-                View Enrollment Form
-                <ChevronDown className={`h-4 w-4 transition-transform duration-200 group-hover:translate-y-0.5 ${showForm ? "rotate-180" : ""}`} />
-              </button>
             </div>
 
-            <div className="min-w-0 rounded-2xl border border-white/60 bg-white/45 p-4 shadow-sm backdrop-blur-xl">
-              <h2 className="truncate text-lg font-black text-slate-950">{studentName}</h2>
-              <div className="mt-3 grid gap-3 text-xs text-slate-600 md:grid-cols-3">
-                <div className="rounded-xl border border-white/70 bg-white/65 p-3 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md">
-                  <p className="font-black text-slate-900">{formData.email || enrollment.user_id || "No email provided"}</p>
-                  <p className="mt-1 text-[11px] font-medium text-slate-500">Email Address</p>
+            <div className="min-w-0">
+              <h2 className="truncate text-4xl font-black tracking-tight text-slate-950">{studentName}</h2>
+              <div className="mt-8 space-y-6 text-slate-700">
+                <div className="grid gap-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center">
+                  <div className="flex items-center gap-4 text-lg font-bold text-slate-500">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
+                      <Mail className="h-5 w-5" />
+                    </span>
+                    Email Address:
+                  </div>
+                  <p className="min-w-0 break-words text-lg font-black text-slate-950">{formData.email || enrollment.user_id || "No email provided"}</p>
                 </div>
-                <div className="rounded-xl border border-white/70 bg-white/65 p-3 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md">
-                  <p className="font-black text-slate-900">{String(enrollment.id)}</p>
-                  <p className="mt-1 text-[11px] font-medium text-slate-500">Student ID</p>
+
+                <div className="grid gap-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center">
+                  <div className="flex items-center gap-4 text-lg font-bold text-slate-500">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
+                      <IdCard className="h-5 w-5" />
+                    </span>
+                    Student ID:
+                  </div>
+                  <p className="min-w-0 break-words text-lg font-black text-slate-950">{String(enrollment.id)}</p>
                 </div>
-                <div className="rounded-xl border border-white/70 bg-white/65 p-3 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-md">
-                  <p className="font-black text-slate-900">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
-                  <p className="mt-1 text-[11px] font-medium text-slate-500">Academic Track / Strand</p>
+
+                <div className="grid gap-3 sm:grid-cols-[210px_minmax(0,1fr)] sm:items-center">
+                  <div className="flex items-center gap-4 text-lg font-bold text-slate-500">
+                    <span className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100/80 text-blue-700 shadow-sm ring-1 ring-white/80">
+                      <GraduationCap className="h-5 w-5" />
+                    </span>
+                    Track:
+                  </div>
+                  <p className="min-w-0 break-words text-lg font-black text-slate-950">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
                 </div>
               </div>
+            </div>
+
+            <div className="flex justify-center lg:justify-end lg:self-start">
+              <button
+                onClick={() => setShowForm((current) => !current)}
+                className="group inline-flex min-h-20 w-full max-w-[320px] items-center justify-center gap-4 rounded-2xl border-2 border-blue-200/90 bg-white/65 px-6 py-4 text-lg font-black text-blue-700 shadow-lg shadow-blue-950/5 backdrop-blur-xl transition hover:-translate-y-1 hover:border-blue-400 hover:bg-blue-50/80 hover:shadow-xl"
+              >
+                <FileText className="h-8 w-8" />
+                View Enrollment Form
+                <ChevronDown className={`h-5 w-5 transition-transform duration-200 group-hover:translate-y-0.5 ${showForm ? "rotate-180" : ""}`} />
+              </button>
             </div>
           </div>
         </section>
