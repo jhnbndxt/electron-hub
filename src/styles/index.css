@@ -26,8 +26,8 @@ svg {
 .smooth-hover {
 	transform: translateZ(0);
 	backface-visibility: hidden;
-	will-change: transform, box-shadow, background-color, border-color, color, opacity;
-	transition-duration: 320ms;
+	will-change: transform, box-shadow, background-color, border-color, color;
+	transition-duration: 360ms;
 	transition-property: transform, box-shadow, background-color, border-color, color, opacity;
 	transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -39,14 +39,18 @@ svg {
 .smooth-button {
 	transform: translateZ(0);
 	backface-visibility: hidden;
-	will-change: transform, box-shadow, background-color, border-color, color, opacity;
-	transition-duration: 280ms;
+	will-change: transform, box-shadow, background-color, border-color, color;
+	transition-duration: 360ms;
 	transition-property: transform, box-shadow, background-color, border-color, color, opacity;
 	transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .smooth-button:hover {
-	transform: translate3d(0, -2px, 0) scale(1.012);
+	transform: translate3d(0, -2px, 0) scale(1.04);
+}
+
+.smooth-button:active {
+	transform: translate3d(0, 0, 0) scale(0.99);
 }
 
 @media (prefers-reduced-motion: reduce) {

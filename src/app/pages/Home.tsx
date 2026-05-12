@@ -316,20 +316,23 @@ export function Home() {
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6 border border-white/20">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6 border border-white/20 shadow-lg shadow-blue-950/10">
                 <Sparkles className="w-4 h-4 text-yellow-300" />
                 <span className="text-sm font-medium">AI-Powered Strand Recommendation</span>
               </div>
               
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold mb-6 leading-tight">
-                Find the strand that fits the future you want.
+              <h1 className="relative mb-5 text-5xl font-black leading-none tracking-tight sm:text-6xl md:text-7xl">
+                <span className="block text-white drop-shadow-[0_14px_34px_rgba(15,23,42,0.28)]">
+                  Electron Hub
+                </span>
+                <span className="mt-4 block h-1.5 w-28 rounded-full bg-[#B91C1C] shadow-[0_0_26px_rgba(255,255,255,0.42)]"></span>
               </h1>
-              <p className="text-lg sm:text-xl md:text-2xl text-blue-100 mb-4 font-light">
-                Electron Hub guides Senior High applicants from assessment to enrollment in one clear, online flow.
+              <p className="mb-5 max-w-xl text-2xl font-semibold leading-snug text-blue-50 sm:text-3xl">
+                Senior High School Online Enrollment and Assessment Portal
               </p>
-              <p className="text-lg text-blue-50 mb-8 leading-relaxed">
-                Answer the assessment, get AI-assisted strand guidance, submit requirements, and move toward your first day at Electron College with confidence.
+              <p className="mb-8 max-w-2xl border-l-4 border-white/40 pl-5 text-lg leading-8 text-blue-50/95">
+                Discover your path to success with our AI-assisted strand recommendation system. Make informed decisions about your academic future.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 w-full">
                 <Link
@@ -556,7 +559,7 @@ export function Home() {
                     <button
                       type="button"
                       onClick={openCreateAnnouncementEditor}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:bg-[#1e40af]"
+                      className="smooth-button inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 hover:bg-[#1e40af]"
                     >
                       <Plus className="h-4 w-4" />
                       Add Announcement
@@ -663,7 +666,7 @@ export function Home() {
                         <button
                           type="submit"
                           disabled={isSavingAnnouncement}
-                          className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:-translate-y-0.5 hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="smooth-button inline-flex items-center justify-center gap-2 rounded-2xl bg-[#1E3A8A] px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-200 hover:bg-[#1e40af] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {isSavingAnnouncement && <Loader2 className="h-4 w-4 animate-spin" />}
                           {editingAnnouncementId ? "Save Changes" : "Publish Announcement"}

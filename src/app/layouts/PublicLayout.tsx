@@ -122,7 +122,7 @@ export function PublicLayout() {
             <Link to="/" className="flex min-w-0 items-center gap-3 group">
               {isAnyAdmin ? (
                 <>
-                  <img src={logo} alt="Electron College Logo" className="w-8 h-8 object-contain flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <img src={logo} alt="Electron College Logo" className="w-8 h-8 object-contain flex-shrink-0 transition-transform duration-300 ease-out group-hover:scale-110" />
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate font-semibold text-sm leading-tight sm:text-base">Electron College of Technical Education</span>
                     <span className="text-xs text-red-200">Malanday • {getAdminLabel()}</span>
@@ -130,7 +130,7 @@ export function PublicLayout() {
                 </>
               ) : (
                 <>
-                  <img src={logo} alt="Electron College Logo" className="w-8 h-8 object-contain flex-shrink-0 group-hover:scale-110 transition-transform" />
+                  <img src={logo} alt="Electron College Logo" className="w-8 h-8 object-contain flex-shrink-0 transition-transform duration-300 ease-out group-hover:scale-110" />
                   <div className="flex min-w-0 flex-col">
                     <span className="truncate font-semibold text-sm leading-tight sm:text-base">Electron College of Technical Education</span>
                     <span className="text-xs opacity-90">Malanday</span>

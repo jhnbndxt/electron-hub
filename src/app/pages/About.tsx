@@ -50,7 +50,7 @@ export function About() {
           {/* 2x2 Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-6xl mx-auto">
             {/* Mission 1 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 border-t-4 hover:transform hover:-translate-y-1" style={{ borderColor: "#1E3A8A" }}>
+            <div className="smooth-hover bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl border-t-4" style={{ borderColor: "#1E3A8A" }}>
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center shadow-md" style={{ backgroundColor: "#1E3A8A" }}>
                   <GraduationCap className="w-8 h-8 text-white" />
@@ -67,7 +67,7 @@ export function About() {
             </div>
 
             {/* Mission 2 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 border-t-4 hover:transform hover:-translate-y-1" style={{ borderColor: "#B91C1C" }}>
+            <div className="smooth-hover bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl border-t-4" style={{ borderColor: "#B91C1C" }}>
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center shadow-md" style={{ backgroundColor: "#B91C1C" }}>
                   <Lightbulb className="w-8 h-8 text-white" />
@@ -84,7 +84,7 @@ export function About() {
             </div>
 
             {/* Mission 3 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 border-t-4 hover:transform hover:-translate-y-1" style={{ borderColor: "#1E3A8A" }}>
+            <div className="smooth-hover bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl border-t-4" style={{ borderColor: "#1E3A8A" }}>
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center shadow-md" style={{ backgroundColor: "#1E3A8A" }}>
                   <Trophy className="w-8 h-8 text-white" />
@@ -101,7 +101,7 @@ export function About() {
             </div>
 
             {/* Mission 4 */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl transition-all duration-300 border-t-4 hover:transform hover:-translate-y-1" style={{ borderColor: "#B91C1C" }}>
+            <div className="smooth-hover bg-white rounded-2xl shadow-lg p-8 hover:shadow-2xl border-t-4" style={{ borderColor: "#B91C1C" }}>
               <div className="flex items-start gap-4">
                 <div className="flex-shrink-0 w-16 h-16 rounded-full flex items-center justify-center shadow-md" style={{ backgroundColor: "#B91C1C" }}>
                   <Zap className="w-8 h-8 text-white" />
