@@ -659,206 +659,209 @@ export function CashierDashboard() {
 
       {/* Online Payment Review Modal */}
       {showReviewModal && selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}>
-          <div className="w-full max-w-7xl rounded-[2rem] bg-white shadow-[0_30px_90px_-40px_rgba(15,23,42,0.40)] ring-1 ring-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
-            <div className="flex items-center justify-between px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700">
-              <div>
-                <h2 className="text-2xl font-semibold text-white">Payment Verification</h2>
-                <p className="text-blue-100 mt-1 text-sm">
-                  {selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash Payment"} Review
-                </p>
-              </div>
-              <button
-                onClick={() => setShowReviewModal(false)}
-                className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
-              >
-                <XCircle className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Split Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
-              {/* Left Side: Receipt Viewer */}
-                      <div className="bg-slate-50 p-6 flex flex-col">
-                <div className="flex flex-col gap-2 mb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">Payment Receipt</p>
-                      <p className="text-xs text-slate-500">Inspect screenshot authenticity and transaction details</p>
-                    </div>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      {selectedReceiptIndex + 1} of {selectedReceiptUrls.length || 1}
-                    </span>
-                  </div>
-                  <div className="rounded-3xl bg-slate-900 p-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 text-slate-100">
-                      <button
-                        onClick={() => setZoom(Math.max(50, zoom - 25))}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700"
-                      >
-                        <ZoomOut className="w-4 h-4" />
-                      </button>
-                      <span className="text-sm font-semibold">{zoom}%</span>
-                      <button
-                        onClick={() => setZoom(Math.min(300, zoom + 25))}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700"
-                      >
-                        <ZoomIn className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => setZoom(100)}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => {
-                          const container = document.querySelector('.receipt-preview') as HTMLElement;
-                          if (container?.requestFullscreen) container.requestFullscreen();
-                        }}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100"
-                      >
-                        <Maximize className="w-4 h-4" />
-                      </button>
-                      <a
-                        href={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
-                        download={selectedPayment.receiptFileName}
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-100"
-                      >
-                        <Download className="w-4 h-4" />
-                      </a>
-                    </div>
-                  </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-md" onClick={() => setShowReviewModal(false)}>
+          <div className="w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="portal-glass-modal">
+              {/* Header */}
+              <div className="flex items-center justify-between px-8 py-6 border-b border-white/20">
+                <div>
+                  <h2 className="text-2xl font-semibold text-slate-900">Payment Verification</h2>
+                  <p className="text-slate-600 mt-1 text-sm">
+                    {selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash Payment"} Review
+                  </p>
                 </div>
-
-                <div className="flex-1 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm receipt-preview">
-                  <img
-                    src={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
-                    alt="Payment Receipt"
-                    className="w-full h-[calc(100%-1rem)] object-contain bg-slate-950"
-                    style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
-                  />
-                </div>
-
-                <div className="mt-4 rounded-3xl bg-white border border-slate-200 p-4">
-                  <p className="text-sm font-semibold text-slate-900 mb-3">Receipt thumbnails</p>
-                  <div className="flex gap-3 overflow-x-auto pb-1">
-                    {(selectedReceiptUrls.length > 0 ? selectedReceiptUrls : ['']).map((url, index) => (
-                      <button
-                        key={`receipt-thumb-${index}`}
-                        onClick={() => setSelectedReceiptIndex(index)}
-                        className={`min-w-[86px] h-20 rounded-3xl overflow-hidden border-2 ${selectedReceiptIndex === index ? 'border-blue-500' : 'border-slate-200'} bg-slate-50`}
-                      >
-                        <img src={url} alt={`Receipt ${index + 1}`} className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <button
+                  onClick={() => setShowReviewModal(false)}
+                  className="portal-glass-icon-button rounded-xl p-2 transition-colors"
+                >
+                  <XCircle className="w-6 h-6 text-slate-700" />
+                </button>
               </div>
 
-              {/* Right Side: Verification Panel */}
-              <div className="bg-white p-6 flex flex-col">
-                {/* Student Information Card */}
-                <div className="bg-slate-50 rounded-xl p-5 mb-6">
-                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Student Information</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Name</span>
-                      <span className="text-sm font-medium text-slate-900">{selectedPayment.studentName}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Email</span>
-                      <span className="text-sm font-medium text-slate-900">{selectedPayment.studentEmail}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Student ID</span>
-                      <span className="text-sm font-medium text-slate-900">{selectedPayment.id}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Academic Track</span>
-                      <span className="text-sm font-medium text-slate-900">{selectedPayment.enrollmentData?.preferredTrack || 'Not set'}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Information Card */}
-                <div className="bg-blue-50 rounded-xl p-5 mb-6">
-                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Payment Information</h4>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Payment Method</span>
-                      <span className="text-sm font-medium text-slate-900">{selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash"}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Reference Number</span>
-                      <span className="text-sm font-mono font-medium text-slate-900">{selectedPayment.referenceNumber}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Transaction ID</span>
-                      <span className="text-sm font-mono font-medium text-slate-900">{selectedPayment.id}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Submitted Date</span>
-                      <span className="text-sm font-medium text-slate-900">{selectedPayment.submittedDate}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Amount Paid</span>
-                      <span className="text-lg font-bold text-blue-600">
-                        {selectedPayment.amount.toLocaleString("en-PH", {
-                          style: "currency",
-                          currency: "PHP",
-                          maximumFractionDigits: 2,
-                        })}
+              {/* Split Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
+                {/* Left Side: Receipt Viewer */}
+                <div className="p-6 flex flex-col border-r border-white/10">
+                  <div className="flex flex-col gap-2 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Payment Receipt</p>
+                        <p className="text-xs text-slate-600">Inspect screenshot authenticity and transaction details</p>
+                      </div>
+                      <span className="rounded-full bg-white/20 backdrop-blur px-3 py-1 text-xs font-semibold text-slate-700">
+                        {selectedReceiptIndex + 1} of {selectedReceiptUrls.length || 1}
                       </span>
                     </div>
-                  </div>
-                </div>
-
-                {/* Validation Warnings */}
-                {isPaymentReferenceDuplicate && (
-                  <div className="mb-6">
-                    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <span className="text-sm text-amber-800">Possible duplicate reference number detected</span>
+                    <div className="rounded-2xl portal-glass-panel p-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setZoom(Math.max(50, zoom - 25))}
+                          className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
+                        >
+                          <ZoomOut className="w-4 h-4" />
+                        </button>
+                        <span className="text-sm font-semibold text-slate-700">{zoom}%</span>
+                        <button
+                          onClick={() => setZoom(Math.min(300, zoom + 25))}
+                          className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
+                        >
+                          <ZoomIn className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setZoom(100)}
+                          className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
+                        >
+                          <RotateCcw className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            const container = document.querySelector('.receipt-preview') as HTMLElement;
+                            if (container?.requestFullscreen) container.requestFullscreen();
+                          }}
+                          className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
+                        >
+                          <Maximize className="w-4 h-4" />
+                        </button>
+                        <a
+                          href={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
+                          download={selectedPayment.receiptFileName}
+                          className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      </div>
                     </div>
                   </div>
-                )}
 
-                {/* Verification Notes */}
-                <div className="mb-6">
-                  <label className="block text-sm font-semibold text-slate-900 mb-2">Verification Notes</label>
-                  <textarea
-                    value={verificationNotes}
-                    onChange={(e) => setVerificationNotes(e.target.value)}
-                    placeholder="Add notes about the verification process..."
-                    rows={4}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                  />
+                  <div className="flex-1 overflow-hidden rounded-2xl border border-white/20 bg-black/30 backdrop-blur-sm receipt-preview mb-4">
+                    <img
+                      src={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
+                      alt="Payment Receipt"
+                      className="w-full h-full object-contain"
+                      style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
+                    />
+                  </div>
+
+                  <div className="portal-glass-panel rounded-2xl p-4">
+                    <p className="text-sm font-semibold text-slate-900 mb-3">Receipt images</p>
+                    <div className="flex gap-3 overflow-x-auto pb-1">
+                      {(selectedReceiptUrls.length > 0 ? selectedReceiptUrls : ['']).map((url, index) => (
+                        <button
+                          key={`receipt-thumb-${index}`}
+                          onClick={() => setSelectedReceiptIndex(index)}
+                          className={`min-w-[86px] h-20 rounded-xl overflow-hidden border-2 transition-all ${ selectedReceiptIndex === index ? 'border-blue-500 ring-2 ring-blue-400/50' : 'border-white/20'} bg-white/10 backdrop-blur`}
+                        >
+                          <img src={url} alt={`Receipt ${index + 1}`} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
-                {/* Action Buttons */}
-                <div className="flex gap-3 mt-auto">
-                  <button
-                    onClick={() => {
-                      if (!verificationNotes.trim()) {
-                        alert("Please provide a reason for rejection.");
-                        return;
-                      }
-                      handleRejectOnlinePayment();
-                    }}
-                    className="flex-1 py-3 px-4 border border-red-300 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 transition-colors"
-                  >
-                    Reject Payment
-                  </button>
-                  <button
-                    onClick={handleApproveOnlinePayment}
-                    className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
-                  >
-                    Approve & Enroll
-                  </button>
+                {/* Right Side: Verification Panel */}
+                <div className="p-6 flex flex-col">
+                  {/* Student Information Card */}
+                  <div className="portal-glass-panel rounded-2xl p-5 mb-6">
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Student Information</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Name</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.studentName}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Email</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.studentEmail}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Student ID</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.id}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Academic Track</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.enrollmentData?.preferredTrack || 'Not set'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Payment Information Card */}
+                  <div className="portal-glass-panel-strong rounded-2xl p-5 mb-6">
+                    <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Payment Information</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Payment Method</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Reference Number</span>
+                        <span className="text-sm font-mono font-medium text-slate-900">{selectedPayment.referenceNumber}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Transaction ID</span>
+                        <span className="text-sm font-mono font-medium text-slate-900">{selectedPayment.id}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Submitted Date</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.submittedDate}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-2 border-t border-white/20">
+                        <span className="text-sm text-slate-700 font-semibold">Amount Paid</span>
+                        <span className="text-lg font-bold" style={{ color: '#2563eb' }}>
+                          {selectedPayment.amount.toLocaleString("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Validation Warnings */}
+                  {isPaymentReferenceDuplicate && (
+                    <div className="mb-6">
+                      <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-400/30 backdrop-blur rounded-xl">
+                        <AlertTriangle className="w-4 h-4 text-amber-600" />
+                        <span className="text-sm text-amber-900">Possible duplicate reference detected</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Verification Notes */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-semibold text-slate-900 mb-2">Verification Notes</label>
+                    <textarea
+                      value={verificationNotes}
+                      onChange={(e) => setVerificationNotes(e.target.value)}
+                      placeholder="Add notes about the verification process..."
+                      rows={4}
+                      className="w-full px-3 py-2 rounded-xl border border-white/20 bg-white/40 backdrop-blur placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none"
+                    />
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3 mt-auto">
+                    <button
+                      onClick={() => {
+                        if (!verificationNotes.trim()) {
+                          alert("Please provide a reason for rejection.");
+                          return;
+                        }
+                        handleRejectOnlinePayment();
+                      }}
+                      className="flex-1 py-3 px-4 border border-red-300/50 bg-red-500/10 text-red-600 rounded-xl font-semibold hover:bg-red-500/20 transition-colors backdrop-blur"
+                    >
+                      Reject Payment
+                    </button>
+                    <button
+                      onClick={handleApproveOnlinePayment}
+                      className="flex-1 py-3 px-4 rounded-xl font-semibold hover:shadow-lg transition-all text-white"
+                      style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
+                    >
+                      Approve & Enroll
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
