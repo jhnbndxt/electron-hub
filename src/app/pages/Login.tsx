@@ -136,16 +136,17 @@ export function Login() {
   }
 
   return (
-    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-          {/* Assessment Banner */}
-          <div className="relative z-10 w-full max-w-md">
+    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex w-full max-w-6xl items-center justify-center">
+        {/* Assessment Banner */}
+        <div className="w-full max-w-[27rem]">
         {showBanner && (
           <div
-            className="mb-5 rounded-[1.5rem] border border-blue-200/80 bg-white/92 px-4 py-4 shadow-lg backdrop-blur-md animate-slide-down"
+            className="mb-4 rounded-[1.25rem] border border-white/60 bg-white/75 px-4 py-3.5 shadow-lg backdrop-blur-xl animate-slide-down"
           >
             <div className="flex items-start gap-3">
               <div
-                className="mt-0.5 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full"
+                className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full shadow-sm"
                 style={{ backgroundColor: "#1E3A8A" }}
               >
                 <Sparkles className="h-4 w-4 text-white" />
@@ -154,7 +155,7 @@ export function Login() {
                 <p className="font-semibold text-sm sm:text-base" style={{ color: "#1E3A8A" }}>
                   Please log in or create an account to take the assessment.
                 </p>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-xs leading-5 text-gray-600 sm:text-sm">
                   New here? Register first, then come back to continue.
                 </p>
               </div>
@@ -175,25 +176,28 @@ export function Login() {
           </div>
         )}
 
-        <div className="auth-panel rounded-[2rem] p-6 sm:p-8">
-          <div className="mb-8 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.5rem] auth-logo-orb">
-              <img src={logo} alt="Electron College Logo" className="h-20 w-20 scale-125 object-contain" />
+        <div className="auth-panel auth-panel-compact rounded-[1.75rem] p-5 sm:p-7">
+          <div className="text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.25rem] auth-logo-orb sm:h-[4.5rem] sm:w-[4.5rem]">
+              <img src={logo} alt="Electron College Logo" className="h-16 w-16 scale-125 object-contain sm:h-[4.5rem] sm:w-[4.5rem]" />
             </div>
-            <h1 className="mt-5 text-3xl font-semibold text-slate-900 sm:text-[2.2rem]">
-              Sign In
+            <p className="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-[#b91c1c]">
+              Electron Hub
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              Welcome back
             </h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">
+            <p className="mt-2 text-sm leading-6 text-slate-600">
               Use your Electron Hub account to continue your application, assessment, and student updates.
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label htmlFor="email" className="sr-only">
                 Email Address
               </label>
-              <div className="auth-input-surface rounded-2xl px-4 py-3.5">
+              <div className="auth-input-surface rounded-2xl px-4 py-3">
                 <Mail className="h-5 w-5 text-slate-400" />
                 <input
                   type="email"
@@ -212,7 +216,7 @@ export function Login() {
               <label htmlFor="password" className="sr-only">
                 Password
               </label>
-              <div className="auth-input-surface rounded-2xl px-4 py-3.5">
+              <div className="auth-input-surface rounded-2xl px-4 py-3">
                 <LockKeyhole className="h-5 w-5 text-slate-400" />
                 <input
                   type={showPassword ? "text" : "password"}
@@ -235,7 +239,7 @@ export function Login() {
                 </button>
               </div>
               <div className="mt-2 flex justify-end">
-                <Link to="/forgot-password" className="text-xs font-medium text-slate-500 hover:text-[#1E3A8A] hover:underline sm:text-sm">
+                <Link to="/forgot-password" className="auth-secondary-link text-xs font-semibold hover:underline sm:text-sm">
                   Forgot password?
                 </Link>
               </div>
@@ -250,16 +254,16 @@ export function Login() {
             <button
               type="submit"
               disabled={isLoading || !isEmailValid || !password}
-              className="auth-primary-button w-full rounded-2xl px-6 py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="auth-primary-button w-full rounded-2xl px-6 py-3.5 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? "Signing in..." : "Log In"}
             </button>
           </form>
 
-          <div className="mt-6 space-y-3 text-center">
+          <div className="mt-5 space-y-2 text-center">
             <p className="text-sm text-slate-600">
               Don&apos;t have an account?{" "}
-              <Link to="/register" className="font-semibold text-[#1E3A8A] hover:underline">
+              <Link to="/register" className="auth-secondary-link font-semibold hover:underline">
                 Register
               </Link>
             </p>
@@ -267,6 +271,7 @@ export function Login() {
               Back to home
             </Link>
           </div>
+        </div>
         </div>
       </div>
       {/* Chat Assistant */}

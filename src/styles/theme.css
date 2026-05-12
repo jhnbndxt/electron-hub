@@ -507,59 +507,69 @@
   position: relative;
   overflow: hidden;
   min-height: 100vh;
+  min-height: 100dvh;
   background:
-    radial-gradient(circle at 16% 14%, rgba(255, 255, 255, 0.14) 0%, transparent 22%),
-    radial-gradient(circle at 84% 18%, rgba(185, 28, 28, 0.12) 0%, transparent 18%),
-    linear-gradient(180deg, var(--electron-blue) 0%, #1e40af 44%, #2563eb 82%, #dbeafe 100%);
+    linear-gradient(90deg, rgba(3, 21, 63, 0.62) 0%, rgba(30, 58, 138, 0.2) 42%, rgba(255, 255, 255, 0.18) 100%),
+    url("../assets/log-background.png") center / cover no-repeat,
+    linear-gradient(135deg, #08236f 0%, #dbeafe 100%);
 }
 
 .auth-shell-bg::before,
 .auth-shell-bg::after {
   content: "";
   position: absolute;
-  border-radius: 9999px;
-  filter: blur(42px);
   pointer-events: none;
 }
 
 .auth-shell-bg::before {
-  width: 34rem;
-  height: 14rem;
-  left: -4rem;
-  bottom: -1rem;
-  background: rgba(191, 219, 254, 0.18);
+  inset: 0;
+  background:
+    linear-gradient(180deg, rgba(3, 7, 18, 0.08) 0%, rgba(3, 7, 18, 0.28) 100%),
+    radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.14) 0%, transparent 25%),
+    radial-gradient(circle at 90% 88%, rgba(185, 28, 28, 0.14) 0%, transparent 28%);
 }
 
 .auth-shell-bg::after {
-  width: 28rem;
-  height: 12rem;
-  right: -3rem;
-  bottom: 2rem;
-  background: rgba(255, 255, 255, 0.24);
+  inset: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 2rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .auth-panel {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.6));
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  box-shadow: 0 28px 64px -34px rgba(15, 23, 42, 0.22), 0 12px 24px -18px rgba(37, 99, 235, 0.18);
-  backdrop-filter: blur(26px) saturate(160%);
-  -webkit-backdrop-filter: blur(26px) saturate(160%);
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(239, 246, 255, 0.56));
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: 0 28px 70px -32px rgba(15, 23, 42, 0.44), 0 16px 36px -28px rgba(30, 58, 138, 0.38);
+  backdrop-filter: blur(30px) saturate(175%);
+  -webkit-backdrop-filter: blur(30px) saturate(175%);
+}
+
+.auth-panel-compact {
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(30, 58, 138, 0.34) transparent;
+}
+
+.auth-panel-compact::-webkit-scrollbar {
+  width: 0.45rem;
 }
 
 .auth-logo-orb {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.58));
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45), 0 12px 30px -20px rgba(30, 58, 138, 0.22);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(219, 234, 254, 0.62));
+  border: 1px solid rgba(255, 255, 255, 0.78);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58), 0 14px 34px -22px rgba(30, 58, 138, 0.46);
 }
 
 .auth-input-surface {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(191, 219, 254, 0.44);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  min-height: 3.25rem;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62), 0 10px 28px -28px rgba(15, 23, 42, 0.4);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
 
 .auth-input-surface input,
@@ -573,13 +583,14 @@
 }
 
 .auth-input-surface:focus-within {
-  border-color: rgba(37, 99, 235, 0.55);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.58);
+  background: rgba(255, 255, 255, 0.86);
+  border-color: rgba(30, 58, 138, 0.48);
+  box-shadow: 0 0 0 4px rgba(30, 58, 138, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.68);
 }
 
 .auth-primary-button {
-  background: linear-gradient(135deg, #102d82 0%, #0f172a 78%, #991b1b 118%);
-  box-shadow: 0 22px 42px -24px rgba(15, 23, 42, 0.48);
+  background: linear-gradient(135deg, #102d82 0%, #1d4ed8 58%, #b91c1c 128%);
+  box-shadow: 0 20px 40px -22px rgba(15, 23, 42, 0.6);
   transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
 
@@ -591,4 +602,27 @@
 .auth-primary-button:disabled {
   box-shadow: none;
   transform: none;
+}
+
+.auth-secondary-link {
+  color: #1e3a8a;
+}
+
+.auth-secondary-link:hover {
+  color: #b91c1c;
+}
+
+@media (max-width: 640px) {
+  .auth-shell-bg {
+    background-position: 36% center;
+  }
+
+  .auth-shell-bg::after {
+    inset: 0.5rem;
+    border-radius: 1.5rem;
+  }
+
+  .auth-panel-compact {
+    max-height: calc(100dvh - 1rem);
+  }
 }

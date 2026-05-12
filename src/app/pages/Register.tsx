@@ -146,7 +146,7 @@ export function Register() {
   const getFieldSurfaceClassName = (field: RegisterField) => {
     const hasError = Boolean(getVisibleFieldError(field));
 
-    return `auth-input-surface rounded-2xl px-4 py-3.5 ${hasError ? "!border-red-300 !bg-red-50/80 focus-within:!border-red-400" : ""}`;
+    return `auth-input-surface rounded-2xl px-4 py-2.5 ${hasError ? "!border-red-300 !bg-red-50/80 focus-within:!border-red-400" : ""}`;
   };
 
   const setFieldTouched = (field: RegisterField) => {
@@ -235,30 +235,33 @@ export function Register() {
   };
 
   return (
-    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 lg:px-8">
-      <div className="relative z-10 w-full max-w-2xl">
-        <div className="auth-panel rounded-[2rem] p-6 sm:p-8 lg:p-10">
-          <div className="mb-8 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.5rem] auth-logo-orb">
-              <img src={logo} alt="Electron College Logo" className="h-20 w-20 scale-125 object-contain" />
+    <div className="auth-shell-bg flex min-h-screen items-center justify-center px-4 py-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 flex w-full max-w-6xl items-center justify-center">
+        <div className="auth-panel auth-panel-compact w-full max-w-3xl rounded-[1.75rem] p-5 sm:p-6 lg:p-7">
+          <div className="text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.25rem] auth-logo-orb sm:h-[4.5rem] sm:w-[4.5rem]">
+              <img src={logo} alt="Electron College Logo" className="h-16 w-16 scale-125 object-contain sm:h-[4.5rem] sm:w-[4.5rem]" />
             </div>
-            <h1 className="mt-5 text-3xl font-semibold text-slate-900 sm:text-[2.2rem]">
+            <p className="mt-4 text-xs font-bold uppercase tracking-[0.2em] text-[#b91c1c]">
+              Student Registration
+            </p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
               Create your account
             </h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500 sm:text-base">
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
               Add your details to start your Electron Hub account and enrollment flow.
             </p>
           </div>
 
           {error && (
-            <div className="mt-6 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="mt-4 rounded-[1.25rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate className="mt-8 space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
             {/* Last Name and First Name */}
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="lastName" className="sr-only">
                   Last Name
@@ -280,7 +283,7 @@ export function Register() {
                   />
                 </div>
                 {getVisibleFieldError("lastName") && (
-                  <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("lastName")}</p>
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("lastName")}</p>
                 )}
               </div>
 
@@ -305,145 +308,149 @@ export function Register() {
                   />
                 </div>
                 {getVisibleFieldError("firstName") && (
-                  <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("firstName")}</p>
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("firstName")}</p>
                 )}
               </div>
             </div>
 
-            {/* Middle Name (Optional) */}
-            <div>
-              <label htmlFor="middleName" className="sr-only">
-                Middle Name
-              </label>
-              <div className={getFieldSurfaceClassName("middleName")}>
-                <User className="h-5 w-5 text-slate-400" />
-                <input
-                  type="text"
-                  id="middleName"
-                  name="middleName"
-                  value={formData.middleName}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  autoComplete="additional-name"
-                  aria-invalid={Boolean(getVisibleFieldError("middleName"))}
-                  className="min-w-0 text-sm placeholder:text-slate-400"
-                  placeholder="Middle name (optional)"
-                />
+            <div className="grid gap-4 sm:grid-cols-3">
+              {/* Middle Name (Optional) */}
+              <div>
+                <label htmlFor="middleName" className="sr-only">
+                  Middle Name
+                </label>
+                <div className={getFieldSurfaceClassName("middleName")}>
+                  <User className="h-5 w-5 text-slate-400" />
+                  <input
+                    type="text"
+                    id="middleName"
+                    name="middleName"
+                    value={formData.middleName}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    autoComplete="additional-name"
+                    aria-invalid={Boolean(getVisibleFieldError("middleName"))}
+                    className="min-w-0 text-sm placeholder:text-slate-400"
+                    placeholder="Middle name"
+                  />
+                </div>
+                {getVisibleFieldError("middleName") && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("middleName")}</p>
+                )}
               </div>
-              {getVisibleFieldError("middleName") && (
-                <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("middleName")}</p>
-              )}
-            </div>
 
-            {/* Sex Dropdown */}
-            <div>
-              <label htmlFor="sex" className="mb-2 block text-sm font-semibold text-slate-700">
-                Sex *
-              </label>
-              <div className={getFieldSurfaceClassName("sex")}>
-                <User className="h-5 w-5 text-slate-400" />
-                <select
-                  id="sex"
-                  name="sex"
-                  value={formData.sex}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  required
-                  aria-invalid={Boolean(getVisibleFieldError("sex"))}
-                  className="min-w-0 text-sm bg-transparent text-slate-700"
-                >
-                  <option value="" disabled>
-                    Select sex
-                  </option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                </select>
+              {/* Sex Dropdown */}
+              <div>
+                <label htmlFor="sex" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  Sex
+                </label>
+                <div className={getFieldSurfaceClassName("sex")}>
+                  <User className="h-5 w-5 text-slate-400" />
+                  <select
+                    id="sex"
+                    name="sex"
+                    value={formData.sex}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    required
+                    aria-invalid={Boolean(getVisibleFieldError("sex"))}
+                    className="min-w-0 bg-transparent text-sm text-slate-700"
+                  >
+                    <option value="" disabled>
+                      Select sex
+                    </option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                {getVisibleFieldError("sex") && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("sex")}</p>
+                )}
               </div>
-              {getVisibleFieldError("sex") && (
-                <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("sex")}</p>
-              )}
-            </div>
 
-            {/* Date of Birth */}
-            <div>
-              <label htmlFor="birthDate" className="mb-2 block text-sm font-semibold text-slate-700">
-                Date of Birth *
-              </label>
-              <div className={getFieldSurfaceClassName("birthDate")}>
-                <User className="h-5 w-5 text-slate-400" />
-                <input
-                  type="date"
-                  id="birthDate"
-                  name="birthDate"
-                  value={formData.birthDate}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  required
-                  aria-invalid={Boolean(getVisibleFieldError("birthDate"))}
-                  className="min-w-0 text-sm text-slate-700"
-                />
+              {/* Date of Birth */}
+              <div>
+                <label htmlFor="birthDate" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+                  Birth date
+                </label>
+                <div className={getFieldSurfaceClassName("birthDate")}>
+                  <User className="h-5 w-5 text-slate-400" />
+                  <input
+                    type="date"
+                    id="birthDate"
+                    name="birthDate"
+                    value={formData.birthDate}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    required
+                    aria-invalid={Boolean(getVisibleFieldError("birthDate"))}
+                    className="min-w-0 text-sm text-slate-700"
+                  />
+                </div>
+                {getVisibleFieldError("birthDate") && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("birthDate")}</p>
+                )}
               </div>
-              {getVisibleFieldError("birthDate") && (
-                <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("birthDate")}</p>
-              )}
             </div>
 
             {/* Email */}
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email Address
-              </label>
-              <div className={getFieldSurfaceClassName("email")}>
-                <Mail className="h-5 w-5 text-slate-400" />
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  required
-                  autoComplete="email"
-                  aria-invalid={Boolean(getVisibleFieldError("email"))}
-                  className="min-w-0 text-sm placeholder:text-slate-400"
-                  placeholder="Email address"
-                />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label htmlFor="email" className="sr-only">
+                  Email Address
+                </label>
+                <div className={getFieldSurfaceClassName("email")}>
+                  <Mail className="h-5 w-5 text-slate-400" />
+                  <input
+                    type="email"
+                    id="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    required
+                    autoComplete="email"
+                    aria-invalid={Boolean(getVisibleFieldError("email"))}
+                    className="min-w-0 text-sm placeholder:text-slate-400"
+                    placeholder="Email address"
+                  />
+                </div>
+                {getVisibleFieldError("email") && (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("email")}</p>
+                )}
               </div>
-              {getVisibleFieldError("email") && (
-                <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("email")}</p>
-              )}
-            </div>
 
-            {/* Contact Number */}
-            <div>
-              <label htmlFor="contactNumber" className="sr-only">
-                Contact Number
-              </label>
-              <div className={getFieldSurfaceClassName("contactNumber")}>
-                <Phone className="h-5 w-5 text-slate-400" />
-                <input
-                  type="tel"
-                  id="contactNumber"
-                  name="contactNumber"
-                  value={formData.contactNumber}
-                  onChange={handleChange}
-                  onBlur={handleBlur}
-                  required
-                  autoComplete="tel"
-                  aria-invalid={Boolean(getVisibleFieldError("contactNumber"))}
-                  className="min-w-0 text-sm placeholder:text-slate-400"
-                  placeholder="Contact number"
-                />
+              {/* Contact Number */}
+              <div>
+                <label htmlFor="contactNumber" className="sr-only">
+                  Contact Number
+                </label>
+                <div className={getFieldSurfaceClassName("contactNumber")}>
+                  <Phone className="h-5 w-5 text-slate-400" />
+                  <input
+                    type="tel"
+                    id="contactNumber"
+                    name="contactNumber"
+                    value={formData.contactNumber}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    required
+                    autoComplete="tel"
+                    aria-invalid={Boolean(getVisibleFieldError("contactNumber"))}
+                    className="min-w-0 text-sm placeholder:text-slate-400"
+                    placeholder="Contact number"
+                  />
+                </div>
+                {getVisibleFieldError("contactNumber") ? (
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("contactNumber")}</p>
+                ) : (
+                  <p className="mt-1.5 text-xs text-slate-500">Use 09XXXXXXXXX or +639XXXXXXXXX.</p>
+                )}
               </div>
-              {getVisibleFieldError("contactNumber") ? (
-                <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("contactNumber")}</p>
-              ) : (
-                <p className="mt-2 text-xs text-slate-500">Use 09XXXXXXXXX or +639XXXXXXXXX.</p>
-              )}
             </div>
 
             {/* Password and Confirm Password */}
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label htmlFor="password" className="sr-only">
                   Create Password
@@ -465,7 +472,7 @@ export function Register() {
                   />
                 </div>
                 {getVisibleFieldError("password") && (
-                  <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("password")}</p>
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("password")}</p>
                 )}
               </div>
 
@@ -490,19 +497,19 @@ export function Register() {
                   />
                 </div>
                 {getVisibleFieldError("confirmPassword") && (
-                  <p className="mt-2 text-sm font-medium text-red-600">{getVisibleFieldError("confirmPassword")}</p>
+                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("confirmPassword")}</p>
                 )}
               </div>
             </div>
 
-            <p className="text-sm text-slate-500">
+            <p className="text-xs leading-5 text-slate-500 sm:text-sm">
               Use 8 or more characters with uppercase, lowercase, a number, and a special character.
             </p>
 
             <button
               type="submit"
               disabled={isLoading || hasValidationErrors}
-              className="auth-primary-button flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="auth-primary-button flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? (
                 <>
@@ -514,10 +521,10 @@ export function Register() {
             </button>
           </form>
 
-          <div className="mt-6 space-y-3 text-center">
+          <div className="mt-5 space-y-2 text-center">
             <p className="text-sm text-slate-600">
               Already have an account?{" "}
-              <Link to="/login" className="font-semibold text-[#1E3A8A] hover:underline">
+              <Link to="/login" className="auth-secondary-link font-semibold hover:underline">
                 Back to Login
               </Link>
             </p>
