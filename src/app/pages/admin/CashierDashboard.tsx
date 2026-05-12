@@ -15,6 +15,12 @@ import {
   Banknote,
   CreditCard,
   Wallet,
+  ZoomIn,
+  ZoomOut,
+  Download,
+  Maximize,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
@@ -90,6 +96,9 @@ export function CashierDashboard() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [rejectionComment, setRejectionComment] = useState("");
+  const [zoom, setZoom] = useState(100);
+  const [verificationNotes, setVerificationNotes] = useState("");
+  const [selectedReceiptIndex, setSelectedReceiptIndex] = useState(0);
 
   const actorReference = userData?.id || userData?.email;
   const actorName = userData?.name || "Cashier";
@@ -197,20 +206,33 @@ export function CashierDashboard() {
       console.error('Error creating notification:', error);
     }
 
-    alert("Payment approved! Student has been enrolled successfully.");
+    // Auto-load next pending payment
+    const currentIndex = onlinePayments.findIndex(p => p.id === selectedPayment!.id);
+    const nextPending = onlinePayments.slice(currentIndex + 1).find(p => p.status === 'pending');
+
+    if (nextPending) {
+      setSelectedPayment(nextPending);
+      setZoom(100);
+      setVerificationNotes("");
+      setSelectedReceiptIndex(0);
+      alert("Payment approved! Loading next pending payment.");
+    } else {
+      alert("Payment approved! No more pending payments.");
+      setShowReviewModal(false);
+      setSelectedPayment(null);
+    }
+
     loadPayments();
-    setShowReviewModal(false);
-    setSelectedPayment(null);
   };
 
   const handleRejectOnlinePayment = async () => {
-    if (!selectedPayment || !rejectionComment.trim()) {
+    if (!selectedPayment || !verificationNotes.trim()) {
       alert("Please provide a reason for rejection");
       return;
     }
 
     // Update payment status in Supabase
-  const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', actorReference);
+  const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', actorReference, verificationNotes);
 
     if (error) {
       alert(`Error rejecting payment: ${error}`);
@@ -221,7 +243,7 @@ export function CashierDashboard() {
     await createAuditLog(
       actorReference,
       'PAYMENT_REJECTED',
-      `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment}`,
+      `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${verificationNotes}`,
       'warning'
     );
 
@@ -236,7 +258,7 @@ export function CashierDashboard() {
     loadPayments();
     setShowReviewModal(false);
     setSelectedPayment(null);
-    setRejectionComment("");
+    setVerificationNotes("");
   };
 
   const handleConfirmCashPayment = async () => {
@@ -611,168 +633,188 @@ export function CashierDashboard() {
 
       {/* Online Payment Review Modal */}
       {showReviewModal && selectedPayment && (
-        <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setShowReviewModal(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
-          <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="w-screen max-w-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex h-full flex-col bg-white shadow-xl">
-                {/* Header */}
-                <div className="px-6 py-6" style={{ background: "linear-gradient(135deg, var(--electron-blue) 0%, #1e40af 100%)" }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Payment Review</h2>
-                      <p className="text-blue-100 mt-1 text-sm">
-                        {selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash Payment"}
-                      </p>
-                    </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}>
+          <div className="w-full max-w-7xl rounded-[2rem] bg-white shadow-[0_30px_90px_-40px_rgba(15,23,42,0.40)] ring-1 ring-slate-200 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-8 py-6 bg-gradient-to-r from-blue-600 to-blue-700">
+              <div>
+                <h2 className="text-2xl font-semibold text-white">Payment Verification</h2>
+                <p className="text-blue-100 mt-1 text-sm">
+                  {selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash Payment"} Review
+                </p>
+              </div>
+              <button
+                onClick={() => setShowReviewModal(false)}
+                className="text-white hover:bg-white/20 p-2 rounded-lg transition-colors"
+              >
+                <XCircle className="w-6 h-6" />
+              </button>
+            </div>
+
+            {/* Split Layout */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
+              {/* Left Side: Receipt Viewer */}
+              <div className="bg-slate-50 p-6 flex flex-col">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4">Receipt Viewer</h3>
+                {/* Receipt Preview Container */}
+                <div className="flex-1 bg-white rounded-xl border border-slate-200 overflow-hidden mb-4 relative receipt-preview">
+                  <img
+                    src={selectedPayment.receiptData}
+                    alt="Payment Receipt"
+                    className="w-full h-full object-contain"
+                    style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
+                  />
+                </div>
+                {/* Controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setShowReviewModal(false)}
-                      className="text-white hover:text-blue-100 hover:bg-white/20 p-2 rounded-lg transition-colors"
+                      onClick={() => setZoom(Math.max(50, zoom - 25))}
+                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
                     >
-                      <XCircle className="w-6 h-6" />
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm text-slate-600">{zoom}%</span>
+                    <button
+                      onClick={() => setZoom(Math.min(300, zoom + 25))}
+                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setZoom(100)}
+                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={selectedPayment.receiptData}
+                      download={selectedPayment.receiptFileName}
+                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                    >
+                      <Download className="w-4 h-4" />
+                    </a>
+                    <button
+                      onClick={() => {
+                        const container = document.querySelector('.receipt-preview') as HTMLElement;
+                        if (container) container.requestFullscreen();
+                      }}
+                      className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                    >
+                      <Maximize className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
-                  {/* Student Info */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Student Information</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">Name:</span>
-                        <span className="font-medium text-gray-900">{selectedPayment.studentName}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">Email:</span>
-                        <span className="font-medium text-gray-900">{selectedPayment.studentEmail}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Payment Info */}
-                  <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Information</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between gap-4">
-                        <span className="text-gray-600">Transaction ID:</span>
-                        <span className="font-mono font-semibold break-all text-right text-gray-900">
-                          {selectedPayment.id}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Reference Number:</span>
-                        <span className="font-mono font-semibold text-gray-900">
-                          {selectedPayment.referenceNumber}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Submitted Date:</span>
-                        <span className="font-medium text-gray-900">{selectedPayment.submittedDate}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Amount:</span>
-                        <span className="font-bold text-lg text-blue-600">₱15,000.00</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Receipt Preview */}
-                  <div className="mb-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Receipt</h3>
-                    <div className="border border-gray-200 rounded-lg overflow-hidden">
-                      <img
-                        src={selectedPayment.receiptData}
-                        alt="Payment Receipt"
-                        className="w-full h-auto"
-                      />
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      File: {selectedPayment.receiptFileName}
-                    </p>
-                  </div>
-
-                  {/* Enrollment Details */}
-                  {selectedPayment.enrollmentData && (
-                    <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Enrollment Information</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Track:</span>
-                          <span className="font-medium text-gray-900">
-                            {selectedPayment.enrollmentData.preferredTrack}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Year Level:</span>
-                          <span className="font-medium text-gray-900">
-                            {selectedPayment.enrollmentData.yearLevel}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Rejection Comment */}
-                  {selectedPayment.status === "pending" && (
-                    <div className="mb-6">
-                      <label className="block text-sm font-semibold text-gray-900 mb-2">
-                        Rejection Comment (if rejecting)
-                      </label>
-                      <textarea
-                        value={rejectionComment}
-                        onChange={(e) => setRejectionComment(e.target.value)}
-                        placeholder="Provide a reason if rejecting this payment..."
-                        rows={4}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                      />
-                    </div>
-                  )}
-
-                  {/* Status Display */}
-                  {selectedPayment.status !== "pending" && (
-                    <div
-                      className={`p-4 rounded-lg border-2 ${
-                        selectedPayment.status === "approved"
-                          ? "bg-green-50 border-green-200"
-                          : "bg-red-50 border-red-200"
-                      }`}
+                {/* Thumbnail Selector */}
+                <div className="mt-4">
+                  <p className="text-sm text-slate-600 mb-2">Receipt Images</p>
+                  <div className="flex gap-2">
+                    <button
+                      className={`w-16 h-16 rounded-lg border-2 overflow-hidden ${selectedReceiptIndex === 0 ? 'border-blue-500' : 'border-slate-200'}`}
+                      onClick={() => setSelectedReceiptIndex(0)}
                     >
-                      <p className="text-sm font-semibold mb-1">
-                        Status: {selectedPayment.status.toUpperCase()}
-                      </p>
-                      {selectedPayment.rejectionComment && (
-                        <p className="text-sm text-gray-700">
-                          Comment: {selectedPayment.rejectionComment}
-                        </p>
-                      )}
+                      <img src={selectedPayment.receiptData} alt="Receipt 1" className="w-full h-full object-cover" />
+                    </button>
+                    {/* Add more thumbnails if multiple */}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side: Verification Panel */}
+              <div className="bg-white p-6 flex flex-col">
+                {/* Student Information Card */}
+                <div className="bg-slate-50 rounded-xl p-5 mb-6">
+                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Student Information</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Name</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedPayment.studentName}</span>
                     </div>
-                  )}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Email</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedPayment.studentEmail}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Student ID</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedPayment.id}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Academic Track</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedPayment.enrollmentData?.preferredTrack || 'Not set'}</span>
+                    </div>
+                  </div>
                 </div>
 
-                {/* Footer Actions */}
-                {selectedPayment.status === "pending" && (
-                  <div className="border-t border-gray-200 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
-                    <div className="flex gap-3">
-                      <button
-                        onClick={handleRejectOnlinePayment}
-                        className="flex-1 py-3 px-4 text-white rounded-lg font-bold hover:opacity-90 transition-all shadow-lg hover:shadow-xl"
-                        style={{ backgroundColor: "var(--electron-red)" }}
-                      >
-                        Reject Payment
-                      </button>
-                      <button
-                        onClick={handleApproveOnlinePayment}
-                        className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all shadow-lg hover:shadow-xl"
-                      >
-                        Approve & Enroll
-                      </button>
+                {/* Payment Information Card */}
+                <div className="bg-blue-50 rounded-xl p-5 mb-6">
+                  <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Payment Information</h4>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Payment Method</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedPayment.paymentMode === "bank" ? "Bank Transfer" : "GCash"}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Reference Number</span>
+                      <span className="text-sm font-mono font-medium text-slate-900">{selectedPayment.referenceNumber}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Transaction ID</span>
+                      <span className="text-sm font-mono font-medium text-slate-900">{selectedPayment.id}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Submitted Date</span>
+                      <span className="text-sm font-medium text-slate-900">{selectedPayment.submittedDate}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-600">Amount Paid</span>
+                      <span className="text-lg font-bold text-blue-600">₱15,000.00</span>
                     </div>
                   </div>
-                )}
+                </div>
+
+                {/* Validation Warnings */}
+                <div className="mb-6">
+                  <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 text-amber-600" />
+                    <span className="text-sm text-amber-800">Possible Duplicate Reference Number</span>
+                  </div>
+                </div>
+
+                {/* Verification Notes */}
+                <div className="mb-6">
+                  <label className="block text-sm font-semibold text-slate-900 mb-2">Verification Notes</label>
+                  <textarea
+                    value={verificationNotes}
+                    onChange={(e) => setVerificationNotes(e.target.value)}
+                    placeholder="Add notes about the verification process..."
+                    rows={4}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 mt-auto">
+                  <button
+                    onClick={() => {
+                      if (!verificationNotes.trim()) {
+                        alert("Please provide a reason for rejection.");
+                        return;
+                      }
+                      handleRejectOnlinePayment();
+                    }}
+                    className="flex-1 py-3 px-4 border border-red-300 bg-white text-red-600 rounded-lg font-semibold hover:bg-red-50 transition-colors"
+                  >
+                    Reject Payment
+                  </button>
+                  <button
+                    onClick={handleApproveOnlinePayment}
+                    className="flex-1 py-3 px-4 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition-colors"
+                  >
+                    Approve & Enroll
+                  </button>
+                </div>
               </div>
             </div>
           </div>

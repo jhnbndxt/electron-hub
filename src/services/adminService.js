@@ -1071,7 +1071,7 @@ export const getAllPayments = async (status = null) => {
 };
 
 // Update payment status
-export const updatePaymentStatus = async (paymentId, status, verifiedBy) => {
+export const updatePaymentStatus = async (paymentId, status, verifiedBy, rejectionComment = null) => {
   try {
     const hasVerifierReference = verifiedBy !== undefined;
     const resolvedVerifierId = hasVerifierReference
@@ -1084,6 +1084,10 @@ export const updatePaymentStatus = async (paymentId, status, verifiedBy) => {
 
     if (hasVerifierReference) {
       updateData.verified_by = resolvedVerifierId;
+    }
+
+    if (rejectionComment) {
+      updateData.rejection_comment = rejectionComment;
     }
 
     // Set appropriate timestamp based on status
