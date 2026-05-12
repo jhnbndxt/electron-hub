@@ -23,7 +23,7 @@ export function Strands() {
     },
     {
       name: "GAS",
-      fullName: "General Academic Strand",
+      fullName: "Academic Strand",
       description: "Provides a flexible curriculum allowing students to explore various disciplines before choosing their Senior High program.",
       icon: "🎯",
     },

@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { CheckCircle, FileText, Upload, Send } from "lucide-react";
+import { CheckCircle, FileText, Send, UserPlus, Brain, CreditCard } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card } from "../components/ui/card";
 
@@ -15,27 +15,33 @@ const requirements = [
 const enrollmentSteps = [
   {
     step: 1,
-    title: "Create Account",
+    title: "Create an Account",
     description: "Register or login to Electron Hub portal",
-    icon: FileText,
+    icon: UserPlus,
   },
   {
     step: 2,
-    title: "Complete Assessment",
+    title: "Take AI Assessment",
     description: "Take the AI-assisted strand assessment",
-    icon: CheckCircle,
+    icon: Brain,
   },
   {
     step: 3,
-    title: "Submit Requirements",
-    description: "Upload required documents online",
-    icon: Upload,
+    title: "Submit Enrollment Form",
+    description: "Complete the form and upload required documents online",
+    icon: FileText,
   },
   {
     step: 4,
-    title: "Final Submission",
-    description: "Review and submit enrollment application",
-    icon: Send,
+    title: "Process Payment",
+    description: "Complete the cashier payment step after review",
+    icon: CreditCard,
+  },
+  {
+    step: 5,
+    title: "Officially Enrolled",
+    description: "Receive confirmation once all requirements are complete",
+    icon: CheckCircle,
   },
 ];
 
@@ -84,11 +90,11 @@ export function EnrollmentInfoPage() {
               Enrollment Process
             </h2>
             <p className="text-lg text-gray-600">
-              Four simple steps to complete your enrollment
+              Five clear steps to complete your enrollment
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {enrollmentSteps.map((item) => {
               const Icon = item.icon;
               return (

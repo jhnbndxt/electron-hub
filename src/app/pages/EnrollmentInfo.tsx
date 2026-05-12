@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
-import { CheckCircle, FileText, UserCheck, Send, Sparkles, GraduationCap } from "lucide-react";
+import { CheckCircle, FileText, Send, Sparkles, GraduationCap, UserPlus, Brain, CreditCard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getSystemSettings } from "../../services/systemSettingsService";
 
@@ -80,28 +80,34 @@ export function EnrollmentInfo() {
 
   const enrollmentSteps = [
     {
-      icon: UserCheck,
-      title: "Create Account / Login",
+      icon: UserPlus,
+      title: "Create an Account",
       description:
-        "If you're a new applicant, create an account. Existing users can login directly.",
+        "Register for Electron Hub or sign in with your existing account to start your application.",
     },
     {
-      icon: FileText,
-      title: "Complete Assessment",
+      icon: Brain,
+      title: "Take AI Assessment",
       description:
-        "Take our AI-powered assessment to receive personalized strand recommendations.",
+        "Answer the AI-assisted assessment to receive guidance for the track that fits your strengths.",
     },
     {
       icon: Send,
-      title: "Fill Enrollment Form",
+      title: "Submit Enrollment Form",
       description:
-        "Complete the online enrollment form with your personal and academic information.",
+        "Complete the online form, upload required documents, and submit your application for registrar review.",
+    },
+    {
+      icon: CreditCard,
+      title: "Process Payment",
+      description:
+        "Proceed with the cashier payment step after your application has been cleared for processing.",
     },
     {
       icon: CheckCircle,
-      title: "Submit Documents",
+      title: "Officially Enrolled",
       description:
-        "Upload required documents and submit your application for review.",
+        "Receive enrollment confirmation once your records, documents, and payment are complete.",
     },
   ];
 
@@ -166,45 +172,53 @@ export function EnrollmentInfo() {
       </section>
 
       {/* Enrollment Process */}
-      <section className="py-20" style={{ backgroundColor: "#F8FAFC" }}>
+      <section className="py-16 sm:py-20" style={{ backgroundColor: "#F8FAFC" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-bold mb-4" style={{ color: "#1E3A8A" }}>
               How to Enroll
             </h2>
-            <p className="text-xl text-gray-600">Follow these simple steps</p>
+            <p className="mx-auto max-w-3xl text-lg md:text-xl text-gray-600">
+              Follow the complete enrollment path below. Each step keeps your application moving toward official enrollment.
+            </p>
             <div className="w-24 h-1 mx-auto mt-4 rounded-full" style={{ backgroundColor: "#B91C1C" }}></div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {enrollmentSteps.map((step, index) => {
-              const Icon = step.icon;
-              return (
-                <div key={index} className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:transform hover:-translate-y-1">
-                  <div
-                    className="w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-md"
-                    style={{
-                      backgroundColor:
-                        index % 2 === 0 ? "#1E3A8A" : "#B91C1C",
-                    }}
-                  >
-                    <Icon className="w-8 h-8 text-white" />
+          <div className="relative mx-auto max-w-7xl">
+            <div className="absolute left-8 right-8 top-12 hidden h-0.5 bg-gradient-to-r from-blue-200 via-slate-200 to-red-200 lg:block"></div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+              {enrollmentSteps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.title} className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-950/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                    <div className="mb-5 flex items-center justify-between gap-3">
+                      <div
+                        className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-md"
+                        style={{
+                          backgroundColor:
+                            index % 2 === 0 ? "#1E3A8A" : "#B91C1C",
+                        }}
+                      >
+                        <Icon className="w-7 h-7 text-white" />
+                      </div>
+                      <div
+                        className="rounded-full px-3 py-1 text-xs font-bold tracking-wide"
+                        style={{
+                          backgroundColor: index % 2 === 0 ? "rgba(30, 58, 138, 0.09)" : "rgba(185, 28, 28, 0.09)",
+                          color: index % 2 === 0 ? "#1E3A8A" : "#B91C1C",
+                        }}
+                      >
+                        STEP {index + 1}
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-bold leading-tight" style={{ color: "#1F2937" }}>
+                      {step.title}
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-gray-600">{step.description}</p>
                   </div>
-                  <div
-                    className="text-sm font-bold mb-2 tracking-wider"
-                    style={{
-                      color: index % 2 === 0 ? "#1E3A8A" : "#B91C1C",
-                    }}
-                  >
-                    STEP {index + 1}
-                  </div>
-                  <h3 className="text-xl font-bold mb-3" style={{ color: "#1F2937" }}>
-                    {step.title}
-                  </h3>
-                  <p className="text-gray-600 leading-relaxed">{step.description}</p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -287,7 +301,7 @@ export function EnrollmentInfo() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
             <div className="bg-white p-6 rounded-lg shadow-md border-t-4" style={{ borderColor: "var(--electron-blue)" }}>
               <h3 className="text-xl mb-2" style={{ color: "var(--electron-blue)" }}>
-                General Academic
+                Academic
               </h3>
               <p className="text-gray-600">
                 For students pursuing college preparatory education with emphasis on academic subjects leading to higher education.

@@ -107,7 +107,7 @@ export function PublicLayout() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="public-page-shell min-h-screen flex flex-col">
       {/* Navigation Bar */}
       <nav
         className="sticky top-0 z-40 text-white shadow-md transition-colors duration-300"

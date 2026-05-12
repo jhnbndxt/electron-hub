@@ -491,7 +491,7 @@ export function PublicAssessment() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-xl font-bold mb-1" style={{ color: "var(--electron-blue)" }}>
-                      General Academic
+                      Academic
                     </h3>
                     <p className="text-sm text-gray-600">
                       College preparatory education with emphasis on academic subjects

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import campusPreview from "../../assets/electron_malanday_campus.jpg";
 import { Link } from "react-router";
-import { ArrowRight, CheckCircle, BookOpen, Award, Users, Sparkles, Megaphone, Plus, Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { ArrowRight, CheckCircle, BookOpen, Award, Users, Sparkles, Megaphone, Plus, Pencil, Trash2, X, Loader2, UserPlus, Brain, FileText, CreditCard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { formatLocalDateTime } from "../utils/dateTime";
@@ -111,7 +111,7 @@ export function Home() {
   const strands = [
     {
       name: "GA",
-      full: "General Academic",
+      full: "Academic",
       description: "For students pursuing college preparatory education with emphasis on academic subjects leading to higher education.",
       color: "#1E3A8A",
     },
@@ -126,18 +126,33 @@ export function Home() {
   const processSteps = [
     {
       number: 1,
-      title: "Complete Assessment",
-      description: "Take our AI-powered assessment test to evaluate your skills and interests.",
+      title: "Create an Account",
+      description: "Register or sign in to access the enrollment portal and keep your application progress organized.",
+      icon: UserPlus,
     },
     {
       number: 2,
-      title: "Review Recommendation",
-      description: "Receive personalized strand recommendations based on your assessment results.",
+      title: "Take AI Assessment",
+      description: "Complete the assessment to receive track guidance based on your strengths and interests.",
+      icon: Brain,
     },
     {
       number: 3,
-      title: "Submit Enrollment",
-      description: "Complete your enrollment form and submit required documents online.",
+      title: "Submit Enrollment Form",
+      description: "Fill out your student details and upload the required enrollment documents for review.",
+      icon: FileText,
+    },
+    {
+      number: 4,
+      title: "Process Payment",
+      description: "Proceed with payment once your application and documents are ready for cashier processing.",
+      icon: CreditCard,
+    },
+    {
+      number: 5,
+      title: "Officially Enrolled",
+      description: "Receive confirmation after all enrollment requirements and payment records are completed.",
+      icon: CheckCircle,
     },
   ];
 
@@ -420,38 +435,52 @@ export function Home() {
       {/* Process Flow */}
       <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-10 sm:mb-12 md:mb-16">
+          <div className="text-center mb-10 sm:mb-12">
             <h2 className="text-4xl md:text-5xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
               Enrollment Process
             </h2>
-            <p className="text-lg md:text-xl text-gray-600">
-              Three simple steps to begin your academic journey
+            <p className="mx-auto max-w-3xl text-lg md:text-xl text-gray-600">
+              A clear five-step journey from account creation to official enrollment.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {processSteps.map((step, index) => (
-              <div key={step.number} className="bg-white p-8 rounded-2xl shadow-lg hover:shadow-2xl transition-all hover:-translate-y-2 border border-gray-100 relative">
-                <div
-                  className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-6 shadow-lg"
-                  style={{
-                    backgroundColor: index % 2 === 0 ? "var(--electron-blue)" : "var(--electron-red)",
-                  }}
-                >
-                  {step.number}
-                </div>
-                <h3 className="text-2xl font-bold mb-4" style={{ color: "var(--electron-dark-gray)" }}>
-                  {step.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed">{step.description}</p>
-                {index < processSteps.length - 1 && (
-                  <ArrowRight
-                    className="hidden md:block absolute -right-4 top-1/2 transform -translate-y-1/2 text-gray-300"
-                    style={{ width: "32px", height: "32px" }}
-                  />
-                )}
-              </div>
-            ))}
+          <div className="relative mx-auto max-w-7xl">
+            <div className="absolute left-8 right-8 top-12 hidden h-0.5 bg-gradient-to-r from-blue-200 via-slate-200 to-red-200 lg:block"></div>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-5">
+              {processSteps.map((step, index) => {
+                const Icon = step.icon;
+                return (
+                  <div key={step.number} className="relative rounded-2xl border border-slate-200 bg-white p-5 shadow-lg shadow-blue-950/5 transition-all hover:-translate-y-1 hover:shadow-xl">
+                    <div className="mb-5 flex items-center justify-between">
+                      <div
+                        className="flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-lg"
+                        style={{
+                          backgroundColor: index % 2 === 0 ? "var(--electron-blue)" : "var(--electron-red)",
+                        }}
+                      >
+                        <Icon className="h-7 w-7" />
+                      </div>
+                      <span
+                        className="rounded-full px-3 py-1 text-xs font-bold"
+                        style={{
+                          backgroundColor: index % 2 === 0 ? "rgba(30, 58, 138, 0.09)" : "rgba(185, 28, 28, 0.09)",
+                          color: index % 2 === 0 ? "var(--electron-blue)" : "var(--electron-red)",
+                        }}
+                      >
+                        STEP {step.number}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-bold leading-tight text-slate-950">
+                      {step.title}
+                    </h3>
+                    <p className="mt-3 text-sm leading-6 text-gray-600">{step.description}</p>
+                    {index < processSteps.length - 1 && (
+                      <ArrowRight className="absolute -right-3 top-12 z-10 hidden h-6 w-6 rounded-full bg-white p-1 text-slate-300 shadow-sm lg:block" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>

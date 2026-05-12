@@ -733,12 +733,47 @@ export function AdminDashboard() {
     }
   };
 
+  const registrarOverviewCards = [
+    {
+      label: "Total Students",
+      value: overviewStats.totalStudents,
+      detail: "Student records currently tracked",
+      icon: Users,
+      accent: "#1E3A8A",
+      surface: "from-blue-50 to-white",
+    },
+    {
+      label: "Pending Applications",
+      value: overviewStats.pendingApplications,
+      detail: "Applications queued for review",
+      icon: Clock,
+      accent: "#B91C1C",
+      surface: "from-red-50 to-white",
+    },
+    {
+      label: "Verified Documents",
+      value: overviewStats.verifiedDocuments,
+      detail: "Document sets cleared by registrar",
+      icon: CheckCircle,
+      accent: "#0F766E",
+      surface: "from-teal-50 to-white",
+    },
+    {
+      label: "Pending Payments",
+      value: overviewStats.pendingPayments,
+      detail: "Students ready for cashier processing",
+      icon: CreditCard,
+      accent: "#C2410C",
+      surface: "from-orange-50 to-white",
+    },
+  ];
+
   return (
     <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       {/* Main Content */}
       <div className="w-full">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-6 lg:gap-8">
+        <div className="mb-8 flex flex-col gap-5 lg:gap-6">
           <DashboardPageHeader
             badge="Registrar Dashboard"
             title="Overview"
@@ -766,123 +801,96 @@ export function AdminDashboard() {
             }
           />
 
-          <div className="grid gap-4 lg:grid-cols-[1fr_auto]">
-            <div className="relative rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                <Search className="w-5 h-5" />
+          <div className="rounded-[1.75rem] border border-white/70 bg-white/80 p-4 shadow-lg shadow-blue-950/5 backdrop-blur-xl sm:p-5">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="relative rounded-2xl border border-slate-200/80 bg-white/85 p-2 shadow-sm">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Search className="w-5 h-5" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search students, emails, or strands..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full border-none bg-transparent pl-11 pr-4 py-3 text-sm font-medium text-slate-900 outline-none"
+                />
               </div>
-              <input
-                type="text"
-                placeholder="Search students, emails, or strands..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full border-none bg-transparent pl-11 pr-4 py-3 text-sm font-medium text-slate-900 outline-none"
-              />
+              <div className="grid gap-3">
+                <div className="rounded-2xl border border-slate-200/80 bg-white/85 p-3 shadow-sm">
+                  <label className="mb-2 block text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
+                  >
+                    <option>All</option>
+                    <option>Pending</option>
+                    <option>Approved</option>
+                    <option>Incomplete</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-                <label className="mb-2 block text-sm font-medium text-slate-600">Filter by Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-200"
+          </div>
+        </div>
+
+        {/* Overview Stats */}
+        <div className="mb-8 overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/75 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+          <div className="border-b border-slate-200/80 bg-gradient-to-r from-blue-50/90 via-white/90 to-red-50/80 px-5 py-5 sm:px-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-800">Enrollment Operations</p>
+                <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Dashboard Overview</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                  Monitor application volume, document progress, and cashier-ready records from one organized registrar workspace.
+                </p>
+              </div>
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white/80 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                <Activity className="h-4 w-4 text-blue-800" />
+                {filteredStudents.length} matching records
+              </div>
+            </div>
+          </div>
+
+          <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+            {registrarOverviewCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={card.label}
+                  className={`group rounded-2xl border border-slate-200/80 bg-gradient-to-br ${card.surface} p-5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:shadow-xl`}
                 >
-                  <option>All</option>
-                  <option>Pending</option>
-                  <option>Approved</option>
-                  <option>Incomplete</option>
-                </select>
-              </div>
-            </div>
+                  <div className="flex items-start justify-between gap-4">
+                    <div
+                      className="flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg"
+                      style={{ backgroundColor: card.accent }}
+                    >
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <span className="rounded-full bg-white/75 px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                      Live
+                    </span>
+                  </div>
+                  <div className="mt-5">
+                    <p className="text-sm font-semibold text-slate-600">{card.label}</p>
+                    <div className="mt-2 flex items-end gap-2">
+                      <span className="text-4xl font-bold tracking-tight text-slate-950">{card.value}</span>
+                    </div>
+                    <p className="mt-3 text-sm leading-5 text-slate-500">{card.detail}</p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* Section Header */}
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Dashboard Overview</h2>
-            <p className="text-sm text-gray-500">High-level registrar metrics and pending review queue.</p>
-          </div>
-          <p className="text-sm text-gray-500">
-            {filteredStudents.length} results matching filters
-          </p>
-        </div>
-
-        {/* Overview Stats - 4 Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {/* Total Students */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
-                style={{ backgroundColor: "#1E3A8A" }}
-              >
-                <Users className="w-7 h-7 text-white" />
-              </div>
-            </div>
-            <h3 className="text-4xl font-bold text-gray-900 mb-2">
-              {overviewStats.totalStudents}
-            </h3>
-            <p className="text-sm text-gray-600 font-medium">Total Students</p>
-          </div>
-
-          {/* Pending Applications */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
-                style={{ backgroundColor: "#F59E0B" }}
-              >
-                <Clock className="w-7 h-7 text-white" />
-              </div>
-            </div>
-            <h3 className="text-4xl font-bold text-gray-900 mb-2">
-              {overviewStats.pendingApplications}
-            </h3>
-            <p className="text-sm text-gray-600 font-medium">
-              Pending Applications
-            </p>
-          </div>
-
-          {/* Verified Documents */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
-                style={{ backgroundColor: "#10B981" }}
-              >
-                <CheckCircle className="w-7 h-7 text-white" />
-              </div>
-            </div>
-            <h3 className="text-4xl font-bold text-gray-900 mb-2">
-              {overviewStats.verifiedDocuments}
-            </h3>
-            <p className="text-sm text-gray-600 font-medium">
-              Verified Documents
-            </p>
-          </div>
-
-          {/* Pending Payments */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg hover:shadow-xl transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <div
-                className="w-14 h-14 rounded-xl flex items-center justify-center shadow-sm"
-                style={{ backgroundColor: "#EF4444" }}
-              >
-                <CreditCard className="w-7 h-7 text-white" />
-              </div>
-            </div>
-            <h3 className="text-4xl font-bold text-gray-900 mb-2">
-              {overviewStats.pendingPayments}
-            </h3>
-            <p className="text-sm text-gray-600 font-medium">
-              Pending Payments
-            </p>
+            <h2 className="text-xl font-semibold text-gray-900">Pending Applications</h2>
+            <p className="text-sm text-gray-500">Review applicants that still need registrar action.</p>
           </div>
         </div>
-
-        {/* Section Header */}
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Pending Applications</h2>
 
         {/* Pending Applications Table */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
