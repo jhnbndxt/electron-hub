@@ -784,30 +784,29 @@ export function Results() {
         AI-Assisted Strand Assessment Results
       </div>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        {/* Congratulations Hero Section */}
-        <div
-          className="relative overflow-hidden rounded-2xl border border-white/30 p-6 shadow-2xl sm:p-8 lg:p-10"
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
+        <section
+          className="relative overflow-hidden rounded-2xl border border-white/40 p-5 shadow-xl sm:p-6 lg:p-8"
           style={{
-            background: "linear-gradient(135deg, #1E3A8A 0%, #2563EB 72%, #A11A0D 100%)",
+            background: "linear-gradient(135deg, #1E3A8A 0%, #2563EB 68%, #A11A0D 100%)",
           }}
         >
           <div className="absolute inset-x-0 bottom-0 h-1 bg-white/30" />
-          
-          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 sm:h-20 sm:w-20">
-                <Award className="h-10 w-10 text-white sm:h-12 sm:w-12" />
+
+          <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+            <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-center">
+              <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
+                <Award className="h-9 w-9 text-white" />
               </div>
-              <div>
-                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/75">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">
                   Assessment complete
                 </p>
-                <h1 className="text-3xl font-bold text-white sm:text-4xl lg:text-5xl">
-                  Your results are ready
+                <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">
+                  Assessment Results Dashboard
                 </h1>
-                <p className="mt-3 max-w-3xl text-base leading-7 text-white/85 sm:text-lg">
-                  Review your recommended track, score profile, electives, and next-step guidance in one organized dashboard.
+                <p className="mt-3 max-w-4xl text-sm leading-6 text-white/85 sm:text-base">
+                  Your recommended track, score profile, electives, and next-step guidance are organized below for quick review.
                 </p>
               </div>
             </div>
@@ -822,219 +821,168 @@ export function Results() {
               {isDownloading ? "Preparing PDF..." : "Download PDF"}
             </button>
           </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="relative z-10 mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Recommended Track", value: track, accent: trackColor },
-            { label: "Overall Score", value: `${overallScore}%`, accent: secondaryColor },
-            { label: "Top Strength", value: topDomains[0] || "Not available", accent: "#10B981" },
-            { label: "Top Interest", value: topInterests[0] || "Not available", accent: "#F59E0B" },
+            { label: "Recommended Track", value: track, accent: "bg-white" },
+            { label: "Overall Score", value: `${overallScore}%`, accent: "bg-red-200" },
+            { label: "Top Strength", value: topDomains[0] || "Not available", accent: "bg-emerald-200" },
+            { label: "Top Interest", value: topInterests[0] || "Not available", accent: "bg-amber-200" },
           ].map((item) => (
-            <div key={item.label} className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50">
-              <div className="mb-4 h-1.5 w-12 rounded-full" style={{ backgroundColor: item.accent }} />
-              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{item.label}</p>
-              <p className="mt-2 text-2xl font-bold leading-tight text-gray-900">{item.value}</p>
+            <div key={item.label} className="rounded-xl border border-white/20 bg-white/12 p-4 backdrop-blur">
+              <div className={`mb-3 h-1 w-10 rounded-full ${item.accent}`} />
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">{item.label}</p>
+              <p className="mt-2 truncate text-xl font-bold leading-tight text-white">{item.value}</p>
             </div>
           ))}
-        </div>
+          </div>
+        </section>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
-          {/* Left Column: Circular Progress & Summary */}
-          <div className="space-y-6">
-            {/* Circular Progress Card */}
-            <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
-              <h3 className="text-xl font-bold mb-6 text-center" style={{ color: "var(--electron-blue)" }}>
-                Overall Score
-              </h3>
-              
-              {/* Circular Progress Chart */}
-              <div className="flex items-center justify-center mb-6">
-                <div className="relative w-48 h-48">
-                  <svg className="w-48 h-48 transform -rotate-90">
-                    {/* Background circle */}
+        <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+          <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Score and track</p>
+                <h2 className="mt-2 text-2xl font-bold text-gray-950">Summary</h2>
+              </div>
+              <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
+                <CheckCircle className="h-4 w-4" />
+                Complete
+              </span>
+            </div>
+
+            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center xl:grid-cols-1 2xl:grid-cols-[auto_minmax(0,1fr)]">
+              <div className="flex justify-center">
+                <div className="relative h-40 w-40">
+                  <svg className="h-40 w-40 -rotate-90">
+                    <circle cx="80" cy="80" r="70" stroke="#E5E7EB" strokeWidth="14" fill="none" />
                     <circle
-                      cx="96"
-                      cy="96"
-                      r="88"
-                      stroke="#E5E7EB"
-                      strokeWidth="16"
-                      fill="none"
-                    />
-                    {/* Progress circle */}
-                    <circle
-                      cx="96"
-                      cy="96"
-                      r="88"
+                      cx="80"
+                      cy="80"
+                      r="70"
                       stroke="var(--electron-blue)"
-                      strokeWidth="16"
+                      strokeWidth="14"
                       fill="none"
-                      strokeDasharray={`${2 * Math.PI * 88}`}
-                      strokeDashoffset={`${2 * Math.PI * 88 * (1 - overallScore / 100)}`}
+                      strokeDasharray={`${2 * Math.PI * 70}`}
+                      strokeDashoffset={`${2 * Math.PI * 70 * (1 - overallScore / 100)}`}
                       strokeLinecap="round"
                       className="transition-all duration-1000"
                     />
                   </svg>
-                  {/* Center text */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold sm:text-5xl" style={{ color: "var(--electron-blue)" }}>
+                    <span className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>
                       {overallScore}%
                     </span>
-                    <span className="text-sm text-gray-500 mt-1">Score</span>
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Overall</span>
                   </div>
                 </div>
               </div>
 
-              <div className="text-center">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-100 text-green-700">
-                  <CheckCircle className="w-5 h-5" />
-                  <span className="font-semibold">Assessment Completed</span>
+              <div className="min-w-0 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                <div className="flex items-center gap-2 text-blue-800">
+                  <Sparkles className="h-5 w-5" />
+                  <p className="text-sm font-semibold">Recommended Track</p>
                 </div>
-              </div>
-            </div>
-
-            {/* Recommended Track Card */}
-            <div
-              className="rounded-xl border-t-4 bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6"
-              style={{ borderColor: "var(--electron-blue)" }}
-            >
-              <p className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide text-center">
-                Recommended Track
-              </p>
-              <h2
-                className="text-3xl font-bold text-center mb-4"
-                style={{ color: "var(--electron-blue)" }}
-              >
-                {track}
-              </h2>
-              <div className="flex items-center justify-center gap-2">
-                <Sparkles className="w-5 h-5" style={{ color: "var(--electron-blue)" }} />
-                <span className="text-sm text-gray-600 italic">
-                  AI-Powered Analysis
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Column: Detailed Breakdown */}
-          <div className="min-w-0 space-y-6">
-            {/* Detailed Score Breakdown Table */}
-            <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
-              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                <TrendingUp className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
-                <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
-                  Detailed Breakdown
+                <h3 className="mt-2 text-3xl font-bold leading-tight" style={{ color: "var(--electron-blue)" }}>
+                  {track}
                 </h3>
-                </div>
-                <p className="text-sm font-medium text-gray-500">Scores by assessment domain</p>
-              </div>
-              
-              {/* Table */}
-              <div className="overflow-x-auto rounded-lg border border-gray-200">
-                <table className="w-full">
-                  <thead style={{ backgroundColor: "var(--electron-blue)" }}>
-                    <tr>
-                      <th className="px-6 py-4 text-left text-white font-semibold">Domain</th>
-                      <th className="px-6 py-4 text-center text-white font-semibold">Score</th>
-                      <th className="px-6 py-4 text-left text-white font-semibold">Progress</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {scoreRows.map((domain, index) => (
-                      <tr key={domain.key} className={index % 2 === 0 ? "bg-gray-50" : "bg-white"}>
-                        <td className="px-6 py-4 font-semibold" style={{ color: "var(--electron-dark-gray)" }}>
-                          {domain.name}
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-2xl font-bold" style={{ color: domain.color }}>
-                            {domain.score.toFixed(0)}%
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="w-full bg-gray-200 rounded-full h-3">
-                            <div
-                              className="h-3 rounded-full transition-all duration-1000"
-                              style={{
-                                width: `${domain.score}%`,
-                                backgroundColor: domain.color,
-                              }}
-                            />
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Suggested Electives */}
-            <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
-              <h3 className="text-2xl font-bold mb-4" style={{ color: "var(--electron-dark-gray)" }}>
-                Suggested Electives
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {electives.map((elective, index) => (
-                  <div
-                    key={index}
-                    className="portal-glass-panel flex items-start gap-3 rounded-lg border-l-4 p-4"
-                    style={{
-                      borderColor: index === 0 ? "var(--electron-blue)" : "var(--electron-red)",
-                    }}
-                  >
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0"
-                      style={{ backgroundColor: index === 0 ? "var(--electron-blue)" : "var(--electron-red)" }}
-                    >
-                      {index + 1}
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Elective {index + 1}</p>
-                      <h4 className="text-lg font-bold" style={{ color: "var(--electron-dark-gray)" }}>
-                        {elective}
-                      </h4>
-                      {electiveExplanations[index] && (
-                        <p className="mt-2 text-sm leading-6 text-gray-700">
-                          {electiveExplanations[index]}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* AI Analysis */}
-            <div
-              className="portal-glass-panel-strong rounded-xl border p-5 shadow-lg sm:p-6"
-              style={{ borderColor: "var(--electron-blue)" }}
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white flex-shrink-0"
-                  style={{ backgroundColor: "var(--electron-blue)" }}
-                >
-                  <Sparkles className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="text-xl font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
-                    AI Analysis & Explanation
-                  </h3>
-                  <p className="text-lg leading-relaxed text-gray-800 mb-4">
-                    {recommendationSummary}
-                  </p>
-                  <div className="portal-glass-panel mt-4 rounded-lg p-4">
-                    <h4 className="font-bold text-gray-900 mb-2">Why This Track?</h4>
-                    <p className="text-gray-700 leading-relaxed">
-                      {trackExplanation}
-                    </p>
-                  </div>
-                </div>
+                <p className="mt-3 text-sm leading-6 text-gray-700">
+                  {trackExplanation}
+                </p>
               </div>
             </div>
           </div>
-        </div>
+
+          <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6">
+            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-6 w-6" style={{ color: "var(--electron-blue)" }} />
+                <h2 className="text-2xl font-bold text-gray-950">Score Breakdown</h2>
+              </div>
+              <p className="text-sm font-medium text-gray-500">Scores by assessment domain</p>
+            </div>
+
+            <div className="grid gap-3">
+              {scoreRows.map((domain) => (
+                <div key={domain.key} className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-gray-900">{domain.name}</p>
+                      <p className="mt-1 text-xs font-medium text-gray-500">{getScoreInterpretation(domain.score)}</p>
+                    </div>
+                    <span className="text-2xl font-bold" style={{ color: domain.color }}>
+                      {domain.score.toFixed(0)}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 overflow-hidden rounded-full bg-gray-200">
+                    <div
+                      className="h-full rounded-full transition-all duration-1000"
+                      style={{ width: `${domain.score}%`, backgroundColor: domain.color }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6">
+          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Recommended selections</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-950">Suggested Electives</h2>
+            </div>
+            <p className="text-sm font-medium text-gray-500">{electives.length} suggested option{electives.length === 1 ? "" : "s"}</p>
+          </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {electives.map((elective, index) => (
+              <div
+                key={index}
+                className="rounded-xl border bg-gray-50/80 p-4"
+                style={{ borderColor: index === 0 ? "rgba(30, 58, 138, 0.22)" : "rgba(161, 26, 13, 0.22)" }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white"
+                    style={{ backgroundColor: index === 0 ? "var(--electron-blue)" : "var(--electron-red)" }}
+                  >
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Elective {index + 1}</p>
+                    <h3 className="mt-1 text-lg font-bold text-gray-950">{elective}</h3>
+                    {electiveExplanations[index] && (
+                      <p className="mt-2 text-sm leading-6 text-gray-700">
+                        {electiveExplanations[index]}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section
+          className="rounded-2xl border bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6"
+          style={{ borderColor: "rgba(30, 58, 138, 0.18)" }}
+        >
+          <div className="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-xl text-white"
+              style={{ backgroundColor: "var(--electron-blue)" }}
+            >
+              <Sparkles className="h-6 w-6" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">AI recommendation</p>
+              <h2 className="mt-1 text-2xl font-bold text-gray-950">Analysis Summary</h2>
+              <p className="mt-3 text-base leading-7 text-gray-800">
+                {recommendationSummary}
+              </p>
+            </div>
+          </div>
+        </section>
 
         {/* Track Overview Section */}
         <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
@@ -1044,7 +992,7 @@ export function Results() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="rounded-lg border border-gray-100 bg-white/55 p-4">
               <h4 className="text-lg font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
-                📚 What You'll Study
+                What You'll Study
               </h4>
               <ul className="space-y-2 text-gray-700">
                 {track === "Academic" ? (
@@ -1090,7 +1038,7 @@ export function Results() {
             </div>
             <div className="rounded-lg border border-gray-100 bg-white/55 p-4">
               <h4 className="text-lg font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
-                🎯 Future Opportunities
+                Future Opportunities
               </h4>
               <ul className="space-y-2 text-gray-700">
                 {track === "Academic" ? (
@@ -1333,7 +1281,7 @@ export function Results() {
         {/* Print hint */}
         <div className="mt-8 text-center print:hidden">
           <p className="text-sm text-gray-500">
-            💡 Tip: Click "Download Results as PDF" to save or share your results with parents or guidance counselors!
+            Download the PDF to save or share your results with parents or guidance counselors.
           </p>
         </div>
       </div>
