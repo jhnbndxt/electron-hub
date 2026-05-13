@@ -19,30 +19,6 @@ import { getLatestAssessmentResult } from "../../services/assessmentResultServic
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 
-type SuggestedCollegeCourse = string | {
-  course?: string;
-  description?: string;
-};
-
-interface CareerPathway {
-  course?: string;
-  category?: string;
-  careers: string[];
-}
-
-interface AiRecommendation {
-  recommendedTrack?: string;
-  trackExplanation?: string;
-  elective1?: string;
-  elective1Explanation?: string;
-  elective2?: string;
-  elective2Explanation?: string;
-  overallAnalysis?: string;
-  suggestedCollegeCourses?: SuggestedCollegeCourse[];
-  careerPathways?: CareerPathway[];
-  raw?: string;
-}
-
 interface AssessmentResults {
   track: string;
   electives: string[];
@@ -54,7 +30,6 @@ interface AssessmentResults {
   };
   topDomains: string[];
   topInterests: string[];
-  aiRecommendation?: AiRecommendation | null;
 }
 
 export function Results() {
@@ -71,28 +46,24 @@ export function Results() {
       const userEmail = userData?.email || "student@gmail.com";
 
       try {
-        const assessmentKey = `assessmentResults_${userEmail}`;
-        const storedResults = localStorage.getItem(assessmentKey);
-        const localResults = storedResults ? JSON.parse(storedResults) : null;
         const latestResult = await getLatestAssessmentResult(userEmail);
 
         if (latestResult) {
           setResults({
-            ...latestResult,
-            ...localResults,
-            track: localResults?.track || latestResult.track,
-            electives: localResults?.electives?.length ? localResults.electives : latestResult.electives,
+            track: latestResult.track,
+            electives: latestResult.electives,
             scores: latestResult.scores,
-            topDomains: localResults?.topDomains || latestResult.topDomains,
-            topInterests: localResults?.topInterests || latestResult.topInterests,
-            aiRecommendation: localResults?.aiRecommendation || latestResult.aiRecommendation || null,
+            topDomains: latestResult.topDomains,
+            topInterests: latestResult.topInterests,
           });
           setLoading(false);
           return;
         }
 
-        if (localResults) {
-          setResults(localResults);
+        const assessmentKey = `assessmentResults_${userEmail}`;
+        const storedResults = localStorage.getItem(assessmentKey);
+        if (storedResults) {
+          setResults(JSON.parse(storedResults));
         } else {
           setResults(null);
         }
@@ -137,11 +108,6 @@ export function Results() {
   }
 
   const { track, electives, scores, topDomains, topInterests } = results;
-  const aiRecommendation = results.aiRecommendation && !results.aiRecommendation.raw ? results.aiRecommendation : null;
-  const electiveExplanations = [
-    aiRecommendation?.elective1Explanation,
-    aiRecommendation?.elective2Explanation,
-  ];
 
   // Calculate overall score (average of all domains)
   const overallScore = Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
@@ -190,13 +156,11 @@ export function Results() {
           "Technical college and vocational degree pathways",
           "Industry certifications and skills-based career advancement",
         ];
-  const fallbackRecommendationSummary = `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
-  const recommendationSummary = aiRecommendation?.overallAnalysis || fallbackRecommendationSummary;
+  const recommendationSummary = `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
   const trackExplanation =
-    aiRecommendation?.trackExplanation ||
-    (track === "Academic"
+    track === "Academic"
       ? "The Academic Track provides a solid foundation for higher education. It supports students who perform well in structured academic work and want to build toward university courses and professional careers."
-      : "The Technical-Professional Track emphasizes applied learning and practical competencies. It is well-suited for students who thrive in skill-based environments and want strong preparation for employment, entrepreneurship, or technical degree programs.");
+      : "The Technical-Professional Track emphasizes applied learning and practical competencies. It is well-suited for students who thrive in skill-based environments and want strong preparation for employment, entrepreneurship, or technical degree programs.";
 
   const getScoreInterpretation = (score: number) => {
     if (score >= 85) {
@@ -361,33 +325,12 @@ export function Results() {
   );
 
   // Remove duplicates
-  const getCourseName = (course: SuggestedCollegeCourse) =>
-    typeof course === "string" ? course : course.course || "";
-  const aiSuggestedCourses = Array.isArray(aiRecommendation?.suggestedCollegeCourses)
-    ? aiRecommendation.suggestedCollegeCourses.filter((course) => getCourseName(course).trim())
-    : [];
-  const uniqueCourses = aiSuggestedCourses.length > 0
-    ? Array.from(new Set(aiSuggestedCourses.map((course) => getCourseName(course).trim()).filter(Boolean)))
-    : Array.from(new Set(allSuggestedCourses));
-  const courseDescriptions = aiSuggestedCourses.reduce<Record<string, string>>((descriptions, course) => {
-    if (typeof course !== "string" && course.course && course.description) {
-      descriptions[course.course] = course.description;
-    }
+  const uniqueCourses = Array.from(new Set(allSuggestedCourses));
 
-    return descriptions;
-  }, {});
-
-  // Get career pathways from the AI result, with elective-based fallback for older assessments.
-  const fallbackCareerPathways = electives.flatMap(elective =>
+  // Get career pathways from all electives
+  const allCareerPathways = electives.flatMap(elective =>
     getCareerPathways(track, elective)
   );
-  const getPathwayLabel = (pathway: CareerPathway) => pathway.category || pathway.course || "";
-  const aiCareerPathways = Array.isArray(aiRecommendation?.careerPathways)
-    ? aiRecommendation.careerPathways.filter(
-        (pathway) => getPathwayLabel(pathway).trim() && Array.isArray(pathway.careers) && pathway.careers.length > 0
-      )
-    : [];
-  const allCareerPathways = aiCareerPathways.length > 0 ? aiCareerPathways : fallbackCareerPathways;
   const recommendedBranches = getRecommendedElectronBranches({
     track,
     electives,
@@ -671,9 +614,9 @@ export function Results() {
         autoTable(doc, {
           startY: cursorY,
           margin: { top: topMargin, right: margin, bottom: bottomMargin, left: margin },
-          head: [["Specialization", "Career Opportunities"]],
+          head: [["College Course", "Career Opportunities"]],
           body: allCareerPathways.map((pathway) => [
-            getPathwayLabel(pathway),
+            pathway.course,
             pathway.careers.join(", "),
           ]),
           theme: "grid",
@@ -762,7 +705,7 @@ export function Results() {
   };
 
   return (
-    <div className="portal-dashboard-page flex w-full flex-col p-4 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
       {/* Print-only Header */}
       <div className="print-only print-header" style={{ display: 'none' }}>
         <div className="print-logo">
@@ -784,215 +727,201 @@ export function Results() {
         AI-Assisted Strand Assessment Results
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5">
-        <section
-          className="relative overflow-hidden rounded-2xl border border-white/40 p-5 shadow-xl sm:p-6 lg:p-8"
+      <div className="max-w-7xl mx-auto">
+        {/* Congratulations Hero Section */}
+        <div
+          className="relative mb-8 overflow-hidden rounded-[2rem] p-8 text-center shadow-2xl sm:p-10 lg:p-12"
           style={{
-            background: "linear-gradient(135deg, #1E3A8A 0%, #2563EB 68%, #A11A0D 100%)",
+            background: "linear-gradient(135deg, #1B3B8F 0%, #2563EB 55%, #60A5FA 100%)",
           }}
         >
-          <div className="absolute inset-x-0 bottom-0 h-1 bg-white/30" />
-
-          <div className="relative z-10 grid gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
-            <div className="flex min-w-0 flex-col gap-5 lg:flex-row lg:items-center">
-              <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25">
-                <Award className="h-9 w-9 text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-white/75">
-                  Assessment complete
-                </p>
-                <h1 className="mt-2 text-3xl font-bold text-white sm:text-4xl">
-                  Assessment Results Dashboard
-                </h1>
-                <p className="mt-3 max-w-4xl text-sm leading-6 text-white/85 sm:text-base">
-                  Your recommended track, score profile, electives, and next-step guidance are organized below for quick review.
-                </p>
-              </div>
+          <div className="absolute inset-x-0 top-0 h-48 bg-white/10 blur-3xl" />
+          <div className="absolute left-10 top-12 h-28 w-28 rounded-full bg-white/20 blur-2xl" />
+          <div className="absolute right-10 bottom-16 h-40 w-40 rounded-full bg-white/15 blur-3xl" />
+          <div className="relative z-10">
+            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-6 shadow-lg backdrop-blur-lg">
+              <Award className="w-12 h-12 text-white" />
             </div>
-
-            <button
-              onClick={handleDownloadPDF}
-              disabled={isDownloading}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-bold shadow-lg transition-all hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-70 print:hidden sm:w-auto"
-              style={{ color: "var(--electron-blue)" }}
-            >
-              <Download className="h-5 w-5" />
-              {isDownloading ? "Preparing PDF..." : "Download PDF"}
-            </button>
+            <h1 className="mb-4 text-3xl font-bold text-white sm:text-5xl">
+              Assessment Results
+            </h1>
+            <p className="mb-2 text-lg text-white/85 sm:text-xl">
+              Your personalized recommendation is ready based on your strengths, interests, and achievement profile.
+            </p>
+            <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/75">
+              The next step is choosing the right track and electives that best match your learning style and future goals.
+            </p>
           </div>
+        </div>
 
-          <div className="relative z-10 mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: "Recommended Track", value: track, accent: "bg-white" },
-            { label: "Overall Score", value: `${overallScore}%`, accent: "bg-red-200" },
-            { label: "Top Strength", value: topDomains[0] || "Not available", accent: "bg-emerald-200" },
-            { label: "Top Interest", value: topInterests[0] || "Not available", accent: "bg-amber-200" },
-          ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-white/20 bg-white/12 p-4 backdrop-blur">
-              <div className={`mb-3 h-1 w-10 rounded-full ${item.accent}`} />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/65">{item.label}</p>
-              <p className="mt-2 truncate text-xl font-bold leading-tight text-white">{item.value}</p>
-            </div>
-          ))}
-          </div>
-        </section>
+        {/* Download Button Row */}
+        <div className="mb-6 flex justify-stretch sm:justify-end">
+          <button
+            onClick={handleDownloadPDF}
+            disabled={isDownloading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold shadow-md transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 print:hidden sm:w-auto"
+            style={{ backgroundColor: "var(--electron-blue)" }}
+          >
+            <Download className="w-5 h-5" />
+            {isDownloading ? "Preparing PDF..." : "Download Results as PDF"}
+          </button>
+        </div>
 
-        <section className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
-          <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6">
-            <div className="mb-5 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Score and track</p>
-                <h2 className="mt-2 text-2xl font-bold text-gray-950">Summary</h2>
-              </div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-green-50 px-3 py-1.5 text-xs font-semibold text-green-700">
-                <CheckCircle className="h-4 w-4" />
-                Complete
-              </span>
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.85fr] gap-8 mb-8">
+          <div className="space-y-8">
+            <section className="relative overflow-hidden rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="absolute left-0 top-0 h-40 w-40 rounded-full bg-white/40 blur-3xl" />
+              <div className="absolute right-0 bottom-0 h-32 w-32 rounded-full bg-white/30 blur-2xl" />
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                  Recommended Track
+                </div>
+                <h2 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">{track}</h2>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+                  Electron Hub recommends this track because your strengths and interests match its long-term opportunities and growth path.
+                </p>
 
-            <div className="grid gap-5 sm:grid-cols-[auto_minmax(0,1fr)] sm:items-center xl:grid-cols-1 2xl:grid-cols-[auto_minmax(0,1fr)]">
-              <div className="flex justify-center">
-                <div className="relative h-40 w-40">
-                  <svg className="h-40 w-40 -rotate-90">
-                    <circle cx="80" cy="80" r="70" stroke="#E5E7EB" strokeWidth="14" fill="none" />
-                    <circle
-                      cx="80"
-                      cy="80"
-                      r="70"
-                      stroke="var(--electron-blue)"
-                      strokeWidth="14"
-                      fill="none"
-                      strokeDasharray={`${2 * Math.PI * 70}`}
-                      strokeDashoffset={`${2 * Math.PI * 70 * (1 - overallScore / 100)}`}
-                      strokeLinecap="round"
-                      className="transition-all duration-1000"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>
-                      {overallScore}%
-                    </span>
-                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">Overall</span>
+                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Top strengths</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">{topDomainSummary}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Interest match</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">{topInterestSummary}</p>
                   </div>
                 </div>
               </div>
+            </section>
 
-              <div className="min-w-0 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
-                <div className="flex items-center gap-2 text-blue-800">
-                  <Sparkles className="h-5 w-5" />
-                  <p className="text-sm font-semibold">Recommended Track</p>
+            <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Suggested Electives</p>
+                  <h3 className="mt-3 text-3xl font-bold text-slate-950">Courses that fit your profile</h3>
                 </div>
-                <h3 className="mt-2 text-3xl font-bold leading-tight" style={{ color: "var(--electron-blue)" }}>
-                  {track}
-                </h3>
-                <p className="mt-3 text-sm leading-6 text-gray-700">
-                  {trackExplanation}
-                </p>
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                  Priority picks
+                </span>
               </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6">
-            <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-6 w-6" style={{ color: "var(--electron-blue)" }} />
-                <h2 className="text-2xl font-bold text-gray-950">Score Breakdown</h2>
-              </div>
-              <p className="text-sm font-medium text-gray-500">Scores by assessment domain</p>
-            </div>
-
-            <div className="grid gap-3">
-              {scoreRows.map((domain) => (
-                <div key={domain.key} className="rounded-xl border border-gray-100 bg-gray-50/80 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-bold text-gray-900">{domain.name}</p>
-                      <p className="mt-1 text-xs font-medium text-gray-500">{getScoreInterpretation(domain.score)}</p>
-                    </div>
-                    <span className="text-2xl font-bold" style={{ color: domain.color }}>
-                      {domain.score.toFixed(0)}%
-                    </span>
-                  </div>
-                  <div className="h-2.5 overflow-hidden rounded-full bg-gray-200">
-                    <div
-                      className="h-full rounded-full transition-all duration-1000"
-                      style={{ width: `${domain.score}%`, backgroundColor: domain.color }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6">
-          <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Recommended selections</p>
-              <h2 className="mt-1 text-2xl font-bold text-gray-950">Suggested Electives</h2>
-            </div>
-            <p className="text-sm font-medium text-gray-500">{electives.length} suggested option{electives.length === 1 ? "" : "s"}</p>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {electives.map((elective, index) => (
-              <div
-                key={index}
-                className="rounded-xl border bg-gray-50/80 p-4"
-                style={{ borderColor: index === 0 ? "rgba(30, 58, 138, 0.22)" : "rgba(161, 26, 13, 0.22)" }}
-              >
-                <div className="flex items-start gap-3">
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                {electives.map((elective, index) => (
                   <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-sm font-bold text-white"
-                    style={{ backgroundColor: index === 0 ? "var(--electron-blue)" : "var(--electron-red)" }}
+                    key={index}
+                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
                   >
-                    {index + 1}
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white text-lg font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Elective {index + 1}</p>
+                        <h4 className="mt-2 text-lg font-semibold text-slate-950">{elective}</h4>
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Elective {index + 1}</p>
-                    <h3 className="mt-1 text-lg font-bold text-gray-950">{elective}</h3>
-                    {electiveExplanations[index] && (
-                      <p className="mt-2 text-sm leading-6 text-gray-700">
-                        {electiveExplanations[index]}
-                      </p>
-                    )}
-                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-blue-600 text-white shadow-lg">
+                  <Sparkles className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Analysis Summary</p>
+                  <h3 className="mt-2 text-3xl font-bold text-slate-950">Why this recommendation works</h3>
                 </div>
               </div>
-            ))}
-          </div>
-        </section>
-
-        <section
-          className="rounded-2xl border bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/50 sm:p-6"
-          style={{ borderColor: "rgba(30, 58, 138, 0.18)" }}
-        >
-          <div className="grid gap-5 lg:grid-cols-[auto_minmax(0,1fr)]">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-xl text-white"
-              style={{ backgroundColor: "var(--electron-blue)" }}
-            >
-              <Sparkles className="h-6 w-6" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">AI recommendation</p>
-              <h2 className="mt-1 text-2xl font-bold text-gray-950">Analysis Summary</h2>
-              <p className="mt-3 text-base leading-7 text-gray-800">
-                {recommendationSummary}
+              <p className="mt-6 max-w-3xl text-sm leading-7 text-slate-600">
+                {recommendationSummary} {trackExplanation}
               </p>
-            </div>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">What stands out</p>
+                  <p className="mt-3 text-sm text-slate-700">Your profile shows strong aptitude in subjects that map directly to this track’s core strengths, making it the most balanced option for your future.</p>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">What to expect</p>
+                  <p className="mt-3 text-sm text-slate-700">This track emphasizes the right mix of learning, hands-on experience, and opportunity to keep you engaged while preparing you for real-world success.</p>
+                </div>
+              </div>
+            </section>
           </div>
-        </section>
+
+          <aside className="space-y-8">
+            <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Score Snapshot</p>
+                  <h3 className="mt-2 text-2xl font-bold text-slate-950">Performance overview</h3>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
+                  Supporting insight
+                </span>
+              </div>
+
+              <div className="mt-6 rounded-[2rem] bg-blue-600 p-6 text-white shadow-inner shadow-blue-500/10">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.24em] text-blue-200">Overall score</p>
+                    <p className="mt-3 text-5xl font-bold">{overallScore}%</p>
+                  </div>
+                  <div className="flex h-24 w-24 items-center justify-center rounded-3xl bg-white/15 text-center">
+                    <div>
+                      <p className="text-sm uppercase text-blue-100">{getScoreInterpretation(overallScore)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 space-y-4">
+                  {scoreRows.map((domain) => (
+                    <div key={domain.key}>
+                      <div className="flex items-center justify-between text-sm font-semibold text-blue-100">
+                        <span>{domain.name}</span>
+                        <span>{domain.score.toFixed(0)}%</span>
+                      </div>
+                      <div className="mt-2 h-3 rounded-full bg-white/15">
+                        <div
+                          className="h-3 rounded-full transition-all duration-1000"
+                          style={{ width: `${domain.score}%`, backgroundColor: domain.color }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <h3 className="text-2xl font-bold text-slate-950">Track Snapshot</h3>
+              <p className="mt-4 text-sm leading-7 text-slate-600">
+                This recommendation highlights your strongest learning channels and how the selected track supports your ambitions.
+              </p>
+              <div className="mt-6 space-y-3">
+                <div className="rounded-3xl bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Core focus</p>
+                  <p className="mt-2 text-sm text-slate-700">{track === "Academic" ? "Academic rigor, research orientation, and strong college-readiness" : "Hands-on skills, technical practice, and industry-aligned preparation"}.</p>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Future outlook</p>
+                  <p className="mt-2 text-sm text-slate-700">{track === "Academic" ? "Prep for university programs, scholarships, and professional careers." : "Prep for vocational pathways, certification, and early employment opportunities."}</p>
+                </div>
+              </div>
+            </section>
+          </aside>
+        </div>
 
         {/* Track Overview Section */}
-        <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
+        <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
             Your Track: {track}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="rounded-lg border border-gray-100 bg-white/55 p-4">
+            <div>
               <h4 className="text-lg font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
-                What You'll Study
+                📚 What You'll Study
               </h4>
               <ul className="space-y-2 text-gray-700">
                 {track === "Academic" ? (
@@ -1036,9 +965,9 @@ export function Results() {
                 )}
               </ul>
             </div>
-            <div className="rounded-lg border border-gray-100 bg-white/55 p-4">
+            <div>
               <h4 className="text-lg font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
-                Future Opportunities
+                🎯 Future Opportunities
               </h4>
               <ul className="space-y-2 text-gray-700">
                 {track === "Academic" ? (
@@ -1087,7 +1016,7 @@ export function Results() {
 
         {/* NEW SECTION: Suggested College Courses */}
         {uniqueCourses.length > 0 && (
-          <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
+          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
             <div className="flex items-center gap-2 mb-2">
               <GraduationCap className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
               <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -1109,11 +1038,6 @@ export function Results() {
                   <p className="font-semibold" style={{ color: "var(--electron-dark-gray)" }}>
                     {course}
                   </p>
-                  {courseDescriptions[course] && (
-                    <p className="mt-2 text-sm leading-6 text-gray-600">
-                      {courseDescriptions[course]}
-                    </p>
-                  )}
                 </div>
               ))}
             </div>
@@ -1122,7 +1046,7 @@ export function Results() {
 
         {/* Recommended Electron Branches */}
         {recommendedBranches.length > 0 && (
-          <div className="rounded-xl bg-white p-5 shadow-md ring-1 ring-white/50 sm:p-6">
+          <div className="mb-8 rounded-xl bg-white p-5 shadow-md ring-1 ring-gray-100 sm:p-6">
             <div className="mb-5 flex items-start gap-3">
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
@@ -1211,7 +1135,7 @@ export function Results() {
 
         {/* NEW SECTION: Career Pathways */}
         {allCareerPathways.length > 0 && (
-          <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
+          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
             <div className="flex items-center gap-2 mb-2">
               <Briefcase className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
               <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -1225,15 +1149,15 @@ export function Results() {
               {allCareerPathways.map((pathway, index) => (
                 <div
                   key={index}
-                  className="portal-glass-panel rounded-xl border p-5 transition-all hover:shadow-lg sm:p-6"
+                  className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
                   style={{ borderColor: "var(--electron-blue)" }}
                 >
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex items-center gap-3 mb-4">
                     <div
                       className="px-4 py-2 rounded-lg text-white font-bold"
                       style={{ backgroundColor: "var(--electron-blue)" }}
                     >
-                      {getPathwayLabel(pathway)}
+                      {pathway.course}
                     </div>
                     <ArrowRight className="w-5 h-5 text-gray-400" />
                     <span className="text-gray-600 font-medium">Career Opportunities</span>
@@ -1261,7 +1185,7 @@ export function Results() {
         )}
 
         {/* What's Next - Action Buttons */}
-        <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 print:hidden sm:p-6">
+        <div className="rounded-xl bg-white p-5 shadow-lg print:hidden sm:p-8">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
             What's Next?
           </h3>
@@ -1281,7 +1205,7 @@ export function Results() {
         {/* Print hint */}
         <div className="mt-8 text-center print:hidden">
           <p className="text-sm text-gray-500">
-            Download the PDF to save or share your results with parents or guidance counselors.
+            💡 Tip: Click "Download Results as PDF" to save or share your results with parents or guidance counselors!
           </p>
         </div>
       </div>
