@@ -6,7 +6,6 @@ import {
   Filter,
   CheckCircle,
   RotateCcw,
-  Eye,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -114,6 +113,34 @@ const getCurrentEnrollmentStatus = ({
   return "Application Submitted";
 };
 
+const formatEnrollmentStatus = (status?: string | null) => {
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+
+  const statusLabels: Record<string, string> = {
+    approved: "Approved",
+    documents_verified: "Documents Verified",
+    enrolled: "Enrolled",
+    pending_documents: "Pending Documents",
+    pending_review: "Pending Review",
+    rejected: "Rejected",
+    dropped: "Dropped",
+    unenrolled: "Unenrolled",
+    removed: "Removed",
+  };
+
+  if (statusLabels[normalizedStatus]) {
+    return statusLabels[normalizedStatus];
+  }
+
+  return normalizedStatus
+    ? normalizedStatus
+        .split("_")
+        .filter(Boolean)
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    : "Application Submitted";
+};
+
 export function PendingApplications() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -191,13 +218,16 @@ export function PendingApplications() {
         email: app.user_id || formData.email,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         status: applicationStatus,
-        currentStatus: getCurrentEnrollmentStatus({
-          enrollmentStatus: app.status,
-          paymentStatus: payment?.status,
-          paymentMethod: payment?.payment_method,
-          documentsUploaded: docs.length,
-          documentsApproved: approvedDocuments,
-        }),
+        currentStatus:
+          applicationStatus === "approved"
+            ? formatEnrollmentStatus(app.status)
+            : getCurrentEnrollmentStatus({
+                enrollmentStatus: app.status,
+                paymentStatus: payment?.status,
+                paymentMethod: payment?.payment_method,
+                documentsUploaded: docs.length,
+                documentsApproved: approvedDocuments,
+              }),
         strandApplied: formData.preferredTrack || formData.track || app.preferred_track || 'Not Set',
         enrollmentId: app.id,
         enrollmentData: app,
@@ -291,7 +321,7 @@ export function PendingApplications() {
   };
 
   const getCurrentStatusStyle = (status: string) => {
-    if (status === "Enrolled" || status === "Documents Verified") {
+    if (status === "Enrolled" || status === "Documents Verified" || status === "Approved") {
       return "border-green-200 bg-green-50 text-green-700";
     }
 
@@ -301,6 +331,10 @@ export function PendingApplications() {
 
     if (status === "Assessment Completed") {
       return "border-indigo-200 bg-indigo-50 text-indigo-700";
+    }
+
+    if (status === "Pending Review" || status === "Pending Documents") {
+      return "border-amber-200 bg-amber-50 text-amber-700";
     }
 
     return "border-amber-200 bg-amber-50 text-amber-700";
@@ -388,22 +422,21 @@ export function PendingApplications() {
         </td>
         <td className="px-6 py-4">
           <span className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${getCurrentStatusStyle(student.currentStatus)}`}>
-            {isApproved ? "Progress Monitoring" : student.currentStatus}
+            {student.currentStatus}
           </span>
         </td>
         <td className="px-6 py-4 text-center">
-          <button
-            onClick={() => navigate(`${reviewBasePath}/review/${student.id}`)}
-            className={`mx-auto inline-flex items-center justify-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition focus-visible:outline-none focus-visible:ring-2 ${
-              isApproved
-                ? "border border-emerald-200 bg-white text-emerald-700 hover:bg-emerald-50 focus-visible:ring-emerald-300"
-                : "bg-blue-600 text-white hover:bg-blue-700 focus-visible:ring-blue-400"
-            }`}
-            title={isApproved ? "View Enrollment Status" : "Review Application"}
-          >
-            {isApproved ? <Eye className="h-4 w-4" /> : null}
-            {isApproved ? "View Enrollment Status" : "Review Application"}
-          </button>
+          {isApproved ? (
+            <span className="text-xs font-semibold text-slate-500">Monitoring only</span>
+          ) : (
+            <button
+              onClick={() => navigate(`${reviewBasePath}/review/${student.id}`)}
+              className="mx-auto inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+              title="Review Application"
+            >
+              Review Application
+            </button>
+          )}
         </td>
       </tr>
     );

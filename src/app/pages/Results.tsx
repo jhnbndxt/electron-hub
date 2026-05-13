@@ -762,7 +762,7 @@ export function Results() {
   };
 
   return (
-    <div className="portal-dashboard-page flex flex-col gap-6 p-4 sm:p-6 lg:p-8 w-full">
+    <div className="portal-dashboard-page flex w-full flex-col p-4 sm:p-6 lg:p-8">
       {/* Print-only Header */}
       <div className="print-only print-header" style={{ display: 'none' }}>
         <div className="print-logo">
@@ -784,52 +784,66 @@ export function Results() {
         AI-Assisted Strand Assessment Results
       </div>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         {/* Congratulations Hero Section */}
         <div
-          className="relative mb-8 overflow-hidden rounded-2xl p-6 text-center shadow-2xl sm:p-8 lg:p-12"
+          className="relative overflow-hidden rounded-2xl border border-white/30 p-6 shadow-2xl sm:p-8 lg:p-10"
           style={{
-            background: "linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)",
+            background: "linear-gradient(135deg, #1E3A8A 0%, #2563EB 72%, #A11A0D 100%)",
           }}
         >
-          {/* Decorative elements */}
-          <div className="absolute top-0 left-0 w-64 h-64 bg-white opacity-10 rounded-full -translate-x-32 -translate-y-32" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-white opacity-10 rounded-full translate-x-32 translate-y-32" />
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-white/30" />
           
-          <div className="relative z-10">
-            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 mb-6">
-              <Award className="w-12 h-12 text-white" />
+          <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/25 sm:h-20 sm:w-20">
+                <Award className="h-10 w-10 text-white sm:h-12 sm:w-12" />
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/75">
+                  Assessment complete
+                </p>
+                <h1 className="text-3xl font-bold text-white sm:text-4xl lg:text-5xl">
+                  Your results are ready
+                </h1>
+                <p className="mt-3 max-w-3xl text-base leading-7 text-white/85 sm:text-lg">
+                  Review your recommended track, score profile, electives, and next-step guidance in one organized dashboard.
+                </p>
+              </div>
             </div>
-            <h1 className="mb-4 text-3xl font-bold text-white sm:text-5xl">
-              🎉 Congratulations!
-            </h1>
-            <p className="mb-2 text-xl text-white/90 sm:text-2xl">
-              You've Successfully Completed the Assessment
-            </p>
-            <p className="text-lg text-white/80">
-              Your personalized track and elective recommendations are ready
-            </p>
+
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-white px-5 py-3 text-sm font-bold shadow-lg transition-all hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-70 print:hidden sm:w-auto"
+              style={{ color: "var(--electron-blue)" }}
+            >
+              <Download className="h-5 w-5" />
+              {isDownloading ? "Preparing PDF..." : "Download PDF"}
+            </button>
           </div>
         </div>
 
-        {/* Download Button Row */}
-        <div className="mb-6 flex justify-stretch sm:justify-end">
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isDownloading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold shadow-md transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 print:hidden sm:w-auto"
-            style={{ backgroundColor: "var(--electron-blue)" }}
-          >
-            <Download className="w-5 h-5" />
-            {isDownloading ? "Preparing PDF..." : "Download Results as PDF"}
-          </button>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            { label: "Recommended Track", value: track, accent: trackColor },
+            { label: "Overall Score", value: `${overallScore}%`, accent: secondaryColor },
+            { label: "Top Strength", value: topDomains[0] || "Not available", accent: "#10B981" },
+            { label: "Top Interest", value: topInterests[0] || "Not available", accent: "#F59E0B" },
+          ].map((item) => (
+            <div key={item.label} className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50">
+              <div className="mb-4 h-1.5 w-12 rounded-full" style={{ backgroundColor: item.accent }} />
+              <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{item.label}</p>
+              <p className="mt-2 text-2xl font-bold leading-tight text-gray-900">{item.value}</p>
+            </div>
+          ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
           {/* Left Column: Circular Progress & Summary */}
-          <div className="lg:col-span-1">
+          <div className="space-y-6">
             {/* Circular Progress Card */}
-            <div className="mb-6 rounded-xl bg-white p-5 shadow-lg sm:p-8">
+            <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
               <h3 className="text-xl font-bold mb-6 text-center" style={{ color: "var(--electron-blue)" }}>
                 Overall Score
               </h3>
@@ -881,7 +895,7 @@ export function Results() {
 
             {/* Recommended Track Card */}
             <div
-              className="rounded-xl border-t-4 bg-white p-5 shadow-lg sm:p-8"
+              className="rounded-xl border-t-4 bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6"
               style={{ borderColor: "var(--electron-blue)" }}
             >
               <p className="text-sm font-semibold text-gray-600 mb-2 uppercase tracking-wide text-center">
@@ -903,14 +917,17 @@ export function Results() {
           </div>
 
           {/* Right Column: Detailed Breakdown */}
-          <div className="lg:col-span-2">
+          <div className="min-w-0 space-y-6">
             {/* Detailed Score Breakdown Table */}
-            <div className="mb-6 rounded-xl bg-white p-5 shadow-lg sm:p-8">
-              <div className="flex items-center gap-2 mb-6">
+            <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
                 <TrendingUp className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
                 <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
                   Detailed Breakdown
                 </h3>
+                </div>
+                <p className="text-sm font-medium text-gray-500">Scores by assessment domain</p>
               </div>
               
               {/* Table */}
@@ -953,7 +970,7 @@ export function Results() {
             </div>
 
             {/* Suggested Electives */}
-            <div className="mb-6 rounded-xl bg-white p-5 shadow-lg sm:p-8">
+            <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
               <h3 className="text-2xl font-bold mb-4" style={{ color: "var(--electron-dark-gray)" }}>
                 Suggested Electives
               </h3>
@@ -990,17 +1007,17 @@ export function Results() {
 
             {/* AI Analysis */}
             <div
-              className="portal-glass-panel-strong rounded-xl border p-5 shadow-lg sm:p-8"
+              className="portal-glass-panel-strong rounded-xl border p-5 shadow-lg sm:p-6"
               style={{ borderColor: "var(--electron-blue)" }}
             >
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 <div
                   className="w-12 h-12 rounded-full flex items-center justify-center text-white flex-shrink-0"
                   style={{ backgroundColor: "var(--electron-blue)" }}
                 >
                   <Sparkles className="w-6 h-6" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h3 className="text-xl font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
                     AI Analysis & Explanation
                   </h3>
@@ -1020,12 +1037,12 @@ export function Results() {
         </div>
 
         {/* Track Overview Section */}
-        <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
+        <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
             Your Track: {track}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
+            <div className="rounded-lg border border-gray-100 bg-white/55 p-4">
               <h4 className="text-lg font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
                 📚 What You'll Study
               </h4>
@@ -1071,7 +1088,7 @@ export function Results() {
                 )}
               </ul>
             </div>
-            <div>
+            <div className="rounded-lg border border-gray-100 bg-white/55 p-4">
               <h4 className="text-lg font-bold mb-3" style={{ color: "var(--electron-blue)" }}>
                 🎯 Future Opportunities
               </h4>
@@ -1122,7 +1139,7 @@ export function Results() {
 
         {/* NEW SECTION: Suggested College Courses */}
         {uniqueCourses.length > 0 && (
-          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
+          <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
             <div className="flex items-center gap-2 mb-2">
               <GraduationCap className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
               <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -1157,7 +1174,7 @@ export function Results() {
 
         {/* Recommended Electron Branches */}
         {recommendedBranches.length > 0 && (
-          <div className="mb-8 rounded-xl bg-white p-5 shadow-md ring-1 ring-gray-100 sm:p-6">
+          <div className="rounded-xl bg-white p-5 shadow-md ring-1 ring-white/50 sm:p-6">
             <div className="mb-5 flex items-start gap-3">
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white shadow-sm"
@@ -1246,7 +1263,7 @@ export function Results() {
 
         {/* NEW SECTION: Career Pathways */}
         {allCareerPathways.length > 0 && (
-          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
+          <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 sm:p-6">
             <div className="flex items-center gap-2 mb-2">
               <Briefcase className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
               <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
@@ -1260,10 +1277,10 @@ export function Results() {
               {allCareerPathways.map((pathway, index) => (
                 <div
                   key={index}
-                  className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
+                  className="portal-glass-panel rounded-xl border p-5 transition-all hover:shadow-lg sm:p-6"
                   style={{ borderColor: "var(--electron-blue)" }}
                 >
-                  <div className="flex items-center gap-3 mb-4">
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div
                       className="px-4 py-2 rounded-lg text-white font-bold"
                       style={{ backgroundColor: "var(--electron-blue)" }}
@@ -1296,7 +1313,7 @@ export function Results() {
         )}
 
         {/* What's Next - Action Buttons */}
-        <div className="rounded-xl bg-white p-5 shadow-lg print:hidden sm:p-8">
+        <div className="rounded-xl bg-white p-5 shadow-lg ring-1 ring-white/50 print:hidden sm:p-6">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
             What's Next?
           </h3>

@@ -255,11 +255,10 @@ export function Profile() {
     return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   };
 
-  // Format gender for display
-  const formatGender = (gender: string) => {
-    if (!gender) return "Not specified";
-    if (gender === "prefer-not-to-say") return "Prefer not to say";
-    return gender.charAt(0).toUpperCase() + gender.slice(1);
+  // Format sex for display
+  const formatSex = (sex: string) => {
+    if (!sex) return "Not specified";
+    return sex.charAt(0).toUpperCase() + sex.slice(1).toLowerCase();
   };
 
   // Use registration data for personal info, enrollment data only for address
@@ -269,7 +268,7 @@ export function Profile() {
     phone: profileData.contactNumber || "Not specified",
     address: formatAddress(enrollmentData),
     birthDate: formatDate(profileData.dateOfBirth),
-    gender: formatGender(profileData.gender),
+    sex: formatSex(profileData.gender),
     studentId: "2026-00001",
   };
 
@@ -338,7 +337,7 @@ export function Profile() {
       "Email",
       "Phone",
       "Date of Birth",
-      "Gender",
+      "Sex",
       "Address",
       "Enrollment Status",
       "Progress",
@@ -353,7 +352,7 @@ export function Profile() {
       studentInfo.email,
       studentInfo.phone,
       studentInfo.birthDate,
-      studentInfo.gender,
+      studentInfo.sex,
       studentInfo.address,
       enrollmentStatus.label,
       `${completedSteps}/${totalSteps} steps`,
@@ -389,9 +388,6 @@ export function Profile() {
           </div>
 
           <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
-            <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-blue-300/20 blur-3xl" />
-            <div className="pointer-events-none absolute -bottom-28 left-10 h-52 w-52 rounded-full bg-red-300/16 blur-3xl" />
-
             <input
               ref={fileInputRef}
               type="file"
@@ -475,7 +471,7 @@ export function Profile() {
                     { icon: Mail, label: "Email Address", value: studentInfo.email },
                     { icon: Phone, label: "Phone Number", value: studentInfo.phone },
                     { icon: Calendar, label: "Birth Date", value: studentInfo.birthDate },
-                    { icon: Users2, label: "Gender", value: studentInfo.gender },
+                    { icon: Users2, label: "Sex", value: studentInfo.sex },
                   ].map((item) => {
                     const Icon = item.icon;
                     return (

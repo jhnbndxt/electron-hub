@@ -1,12 +1,30 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Lock, Eye, EyeOff, Shield } from "lucide-react";
+import { Eye, EyeOff, LoaderCircle, Lock, Shield } from "lucide-react";
+import bcrypt from "bcryptjs";
+import toast, { Toaster } from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../../supabase";
+
+const getPasswordIssues = (password: string) => {
+  const issues: string[] = [];
+  if (password.length < 8) issues.push("at least 8 characters");
+  if (!/[A-Z]/.test(password)) issues.push("one uppercase letter");
+  if (!/[a-z]/.test(password)) issues.push("one lowercase letter");
+  if (!/\d/.test(password)) issues.push("one number");
+  if (!/[^A-Za-z0-9]/.test(password)) issues.push("one special character");
+  return issues;
+};
 
 export function ChangePassword() {
   const navigate = useNavigate();
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { userData } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
+  const [visibleFields, setVisibleFields] = useState({
+    currentPassword: false,
+    newPassword: false,
+    confirmPassword: false,
+  });
   const [formData, setFormData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -14,161 +32,169 @@ export function ChangePassword() {
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
+    setFormData((current) => ({
+      ...current,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const toggleField = (field: keyof typeof visibleFields) => {
+    setVisibleFields((current) => ({ ...current, [field]: !current[field] }));
+  };
+
+  const verifyCurrentPassword = async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("password_hash")
+      .eq("id", userData?.id)
+      .single();
+
+    if (error || !data?.password_hash) {
+      throw new Error("Unable to verify your current password right now.");
+    }
+
+    const passwordMatches = await bcrypt.compare(formData.currentPassword, data.password_hash);
+    if (!passwordMatches) {
+      throw new Error("The current password you entered is incorrect.");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
+    if (!userData?.id) {
+      toast.error("Please sign in again before changing your password.");
+      return;
+    }
+
     if (formData.newPassword !== formData.confirmPassword) {
-      alert("New passwords do not match!");
+      toast.error("New passwords do not match.");
       return;
     }
-    
-    if (formData.newPassword.length < 8) {
-      alert("Password must be at least 8 characters long!");
+
+    const passwordIssues = getPasswordIssues(formData.newPassword);
+    if (passwordIssues.length > 0) {
+      toast.error(`Password must include ${passwordIssues.join(", ")}.`);
       return;
     }
-    
-    // TODO: Implement password change logic
-    alert("Password changed successfully!");
-    navigate("/dashboard");
+
+    if (formData.currentPassword === formData.newPassword) {
+      toast.error("New password must be different from your current password.");
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      await verifyCurrentPassword();
+
+      const passwordHash = await bcrypt.hash(formData.newPassword, 10);
+      const { error } = await supabase
+        .from("users")
+        .update({
+          password_hash: passwordHash,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", userData.id);
+
+      if (error) {
+        throw new Error(error.message || "Failed to update password.");
+      }
+
+      toast.success("Password changed successfully.");
+      setFormData({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setTimeout(() => navigate("/dashboard/profile"), 900);
+    } catch (error) {
+      console.error("Error changing password:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to change password.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const passwordField = (
+    name: keyof typeof formData,
+    label: string,
+    placeholder: string,
+    autoComplete: string
+  ) => {
+    const isVisible = visibleFields[name];
+
+    return (
+      <label>
+        <span className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+          <Lock className="h-4 w-4 text-blue-900" />
+          {label}
+        </span>
+        <div className="relative">
+          <input
+            type={isVisible ? "text" : "password"}
+            name={name}
+            value={formData[name]}
+            onChange={handleChange}
+            required
+            minLength={name === "currentPassword" ? undefined : 8}
+            autoComplete={autoComplete}
+            className="w-full rounded-xl border border-slate-200 bg-white/85 px-4 py-3 pr-12 text-sm outline-none transition focus:ring-2 focus:ring-blue-200"
+            placeholder={placeholder}
+          />
+          <button
+            type="button"
+            onClick={() => toggleField(name)}
+            className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
+            aria-label={isVisible ? `Hide ${label}` : `Show ${label}`}
+          >
+            {isVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+      </label>
+    );
   };
 
   return (
-    <div className="p-6">
-      <div className="max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Change Password</h1>
-          <p className="text-gray-600 mt-1">Update your account password</p>
-        </div>
-
-        {/* Form Card */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          {/* Security Notice */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
-            <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-blue-900 mb-1">Security Tip</h3>
-              <p className="text-sm text-blue-700">
-                Use a strong password with at least 8 characters, including uppercase letters, lowercase letters, numbers, and special characters.
-              </p>
-            </div>
+    <div className="portal-dashboard-page flex w-full flex-col p-4 sm:p-6 lg:p-8">
+      <Toaster position="top-center" />
+      <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <section className="portal-glass-panel-strong rounded-2xl p-6">
+          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--electron-blue)] text-white shadow-lg">
+            <Shield className="h-7 w-7" />
           </div>
+          <h1 className="mt-6 text-3xl font-bold text-slate-950">Change Password</h1>
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Verify your current password before setting a new one for your Electron Hub account.
+          </p>
+          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/80 p-4">
+            <p className="text-sm font-semibold text-blue-950">Password requirements</p>
+            <p className="mt-2 text-sm leading-6 text-blue-800">
+              Use at least 8 characters with uppercase, lowercase, number, and special character.
+            </p>
+          </div>
+        </section>
 
+        <section className="portal-glass-panel rounded-2xl p-5 sm:p-6">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Current Password */}
-            <div>
-              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4" style={{ color: "#1E3A8A" }} />
-                  Current Password
-                </div>
-              </label>
-              <div className="relative">
-                <input
-                  type={showCurrentPassword ? "text" : "password"}
-                  id="currentPassword"
-                  name="currentPassword"
-                  value={formData.currentPassword}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                  placeholder="Enter current password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
+            {passwordField("currentPassword", "Current Password", "Enter current password", "current-password")}
+            {passwordField("newPassword", "New Password", "Enter new password", "new-password")}
+            {passwordField("confirmPassword", "Confirm New Password", "Confirm new password", "new-password")}
 
-            {/* New Password */}
-            <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4" style={{ color: "#1E3A8A" }} />
-                  New Password
-                </div>
-              </label>
-              <div className="relative">
-                <input
-                  type={showNewPassword ? "text" : "password"}
-                  id="newPassword"
-                  name="newPassword"
-                  value={formData.newPassword}
-                  onChange={handleChange}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                  placeholder="Enter new password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Confirm New Password */}
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                <div className="flex items-center gap-2">
-                  <Lock className="w-4 h-4" style={{ color: "#1E3A8A" }} />
-                  Confirm New Password
-                </div>
-              </label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"}
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                  minLength={8}
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent pr-10"
-                  placeholder="Confirm new password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
+            <div className="flex flex-col gap-3 pt-2 sm:flex-row">
               <button
                 type="button"
-                onClick={() => navigate("/dashboard")}
-                className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-md font-medium hover:bg-gray-50 transition-colors"
+                onClick={() => navigate("/dashboard/profile")}
+                className="inline-flex min-h-12 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="flex-1 px-6 py-3 text-white rounded-md font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#1E3A8A" }}
+                disabled={isSaving}
+                className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--electron-blue)] px-6 py-3 text-sm font-semibold text-white shadow-lg transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Update Password
+                {isSaving ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Lock className="h-5 w-5" />}
+                {isSaving ? "Updating..." : "Update Password"}
               </button>
             </div>
           </form>
-        </div>
+        </section>
       </div>
     </div>
   );
