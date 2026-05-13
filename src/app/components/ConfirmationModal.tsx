@@ -120,12 +120,7 @@ export function ConfirmationModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50"
-            style={{
-              background:
-                "radial-gradient(circle at top, rgba(15, 23, 42, 0.18), rgba(15, 23, 42, 0.62))",
-              backdropFilter: "blur(10px)",
-            }}
+            className="fixed inset-0 z-50 bg-white/35 backdrop-blur-sm"
             onClick={() => {
               if (!isConfirming) {
                 onClose();

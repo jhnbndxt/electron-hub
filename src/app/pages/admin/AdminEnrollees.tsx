@@ -282,7 +282,7 @@ export function AdminEnrollees() {
         <div className="fixed inset-0 z-50 overflow-hidden">
           {/* Overlay */}
           <div
-            className="absolute inset-0 bg-black bg-opacity-50 transition-opacity"
+            className="absolute inset-0 bg-white/35 backdrop-blur-sm transition-opacity"
             onClick={() => setSelectedStudent(null)}
           />
 

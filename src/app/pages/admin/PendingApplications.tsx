@@ -6,6 +6,10 @@ import {
   Filter,
   CheckCircle,
   RotateCcw,
+  Clock,
+  UserCheck,
+  Users,
+  XCircle,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -26,6 +30,13 @@ interface Student {
   enrollmentData?: any;
   hasReuploadedDocuments?: boolean;
   queuePriority: number;
+}
+
+interface RegistrarDashboardStats {
+  pendingApplications: number;
+  approvedApplications: number;
+  rejectedApplications: number;
+  totalEnrolledStudents: number;
 }
 
 const COMPLETED_PAYMENT_STATUSES = new Set(["verified", "approved", "completed", "paid"]);
@@ -147,10 +158,17 @@ export function PendingApplications() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
+  const [dashboardStats, setDashboardStats] = useState<RegistrarDashboardStats>({
+    pendingApplications: 0,
+    approvedApplications: 0,
+    rejectedApplications: 0,
+    totalEnrolledStudents: 0,
+  });
   const [isLoading, setIsLoading] = useState(true);
   const reviewBasePath = location.pathname.startsWith("/branchcoordinator")
     ? "/branchcoordinator"
     : "/registrar";
+  const isRegistrarView = reviewBasePath === "/registrar";
   const alert = (message: string) => {
     const text = String(message || "");
     if (text.includes("âœ…") || text.includes("✅")) return;
@@ -177,11 +195,42 @@ export function PendingApplications() {
 
     if (!applications || applications.length === 0) {
       setStudents([]);
+      setDashboardStats({
+        pendingApplications: 0,
+        approvedApplications: 0,
+        rejectedApplications: 0,
+        totalEnrolledStudents: 0,
+      });
       setIsLoading(false);
       console.log('📋 No pending applications found');
       return;
     }
     
+    const nextDashboardStats = applications.reduce(
+      (stats: RegistrarDashboardStats, app: any) => {
+        const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
+
+        if (normalizedEnrollmentStatus === "enrolled") {
+          stats.totalEnrolledStudents += 1;
+        } else if (normalizedEnrollmentStatus === "rejected") {
+          stats.rejectedApplications += 1;
+        } else if (APPROVED_MONITORING_STATUSES.has(normalizedEnrollmentStatus)) {
+          stats.approvedApplications += 1;
+        } else if (!ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus)) {
+          stats.pendingApplications += 1;
+        }
+
+        return stats;
+      },
+      {
+        pendingApplications: 0,
+        approvedApplications: 0,
+        rejectedApplications: 0,
+        totalEnrolledStudents: 0,
+      }
+    );
+    setDashboardStats(nextDashboardStats);
+
     const visibleApplications = applications.filter((app: any) => {
       const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
       return normalizedEnrollmentStatus !== "enrolled" && !ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus);
@@ -284,6 +333,40 @@ export function PendingApplications() {
   const activeStudents = filteredStudents.filter((student) => student.status === "pending" || student.status === "re-submit");
   const completedStudents = filteredStudents.filter((student) => student.status === "approved");
   const visibleStudents = [...activeStudents, ...completedStudents];
+  const registrarDashboardCards = [
+    {
+      label: "Pending Applications",
+      value: dashboardStats.pendingApplications,
+      icon: Clock,
+      accent: "#D97706",
+      surface: "border-amber-100 bg-amber-50",
+      text: "text-amber-800",
+    },
+    {
+      label: "Approved Applications",
+      value: dashboardStats.approvedApplications,
+      icon: UserCheck,
+      accent: "#059669",
+      surface: "border-emerald-100 bg-emerald-50",
+      text: "text-emerald-800",
+    },
+    {
+      label: "Rejected Applications",
+      value: dashboardStats.rejectedApplications,
+      icon: XCircle,
+      accent: "#DC2626",
+      surface: "border-red-100 bg-red-50",
+      text: "text-red-800",
+    },
+    {
+      label: "Total Enrolled Students",
+      value: dashboardStats.totalEnrolledStudents,
+      icon: Users,
+      accent: "#1E3A8A",
+      surface: "border-blue-100 bg-blue-50",
+      text: "text-blue-900",
+    },
+  ];
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -462,6 +545,41 @@ export function PendingApplications() {
         subtitle="Review and process student applications requiring action"
         icon={FileCheck}
       />
+
+      {isRegistrarView && (
+        <div className="mb-6 overflow-hidden rounded-2xl border border-white/70 bg-white/75 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+          <div className="border-b border-slate-200/80 bg-gradient-to-r from-blue-50/90 via-white/90 to-red-50/80 px-5 py-5 sm:px-6">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-800">Registrar Dashboard</p>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">Application Summary</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+              Monitor the current enrollment application volume before reviewing the queue.
+            </p>
+          </div>
+          <div className="grid gap-4 p-5 sm:grid-cols-2 sm:p-6 xl:grid-cols-4">
+            {registrarDashboardCards.map((card) => {
+              const Icon = card.icon;
+
+              return (
+                <div key={card.label} className={`rounded-xl border p-5 shadow-sm ${card.surface}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div
+                      className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-sm"
+                      style={{ backgroundColor: card.accent }}
+                    >
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <span className="rounded-full bg-white/75 px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
+                      Live
+                    </span>
+                  </div>
+                  <p className={`mt-5 text-sm font-semibold ${card.text}`}>{card.label}</p>
+                  <p className="mt-2 text-4xl font-bold tracking-tight text-slate-950">{card.value}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="backdrop-blur-xl bg-white/60 border border-white/50 rounded-xl shadow-lg p-5 mb-6">

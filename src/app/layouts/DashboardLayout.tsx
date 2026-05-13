@@ -15,8 +15,11 @@ import {
   BarChart3,
   LockKeyhole,
   AlertTriangle,
+  ClipboardCheck,
   Menu,
+  Send,
   X,
+  XCircle,
 } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
 import { MaintenanceNotice } from "../components/MaintenanceNotice";
@@ -199,6 +202,28 @@ function DashboardLayoutContent() {
           dot: 'bg-blue-500',
           actionColor: 'text-blue-700',
         };
+    }
+  };
+
+  const getNotificationIcon = (notificationType: string, variant: string) => {
+    switch (notificationType) {
+      case "DOCUMENTS_VERIFIED":
+      case "ENROLLMENT_APPROVED":
+      case "PAYMENT_VERIFIED":
+      case "ASSESSMENT_COMPLETED":
+        return CheckCircle;
+      case "DOCUMENTS_REJECTED":
+      case "PAYMENT_REJECTED":
+      case "ENROLLMENT_REJECTED":
+        return XCircle;
+      case "PAYMENT_SUBMITTED":
+      case "ENROLLMENT_SUBMITTED":
+        return Send;
+      case "ENROLLMENT_OPENED":
+      case "ENROLLMENT_CLOSED":
+        return ClipboardCheck;
+      default:
+        return variant === "warning" || variant === "error" ? AlertTriangle : Bell;
     }
   };
 
@@ -653,9 +678,10 @@ function DashboardLayoutContent() {
                         </div>
                       ) : (
                         <div className="divide-y divide-slate-100">
-                          {notifications.slice(0, 5).map((notification) => {
+                          {notifications.map((notification) => {
                             const variant = getNotificationVariant(notification.type);
                             const variantStyles = getVariantStyles(variant);
+                            const NotificationIcon = getNotificationIcon(notification.type, variant);
 
                             if (notification.type === "DOCUMENTS_VERIFIED") {
                               return (
@@ -670,7 +696,7 @@ function DashboardLayoutContent() {
                                     <div
                                       className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${variantStyles.iconBg}`}
                                     >
-                                      <CheckCircle className="h-4 w-4" />
+                                      <NotificationIcon className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-start justify-between gap-2">
@@ -707,7 +733,7 @@ function DashboardLayoutContent() {
                                     <div
                                       className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${variantStyles.iconBg}`}
                                     >
-                                      <AlertTriangle className="h-4 w-4" />
+                                      <NotificationIcon className="h-4 w-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-start justify-between gap-2">
@@ -743,11 +769,7 @@ function DashboardLayoutContent() {
                                   <div
                                     className={`mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${variantStyles.iconBg}`}
                                   >
-                                    {variant === "warning" || variant === "error" ? (
-                                      <AlertTriangle className="h-4 w-4" />
-                                    ) : (
-                                      <Bell className="h-4 w-4" />
-                                    )}
+                                    <NotificationIcon className="h-4 w-4" />
                                   </div>
                                   <div className="min-w-0 flex-1">
                                     <div className="flex items-start justify-between gap-2">
@@ -956,41 +978,35 @@ function DashboardLayoutContent() {
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm"
         >
-          <div className="portal-glass-modal w-full max-w-sm rounded-xl animate-in fade-in-0 zoom-in-95 duration-200">
-            {/* Icon and Question */}
-            <div className="p-8 text-center">
-              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
-                <LogOut className="h-6 w-6 text-red-600" />
+          <div className="portal-glass-modal w-full max-w-md overflow-hidden rounded-2xl border border-white/70 animate-in fade-in-0 zoom-in-95 duration-200">
+            <div className="border-b border-white/50 bg-gradient-to-r from-blue-50/90 via-white/90 to-red-50/80 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--electron-blue)] text-white shadow-lg">
+                <LogOut className="h-7 w-7" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                Log out?
+              <h3 className="text-2xl font-bold text-slate-950">
+                Log out of Electron Hub?
               </h3>
-              <p className="text-sm text-gray-600">
-                Are you sure you want to log out of your account?
+              <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-slate-600">
+                You can sign back in anytime to continue your enrollment tasks and check updates.
               </p>
             </div>
 
-            {/* Action Buttons */}
-            <div className="px-6 pb-6 flex gap-3">
+            <div className="flex flex-col-reverse gap-3 p-6 sm:flex-row">
               <Button
                 variant="outline"
                 onClick={() => setShowLogoutModal(false)}
-                className="flex-1"
+                className="min-h-12 flex-1 rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
               >
-                Cancel
+                Stay Logged In
               </Button>
               <Button
                 variant="default"
                 onClick={handleLogout}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                className="min-h-12 flex-1 rounded-xl bg-[var(--electron-red)] text-white hover:bg-red-800"
               >
-                Log out
+                Log Out
               </Button>
             </div>
           </div>

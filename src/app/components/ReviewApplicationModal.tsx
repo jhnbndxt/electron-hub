@@ -232,7 +232,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-white/35 backdrop-blur-sm"
         onClick={onClose}
       />
 
@@ -544,7 +544,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
       {showRejectModal && rejectingDocument && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/60"
+            className="absolute inset-0 bg-white/35 backdrop-blur-sm"
             onClick={() => setShowRejectModal(false)}
           />
           <div className="relative flex w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl border border-gray-200">

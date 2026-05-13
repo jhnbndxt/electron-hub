@@ -681,7 +681,7 @@ export function SystemConfiguration() {
       {showConfirmSaveModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+            className="absolute inset-0 bg-white/35 backdrop-blur-sm"
             onClick={() => {
               if (!saving) {
                 setShowConfirmSaveModal(false);
@@ -765,7 +765,7 @@ export function SystemConfiguration() {
 
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)} />
+          <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)} />
           <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-emerald-100 bg-white text-center shadow-2xl">
             <div className="px-6 pb-6 pt-8">
               <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">

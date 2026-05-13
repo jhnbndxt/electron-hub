@@ -542,7 +542,7 @@ export function Register() {
       {showSuccessModal && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ backdropFilter: "blur(10px)", backgroundColor: "rgba(15, 23, 42, 0.45)" }}
+          style={{ backdropFilter: "blur(6px)", backgroundColor: "rgba(255, 255, 255, 0.35)" }}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
         >

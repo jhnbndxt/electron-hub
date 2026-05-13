@@ -87,6 +87,7 @@ export function Profile() {
   const checkStatus = async () => {
     const userId = userData?.id;
     const userEmail = userData?.email || "";
+    let latestEnrollmentId = "";
     
     // Check enrollment data from Supabase
     if (userEmail) {
@@ -98,6 +99,7 @@ export function Profile() {
         .limit(1);
       
       const latestEnrollment = enrollments?.[0];
+      latestEnrollmentId = latestEnrollment?.id || "";
       setEnrollmentData(
         latestEnrollment
           ? {
@@ -124,15 +126,32 @@ export function Profile() {
     }
     
     // Check payment data from Supabase
-    if (userId) {
-      const { data: payments } = await supabase
-        .from('payments')
-        .select('*')
-        .eq('student_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      setPaymentData(payments?.[0] || null);
+    if (userId || userEmail || latestEnrollmentId) {
+      const paymentLookups = [
+        latestEnrollmentId
+          ? supabase.from('payments').select('*').eq('enrollment_id', latestEnrollmentId).order('created_at', { ascending: false }).limit(1)
+          : null,
+        userId
+          ? supabase.from('payments').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(1)
+          : null,
+        userEmail
+          ? supabase.from('payments').select('*').eq('student_id', userEmail).order('created_at', { ascending: false }).limit(1)
+          : null,
+      ].filter(Boolean) as any[];
+
+      const paymentResults = await Promise.all(paymentLookups);
+      const paymentRows = paymentResults.flatMap((result) => result.data || []);
+      paymentResults.forEach((result) => {
+        if (result.error) {
+          console.error('Error fetching payment data:', result.error);
+        }
+      });
+
+      const latestPayment = paymentRows.sort(
+        (a: any, b: any) => new Date(b.created_at || b.submitted_at || 0).getTime() - new Date(a.created_at || a.submitted_at || 0).getTime()
+      )[0];
+
+      setPaymentData(latestPayment || null);
     }
     
     // Load registration data from Supabase users table.
@@ -287,17 +306,19 @@ export function Profile() {
   const totalDocuments = 5; // Total required documents
   const enrollmentProgressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
   const getDocumentKey = (doc: any) =>
-    String(doc?.document_type || doc?.type || doc?.key || doc?.name || "").toLowerCase();
+    String(doc?.document_type || doc?.type || doc?.key || doc?.name || "")
+      .toLowerCase()
+      .replace(/[\s_-]/g, "");
   const isDocumentApproved = (doc: any) => String(doc?.status || "").toLowerCase() === "approved";
-  const requiredDocumentKeys = ["form138", "report_card", "birth", "idpicture", "id_picture", "diploma"];
-  const followUpDocumentKeys = ["esc", "form137", "goodmoral", "good_moral", "moral"];
+  const requiredDocumentKeys = ["form138", "reportcard", "birthcertificate", "birth", "idpicture", "diploma"];
+  const followUpDocumentKeys = ["esccertificate", "esc", "form137", "goodmoral", "moral"];
   const requiredDocumentsVerified = enrollmentDocuments.filter((doc: any) => {
-    const key = getDocumentKey(doc).replace(/[\s_-]/g, "");
-    return isDocumentApproved(doc) && requiredDocumentKeys.some((requiredKey) => key.includes(requiredKey.replace(/[\s_-]/g, "")));
+    const key = getDocumentKey(doc);
+    return isDocumentApproved(doc) && requiredDocumentKeys.some((requiredKey) => key.includes(requiredKey));
   }).length;
   const followUpDocumentsVerified = enrollmentDocuments.filter((doc: any) => {
-    const key = getDocumentKey(doc).replace(/[\s_-]/g, "");
-    return isDocumentApproved(doc) && followUpDocumentKeys.some((followUpKey) => key.includes(followUpKey.replace(/[\s_-]/g, "")));
+    const key = getDocumentKey(doc);
+    return isDocumentApproved(doc) && followUpDocumentKeys.some((followUpKey) => key.includes(followUpKey));
   }).length;
   
   // Get enrollment status from progress
@@ -319,6 +340,22 @@ export function Profile() {
   };
   
   const enrollmentStatus = getEnrollmentStatus();
+  const paymentMethod = paymentData?.payment_method || paymentData?.paymentMode || paymentData?.payment_mode || "";
+  const paymentReferenceNumber = paymentData?.reference_number || paymentData?.referenceNumber || "";
+  const paymentQueueNumber = paymentData?.queue_number || paymentData?.queueNumber || "";
+  const paymentRejectionComment = paymentData?.rejection_comment || paymentData?.rejectionComment || paymentData?.notes || "";
+  const paymentSubmittedDate =
+    paymentData?.submitted_at ||
+    paymentData?.submittedDate ||
+    paymentData?.generatedDate ||
+    paymentData?.created_at ||
+    "";
+  const formatPaymentDate = (dateValue: string) => {
+    if (!dateValue) return "Not specified";
+    const date = new Date(dateValue);
+    if (Number.isNaN(date.getTime())) return dateValue;
+    return date.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  };
 
   // Get user initial
   const userInitial =
@@ -657,8 +694,9 @@ export function Profile() {
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Method</p>
                         <p className="mt-1 text-lg font-bold text-slate-950">
-                          {paymentData.paymentMode === "bank" ? "Bank Transfer" : 
-                           paymentData.paymentMode === "gcash" ? "GCash" : "Cash"}
+                          {paymentMethod === "bank" ? "Bank Transfer" :
+                           paymentMethod === "gcash" ? "GCash" :
+                           paymentMethod === "cash" ? "Cash" : "Not specified"}
                         </p>
                       </div>
                       <span
@@ -683,19 +721,19 @@ export function Profile() {
                       <div className="rounded-2xl bg-slate-50/80 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Date Submitted</p>
                         <p className="mt-1 text-sm font-semibold text-slate-950">
-                          {paymentData.submittedDate || paymentData.generatedDate || "Not specified"}
+                          {formatPaymentDate(paymentSubmittedDate)}
                         </p>
                       </div>
-                      {paymentData.referenceNumber && (
+                      {paymentReferenceNumber && (
                         <div className="rounded-2xl bg-slate-50/80 p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Reference Number</p>
-                          <p className="mt-1 break-all font-mono text-sm font-bold text-slate-950">{paymentData.referenceNumber}</p>
+                          <p className="mt-1 break-all font-mono text-sm font-bold text-slate-950">{paymentReferenceNumber}</p>
                         </div>
                       )}
-                      {paymentData.queueNumber && (
+                      {paymentQueueNumber && (
                         <div className="rounded-2xl bg-slate-50/80 p-4">
                           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Queue Number</p>
-                          <p className="mt-1 font-mono text-xl font-bold text-blue-900">{paymentData.queueNumber}</p>
+                          <p className="mt-1 font-mono text-xl font-bold text-blue-900">{paymentQueueNumber}</p>
                         </div>
                       )}
                     </div>
@@ -710,10 +748,10 @@ export function Profile() {
                       </div>
                     )}
 
-                    {paymentData.status === "rejected" && paymentData.rejectionComment && (
+                    {paymentData.status === "rejected" && paymentRejectionComment && (
                       <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-4">
                         <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Rejection Reason</p>
-                        <p className="mt-1 text-sm font-medium text-red-700">{paymentData.rejectionComment}</p>
+                        <p className="mt-1 text-sm font-medium text-red-700">{paymentRejectionComment}</p>
                       </div>
                     )}
                   </div>

@@ -558,7 +558,7 @@ export function PaymentHistory() {
 
         {/* Receipt Modal */}
         {showReceipt && selectedPayment && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 print:bg-white print:p-0 print:block print:static">
+          <div className="fixed inset-0 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm z-50 print:bg-white print:p-0 print:block print:static">
             <div className="bg-white rounded-lg shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto print:max-h-none print:shadow-none print:rounded-none">
               {/* Print Header */}
               <div className="print-only print-header" style={{ display: 'none' }}>

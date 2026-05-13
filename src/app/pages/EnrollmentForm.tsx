@@ -278,6 +278,13 @@ export function EnrollmentForm() {
     }));
   };
 
+  const mergeDraftWithRegistrationData = (draftData: Partial<FormData>, registrationSource: any = {}) => ({
+    ...draftData,
+    sex: draftData.sex || registrationSource.sex || registrationSource.gender || "",
+    birthday: draftData.birthday || registrationSource.birthDate || registrationSource.birth_date || "",
+    contactNumber: draftData.contactNumber || registrationSource.contactNumber || registrationSource.contact_number || "",
+  });
+
   const normalizeSubmittedRecord = (record: any) => {
     const source = record?.form_data || record || {};
 
@@ -370,16 +377,13 @@ export function EnrollmentForm() {
         }
 
         let restoredDraftData: any = null;
+        let registrationSource: any = userData || {};
 
         try {
           const localDraft = localStorage.getItem(enrollmentDraftKey);
           if (localDraft) {
             const parsedDraft = JSON.parse(localDraft);
             restoredDraftData = parsedDraft.formData || null;
-
-            if (restoredDraftData) {
-              setFormData(prev => ({ ...prev, ...restoredDraftData }));
-            }
 
             if (Number.isInteger(parsedDraft.currentPage)) {
               setCurrentPage(Math.min(Math.max(parsedDraft.currentPage, 1), 7));
@@ -402,10 +406,17 @@ export function EnrollmentForm() {
             .eq("email", userEmail)
             .single();
 
-          applyRegistrationData(registrationData || userData || {});
+          registrationSource = registrationData || userData || {};
+          applyRegistrationData(registrationSource);
         } catch (error) {
           console.error("Failed to fetch registration data:", error);
           applyRegistrationData(userData || {});
+        }
+
+        if (restoredDraftData) {
+          const restData = mergeDraftWithRegistrationData(restoredDraftData, registrationSource);
+          setFormData(prev => ({ ...prev, ...restData }));
+          restoredDraftData = restData;
         }
         
         // Try to restore autosaved draft
@@ -413,7 +424,10 @@ export function EnrollmentForm() {
         if (draftData && !restoredDraftData) {
           try {
             const { currentPage: draftPage, certificationChecked: draftCertification, lastSaved, ...rawDraftData } = draftData;
-            const restData = stripFileFields(rawDraftData as Partial<FormData>);
+            const restData = mergeDraftWithRegistrationData(
+              stripFileFields(rawDraftData as Partial<FormData>),
+              registrationSource
+            );
             setFormData(prev => ({ ...prev, ...restData }));
             if (Number.isInteger(draftPage)) {
               setCurrentPage(Math.min(Math.max(draftPage, 1), 7));

@@ -28,7 +28,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
   return (
     <div className="fixed inset-0 z-[10001] flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-white/35 backdrop-blur-sm"
         onClick={onClose}
       />
 

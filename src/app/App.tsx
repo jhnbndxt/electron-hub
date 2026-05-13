@@ -27,7 +27,6 @@ import { PaymentHistory } from "./pages/PaymentHistory";
 import { Payment } from "./pages/Payment";
 import { StudentAccount } from "./pages/StudentAccount";
 import { PublicAssessment } from "./pages/PublicAssessment";
-import { AdminDashboard } from "./pages/admin/AdminDashboard";
 import { PendingApplications } from "./pages/admin/PendingApplications";
 import { ApplicationReviewPage } from "./pages/admin/ApplicationReviewPage";
 import { DocumentVerification } from "./pages/admin/DocumentVerification";
@@ -138,7 +137,7 @@ export default function App() {
           Component: AdminLayout,
           ErrorBoundary: ErrorBoundary,
           children: [
-            { index: true, Component: AdminDashboard },
+            { index: true, element: <Navigate to="/registrar/pending" replace /> },
             { path: "pending", Component: PendingApplications },
             { path: "review", Component: ApplicationReviewPage },
             { path: "review/:id", Component: ApplicationReviewPage },

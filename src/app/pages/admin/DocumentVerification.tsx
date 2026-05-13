@@ -494,7 +494,7 @@ export function DocumentVerification() {
       {/* Review Modal */}
       {showReviewModal && selectedStudent && selectedDocument && (
         <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setShowReviewModal(false)}>
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" />
           <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
             <div className="w-screen max-w-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex h-full flex-col bg-white shadow-2xl">

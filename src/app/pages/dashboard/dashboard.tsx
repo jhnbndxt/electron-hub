@@ -293,8 +293,8 @@ export function DashboardPage() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn"
           style={{
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
-            backdropFilter: "blur(4px)",
+            backgroundColor: "rgba(255, 255, 255, 0.35)",
+            backdropFilter: "blur(6px)",
           }}
         >
           <div

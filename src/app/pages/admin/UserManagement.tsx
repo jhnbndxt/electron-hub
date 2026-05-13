@@ -973,9 +973,9 @@ export function UserManagement() {
         <div
           className="fixed inset-0 flex items-center justify-center p-4 z-50"
           style={{
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
-            backdropFilter: "blur(8px)",
-            WebkitBackdropFilter: "blur(8px)"
+            backgroundColor: "rgba(255, 255, 255, 0.35)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)"
           }}
           onClick={() => setShowAddModal(false)}
         >
