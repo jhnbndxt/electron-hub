@@ -2,7 +2,7 @@ import {
   Search,
   FileCheck,
   FileText,
-  Download,
+  RefreshCw,
   Filter,
   CheckCircle,
   RotateCcw,
@@ -616,7 +616,7 @@ export function PendingApplications() {
             className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
-            <Download className="w-4 h-4" />
+            <RefreshCw className="w-4 h-4" />
             Refresh
           </button>
         </div>
