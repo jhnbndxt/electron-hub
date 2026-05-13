@@ -751,20 +751,15 @@ export function Results() {
             <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-white/75">
               The next step is choosing the right track and electives that best match your learning style and future goals.
             </p>
+            <button
+              onClick={handleDownloadPDF}
+              disabled={isDownloading}
+              className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-white/95 px-8 py-3 text-sm font-semibold text-blue-800 shadow-xl shadow-blue-900/10 transition-all hover:bg-white print:hidden"
+            >
+              <Download className="w-5 h-5" />
+              {isDownloading ? "Preparing PDF..." : "Download Results as PDF"}
+            </button>
           </div>
-        </div>
-
-        {/* Download Button Row */}
-        <div className="mb-6 flex justify-stretch sm:justify-end">
-          <button
-            onClick={handleDownloadPDF}
-            disabled={isDownloading}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold shadow-md transition-all hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 print:hidden sm:w-auto"
-            style={{ backgroundColor: "var(--electron-blue)" }}
-          >
-            <Download className="w-5 h-5" />
-            {isDownloading ? "Preparing PDF..." : "Download Results as PDF"}
-          </button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.85fr] gap-8 mb-8">
@@ -779,6 +774,9 @@ export function Results() {
                 <h2 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">{track}</h2>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
                   Electron Hub recommends this track because your strengths and interests match its long-term opportunities and growth path.
+                </p>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+                  {trackExplanation} It highlights how your performance across analytical, technical, mathematical, and communication domains aligns with the strengths of the {track} Track.
                 </p>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -1142,8 +1140,11 @@ export function Results() {
                 Career Pathways
               </h3>
             </div>
+            <p className="text-gray-600 mb-3">
+              The AI recommendation not only selects the right track, it also identifies strong career directions you can pursue from this path.
+            </p>
             <p className="text-gray-600 mb-6">
-              Explore potential career paths based on your recommended track and electives:
+              These careers reflect your elective choices and cognitive strengths, making them well-suited pathways to build a meaningful and sustainable future.
             </p>
             <div className="grid grid-cols-1 gap-6">
               {allCareerPathways.map((pathway, index) => (
