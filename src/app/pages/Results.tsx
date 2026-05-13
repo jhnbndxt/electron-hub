@@ -360,6 +360,14 @@ export function Results() {
         (pathway) => pathway?.category && Array.isArray(pathway.careers) && pathway.careers.length > 0
       )
     : [];
+  const electiveExplanations = electives.map((elective, index) => ({
+    elective,
+    explanation:
+      index === 0
+        ? aiRecommendation?.elective1Explanation
+        : aiRecommendation?.elective2Explanation,
+  }));
+
   const recommendedBranches = getRecommendedElectronBranches({
     track,
     electives,
@@ -584,6 +592,18 @@ export function Results() {
         },
       });
       cursorY = getLastAutoTableFinalY() + 22;
+
+      if (electiveExplanations.some((item) => item.explanation)) {
+        addSectionTitle("Elective Insights");
+        electiveExplanations.forEach((item, index) => {
+          if (item.explanation) {
+            addParagraph(`Elective ${index + 1} (${item.elective}): ${item.explanation}`, {
+              gapAfter: 6,
+            });
+          }
+        });
+        cursorY = getLastAutoTableFinalY() + 22;
+      }
 
       addSectionTitle("Track Overview");
       autoTable(doc, {
@@ -829,7 +849,7 @@ export function Results() {
                 </span>
               </div>
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                {electives.map((elective, index) => (
+                {electiveExplanations.map(({ elective, explanation }, index) => (
                   <div
                     key={index}
                     className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
@@ -843,6 +863,11 @@ export function Results() {
                         <h4 className="mt-2 text-lg font-semibold text-slate-950">{elective}</h4>
                       </div>
                     </div>
+                    {explanation ? (
+                      <p className="mt-4 text-sm leading-6 text-slate-600">
+                        {explanation}
+                      </p>
+                    ) : null}
                   </div>
                 ))}
               </div>
