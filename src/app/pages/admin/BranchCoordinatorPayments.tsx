@@ -621,8 +621,8 @@ export function BranchCoordinatorPayments() {
 
       {/* Details Modal */}
       {showDetailsModal && selectedPayment && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" onClick={closeDetailsModal}>
-          <div className="fixed inset-0 bg-gradient-to-br from-slate-950/35 via-blue-950/25 to-slate-900/35 backdrop-blur-md" />
+        <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-y-auto lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={closeDetailsModal}>
+          <div className="fixed inset-y-0 right-0 left-0 bg-white/35 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]" />
           <div className="relative flex min-h-full items-center justify-center p-4">
             <div
               className="w-full max-w-6xl overflow-hidden rounded-3xl border border-white/60 bg-white/75 shadow-2xl shadow-blue-950/20 ring-1 ring-blue-100/50 backdrop-blur-2xl"
@@ -788,9 +788,9 @@ export function BranchCoordinatorPayments() {
 
       {/* Legacy details modal retained inactive after redesign */}
       {false && showDetailsModal && selectedPayment && (
-        <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setShowDetailsModal(false)}>
+        <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-hidden lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowDetailsModal(false)}>
           <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" />
-          <div className="fixed inset-0 flex items-center justify-center p-4">
+          <div className="fixed inset-y-0 right-0 left-0 flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full" onClick={(e) => e.stopPropagation()}>
               <div className="px-6 py-4 bg-blue-600 rounded-t-lg">
                 <h2 className="text-xl font-semibold text-white">Transaction Details</h2>

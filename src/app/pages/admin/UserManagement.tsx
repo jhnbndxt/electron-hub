@@ -821,11 +821,11 @@ export function UserManagement() {
       {/* Edit Role Modal */}
       {editingUser && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]"
           style={{
-            background: "linear-gradient(135deg, rgba(15, 23, 42, 0.32), rgba(30, 58, 138, 0.22))",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            backgroundColor: "rgba(255, 255, 255, 0.35)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
           }}
           onClick={closeEditModal}
         >
@@ -971,7 +971,7 @@ export function UserManagement() {
       {/* Add User Modal */}
       {showAddModal && (
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-50"
+          className="fixed inset-y-0 right-0 left-0 flex items-center justify-center p-4 z-50 lg:left-[var(--dashboard-sidebar-offset,0px)]"
           style={{
             backgroundColor: "rgba(255, 255, 255, 0.35)",
             backdropFilter: "blur(6px)",

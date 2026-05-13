@@ -291,7 +291,7 @@ export function DashboardPage() {
       {/* Welcome Modal */}
       {showWelcomeModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn"
+          className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center p-4 animate-fadeIn lg:left-[var(--dashboard-sidebar-offset,0px)]"
           style={{
             backgroundColor: "rgba(255, 255, 255, 0.35)",
             backdropFilter: "blur(6px)",

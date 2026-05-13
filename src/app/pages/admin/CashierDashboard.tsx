@@ -671,7 +671,7 @@ export function CashierDashboard() {
 
       {/* Online Payment Review Modal */}
       {showReviewModal && selectedPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm" onClick={() => setShowReviewModal(false)}>
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowReviewModal(false)}>
           <div className="w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="portal-glass-modal">
               {/* Header */}
@@ -883,9 +883,9 @@ export function CashierDashboard() {
 
       {/* Cash Payment Modal */}
       {showCashModal && selectedCashPayment && (
-        <div className="fixed inset-0 z-50 overflow-hidden" onClick={() => setShowCashModal(false)}>
+        <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-hidden lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowCashModal(false)}>
           <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" />
-          <div className="fixed inset-y-0 right-0 flex max-w-full pl-10">
+          <div className="absolute inset-y-0 right-0 flex max-w-full pl-10">
             <div className="w-screen max-w-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex h-full flex-col bg-white shadow-xl">
                 {/* Header */}

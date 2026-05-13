@@ -679,7 +679,7 @@ export function SystemConfiguration() {
       </div>
 
       {showConfirmSaveModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div
             className="absolute inset-0 bg-white/35 backdrop-blur-sm"
             onClick={() => {
@@ -764,7 +764,7 @@ export function SystemConfiguration() {
       )}
 
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" onClick={() => setShowSuccessModal(false)} />
           <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-emerald-100 bg-white text-center shadow-2xl">
             <div className="px-6 pb-6 pt-8">

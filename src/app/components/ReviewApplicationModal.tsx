@@ -230,7 +230,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
     : formData?.guardianSource || "N/A";
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-y-0 right-0 left-0 z-[9999] flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
       <div
         className="absolute inset-0 bg-white/35 backdrop-blur-sm"
         onClick={onClose}
@@ -542,7 +542,7 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
 
       {/* Rejection Reason Modal */}
       {showRejectModal && rejectingDocument && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+        <div className="fixed inset-y-0 right-0 left-0 z-[10000] flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div
             className="absolute inset-0 bg-white/35 backdrop-blur-sm"
             onClick={() => setShowRejectModal(false)}

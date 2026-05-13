@@ -78,6 +78,20 @@ function DashboardLayoutContent() {
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const paymentTooltipRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    const previousOffset = root.style.getPropertyValue("--dashboard-sidebar-offset");
+    root.style.setProperty("--dashboard-sidebar-offset", "16rem");
+
+    return () => {
+      if (previousOffset) {
+        root.style.setProperty("--dashboard-sidebar-offset", previousOffset);
+      } else {
+        root.style.removeProperty("--dashboard-sidebar-offset");
+      }
+    };
+  }, []);
+
   // Get user's name and initial from authenticated user
   const userName = userData?.name || "Student";
   const userInitial =
@@ -978,7 +992,7 @@ function DashboardLayoutContent() {
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm"
+          className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
         >
           <div className="portal-glass-modal w-full max-w-md overflow-hidden rounded-2xl border border-white/70 animate-in fade-in-0 zoom-in-95 duration-200">
             <div className="border-b border-white/50 bg-gradient-to-r from-blue-50/90 via-white/90 to-red-50/80 p-6 text-center">

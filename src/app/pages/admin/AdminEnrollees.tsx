@@ -279,7 +279,7 @@ export function AdminEnrollees() {
 
       {/* Slide-over Panel */}
       {selectedStudent && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
+        <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-hidden lg:left-[var(--dashboard-sidebar-offset,0px)]">
           {/* Overlay */}
           <div
             className="absolute inset-0 bg-white/35 backdrop-blur-sm transition-opacity"

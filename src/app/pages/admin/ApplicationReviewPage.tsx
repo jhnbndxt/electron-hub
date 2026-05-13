@@ -498,7 +498,7 @@ export function ApplicationReviewPage() {
       <Toaster position="top-right" />
 
       {isProcessing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30">
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div className="inline-flex items-center gap-3 rounded-xl bg-white px-5 py-4 text-sm font-bold shadow-xl">
             <RefreshCw className="h-5 w-5 animate-spin text-blue-700" />
             Processing...
@@ -913,7 +913,7 @@ export function ApplicationReviewPage() {
       </div>
 
       {(docRejectKey || docRejectKeys.length > 0) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm">
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50 px-5 py-4">
               <div>
@@ -963,7 +963,7 @@ export function ApplicationReviewPage() {
       )}
 
       {showApplicationReject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm">
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50 px-5 py-4">
               <h2 className="text-lg font-black text-slate-950">Reject Application</h2>
