@@ -568,9 +568,6 @@ export function PendingApplications() {
                     >
                       <Icon className="h-5 w-5" />
                     </div>
-                    <span className="rounded-full bg-white/75 px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm">
-                      Live
-                    </span>
                   </div>
                   <p className={`mt-5 text-sm font-semibold ${card.text}`}>{card.label}</p>
                   <p className="mt-2 text-4xl font-bold tracking-tight text-slate-950">{card.value}</p>

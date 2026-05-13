@@ -30,6 +30,18 @@ interface AssessmentResults {
   };
   topDomains: string[];
   topInterests: string[];
+  overallScore?: number;
+  aiRecommendation?: {
+    recommendedTrack?: string;
+    trackExplanation?: string;
+    elective1?: string;
+    elective1Explanation?: string;
+    elective2?: string;
+    elective2Explanation?: string;
+    overallAnalysis?: string;
+    suggestedCollegeCourses?: string[];
+    careerPathways?: Array<{ category: string; careers: string[] }>;
+  };
 }
 
 export function Results() {
@@ -44,6 +56,9 @@ export function Results() {
 
     const loadResults = async () => {
       const userEmail = userData?.email || "student@gmail.com";
+      const assessmentKey = `assessmentResults_${userEmail}`;
+      const storedResultsRaw = localStorage.getItem(assessmentKey);
+      const storedResults = storedResultsRaw ? JSON.parse(storedResultsRaw) : null;
 
       try {
         const latestResult = await getLatestAssessmentResult(userEmail);
@@ -55,21 +70,25 @@ export function Results() {
             scores: latestResult.scores,
             topDomains: latestResult.topDomains,
             topInterests: latestResult.topInterests,
+            overallScore: latestResult.overallScore,
+            aiRecommendation: storedResults?.aiRecommendation,
           });
           setLoading(false);
           return;
         }
 
-        const assessmentKey = `assessmentResults_${userEmail}`;
-        const storedResults = localStorage.getItem(assessmentKey);
         if (storedResults) {
-          setResults(JSON.parse(storedResults));
+          setResults(storedResults);
         } else {
           setResults(null);
         }
       } catch (error) {
         console.error("Error loading assessment results:", error);
-        setResults(null);
+        if (storedResults) {
+          setResults(storedResults);
+        } else {
+          setResults(null);
+        }
       } finally {
         setLoading(false);
       }
@@ -107,12 +126,19 @@ export function Results() {
     );
   }
 
-  const { track, electives, scores, topDomains, topInterests } = results;
+  const { track, electives, scores, topDomains, topInterests, overallScore: storedOverallScore, aiRecommendation } = results;
 
-  // Calculate overall score (average of all domains)
-  const overallScore = Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
+  // Calculate overall score (average of all domains) when not provided by stored results
+  const overallScore = storedOverallScore ?? Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
+  const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest domains";
+  const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your preferred interests";
 
-  // Determine track color based on Electron Blue theme
+  const trackNarrative = aiRecommendation?.trackExplanation ||
+    `The ${track} Track is recommended because your aptitude and interests align strongly with its learning profile.`;
+
+  const analysisSummary = aiRecommendation?.overallAnalysis ||
+    `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
+
   const trackColor = "var(--electron-blue)";
   const secondaryColor = "var(--electron-red)";
   const generatedDateLabel = new Date().toLocaleDateString("en-US", {
@@ -126,8 +152,6 @@ export function Results() {
     { name: "Mathematical Ability", score: scores.MA, color: "#3B82F6", key: "MA" },
     { name: "Verbal / Communication", score: scores.VA, color: "#EC4899", key: "VA" },
   ];
-  const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest domains";
-  const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your preferred interests";
   const trackStudyHighlights =
     track === "Academic"
       ? [
@@ -331,11 +355,16 @@ export function Results() {
   const allCareerPathways = electives.flatMap(elective =>
     getCareerPathways(track, elective)
   );
+  const aiCareerPathways = Array.isArray(aiRecommendation?.careerPathways)
+    ? aiRecommendation.careerPathways.filter(
+        (pathway) => pathway?.category && Array.isArray(pathway.careers) && pathway.careers.length > 0
+      )
+    : [];
   const recommendedBranches = getRecommendedElectronBranches({
     track,
     electives,
     suggestedCourses: uniqueCourses,
-    careerPathways: allCareerPathways,
+    careerPathways: aiCareerPathways.length > 0 ? aiCareerPathways : allCareerPathways,
     topDomains,
     topInterests,
   });
@@ -773,10 +802,7 @@ export function Results() {
                 </div>
                 <h2 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">{track}</h2>
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                  Electron Hub recommends this track because your strengths and interests match its long-term opportunities and growth path.
-                </p>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
-                  {trackExplanation} It highlights how your performance across analytical, technical, mathematical, and communication domains aligns with the strengths of the {track} Track.
+                  {trackNarrative}
                 </p>
 
                 <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -833,7 +859,7 @@ export function Results() {
                 </div>
               </div>
               <p className="mt-6 max-w-3xl text-sm leading-7 text-slate-600">
-                {recommendationSummary} {trackExplanation}
+                {analysisSummary}
               </p>
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-3xl bg-slate-50 p-5">
@@ -1132,7 +1158,7 @@ export function Results() {
         )}
 
         {/* NEW SECTION: Career Pathways */}
-        {allCareerPathways.length > 0 && (
+        {(aiCareerPathways.length > 0 || allCareerPathways.length > 0) && (
           <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
             <div className="flex items-center gap-2 mb-2">
               <Briefcase className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
@@ -1141,46 +1167,75 @@ export function Results() {
               </h3>
             </div>
             <p className="text-gray-600 mb-3">
-              The AI recommendation not only selects the right track, it also identifies strong career directions you can pursue from this path.
+              {aiCareerPathways.length > 0
+                ? "The AI recommendation identifies career categories that match your strengths, track, and elective choices."
+                : "Explore potential career paths based on your recommended track and electives:"}
             </p>
             <p className="text-gray-600 mb-6">
-              These careers reflect your elective choices and cognitive strengths, making them well-suited pathways to build a meaningful and sustainable future.
+              {aiCareerPathways.length > 0
+                ? "These career paths are tailored to your aptitude, interests, and recommended track."
+                : "These careers reflect your elective choices and cognitive strengths, making them well-suited pathways to build a meaningful and sustainable future."}
             </p>
             <div className="grid grid-cols-1 gap-6">
-              {allCareerPathways.map((pathway, index) => (
-                <div
-                  key={index}
-                  className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
-                  style={{ borderColor: "var(--electron-blue)" }}
-                >
-                  <div className="flex items-center gap-3 mb-4">
-                    <div
-                      className="px-4 py-2 rounded-lg text-white font-bold"
-                      style={{ backgroundColor: "var(--electron-blue)" }}
-                    >
-                      {pathway.course}
+              {aiCareerPathways.length > 0 ? (
+                aiCareerPathways.map((pathway, categoryIndex) => (
+                  <div
+                    key={categoryIndex}
+                    className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
+                    style={{ borderColor: "var(--electron-blue)" }}
+                  >
+                    <div className="mb-4">
+                      <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{pathway.category}</p>
+                      <h4 className="mt-2 text-xl font-bold text-slate-900">Career opportunities</h4>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-600 font-medium">Career Opportunities</span>
+                    <div className="flex flex-wrap gap-3">
+                      {pathway.careers.map((career, careerIndex) => (
+                        <span
+                          key={careerIndex}
+                          className="rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700"
+                        >
+                          {career}
+                        </span>
+                      ))}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-3">
-                    {pathway.careers.map((career, careerIndex) => (
+                ))
+              ) : (
+                allCareerPathways.map((pathway, index) => (
+                  <div
+                    key={index}
+                    className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
+                    style={{ borderColor: "var(--electron-blue)" }}
+                  >
+                    <div className="flex items-center gap-3 mb-4">
                       <div
-                        key={careerIndex}
-                        className="px-4 py-2 rounded-lg font-semibold border-2 transition-all hover:shadow-md"
-                        style={{
-                          borderColor: "var(--electron-red)",
-                          color: "var(--electron-red)",
-                          backgroundColor: "var(--electron-light-gray)",
-                        }}
+                        className="px-4 py-2 rounded-lg text-white font-bold"
+                        style={{ backgroundColor: "var(--electron-blue)" }}
                       >
-                        <Briefcase className="w-4 h-4 inline-block mr-2" />
-                        {career}
+                        {pathway.course}
                       </div>
-                    ))}
+                      <ArrowRight className="w-5 h-5 text-gray-400" />
+                      <span className="text-gray-600 font-medium">Career Opportunities</span>
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {pathway.careers.map((career, careerIndex) => (
+                        <div
+                          key={careerIndex}
+                          className="px-4 py-2 rounded-lg font-semibold border-2 transition-all hover:shadow-md"
+                          style={{
+                            borderColor: "var(--electron-red)",
+                            color: "var(--electron-red)",
+                            backgroundColor: "var(--electron-light-gray)",
+                          }}
+                        >
+                          <Briefcase className="w-4 h-4 inline-block mr-2" />
+                          {career}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         )}

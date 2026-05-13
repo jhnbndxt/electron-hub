@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Download } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -495,11 +495,11 @@ export function Profile() {
                   </div>
                   <button
                     type="button"
-                    onClick={handleExportStudentRecordCSV}
+                    onClick={() => navigate("/dashboard/edit-profile")}
                     className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-                    aria-label="Export student record"
+                    aria-label="Edit profile"
                   >
-                    <Download className="h-4 w-4" />
+                    <Edit3 className="h-4 w-4" />
                   </button>
                 </div>
 
