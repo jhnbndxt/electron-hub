@@ -87,12 +87,12 @@ const TECHNICAL_TRACK_KEYWORDS = ["technical", "technical-professional", "techni
 const ACCOUNT_KEYWORDS = ["login", "register", "create account", "sign up", "account"];
 
 const QUICK_PROMPTS = [
-  { label: "Enrollment Process", value: "How do I enroll?", icon: Compass },
-  { label: "Required Documents", value: "What are the required documents?", icon: FileCheck2 },
-  { label: "Voucher Eligibility", value: "Am I eligible for the voucher program?", icon: Sparkles },
-  { label: "Payment Methods", value: "How do I pay?", icon: CreditCard },
-  { label: "AI Assessment", value: "How does the AI Assessment work?", icon: GraduationCap },
-  { label: "Re-upload Documents", value: "How do I re-upload rejected documents?", icon: FileCheck2 },
+  { label: "How do I enroll?", value: "How do I enroll?", icon: Compass },
+  { label: "What documents are required?", value: "What documents are required?", icon: FileCheck2 },
+  { label: "Am I eligible for the voucher program?", value: "Am I eligible for the voucher program?", icon: Sparkles },
+  { label: "How do I re-upload documents?", value: "How do I re-upload documents?", icon: FileCheck2 },
+  { label: "How do I pay tuition?", value: "How do I pay tuition?", icon: CreditCard },
+  { label: "What track fits me?", value: "What track fits me?", icon: GraduationCap },
 ];
 
 const ACADEMIC_ELECTIVES = [
@@ -159,13 +159,13 @@ function deserializeMessage(message: StoredChatMessage): ChatMessage {
 
 function loadStoredMessages() {
   if (typeof window === "undefined") {
-    return [buildWelcomeMessage()];
+    return [];
   }
 
   try {
     const stored = localStorage.getItem(CHAT_STORAGE_KEY);
     if (!stored) {
-      return [buildWelcomeMessage()];
+      return [];
     }
 
     const parsed = JSON.parse(stored);
@@ -174,10 +174,10 @@ function loadStoredMessages() {
       .map((message: StoredChatMessage) => deserializeMessage(message))
       .filter((message: ChatMessage) => message.id && message.sender && message.text);
 
-    return messages.length > 0 ? messages : [buildWelcomeMessage()];
+    return messages;
   } catch (error) {
     console.error("Failed to restore chatbot conversation:", error);
-    return [buildWelcomeMessage()];
+    return [];
   }
 }
 
@@ -331,22 +331,6 @@ function getCurrentProgressStep(progress: AssistantContext["enrollmentProgress"]
 
   const lastCompletedStep = [...progress].reverse().find((step) => step.status === "completed");
   return lastCompletedStep?.name || "Account Created";
-}
-
-function buildWelcomeMessage(): ChatMessage {
-  return {
-    id: createMessageId("bot"),
-    sender: "bot",
-    text: "Hello! Welcome to Electron Hub. How can I assist you today?",
-    timestamp: new Date(),
-    source: "local",
-    actions: [
-      promptAction("Assessment help", "How does the assessment work?", GraduationCap),
-      promptAction("Enrollment steps", "How do I enroll?", Compass),
-      promptAction("Requirements", "What are the document requirements?", FileCheck2),
-      promptAction("Payment options", "How do I pay?", CreditCard),
-    ],
-  };
 }
 
 function buildStatusReply(context: AssistantContext) {
@@ -644,8 +628,8 @@ export function ChatAssistantShell({
     }),
     [enrollmentProgress, routes, userData?.name, userRole]
   );
-  const hasUserStartedConversation = messages.some((message) => message.sender === "user");
-  const shouldShowQuickPrompts = !hasUserStartedConversation;
+  const isConversationEmpty = messages.length === 0;
+  const shouldShowQuickPrompts = isConversationEmpty;
 
   const openStateChange = (nextOpenState: boolean) => {
     if (externalIsOpen === undefined) {
@@ -660,7 +644,7 @@ export function ChatAssistantShell({
   const clearConversation = () => {
     skipNextPersistRef.current = true;
     localStorage.removeItem(CHAT_STORAGE_KEY);
-    setMessages([buildWelcomeMessage()]);
+    setMessages([]);
     setInput("");
     setIsTyping(false);
     setShowClearConfirmation(false);
@@ -895,7 +879,7 @@ export function ChatAssistantShell({
                       <button
                         type="button"
                         onClick={() => setShowClearConfirmation(true)}
-                        disabled={messages.length <= 1 && !hasUserStartedConversation}
+                        disabled={isConversationEmpty}
                         className="rounded-2xl border border-slate-200/80 bg-white/80 p-1.5 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 sm:p-2"
                         aria-label="Clear chat conversation"
                         title="Clear conversation"
@@ -917,21 +901,29 @@ export function ChatAssistantShell({
 
                 <div
                   ref={scrollContainerRef}
-                  className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4 sm:px-5"
+                  className={`relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4 sm:px-5 ${
+                    isConversationEmpty ? "flex items-center" : ""
+                  }`}
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   <AnimatePresence initial={false}>
                     {shouldShowQuickPrompts && (
                       <motion.div
-                        className="mb-4"
-                        initial={{ opacity: 0, y: -8 }}
+                        className="mx-auto w-full max-w-sm py-8 text-center"
+                        initial={{ opacity: 0, y: 10, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -8 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
                       >
-                        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-                          Quick questions
+                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                          <Sparkles className="h-7 w-7" />
+                        </div>
+                        <h3 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
+                          How can I help you today?
+                        </h3>
+                        <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                          Ask about enrollment, documents, voucher eligibility, payments, or your track options.
                         </p>
-                        <div className="flex gap-2 overflow-x-auto pb-1">
+                        <div className="mt-6 grid gap-2">
                           {QUICK_PROMPTS.map((prompt) => {
                             const PromptIcon = prompt.icon;
                             return (
@@ -940,10 +932,12 @@ export function ChatAssistantShell({
                                 type="button"
                                 onClick={() => handleSend(prompt.value)}
                                 disabled={isTyping}
-                                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3 py-2 text-xs font-semibold text-blue-900 shadow-sm transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                                className="group inline-flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 text-left text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-900 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
                               >
-                                <PromptIcon className="h-3.5 w-3.5" />
-                                {prompt.label}
+                                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-blue-700 transition group-hover:bg-white">
+                                  <PromptIcon className="h-4.5 w-4.5" />
+                                </span>
+                                <span>{prompt.label}</span>
                               </button>
                             );
                           })}
