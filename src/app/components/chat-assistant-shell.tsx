@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Send,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -23,6 +24,7 @@ export interface ChatAssistantShellProps {
 }
 
 type Sender = "user" | "bot";
+const ASSISTANT_NAME = "EHub AI Assistant";
 
 interface AssistantAction {
   kind: "prompt" | "link";
@@ -122,6 +124,55 @@ const COMMON_REQUIREMENTS = [
 
 function createMessageId(prefix: Sender) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function reviveMessage(message: ChatMessage): ChatMessage {
+  return {
+    ...message,
+    timestamp: message.timestamp ? new Date(message.timestamp) : new Date(),
+  };
+}
+
+function getStoredMessages(storageKey: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const storedMessages = window.localStorage.getItem(storageKey);
+    if (!storedMessages) return null;
+
+    const parsedMessages = JSON.parse(storedMessages);
+    if (!Array.isArray(parsedMessages) || parsedMessages.length === 0) return null;
+
+    return parsedMessages.map(reviveMessage);
+  } catch {
+    return null;
+  }
+}
+
+function saveStoredMessages(storageKey: string, messages: ChatMessage[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(messages));
+  } catch {
+    // Ignore storage errors so chat remains usable in restricted browser modes.
+  }
+}
+
+function clearStoredMessages(storageKey: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Ignore storage errors so the UI can still reset the in-memory conversation.
+  }
 }
 
 function normalizeInput(value: string) {
@@ -265,7 +316,7 @@ function buildWelcomeMessage(): ChatMessage {
   return {
     id: createMessageId("bot"),
     sender: "bot",
-    text: "Hello! Welcome to Electron Hub. How can I assist you today?",
+    text: `Hello! I am ${ASSISTANT_NAME}. I can help with enrollment, assessment, documents, payments, vouchers, and portal navigation.`,
     timestamp: new Date(),
     source: "local",
     actions: [
@@ -406,7 +457,7 @@ function buildAssistantReply(input: string, context: AssistantContext) {
 
   if (hasKeyword(normalizedInput, IDENTITY_KEYWORDS)) {
     return {
-      text: "I am the Electron Hub AI Enrollment Assistant. I combine quick FAQ answers, enrollment knowledge, and AI support to guide students through the portal.",
+      text: `I am ${ASSISTANT_NAME}. I combine quick FAQ answers, enrollment knowledge, and AI support to guide students through the portal.`,
       source: "local" as const,
       actions: [
         promptAction("What can you do?", "What can you do?", Sparkles),
@@ -538,6 +589,19 @@ export function ChatAssistantShell({
   }, [isTyping, messages]);
 
   const routes = useMemo(() => getAssistantRoutes(userRole), [userRole]);
+  const conversationStorageKey = useMemo(() => {
+    const userKey = userData?.id || userData?.email || "guest";
+    return `ehub_ai_assistant_conversation_${userKey}`;
+  }, [userData?.email, userData?.id]);
+
+  useEffect(() => {
+    const storedMessages = getStoredMessages(conversationStorageKey);
+    setMessages(storedMessages || [buildWelcomeMessage()]);
+  }, [conversationStorageKey]);
+
+  useEffect(() => {
+    saveStoredMessages(conversationStorageKey, messages);
+  }, [conversationStorageKey, messages]);
 
   const assistantContext = useMemo<AssistantContext>(
     () => ({
@@ -557,6 +621,14 @@ export function ChatAssistantShell({
     }
 
     onToggle?.(nextOpenState);
+  };
+
+  const handleClearConversation = () => {
+    const nextMessages = [buildWelcomeMessage()];
+    clearStoredMessages(conversationStorageKey);
+    setMessages(nextMessages);
+    setInput("");
+    setIsTyping(false);
   };
 
   const requestAiReply = async (message: string, currentMessages: ChatMessage[]) => {
@@ -633,7 +705,7 @@ export function ChatAssistantShell({
       return;
     }
 
-    requestAiReply(nextText, messages)
+    requestAiReply(nextText, [...messages, userMessage])
       .then((result) => {
         const category = result?.category;
         const botMessage: ChatMessage = {
@@ -679,8 +751,8 @@ export function ChatAssistantShell({
         <motion.button
           type="button"
           onClick={() => openStateChange(!isOpen)}
-          aria-label={isOpen ? "Close chat assistant" : "Open chat assistant"}
-          className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/25 text-white shadow-[0_24px_50px_-24px_rgba(15,23,42,0.7)]"
+          aria-label={isOpen ? `Close ${ASSISTANT_NAME}` : `Open ${ASSISTANT_NAME}`}
+          className="relative flex h-15 w-15 items-center justify-center rounded-2xl border border-white/25 text-white shadow-[0_24px_50px_-24px_rgba(15,23,42,0.7)] sm:h-16 sm:w-16 sm:rounded-full"
           style={{
             background:
               "linear-gradient(135deg, var(--electron-blue) 0%, #2d5cc9 55%, var(--electron-red) 100%)",
@@ -689,12 +761,12 @@ export function ChatAssistantShell({
           whileTap={{ scale: 0.96 }}
         >
           <motion.span
-            className="absolute inset-0 rounded-full"
+            className="absolute inset-0 rounded-2xl sm:rounded-full"
             style={{ background: "rgba(37, 99, 235, 0.22)" }}
             animate={{ scale: [1, 1.16, 1], opacity: [0.35, 0.08, 0.35] }}
             transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
           />
-          <span className="absolute inset-[6px] rounded-full bg-white/12 backdrop-blur" />
+          <span className="absolute inset-[6px] rounded-[1.1rem] bg-white/12 backdrop-blur sm:rounded-full" />
           {isOpen ? (
             <X className="relative h-6 w-6" />
           ) : (
@@ -713,7 +785,7 @@ export function ChatAssistantShell({
           <>
             <motion.button
               type="button"
-              aria-label="Close chat assistant overlay"
+              aria-label={`Close ${ASSISTANT_NAME} overlay`}
               className="fixed inset-0 z-[79] bg-slate-950/20 backdrop-blur-[1px] sm:bg-transparent sm:backdrop-blur-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -723,8 +795,8 @@ export function ChatAssistantShell({
 
             <motion.section
               role="dialog"
-              aria-label="Electron Hub AI Assistant"
-              className="fixed inset-x-3 bottom-3 z-[80] flex h-[min(82vh,760px)] min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/55 bg-white/80 shadow-[0_42px_120px_-50px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[430px] sm:max-w-[calc(100vw-3rem)] lg:bottom-8 lg:right-8"
+              aria-label={ASSISTANT_NAME}
+              className="fixed inset-x-2 bottom-2 z-[80] flex h-[min(86vh,780px)] min-h-0 flex-col overflow-hidden rounded-3xl border border-white/60 bg-white/85 shadow-[0_42px_120px_-50px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[450px] sm:max-w-[calc(100vw-3rem)] sm:rounded-[2rem] lg:bottom-8 lg:right-8"
               initial={{ opacity: 0, y: 24, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -747,7 +819,7 @@ export function ChatAssistantShell({
 
               <div className="relative flex min-h-0 flex-1 flex-col">
                 <header
-                  className="shrink-0 border-b border-slate-200/80 px-5 py-4 backdrop-blur"
+                  className="shrink-0 border-b border-slate-200/80 px-4 py-4 backdrop-blur sm:px-5"
                   style={{
                     background:
                       "linear-gradient(180deg, rgba(241, 246, 255, 0.96) 0%, rgba(255, 255, 255, 0.92) 100%)",
@@ -770,24 +842,34 @@ export function ChatAssistantShell({
 
                       <div className="min-w-0">
                         <h2 className="text-base font-semibold leading-tight text-slate-900 sm:text-lg">
-                          AI Enrollment Assistant
+                          {ASSISTANT_NAME}
                         </h2>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                          Smart FAQ, enrollment guide, and portal support
+                          Enrollment, documents, payment, and portal guide
                         </p>
                       </div>
                     </div>
 
                     <div className="flex shrink-0 items-center gap-2">
-                      <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:px-2.5">
-                        Online
+                      <span className="hidden rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:inline-flex">
+                        Ready
                       </span>
+
+                      <button
+                        type="button"
+                        onClick={handleClearConversation}
+                        className="rounded-2xl border border-slate-200/80 bg-white/80 p-1.5 text-slate-500 transition-colors hover:bg-red-50 hover:text-red-700 sm:p-2"
+                        aria-label="Clear conversation"
+                        title="Clear conversation"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
 
                       <button
                         type="button"
                         onClick={() => openStateChange(false)}
                         className="rounded-2xl border border-slate-200/80 bg-white/80 p-1.5 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800 sm:p-2"
-                        aria-label="Close chat assistant"
+                        aria-label={`Close ${ASSISTANT_NAME}`}
                       >
                         <X className="h-5 w-5" />
                       </button>
@@ -894,7 +976,7 @@ export function ChatAssistantShell({
                                 </div>
                               )}
                               <div className={`mt-1 px-1 text-[10px] text-slate-400 ${isBot ? "text-left" : "text-right"}`}>
-                                {message.source === "ai" ? "AI assisted · " : message.source === "faq" ? "FAQ · " : ""}
+                                {message.source === "ai" ? "AI assisted - " : message.source === "faq" ? "FAQ - " : ""}
                                 {formatMessageTime(message.timestamp)}
                               </div>
                             </div>
