@@ -843,19 +843,13 @@ export function Payment() {
           <p className="text-gray-600 mb-8">
             Generate a queue number and schedule your payment at the Cashier's office
           </p>
-          <div className="flex gap-4 justify-center">
+          <div className="flex justify-center">
             <button
               onClick={handleGenerateQueue}
               className="px-12 py-4 rounded-lg text-white text-lg font-semibold transition-all hover:opacity-90 shadow-lg"
               style={{ backgroundColor: "#10B981" }}
             >
               Generate Queue Number
-            </button>
-            <button
-              onClick={() => setSelectedMode(null)}
-              className="px-8 py-4 rounded-lg border-2 border-gray-300 text-gray-700 text-lg font-semibold transition-all hover:bg-gray-50"
-            >
-              Change Payment Method
             </button>
           </div>
           <p className="text-xs text-gray-500 mt-6">
