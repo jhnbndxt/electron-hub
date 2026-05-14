@@ -19,17 +19,46 @@ import {
   CircleDot,
   AlertCircle,
   XCircle,
+  Mail,
+  Phone,
+  IdCard,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
 
+type DocumentChecklistItem = {
+  key: string;
+  name: string;
+  status: "approved" | "rejected" | "pending" | "missing";
+  comment?: string;
+};
+
+type EnrollmentSnapshot = {
+  status: string;
+  strand?: string;
+  track?: string;
+  gradeLevel?: string;
+  submittedAt?: string;
+};
+
+const requiredDocumentNames: Record<string, string> = {
+  form138: "Form 138 (Report Card)",
+  birthCertificate: "PSA Birth Certificate",
+  idPicture: "2x2 ID Picture",
+};
+
 export function Dashboard() {
   const navigate = useNavigate();
   const { userData, enrollmentProgress, hasVisitedPayment, logout } = useAuth();
   const { openChat } = useChat();
   const [rejectedDocuments, setRejectedDocuments] = useState<Array<{ name: string; comment: string }>>([]);
+  const [documentChecklist, setDocumentChecklist] = useState<DocumentChecklistItem[]>(
+    Object.entries(requiredDocumentNames).map(([key, name]) => ({ key, name, status: "missing" }))
+  );
+  const [enrollmentSnapshot, setEnrollmentSnapshot] = useState<EnrollmentSnapshot | null>(null);
   const [isFirstLogin, setIsFirstLogin] = useState(false);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   
@@ -49,9 +78,9 @@ export function Dashboard() {
     }
   }, [userData?.id]);
 
-  // Check for rejected documents from Supabase
+  // Check for enrollment details and document status from Supabase
   useEffect(() => {
-    const checkRejectedDocs = async () => {
+    const loadEnrollmentReadiness = async () => {
       if (!userData?.email) return;
 
       // Get the user's enrollment and documents
@@ -63,7 +92,20 @@ export function Dashboard() {
         .limit(1);
 
       const enrollment = enrollments?.[0];
-      if (!enrollment?.enrollment_documents) return;
+      const documents = enrollment?.enrollment_documents || [];
+
+      if (enrollment) {
+        const formData = enrollment.form_data || {};
+        setEnrollmentSnapshot({
+          status: enrollment.status || "submitted",
+          strand: formData.strand || formData.selectedStrand || formData.preferredStrand || formData.program,
+          track: formData.track || formData.selectedTrack || formData.preferredTrack,
+          gradeLevel: formData.gradeLevel || formData.grade_level || formData.yearLevel,
+          submittedAt: enrollment.enrollment_date || enrollment.created_at,
+        });
+      } else {
+        setEnrollmentSnapshot(null);
+      }
 
       const documentNames: Record<string, string> = {
         birthCertificate: "PSA Birth Certificate",
@@ -74,7 +116,29 @@ export function Dashboard() {
         diploma: "Grade 10 Diploma",
       };
 
-      const rejected = enrollment.enrollment_documents
+      const checklist = Object.entries(requiredDocumentNames).map(([key, name]) => {
+        const uploadedDoc = documents.find((doc: any) => doc.document_type === key);
+        const rawStatus = uploadedDoc?.status?.toLowerCase();
+        const status =
+          rawStatus === "approved" || rawStatus === "verified"
+            ? "approved"
+            : rawStatus === "rejected"
+            ? "rejected"
+            : uploadedDoc
+            ? "pending"
+            : "missing";
+
+        return {
+          key,
+          name,
+          status,
+          comment: uploadedDoc?.rejection_comment || uploadedDoc?.rejection_reason,
+        } as DocumentChecklistItem;
+      });
+
+      setDocumentChecklist(checklist);
+
+      const rejected = documents
         .filter((doc: any) => doc.status === 'rejected')
         .map((doc: any) => ({
           name: documentNames[doc.document_type] || doc.document_type,
@@ -84,7 +148,7 @@ export function Dashboard() {
       setRejectedDocuments(rejected);
     };
 
-    checkRejectedDocs();
+    loadEnrollmentReadiness();
   }, [userData]);
 
   // Define the 7 enrollment steps with icons
@@ -154,6 +218,19 @@ export function Dashboard() {
   const isFullyEnrolled = enrollmentSteps.find(step => step.name === "Enrolled")?.status === "completed";
 
   const currentStatusInfo = currentStep ? statusMessages[currentStep.name] : null;
+  const profileReadiness = [
+    { label: "Email address", value: userData?.email, icon: Mail },
+    { label: "Contact number", value: userData?.contactNumber, icon: Phone },
+    { label: "Student profile", value: userData?.name, icon: IdCard },
+  ];
+  const completedProfileItems = profileReadiness.filter((item) => Boolean(item.value)).length;
+  const approvedDocumentCount = documentChecklist.filter((doc) => doc.status === "approved").length;
+  const pendingDocumentCount = documentChecklist.filter((doc) => doc.status === "pending").length;
+  const missingDocumentCount = documentChecklist.filter((doc) => doc.status === "missing").length;
+  const rejectedDocumentCount = documentChecklist.filter((doc) => doc.status === "rejected").length;
+  const readinessScore = Math.round(
+    ((completedProfileItems + approvedDocumentCount) / (profileReadiness.length + documentChecklist.length)) * 100
+  );
 
   // Dynamic upcoming tasks based on enrollment progress
   const getUpcomingTasks = () => {
@@ -633,6 +710,184 @@ export function Dashboard() {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Student Readiness Center */}
+      <div className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-md sm:p-8">
+        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-blue-900">
+              <ClipboardList className="h-4 w-4" />
+              Readiness Center
+            </div>
+            <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+              What you can fix or confirm today
+            </h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              This brings your profile details, enrollment choice, and required documents into one place so you do not have to hunt through every page.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-5 py-4 text-blue-950">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">Ready Score</p>
+            <p className="mt-1 text-3xl font-bold">{readinessScore}%</p>
+            <p className="mt-1 text-xs text-blue-800">
+              Based on complete profile fields and approved required documents
+            </p>
+          </div>
+        </div>
+
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-slate-900">Profile and enrollment summary</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {completedProfileItems} of {profileReadiness.length} profile details are available.
+                </p>
+              </div>
+              <Link
+                to="/dashboard/profile"
+                className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-blue-900 transition-colors hover:bg-blue-50"
+              >
+                Profile
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            <div className="space-y-3">
+              {profileReadiness.map((item) => {
+                const ItemIcon = item.icon;
+                return (
+                  <div key={item.label} className="flex items-center gap-3 rounded-lg bg-white p-3 ring-1 ring-gray-200">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-900">
+                      <ItemIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</p>
+                      <p className="truncate text-sm font-medium text-slate-900">{item.value || "Missing"}</p>
+                    </div>
+                    {item.value ? (
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-amber-600" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Enrollment choice</p>
+              <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                  <span className="text-slate-500">Status</span>
+                  <p className="font-semibold capitalize text-slate-900">{enrollmentSnapshot?.status?.replace(/_/g, " ") || "Not submitted"}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Grade level</span>
+                  <p className="font-semibold text-slate-900">{enrollmentSnapshot?.gradeLevel || "Not selected"}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Track</span>
+                  <p className="font-semibold text-slate-900">{enrollmentSnapshot?.track || "Not selected"}</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Strand</span>
+                  <p className="font-semibold text-slate-900">{enrollmentSnapshot?.strand || "Not selected"}</p>
+                </div>
+              </div>
+              <Link
+                to="/dashboard/enrollment"
+                className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-blue-900 hover:text-blue-700"
+              >
+                Review enrollment form
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-900">Required document checklist</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  {approvedDocumentCount} approved, {pendingDocumentCount} under review, {missingDocumentCount} missing, {rejectedDocumentCount} rejected.
+                </p>
+              </div>
+              <Link
+                to="/dashboard/my-documents"
+                className="inline-flex items-center justify-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-blue-900 transition-colors hover:bg-blue-50"
+              >
+                Documents
+                <ArrowRight className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {documentChecklist.map((doc) => {
+                const isApproved = doc.status === "approved";
+                const isRejected = doc.status === "rejected";
+                const isMissing = doc.status === "missing";
+                const statusLabel = isApproved
+                  ? "Approved"
+                  : isRejected
+                  ? "Needs resubmission"
+                  : isMissing
+                  ? "Missing"
+                  : "Under review";
+
+                return (
+                  <div key={doc.key} className="flex min-h-[170px] flex-col rounded-lg bg-white p-4 ring-1 ring-gray-200">
+                    <div
+                      className={`mb-4 flex h-11 w-11 items-center justify-center rounded-lg ${
+                        isApproved
+                          ? "bg-emerald-50 text-emerald-700"
+                          : isRejected
+                          ? "bg-red-50 text-red-700"
+                          : isMissing
+                          ? "bg-gray-100 text-gray-500"
+                          : "bg-amber-50 text-amber-700"
+                      }`}
+                    >
+                      {isApproved ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : isRejected ? (
+                        <XCircle className="h-5 w-5" />
+                      ) : (
+                        <FileCheck className="h-5 w-5" />
+                      )}
+                    </div>
+                    <h4 className="text-sm font-semibold text-slate-900">{doc.name}</h4>
+                    <p
+                      className={`mt-2 text-xs font-semibold ${
+                        isApproved
+                          ? "text-emerald-700"
+                          : isRejected
+                          ? "text-red-700"
+                          : isMissing
+                          ? "text-slate-500"
+                          : "text-amber-700"
+                      }`}
+                    >
+                      {statusLabel}
+                    </p>
+                    {doc.comment && (
+                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{doc.comment}</p>
+                    )}
+                    <Link
+                      to="/dashboard/my-documents"
+                      className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-semibold text-blue-900 hover:text-blue-700"
+                    >
+                      {isApproved ? "View file" : "Update file"}
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Upcoming Tasks and Quick Actions */}
