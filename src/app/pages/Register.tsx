@@ -313,32 +313,31 @@ export function Register() {
               </div>
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-3">
-              {/* Middle Name (Optional) */}
-              <div>
-                <label htmlFor="middleName" className="sr-only">
-                  Middle Name
-                </label>
-                <div className={getFieldSurfaceClassName("middleName")}>
-                  <User className="h-5 w-5 text-slate-400" />
-                  <input
-                    type="text"
-                    id="middleName"
-                    name="middleName"
-                    value={formData.middleName}
-                    onChange={handleChange}
-                    onBlur={handleBlur}
-                    autoComplete="additional-name"
-                    aria-invalid={Boolean(getVisibleFieldError("middleName"))}
-                    className="min-w-0 text-sm placeholder:text-slate-400"
-                    placeholder="Middle name"
-                  />
-                </div>
-                {getVisibleFieldError("middleName") && (
-                  <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("middleName")}</p>
-                )}
+            <div>
+              <label htmlFor="middleName" className="sr-only">
+                Middle Name
+              </label>
+              <div className={getFieldSurfaceClassName("middleName")}>
+                <User className="h-5 w-5 text-slate-400" />
+                <input
+                  type="text"
+                  id="middleName"
+                  name="middleName"
+                  value={formData.middleName}
+                  onChange={handleChange}
+                  onBlur={handleBlur}
+                  autoComplete="additional-name"
+                  aria-invalid={Boolean(getVisibleFieldError("middleName"))}
+                  className="min-w-0 text-sm placeholder:text-slate-400"
+                  placeholder="Middle name"
+                />
               </div>
+              {getVisibleFieldError("middleName") && (
+                <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("middleName")}</p>
+              )}
+            </div>
 
+            <div className="grid gap-4 sm:grid-cols-2">
               {/* Sex Dropdown */}
               <div>
                 <label htmlFor="sex" className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
