@@ -343,10 +343,17 @@ export function Results() {
     return [];
   };
 
-  // Get all suggested courses from all electives
-  const allSuggestedCourses = electives.flatMap(elective =>
-    getSuggestedCourses(track, elective)
-  );
+  const aiSuggestedCourses = Array.isArray(aiRecommendation?.suggestedCollegeCourses)
+    ? aiRecommendation.suggestedCollegeCourses
+        .map((course) => String(course || "").trim())
+        .filter(Boolean)
+    : [];
+
+  // Get all suggested courses from AI output and elective mappings.
+  const allSuggestedCourses = [
+    ...aiSuggestedCourses,
+    ...electives.flatMap(elective => getSuggestedCourses(track, elective)),
+  ];
 
   // Remove duplicates
   const uniqueCourses = Array.from(new Set(allSuggestedCourses));
@@ -964,6 +971,42 @@ export function Results() {
           </aside>
         </div>
 
+        {/* Suggested College Courses */}
+        {uniqueCourses.length > 0 && (
+          <div className="mb-8 rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-white shadow-lg"
+                  style={{ backgroundColor: "var(--electron-blue)" }}
+                >
+                  <GraduationCap className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Suggested College Courses</p>
+                  <h3 className="mt-2 text-3xl font-bold text-slate-950">College paths aligned with your result</h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    These course options are based on your recommended track, electives, and AI assessment insights.
+                  </p>
+                </div>
+              </div>
+              <span className="inline-flex w-fit rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                {uniqueCourses.length} option{uniqueCourses.length === 1 ? "" : "s"}
+              </span>
+            </div>
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {uniqueCourses.map((course, index) => (
+                <div
+                  key={index}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-blue-200 hover:bg-white hover:shadow-md"
+                >
+                  <p className="text-base font-bold text-slate-950">{course}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Track Overview Section */}
         <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
           <h3 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
@@ -1064,36 +1107,6 @@ export function Results() {
             </div>
           </div>
         </div>
-
-        {/* NEW SECTION: Suggested College Courses */}
-        {uniqueCourses.length > 0 && (
-          <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
-            <div className="flex items-center gap-2 mb-2">
-              <GraduationCap className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
-              <h3 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
-                Suggested College Courses
-              </h3>
-            </div>
-            <p className="text-gray-600 mb-6">
-              Based on your recommendation, here are some college courses you may pursue:
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {uniqueCourses.map((course, index) => (
-                <div
-                  key={index}
-                  className="portal-glass-panel rounded-lg border-l-4 p-4 transition-all hover:shadow-md"
-                  style={{
-                    borderColor: "var(--electron-blue)",
-                  }}
-                >
-                  <p className="font-semibold" style={{ color: "var(--electron-dark-gray)" }}>
-                    {course}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Recommended Electron Branches */}
         {recommendedBranches.length > 0 && (

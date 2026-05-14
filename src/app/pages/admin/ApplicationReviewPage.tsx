@@ -120,6 +120,14 @@ export function ApplicationReviewPage() {
       .slice(0, 2)
       .map((part: string) => part[0]?.toUpperCase())
       .join("") || "S";
+  const studentProfilePictureUrl =
+    studentProfile?.profile_picture_url ||
+    formData.profilePictureUrl ||
+    formData.profile_picture_url ||
+    formData.profilePhotoUrl ||
+    formData.photoUrl ||
+    formData.idPictureUrl ||
+    null;
 
   const documents = useMemo(() => {
     const uploaded = enrollment?.enrollment_documents || [];
@@ -159,9 +167,11 @@ export function ApplicationReviewPage() {
   const selectedDocument = documents.find((doc) => doc.key === selectedDocKey) || documents[0];
   const canReviewDocument = (doc: any) => Boolean(doc?.id) && (doc.status === "pending" || doc.reuploadedForReview);
   const actionableDocuments = documents.filter((doc) => canReviewDocument(doc));
-  const requiredApproved = documents.filter((doc) => doc.required).every((doc) => doc.status === "approved");
+  const selectedActionableDocs = selectedDocs.filter((key) => {
+    const doc = documents.find((item) => item.key === key);
+    return canReviewDocument(doc);
+  });
   const existingVoucherStatus = enrollment?.voucher_status || formData?.voucher?.voucher_status;
-  const requiredDocumentDefinitions = DOCUMENTS.filter((doc) => doc.required);
   const missingRequiredDocuments = documents.filter((doc) => doc.required && !doc.id);
   const unapprovedRequiredDocuments = documents.filter((doc) => doc.required && doc.id && doc.status !== "approved");
 
@@ -271,10 +281,12 @@ export function ApplicationReviewPage() {
     if (firstActionable) setSelectedDocKey(firstActionable.document_type);
 
     if (data.user_id) {
-      const { data: profile } = await supabase
+      let profileQuery = supabase
         .from("users")
-        .select("id, email, full_name, profile_picture_url")
-        .eq("email", data.user_id)
+        .select("id, email, full_name, profile_picture_url");
+
+      const { data: profile } = await profileQuery
+        .or(`email.eq.${data.user_id},id.eq.${data.user_id}`)
         .maybeSingle();
       setStudentProfile(profile || null);
     }
@@ -573,14 +585,14 @@ export function ApplicationReviewPage() {
     children: ReactNode,
     subtitle?: string
   ) => (
-    <section className="rounded-2xl border border-white/70 bg-white/55 p-4 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/40 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/70 hover:shadow-xl">
+    <section className="rounded-2xl border border-white/70 bg-white/55 p-5 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/40 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/70 hover:shadow-xl">
       <div className="mb-3 flex items-center gap-3">
         <div className="rounded-full bg-gradient-to-br from-blue-800 to-sky-600 p-2.5 text-white shadow-lg shadow-blue-700/20">
-          <Icon className="h-4 w-4" />
+          <Icon className="h-5 w-5" />
         </div>
         <div>
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-          {subtitle && <p className="text-xs text-gray-600">{subtitle}</p>}
+          <h3 className="text-lg font-bold text-gray-900">{title}</h3>
+          {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
         </div>
       </div>
       {children}
@@ -622,20 +634,20 @@ export function ApplicationReviewPage() {
       <div className="mx-auto w-full max-w-[min(1780px,calc(100vw-1rem))] rounded-3xl border border-white/70 bg-white/40 p-4 shadow-[0_28px_90px_-45px_rgba(15,23,42,0.55)] ring-1 ring-blue-100/70 backdrop-blur-2xl">
         <header className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <h1 className="text-lg font-black text-slate-950">Pending Application Review</h1>
-            <p className="mt-1 text-xs font-medium text-slate-500">Review and verify documents before approving the application.</p>
+            <h1 className="text-2xl font-black text-slate-950">Pending Application Review</h1>
+            <p className="mt-1 text-sm font-medium text-slate-500">Review and verify documents before approving the application.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => navigate(`${basePath}/pending`)}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-3 py-2 text-xs font-black text-slate-700 shadow-sm shadow-slate-950/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/80 bg-white/70 px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm shadow-slate-950/5 backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"
             >
               <ArrowLeft className="h-4 w-4" />
               Back
             </button>
             <button
               onClick={moveToNextApplicant}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-sky-600 px-3 py-2 text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-blue-700/25"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-700/90 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-700/15 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-700/20"
             >
               Move to Next Applicant
             </button>
@@ -645,9 +657,9 @@ export function ApplicationReviewPage() {
         <section className="mt-4 overflow-hidden rounded-2xl border border-white/80 bg-white/70 p-5 shadow-[0_22px_70px_-48px_rgba(30,58,138,0.65)] ring-1 ring-blue-100/70 backdrop-blur-2xl">
           <div className="grid gap-5 lg:grid-cols-[116px_minmax(0,1fr)_230px] lg:items-center">
             <div className="flex items-center justify-center lg:justify-start">
-              <div className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 via-white to-sky-100 text-2xl font-black text-blue-700 ring-1 ring-blue-100 shadow-[0_18px_42px_-32px_rgba(30,58,138,0.65)]">
-                {studentProfile?.profile_picture_url ? (
-                  <img src={studentProfile.profile_picture_url} alt="" className="h-full w-full object-cover" />
+              <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-blue-100 via-white to-sky-100 text-3xl font-black text-blue-700 ring-1 ring-blue-100 shadow-[0_18px_42px_-32px_rgba(30,58,138,0.65)]">
+                {studentProfilePictureUrl ? (
+                  <img src={studentProfilePictureUrl} alt={`${studentName} profile`} className="h-full w-full object-cover" />
                 ) : (
                   initials
                 )}
@@ -655,20 +667,20 @@ export function ApplicationReviewPage() {
             </div>
 
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-700">Applicant profile</p>
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Applicant profile</p>
               <h2 className="mt-1 truncate text-3xl font-black tracking-tight text-slate-950">{studentName}</h2>
-              <div className="mt-4 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 xl:grid-cols-3">
+              <div className="mt-4 grid gap-x-6 gap-y-3 text-base sm:grid-cols-2 xl:grid-cols-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Email</p>
-                  <p className="mt-1 truncate font-medium text-slate-600">{formData.email || enrollment.user_id || "No email provided"}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Email</p>
+                  <p className="mt-1 truncate font-semibold text-slate-700">{formData.email || enrollment.user_id || "No email provided"}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Student ID</p>
-                  <p className="mt-1 truncate font-medium text-slate-600">{String(enrollment.id)}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Student ID</p>
+                  <p className="mt-1 truncate font-semibold text-slate-700">{String(enrollment.id)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400">Track</p>
-                  <p className="mt-1 truncate font-medium text-slate-600">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Track</p>
+                  <p className="mt-1 truncate font-semibold text-slate-700">{formData.preferredTrack || formData.track || enrollment.preferred_track || "Not set"}</p>
                 </div>
               </div>
             </div>
@@ -699,7 +711,7 @@ export function ApplicationReviewPage() {
             </div>
             <div className="mt-4 grid max-h-[68vh] gap-4 overflow-y-auto pr-1 xl:grid-cols-2">
               {renderEnrollmentSection("Basic Information", User, (
-                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 text-base text-slate-700 sm:grid-cols-2">
                   {renderSubmittedField("Admission Type", formData.admissionType)}
                   {renderSubmittedField("Previous Student ID", formData.previousStudentId || "N/A")}
                   {renderSubmittedField("LRN", formData.lrn)}
@@ -720,7 +732,7 @@ export function ApplicationReviewPage() {
               ), "Submitted student details")}
 
               {renderEnrollmentSection("Address", MapPin, (
-                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 text-base text-slate-700 sm:grid-cols-2">
                   {renderSubmittedField("Region", formData.region)}
                   {renderSubmittedField("Province", formData.province)}
                   {renderSubmittedField("City / Municipality", formData.city)}
@@ -730,7 +742,7 @@ export function ApplicationReviewPage() {
               ))}
 
               {renderEnrollmentSection("Parents & Guardians", Users, (
-                <div className="space-y-4 text-sm text-slate-700">
+                <div className="space-y-4 text-base text-slate-700">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {renderSubmittedField("Father's Name", fatherName)}
                     {renderSubmittedField("Occupation", formData.fatherOccupation)}
@@ -753,7 +765,7 @@ export function ApplicationReviewPage() {
               ))}
 
               {renderEnrollmentSection("Enrollment Details", GraduationCap, (
-                <div className="grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 text-base text-slate-700 sm:grid-cols-2">
                   {renderSubmittedField("Preferred Track", formData.preferredTrack || formData.track)}
                   {renderSubmittedField("Year Level", formData.yearLevel)}
                   {renderSubmittedField("Elective 1", formData.elective1)}
@@ -762,7 +774,7 @@ export function ApplicationReviewPage() {
               ))}
 
               {renderEnrollmentSection("Educational Background", BookOpen, (
-                <div className="space-y-4 text-sm text-slate-700">
+                <div className="space-y-4 text-base text-slate-700">
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {renderSubmittedField("Primary School", formData.primarySchool)}
                     {renderSubmittedField("Year Graduated", formData.primaryYearGraduated)}
@@ -776,7 +788,7 @@ export function ApplicationReviewPage() {
               ))}
 
               {renderEnrollmentSection("Documents Summary", FileCheck, (
-                <div className="grid gap-2 text-sm text-slate-700">
+                <div className="grid gap-2 text-base text-slate-700">
                   {DOCUMENTS.map((doc) => (
                     <div key={doc.key} className="flex items-center gap-2">
                       {hasDocument(doc.key) ? (
@@ -795,12 +807,12 @@ export function ApplicationReviewPage() {
           </section>
         )}
 
-        <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-4 shadow-xl shadow-blue-950/10 ring-1 ring-blue-100/60 backdrop-blur-2xl">
-          <p className="text-[11px] font-black uppercase tracking-wide text-slate-600">Document Verification</p>
-          <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(340px,32%)_minmax(0,1fr)]">
-            <aside className="rounded-2xl border border-white/70 bg-white/55 p-3 shadow-inner shadow-white/60 backdrop-blur-xl">
-              <div className="flex flex-wrap items-center gap-2">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+        <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-5 shadow-xl shadow-blue-950/10 ring-1 ring-blue-100/60 backdrop-blur-2xl">
+          <p className="text-sm font-black uppercase tracking-wide text-slate-600">Document Verification</p>
+          <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(460px,36%)_minmax(0,1fr)]">
+            <aside className="rounded-2xl border border-white/70 bg-white/55 p-4 shadow-inner shadow-white/60 backdrop-blur-xl">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
                   <input
                     type="checkbox"
                     checked={actionableDocuments.length > 0 && selectedDocs.length === actionableDocuments.length}
@@ -810,18 +822,8 @@ export function ApplicationReviewPage() {
                   Select all documents ({actionableDocuments.length})
                 </label>
                 <button
-                  onClick={approveSelectedDocuments}
-                  disabled={selectedDocs.length === 0 || isProcessing}
-                  className="rounded-lg bg-gradient-to-r from-blue-700 to-sky-600 px-3 py-1.5 text-[11px] font-black text-white shadow-md shadow-blue-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
-                >
-                  Bulk Approve
-                </button>
-                <button
                   onClick={() => {
-                    const keys = selectedDocs.filter((key) => {
-                      const doc = documents.find((item) => item.key === key);
-                      return canReviewDocument(doc);
-                    });
+                    const keys = selectedActionableDocs;
                     if (keys.length === 0) {
                       toast.error("Select at least one document that is pending review or re-uploaded for review.");
                       return;
@@ -830,15 +832,22 @@ export function ApplicationReviewPage() {
                     setDocRejectKeys(keys);
                     setDocRejectReason("");
                   }}
-                  disabled={selectedDocs.length === 0 || isProcessing}
-                  className="rounded-lg bg-gradient-to-r from-rose-600 to-red-500 px-3 py-1.5 text-[11px] font-black text-white shadow-md shadow-rose-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
+                  disabled={selectedActionableDocs.length === 0 || isProcessing}
+                  className="rounded-xl border border-rose-200/80 bg-white/65 px-4 py-2 text-sm font-black text-rose-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
                 >
                   Bulk Reject
                 </button>
+                <button
+                  onClick={approveSelectedDocuments}
+                  disabled={selectedActionableDocs.length === 0 || isProcessing}
+                  className="rounded-xl border border-blue-200/80 bg-white/65 px-4 py-2 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
+                >
+                  Bulk Approve
+                </button>
               </div>
 
-              <div className="mt-3 overflow-hidden rounded-2xl border border-white/70 bg-white/45 shadow-sm backdrop-blur-xl">
-                <div className="grid grid-cols-[32px_1fr_132px] bg-white/70 px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-500 backdrop-blur-xl">
+              <div className="mt-4 overflow-hidden rounded-2xl border border-white/70 bg-white/45 shadow-sm backdrop-blur-xl">
+                <div className="grid grid-cols-[40px_1fr_150px] bg-white/70 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500 backdrop-blur-xl">
                   <span />
                   <span>Document Name</span>
                   <span>Status</span>
@@ -848,7 +857,7 @@ export function ApplicationReviewPage() {
                     <button
                       key={doc.key}
                       onClick={() => setSelectedDocKey(doc.key)}
-                      className={`grid w-full grid-cols-[32px_1fr_132px] items-center gap-2 px-3 py-2 text-left transition ${
+                      className={`grid w-full grid-cols-[40px_1fr_150px] items-center gap-3 px-4 py-3 text-left transition ${
                         selectedDocKey === doc.key ? "bg-blue-100/70 shadow-inner" : "hover:bg-white/70"
                       }`}
                     >
@@ -865,11 +874,11 @@ export function ApplicationReviewPage() {
                         className="h-4 w-4 accent-blue-700"
                       />
                       <div className="min-w-0">
-                        <p className="truncate text-xs font-black text-slate-900">{doc.label}</p>
-                        <p className="truncate text-[11px] font-medium text-slate-500">{doc.fileName}</p>
+                        <p className="truncate text-sm font-black text-slate-900">{doc.label}</p>
+                        <p className="mt-1 truncate text-xs font-medium text-slate-500">{doc.fileName}</p>
                       </div>
                       <span
-                        className={`justify-self-start rounded-full px-2 py-1 text-[10px] font-black ${
+                        className={`justify-self-start rounded-full px-3 py-1.5 text-xs font-black ${
                           doc.status === "approved"
                             ? "bg-emerald-100 text-emerald-700"
                           : doc.status === "rejected"
@@ -890,37 +899,53 @@ export function ApplicationReviewPage() {
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
-                  onClick={() => approveDocument()}
-                  disabled={!canReviewDocument(selectedDocument) || isProcessing}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-sky-600 px-3 py-2 text-xs font-black text-white shadow-md shadow-blue-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
-                >
-                  <CheckCircle className="h-4 w-4" />
-                  Approve
-                </button>
-                <button
                   onClick={() => {
                     setDocRejectKey(selectedDocument?.key || null);
                     setDocRejectKeys([]);
                     setDocRejectReason(selectedDocument?.rejectionComment || "");
                   }}
                   disabled={!canReviewDocument(selectedDocument) || isProcessing}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-600 to-red-500 px-3 py-2 text-xs font-black text-white shadow-md shadow-rose-700/20 transition hover:-translate-y-0.5 disabled:bg-slate-300 disabled:shadow-none"
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black shadow-sm backdrop-blur-xl transition ${
+                    selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview
+                      ? "pointer-events-none border-rose-200 bg-rose-50/80 text-rose-700 shadow-none"
+                    : selectedDocument?.status === "approved"
+                      ? "pointer-events-none border-emerald-200 bg-emerald-50/80 text-emerald-700 shadow-none"
+                    : !canReviewDocument(selectedDocument)
+                      ? "pointer-events-none border-slate-200 bg-slate-100/70 text-slate-400 shadow-none"
+                      : "border-rose-200/80 bg-white/65 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md"
+                  }`}
                 >
                   <XCircle className="h-4 w-4" />
-                  Reject
+                  {selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview ? "Rejected" : "Reject"}
+                </button>
+                <button
+                  onClick={() => approveDocument()}
+                  disabled={!canReviewDocument(selectedDocument) || isProcessing}
+                  className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black shadow-sm backdrop-blur-xl transition ${
+                    selectedDocument?.status === "approved"
+                      ? "pointer-events-none border-emerald-200 bg-emerald-50/80 text-emerald-700 shadow-none"
+                    : selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview
+                      ? "pointer-events-none border-rose-200 bg-rose-50/80 text-rose-700 shadow-none"
+                    : !canReviewDocument(selectedDocument)
+                      ? "pointer-events-none border-slate-200 bg-slate-100/70 text-slate-400 shadow-none"
+                      : "border-blue-200/80 bg-white/65 text-blue-700 hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md"
+                  }`}
+                >
+                  <CheckCircle className="h-4 w-4" />
+                  {selectedDocument?.status === "approved" ? "Approved" : "Approve"}
                 </button>
               </div>
             </aside>
 
-            <section className="flex min-h-[62vh] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/65 px-3 py-2 backdrop-blur-xl">
+            <section className="flex h-[68vh] min-h-[620px] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/65 px-4 py-3 backdrop-blur-xl">
                 <div className="min-w-0">
-                  <p className="text-[11px] font-black text-slate-900">Document Preview</p>
+                  <p className="text-sm font-black text-slate-900">Document Preview</p>
                   <div className="mt-1 flex flex-wrap items-center gap-2">
-                    <p className="truncate text-[11px] font-medium text-slate-500">{selectedDocument?.label || "Select a document"}</p>
+                    <p className="truncate text-sm font-medium text-slate-500">{selectedDocument?.label || "Select a document"}</p>
                     {selectedDocument && (
                       <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                        className={`rounded-full px-3 py-1 text-xs font-black ${
                           selectedDocument.status === "approved"
                             ? "bg-emerald-100 text-emerald-700"
                             : selectedDocument.status === "rejected"
@@ -937,7 +962,7 @@ export function ApplicationReviewPage() {
                     )}
                   </div>
                   {selectedDocument?.status === "rejected" && (
-                    <p className="mt-1 text-[11px] font-semibold text-rose-600">
+                    <p className="mt-1 text-xs font-semibold text-rose-600">
                       This document is locked until the student uploads a revised file.
                     </p>
                   )}
@@ -946,7 +971,7 @@ export function ApplicationReviewPage() {
                   <button onClick={() => setZoom((current) => Math.max(50, current - 10))} className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Zoom out">
                     <Minus className="h-4 w-4" />
                   </button>
-                  <span className="rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-[11px] font-black shadow-sm">{zoom}%</span>
+                  <span className="rounded-lg border border-white/80 bg-white/75 px-3 py-2 text-sm font-black shadow-sm">{zoom}%</span>
                   <button onClick={() => setZoom((current) => Math.min(180, current + 10))} className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Zoom in">
                     <Plus className="h-4 w-4" />
                   </button>
@@ -958,24 +983,26 @@ export function ApplicationReviewPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-auto bg-white/60 p-2 backdrop-blur-xl">
+              <div className="min-h-0 flex-1 overflow-hidden bg-white/60 p-3 backdrop-blur-xl">
                 {selectedDocument?.fileUrl ? (
                   selectedDocument.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <div className="flex min-h-full items-start justify-center">
+                    <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-white/60">
                       <img
                         src={selectedDocument.fileUrl}
                         alt={selectedDocument.label}
                         style={{ transform: `scale(${zoom / 100})` }}
-                        className="max-h-none max-w-full origin-top rounded bg-white object-contain transition-transform"
+                        className="max-h-full max-w-full origin-center rounded bg-white object-contain transition-transform"
                       />
                     </div>
                   ) : (
+                    <div className="h-full w-full overflow-hidden rounded-2xl bg-white">
                     <iframe
                       src={selectedDocument.fileUrl}
                       title={selectedDocument.label}
-                      style={{ width: `${zoom}%` }}
-                      className="mx-auto h-full min-h-[58vh] rounded bg-white"
+                      style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
+                      className="h-full w-full rounded bg-white transition-transform"
                     />
+                    </div>
                   )
                 ) : (
                   <div className="flex h-full min-h-[52vh] items-center justify-center text-center text-slate-400">
@@ -1011,78 +1038,6 @@ export function ApplicationReviewPage() {
           {existingVoucherStatus && <p className="mt-2 text-[11px] font-semibold text-slate-500">Saved decision: {String(existingVoucherStatus).replace("_", " ")}</p>}
         </section>
 
-        <section
-          className={`mt-3 rounded-2xl border p-4 shadow-lg shadow-blue-950/5 backdrop-blur-2xl ${
-            canApproveApplication
-              ? "border-emerald-200 bg-emerald-50/80"
-              : "border-amber-200 bg-amber-50/85"
-          }`}
-        >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className={`text-sm font-black ${canApproveApplication ? "text-emerald-900" : "text-amber-950"}`}>
-                {canApproveApplication ? "Application is ready for approval" : "Approval requirements still pending"}
-              </p>
-              <p className={`mt-1 text-xs font-medium ${canApproveApplication ? "text-emerald-700" : "text-amber-800"}`}>
-                {canApproveApplication
-                  ? "All required fields, documents, and decisions are complete."
-                  : "Resolve the items below before the Approve Application button can be used."}
-              </p>
-            </div>
-            <div className="grid gap-2 text-xs font-bold sm:grid-cols-3 lg:min-w-[420px]">
-              <span className={`rounded-full px-3 py-2 text-center ${missingFieldGroups.length === 0 ? "bg-emerald-100 text-emerald-700" : "bg-white/70 text-amber-800"}`}>
-                Form fields: {missingFieldGroups.length === 0 ? "Complete" : `${missingFieldGroups.reduce((count, group) => count + group.fields.length, 0)} missing`}
-              </span>
-              <span className={`rounded-full px-3 py-2 text-center ${requiredApproved ? "bg-emerald-100 text-emerald-700" : "bg-white/70 text-amber-800"}`}>
-                Required docs: {documents.filter((doc) => doc.required && doc.status === "approved").length}/{requiredDocumentDefinitions.length}
-              </span>
-              <span className={`rounded-full px-3 py-2 text-center ${voucherEligibility ? "bg-emerald-100 text-emerald-700" : "bg-white/70 text-amber-800"}`}>
-                Voucher: {voucherEligibility ? "Set" : "Required"}
-              </span>
-            </div>
-          </div>
-
-          {!canApproveApplication && (
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {missingFieldGroups.map((group) => (
-                <div key={group.label} className="rounded-xl border border-white/70 bg-white/70 p-3">
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-600">{group.label}</p>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {group.fields.map((field) => (
-                      <span key={field} className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-800">
-                        {field}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-
-              {(missingRequiredDocuments.length > 0 || unapprovedRequiredDocuments.length > 0) && (
-                <div className="rounded-xl border border-white/70 bg-white/70 p-3">
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-600">Document Requirements</p>
-                  <div className="mt-2 space-y-2">
-                    {[...missingRequiredDocuments, ...unapprovedRequiredDocuments].map((doc) => (
-                      <div key={doc.key} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                        <span className="font-bold text-slate-700">{doc.label}</span>
-                        <span className="rounded-full bg-white px-2 py-0.5 font-black text-slate-600 ring-1 ring-slate-200">
-                          {doc.reviewState}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {!voucherEligibility && (
-                <div className="rounded-xl border border-white/70 bg-white/70 p-3">
-                  <p className="text-xs font-black uppercase tracking-wide text-slate-600">Voucher Decision</p>
-                  <p className="mt-2 text-xs font-semibold text-amber-800">Select whether the student is eligible for the voucher program.</p>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-
         <footer className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
           <div className="grid gap-3 lg:grid-cols-2">
             <button
@@ -1095,7 +1050,7 @@ export function ApplicationReviewPage() {
             <button
               onClick={approveApplication}
               disabled={!canApproveApplication || isProcessing}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-700 to-sky-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:shadow-xl disabled:bg-slate-300 disabled:shadow-none"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200/80 bg-white/65 px-4 py-3 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
             >
               <ShieldCheck className="h-4 w-4" />
               Approve Application
