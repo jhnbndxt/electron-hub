@@ -14,6 +14,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { findDirectFaq, retrieveChatbotKnowledge } from "../../data/chatbotKnowledge.js";
 
 export interface ChatAssistantShellProps {
   isVisible?: boolean;
@@ -37,6 +38,7 @@ interface ChatMessage {
   text: string;
   timestamp: Date;
   actions?: AssistantAction[];
+  source?: "faq" | "ai" | "retrieval" | "guardrail" | "local";
 }
 
 interface AssistantRoutes {
@@ -82,6 +84,15 @@ const TRACK_KEYWORDS = ["track", "tracks", "strand", "elective", "programs", "av
 const ACADEMIC_TRACK_KEYWORDS = ["academic track", "academic"];
 const TECHNICAL_TRACK_KEYWORDS = ["technical", "technical-professional", "technical professional", "tvl"];
 const ACCOUNT_KEYWORDS = ["login", "register", "create account", "sign up", "account"];
+
+const QUICK_PROMPTS = [
+  { label: "Enrollment Process", value: "How do I enroll?", icon: Compass },
+  { label: "Required Documents", value: "What are the required documents?", icon: FileCheck2 },
+  { label: "Voucher Eligibility", value: "Am I eligible for the voucher program?", icon: Sparkles },
+  { label: "Payment Methods", value: "How do I pay?", icon: CreditCard },
+  { label: "AI Assessment", value: "How does the AI Assessment work?", icon: GraduationCap },
+  { label: "Re-upload Documents", value: "How do I re-upload rejected documents?", icon: FileCheck2 },
+];
 
 const ACADEMIC_ELECTIVES = [
   "Biology and Physics",
@@ -137,6 +148,75 @@ function linkAction(label: string, to: string, icon?: LucideIcon): AssistantActi
   return { kind: "link", label, to, icon };
 }
 
+function getCategoryActions(category: string | undefined, context: AssistantContext): AssistantAction[] {
+  switch (category) {
+    case "documents":
+      return [
+        linkAction("My Documents", context.routes.documents, FileCheck2),
+        linkAction("Enrollment", context.routes.enrollment, Compass),
+      ];
+    case "payments":
+      return [
+        linkAction("Payment", context.routes.payment, CreditCard),
+        linkAction("Payment History", context.routes.paymentHistory, LayoutDashboard),
+      ];
+    case "assessment":
+      return [
+        linkAction("AI Assessment", context.routes.assessment, GraduationCap),
+        linkAction("Results", context.routes.results, GraduationCap),
+      ];
+    case "voucher":
+      return [
+        promptAction("Payment locked?", "Why is payment locked?", CreditCard),
+        linkAction("Enrollment", context.routes.enrollment, Compass),
+      ];
+    case "navigation":
+      return [
+        linkAction("Dashboard", context.routes.dashboard, LayoutDashboard),
+        promptAction("Next step", "What is my next step?", Compass),
+      ];
+    case "enrollment":
+    default:
+      return [
+        linkAction("Enrollment", context.routes.enrollment, Compass),
+        linkAction("Dashboard", context.routes.dashboard, LayoutDashboard),
+      ];
+  }
+}
+
+function buildFaqReply(input: string, context: AssistantContext) {
+  const faq = findDirectFaq(input);
+  if (!faq) return null;
+
+  return {
+    text: faq.answer,
+    actions: getCategoryActions(faq.category, context),
+    source: "faq" as const,
+  };
+}
+
+function buildRetrievalFallbackReply(input: string, context: AssistantContext) {
+  const knowledge = retrieveChatbotKnowledge(input, 1);
+  const category = knowledge[0]?.category;
+
+  return {
+    text:
+      category === "documents"
+        ? "For documents, upload clear and readable files in the My Documents page. If one was rejected, replace it there and wait for registrar review."
+        : category === "payments"
+        ? "Payment becomes available after registrar approval unless voucher eligibility keeps it locked. Use the Payment page for GCash, bank transfer, or cash payment instructions."
+        : category === "voucher"
+        ? "Voucher eligibility is checked by the registrar. Public school Grade 10 completers, SUC/LUC completers, and current ESC grantees may qualify."
+        : "I can help with enrollment, assessment, documents, payment, voucher, and portal navigation. Please check the related dashboard page for the next action.",
+    actions: getCategoryActions(category, context),
+    source: "retrieval" as const,
+  };
+}
+
+function formatMessageTime(timestamp: Date) {
+  return timestamp.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function getAssistantRoutes(userRole: AssistantContext["userRole"]): AssistantRoutes {
   if (userRole === "student") {
     return {
@@ -187,6 +267,7 @@ function buildWelcomeMessage(): ChatMessage {
     sender: "bot",
     text: "Hello! Welcome to Electron Hub. How can I assist you today?",
     timestamp: new Date(),
+    source: "local",
     actions: [
       promptAction("Assessment help", "How does the assessment work?", GraduationCap),
       promptAction("Enrollment steps", "How do I enroll?", Compass),
@@ -305,10 +386,16 @@ function buildNextStepReply(context: AssistantContext) {
 
 function buildAssistantReply(input: string, context: AssistantContext) {
   const normalizedInput = normalizeInput(input);
+  const faqReply = buildFaqReply(input, context);
+
+  if (faqReply) {
+    return faqReply;
+  }
 
   if (hasKeyword(normalizedInput, GREETING_KEYWORDS)) {
     return {
-      text: "Hello! Welcome to Electron Hub. How can I assist you today?",
+      text: "Hello! I can help with enrollment, assessment, documents, payment, voucher questions, and finding the right page in Electron Hub.",
+      source: "local" as const,
       actions: [
         promptAction("Assessment help", "How does the assessment work?", GraduationCap),
         promptAction("How do I enroll?", "How do I enroll?", Compass),
@@ -319,7 +406,8 @@ function buildAssistantReply(input: string, context: AssistantContext) {
 
   if (hasKeyword(normalizedInput, IDENTITY_KEYWORDS)) {
     return {
-      text: "I am the Electron Hub AI Assistant. I help you with assessment, enrollment, documents, payment, sectioning, and portal navigation.",
+      text: "I am the Electron Hub AI Enrollment Assistant. I combine quick FAQ answers, enrollment knowledge, and AI support to guide students through the portal.",
+      source: "local" as const,
       actions: [
         promptAction("What can you do?", "What can you do?", Sparkles),
         promptAction("How do I enroll?", "How do I enroll?", Compass),
@@ -330,169 +418,27 @@ function buildAssistantReply(input: string, context: AssistantContext) {
   if (hasKeyword(normalizedInput, RETAKE_KEYWORDS)) {
     return {
       text: "Assessment retakes are currently disabled after completion. Once you finish the assessment, you can review your recommendation and proceed to enrollment.",
+      source: "local" as const,
       actions: [linkAction("View Results", context.routes.results, GraduationCap)],
     };
   }
 
-  if (hasKeyword(normalizedInput, ASSESSMENT_DONE_KEYWORDS)) {
-    return {
-      text: "If you already finished the assessment, you can review your recommended track and electives, then proceed to enrollment.",
-      actions: [
-        linkAction("View Results", context.routes.results, GraduationCap),
-        linkAction("Open Enrollment", context.routes.enrollment, Compass),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, ASSESSMENT_KEYWORDS)) {
-    return {
-      text: "You may take the AI Assessment to receive your recommended track and two suggested electives. After completion, your result is saved and used to guide your enrollment.",
-      actions: [
-        linkAction("Start Assessment", context.routes.assessment, GraduationCap),
-        promptAction("What tracks are available?", "What tracks are available?", Sparkles),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, ENROLL_WITHOUT_ASSESSMENT_KEYWORDS)) {
-    return {
-      text: "Yes, you can enroll without the assessment, but it is recommended because it gives you a better track and elective suggestion before submission.",
-      actions: [
-        linkAction("Enrollment Guide", context.routes.enrollment, Compass),
-        linkAction("Start Assessment", context.routes.assessment, GraduationCap),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, ENROLLMENT_KEYWORDS)) {
-    return {
-      text: "Complete the enrollment form, upload your documents, and submit your payment. If you are unsure about your track, take the AI Assessment first.",
-      actions: [
-        linkAction("Open Enrollment", context.routes.enrollment, Compass),
-        linkAction("Start Assessment", context.routes.assessment, GraduationCap),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, DOCUMENT_REJECTED_KEYWORDS)) {
-    return {
-      text: "Please check the remarks provided for the rejected document, upload a clearer or corrected file, and resubmit it through your document or enrollment page.",
-      actions: [
-        linkAction("My Documents", context.routes.documents, FileCheck2),
-        promptAction("What are the requirements?", "What are the document requirements?", FileCheck2),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, DOCUMENT_UPLOAD_KEYWORDS)) {
-    return {
-      text: "Upload your documents through the enrollment flow or My Documents page. Use clear PDF or JPG files and follow the upload size limit shown in the portal.",
-      actions: [
-        linkAction("Open Documents", context.routes.documents, FileCheck2),
-        linkAction("Open Enrollment", context.routes.enrollment, Compass),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, DOCUMENT_KEYWORDS)) {
-    return {
-      text: `Common requirements include ${formatList(COMMON_REQUIREMENTS)}. Additional requirements may apply depending on your case.`,
-      actions: [
-        linkAction("Open Enrollment Guide", context.routes.enrollment, Compass),
-        linkAction("My Documents", context.routes.documents, FileCheck2),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, RECEIPT_KEYWORDS)) {
-    return {
-      text: "Please upload your receipt and provide the reference number so the cashier can verify your payment.",
-      actions: [linkAction("Open Payment", context.routes.payment, CreditCard)],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, CASH_PAYMENT_KEYWORDS)) {
-    return {
-      text: "For cash payment, Electron Hub can provide a queue number and schedule for cashier processing. Please follow the instructions shown on the payment page.",
-      actions: [linkAction("Open Payment", context.routes.payment, CreditCard)],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, PAYMENT_REJECTED_KEYWORDS)) {
-    return {
-      text: "If your payment was rejected, please review the remarks, correct the details, and resubmit your payment information.",
-      actions: [
-        linkAction("Open Payment", context.routes.payment, CreditCard),
-        linkAction("Payment History", context.routes.paymentHistory, LayoutDashboard),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, PAYMENT_KEYWORDS)) {
-    return {
-      text: "You may choose online payment or cash payment. After submission, the cashier verifies the payment before your enrollment is finalized.",
-      actions: [
-        linkAction("Open Payment", context.routes.payment, CreditCard),
-        promptAction("Cash payment", "How does cash payment work?", CreditCard),
-      ],
-    };
-  }
-
   if (hasKeyword(normalizedInput, ENROLLED_KEYWORDS)) {
-    return buildEnrolledReply(context);
+    return { ...buildEnrolledReply(context), source: "local" as const };
   }
 
   if (hasKeyword(normalizedInput, STATUS_KEYWORDS)) {
-    return buildStatusReply(context);
-  }
-
-  if (hasKeyword(normalizedInput, SECTIONING_KEYWORDS)) {
-    return {
-      text: "Students are grouped into sections based on their track and elective combination, with capacity limits applied during sectioning.",
-      actions: [
-        promptAction("What track was recommended?", "What tracks are available?", GraduationCap),
-        promptAction("What is my next step?", "What is my next step?", LayoutDashboard),
-      ],
-    };
+    return { ...buildStatusReply(context), source: "local" as const };
   }
 
   if (hasKeyword(normalizedInput, NAVIGATION_KEYWORDS)) {
-    return buildNextStepReply(context);
-  }
-
-  if (hasKeyword(normalizedInput, ACADEMIC_TRACK_KEYWORDS)) {
-    return {
-      text: `The Academic Track is commonly paired with electives such as ${formatList(ACADEMIC_ELECTIVES)}. The assessment helps identify which pair best matches your strengths and interests.`,
-      actions: [
-        linkAction("Start Assessment", context.routes.assessment, GraduationCap),
-        linkAction("View Results", context.routes.results, GraduationCap),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, TECHNICAL_TRACK_KEYWORDS)) {
-    return {
-      text: `The Technical-Professional Track focuses on practical skills and may lead to electives such as ${formatList(TECHNICAL_ELECTIVES)}. The assessment helps determine the best match for you.`,
-      actions: [
-        linkAction("Start Assessment", context.routes.assessment, GraduationCap),
-        linkAction("Open Enrollment", context.routes.enrollment, Compass),
-      ],
-    };
-  }
-
-  if (hasKeyword(normalizedInput, TRACK_KEYWORDS)) {
-    return {
-      text: "Electron Hub currently guides students through two main paths: Academic and Technical-Professional. The AI Assessment recommends one track plus two electives based on your answers.",
-      actions: [
-        promptAction("Academic track", "Tell me about the Academic Track", GraduationCap),
-        promptAction("Technical track", "Tell me about the Technical-Professional Track", GraduationCap),
-      ],
-    };
+    return { ...buildNextStepReply(context), source: "local" as const };
   }
 
   if (hasKeyword(normalizedInput, ACCOUNT_KEYWORDS)) {
     return {
       text: "Create an account or log in to continue with assessment results, enrollment, document submission, payment, and dashboard tracking.",
+      source: "local" as const,
       actions: [
         linkAction("Login", context.routes.login, LayoutDashboard),
         linkAction("Register", context.routes.register, LayoutDashboard),
@@ -503,6 +449,7 @@ function buildAssistantReply(input: string, context: AssistantContext) {
   if (hasKeyword(normalizedInput, HELP_KEYWORDS)) {
     return {
       text: "I can guide you through the assessment, enrollment, document submission, payment, sectioning, and next-step navigation in Electron Hub.",
+      source: "local" as const,
       actions: [
         promptAction("Assessment", "How does the assessment work?", GraduationCap),
         promptAction("Documents", "What are the document requirements?", FileCheck2),
@@ -511,14 +458,7 @@ function buildAssistantReply(input: string, context: AssistantContext) {
     };
   }
 
-  return {
-    text: "I'm sorry, I didn't fully understand your question. Could you please clarify? You can ask about assessment, enrollment, documents, payment, sectioning, or your next step.",
-    actions: [
-      promptAction("Assessment help", "How does the assessment work?", GraduationCap),
-      promptAction("Enrollment steps", "How do I enroll?", Compass),
-      promptAction("Payment options", "How do I pay?", CreditCard),
-    ],
-  };
+  return null;
 }
 
 export function ChatAssistantShell({
@@ -619,6 +559,41 @@ export function ChatAssistantShell({
     onToggle?.(nextOpenState);
   };
 
+  const requestAiReply = async (message: string, currentMessages: ChatMessage[]) => {
+    const recentMessages = currentMessages.slice(-4).map((item) => ({
+      role: item.sender === "bot" ? "assistant" : "user",
+      content: item.text,
+    }));
+
+    const requestBody = JSON.stringify({
+      message,
+      context: {
+        userRole: assistantContext.userRole,
+        currentStep: getCurrentProgressStep(assistantContext.enrollmentProgress),
+        enrollmentProgress: assistantContext.enrollmentProgress,
+      },
+      recentMessages,
+    });
+
+    const requestOptions = {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: requestBody,
+    };
+
+    let response = await fetch("/api/chatbot", requestOptions);
+
+    if (!response.ok && window.location.hostname === "localhost") {
+      response = await fetch("http://localhost:3001/api/chatbot", requestOptions);
+    }
+
+    if (!response.ok) {
+      throw new Error("Chatbot API request failed");
+    }
+
+    return response.json();
+  };
+
   const handleSend = (overrideText?: string) => {
     const nextText = (overrideText ?? input).trim();
 
@@ -633,26 +608,61 @@ export function ChatAssistantShell({
       timestamp: new Date(),
     };
 
-    const reply = buildAssistantReply(nextText, assistantContext);
+    const localReply = buildAssistantReply(nextText, assistantContext);
 
     setMessages((currentMessages) => [...currentMessages, userMessage]);
     setInput("");
     setIsTyping(true);
 
-    const responseDelay = Math.min(900, Math.max(420, reply.text.length * 10));
+    if (localReply) {
+      const responseDelay = Math.min(650, Math.max(260, localReply.text.length * 6));
 
-    window.setTimeout(() => {
-      const botMessage: ChatMessage = {
-        id: createMessageId("bot"),
-        sender: "bot",
-        text: reply.text,
-        timestamp: new Date(),
-        actions: reply.actions,
-      };
+      window.setTimeout(() => {
+        const botMessage: ChatMessage = {
+          id: createMessageId("bot"),
+          sender: "bot",
+          text: localReply.text,
+          timestamp: new Date(),
+          actions: localReply.actions,
+          source: localReply.source,
+        };
 
-      setMessages((currentMessages) => [...currentMessages, botMessage]);
-      setIsTyping(false);
-    }, responseDelay);
+        setMessages((currentMessages) => [...currentMessages, botMessage]);
+        setIsTyping(false);
+      }, responseDelay);
+      return;
+    }
+
+    requestAiReply(nextText, messages)
+      .then((result) => {
+        const category = result?.category;
+        const botMessage: ChatMessage = {
+          id: createMessageId("bot"),
+          sender: "bot",
+          text:
+            result?.reply ||
+            "I can help with enrollment, assessment, documents, payment, voucher, and portal navigation. Could you ask that another way?",
+          timestamp: new Date(),
+          actions: getCategoryActions(category, assistantContext),
+          source: result?.source || "ai",
+        };
+
+        setMessages((currentMessages) => [...currentMessages, botMessage]);
+      })
+      .catch(() => {
+        const fallback = buildRetrievalFallbackReply(nextText, assistantContext);
+        const botMessage: ChatMessage = {
+          id: createMessageId("bot"),
+          sender: "bot",
+          text: fallback.text,
+          timestamp: new Date(),
+          actions: fallback.actions,
+          source: fallback.source,
+        };
+
+        setMessages((currentMessages) => [...currentMessages, botMessage]);
+      })
+      .finally(() => setIsTyping(false));
   };
 
   if (!isVisible || !portalContainer) {
@@ -760,8 +770,11 @@ export function ChatAssistantShell({
 
                       <div className="min-w-0">
                         <h2 className="text-base font-semibold leading-tight text-slate-900 sm:text-lg">
-                          Electron Hub Assistant
+                          AI Enrollment Assistant
                         </h2>
+                        <p className="mt-0.5 truncate text-xs text-slate-500">
+                          Smart FAQ, enrollment guide, and portal support
+                        </p>
                       </div>
                     </div>
 
@@ -787,6 +800,24 @@ export function ChatAssistantShell({
                   className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4 sm:px-5"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
+                  <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+                    {QUICK_PROMPTS.map((prompt) => {
+                      const PromptIcon = prompt.icon;
+                      return (
+                        <button
+                          key={prompt.label}
+                          type="button"
+                          onClick={() => handleSend(prompt.value)}
+                          disabled={isTyping}
+                          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3 py-2 text-xs font-semibold text-blue-900 shadow-sm transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <PromptIcon className="h-3.5 w-3.5" />
+                          {prompt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+
                   <div className="space-y-4">
                     <AnimatePresence initial={false}>
                       {messages.map((message) => {
@@ -823,7 +854,48 @@ export function ChatAssistantShell({
                                       }
                                 }
                               >
-                                <p>{message.text}</p>
+                                <p className="whitespace-pre-line">{message.text}</p>
+                              </div>
+                              {message.actions && message.actions.length > 0 && (
+                                <div className={`mt-2 flex flex-wrap gap-2 ${isBot ? "justify-start" : "justify-end"}`}>
+                                  {message.actions.map((action) => {
+                                    const ActionIcon = action.icon;
+                                    const content = (
+                                      <>
+                                        {ActionIcon && <ActionIcon className="h-3.5 w-3.5" />}
+                                        {action.label}
+                                      </>
+                                    );
+
+                                    if (action.kind === "link" && action.to) {
+                                      return (
+                                        <a
+                                          key={`${message.id}-${action.label}`}
+                                          href={action.to}
+                                          className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-900"
+                                        >
+                                          {content}
+                                        </a>
+                                      );
+                                    }
+
+                                    return (
+                                      <button
+                                        key={`${message.id}-${action.label}`}
+                                        type="button"
+                                        onClick={() => handleSend(action.value || action.label)}
+                                        disabled={isTyping}
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-900 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        {content}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                              <div className={`mt-1 px-1 text-[10px] text-slate-400 ${isBot ? "text-left" : "text-right"}`}>
+                                {message.source === "ai" ? "AI assisted · " : message.source === "faq" ? "FAQ · " : ""}
+                                {formatMessageTime(message.timestamp)}
                               </div>
                             </div>
                           </motion.div>

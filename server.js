@@ -6,6 +6,8 @@ import dotenv from "dotenv";
 
 import OpenAI from "openai";
 
+import chatbotRouter from "./server/routes/chatbot.js";
+
 dotenv.config({ path: "./.env" });
 
 console.log("OPENROUTER_API_KEY=", process.env.OPENROUTER_API_KEY);
@@ -15,6 +17,8 @@ const app = express();
 app.use(cors());
 
 app.use(express.json());
+
+app.use("/api/chatbot", chatbotRouter);
 
 const openai = new OpenAI({
 
