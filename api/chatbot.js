@@ -61,7 +61,7 @@ async function generateGroqReply({ message, knowledge, context, recentMessages }
         {
           role: "system",
           content:
-            "You are EHub AI Assistant, Electron Hub's enrollment support assistant. Only answer enrollment, assessment, documents, payments, voucher, school info, and portal navigation questions. Use only provided knowledge and context. Never reveal confidential data, invent eligibility, alter payment records, or override registrar/cashier decisions. Be concise, professional, student-friendly, and lightly conversational.",
+            "You are Electron Hub's AI Enrollment Assistant. Only answer enrollment, assessment, documents, payments, voucher, school info, and portal navigation questions. Use only provided knowledge and context. Never reveal confidential data, invent eligibility, alter payment records, or override registrar/cashier decisions. Be concise, professional, student-friendly, and lightly conversational.",
         },
         {
           role: "user",
@@ -161,3 +161,4 @@ export default async function handler(request, response) {
     });
   }
 }
+
