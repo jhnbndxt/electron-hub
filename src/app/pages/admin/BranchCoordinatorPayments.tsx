@@ -16,11 +16,18 @@ import {
   Printer,
   Maximize2,
   ZoomIn,
+  Settings,
+  Edit3,
+  ShieldCheck,
+  Save,
 } from "lucide-react";
+import bcrypt from "bcryptjs";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
+import { useAuth } from "../../context/AuthContext";
+import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
 
 interface PaymentRecord {
   id: string;
@@ -80,7 +87,38 @@ const getPaymentModeLabel = (mode?: string) => {
 
 const isValidDate = (date: Date) => !Number.isNaN(date.getTime());
 
-const formatCurrency = (amount: number) => `₱${amount.toLocaleString()}`;
+const formatCurrency = (amount: number) =>
+  amount.toLocaleString("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 2,
+  });
+
+type PaymentSettingsForm = {
+  payment_bank_enabled: boolean;
+  payment_bank_account_name: string;
+  payment_bank_account_number: string;
+  payment_bank_details: string;
+  payment_gcash_enabled: boolean;
+  payment_gcash_account_name: string;
+  payment_gcash_account_number: string;
+  payment_gcash_details: string;
+  payment_cash_enabled: boolean;
+  payment_tuition_amount: number;
+};
+
+const defaultPaymentSettingsForm: PaymentSettingsForm = {
+  payment_bank_enabled: true,
+  payment_bank_account_name: "Electron College of Technological Education",
+  payment_bank_account_number: "007-123-456789",
+  payment_bank_details: "BDO Unibank",
+  payment_gcash_enabled: true,
+  payment_gcash_account_name: "Electron College",
+  payment_gcash_account_number: "0917-123-4567",
+  payment_gcash_details: "Official Electron Hub GCash payment channel",
+  payment_cash_enabled: true,
+  payment_tuition_amount: 15000,
+};
 
 const formatTransactionDate = (value?: string) => {
   if (!value) return "Not processed";
@@ -132,6 +170,7 @@ function TransactionDetailRow({
 }
 
 export function BranchCoordinatorPayments() {
+  const { userRole, userData } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
@@ -141,9 +180,19 @@ export function BranchCoordinatorPayments() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [receiptZoom, setReceiptZoom] = useState(100);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettingsForm>(defaultPaymentSettingsForm);
+  const [settingsDraft, setSettingsDraft] = useState<PaymentSettingsForm>(defaultPaymentSettingsForm);
+  const [editingCategory, setEditingCategory] = useState<"bank" | "gcash" | "cash" | "tuition" | null>(null);
+  const [confirmationPassword, setConfirmationPassword] = useState("");
+  const [settingsError, setSettingsError] = useState("");
+  const [failedSettingsAttempts, setFailedSettingsAttempts] = useState(0);
+  const [settingsLockedUntil, setSettingsLockedUntil] = useState<number | null>(null);
+  const canManagePaymentSettings = userRole === "branchcoordinator" || userRole === "cashier";
 
   useEffect(() => {
     loadPayments();
+    void loadPaymentSettings();
   }, []);
 
   const loadPayments = async () => {
@@ -247,6 +296,113 @@ export function BranchCoordinatorPayments() {
     }
   };
 
+  const loadPaymentSettings = async () => {
+    const { data } = await getSystemSettings();
+    const normalizedSettings = {
+      ...defaultPaymentSettingsForm,
+      ...(data || {}),
+      payment_tuition_amount: Number(data?.payment_tuition_amount) || defaultPaymentSettingsForm.payment_tuition_amount,
+    };
+
+    setPaymentSettings(normalizedSettings);
+    setSettingsDraft(normalizedSettings);
+  };
+
+  const verifySettingsPassword = async () => {
+    if (!userData?.email) {
+      throw new Error("Please sign in again before changing payment settings.");
+    }
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("password_hash")
+      .eq("email", userData.email)
+      .maybeSingle();
+
+    if (error || !data?.password_hash) {
+      throw new Error("Unable to verify your password right now.");
+    }
+
+    const matches = await bcrypt.compare(confirmationPassword, data.password_hash);
+    if (!matches) {
+      throw new Error("The password you entered is incorrect.");
+    }
+  };
+
+  const handleSavePaymentSettings = async () => {
+    if (!canManagePaymentSettings) {
+      setSettingsError("Only branch coordinators and cashiers can update payment settings.");
+      return;
+    }
+
+    if (settingsLockedUntil && Date.now() < settingsLockedUntil) {
+      setSettingsError("Payment settings are temporarily locked after multiple failed password attempts. Please try again shortly.");
+      return;
+    }
+
+    if (!confirmationPassword.trim()) {
+      setSettingsError("Enter your password to confirm this sensitive settings change.");
+      return;
+    }
+
+    if (!window.confirm("Save these payment settings? This will immediately affect student payment options.")) {
+      return;
+    }
+
+    try {
+      await verifySettingsPassword();
+      const timestamp = new Date().toISOString();
+      localStorage.setItem(
+        `payment_settings_backup_${timestamp}`,
+        JSON.stringify({ settings: paymentSettings, backedUpAt: timestamp, actor: userData?.email || userData?.id })
+      );
+
+      const currentSettingsResult = await getSystemSettings();
+      const { warning } = await saveSystemSettings(
+        { ...(currentSettingsResult.data || {}), ...settingsDraft },
+        userData?.id || userData?.email
+      );
+      setPaymentSettings(settingsDraft);
+      setConfirmationPassword("");
+      setEditingCategory(null);
+      setSettingsError(warning || "");
+      setFailedSettingsAttempts(0);
+      setSettingsLockedUntil(null);
+      await loadPaymentSettings();
+    } catch (error) {
+      const nextFailedAttempts = failedSettingsAttempts + 1;
+      setFailedSettingsAttempts(nextFailedAttempts);
+      if (nextFailedAttempts >= 3) {
+        setSettingsLockedUntil(Date.now() + 5 * 60 * 1000);
+      }
+      setSettingsError(error instanceof Error ? error.message : "Unable to save payment settings.");
+    }
+  };
+
+  const handleRestoreLastPaymentSettingsBackup = () => {
+    const backupKeys = Object.keys(localStorage)
+      .filter((key) => key.startsWith("payment_settings_backup_"))
+      .sort()
+      .reverse();
+
+    const latestBackupKey = backupKeys[0];
+    if (!latestBackupKey) {
+      setSettingsError("No payment settings backup is available in this browser.");
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(localStorage.getItem(latestBackupKey) || "{}");
+      if (backup?.settings) {
+        setSettingsDraft({ ...defaultPaymentSettingsForm, ...backup.settings });
+        setEditingCategory("tuition");
+        setSettingsError("Latest backup loaded into the draft. Confirm your password and save to restore it.");
+      }
+    } catch (_error) {
+      setSettingsError("Unable to read the latest payment settings backup.");
+    }
+  };
+
   const closeDetailsModal = () => {
     setShowDetailsModal(false);
     setSelectedPayment(null);
@@ -322,7 +478,7 @@ export function BranchCoordinatorPayments() {
       p.studentEmail,
       getPaymentModeLabel(p.paymentMode),
       p.referenceNumber || p.queueNumber || "N/A",
-      `₱${p.amount.toLocaleString()}`,
+      formatCurrency(p.amount),
       p.status.toUpperCase(),
     ]);
 
@@ -331,7 +487,7 @@ export function BranchCoordinatorPayments() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `payment-history-${new Date().toISOString().split("T")[0]}.csv`;
+    link.download = `payment-management-${new Date().toISOString().split("T")[0]}.csv`;
     link.click();
   };
 
@@ -350,9 +506,25 @@ export function BranchCoordinatorPayments() {
     <div className="p-4 sm:p-6 lg:p-8">
       <DashboardPageHeader
         badge="Payment Administration"
-        title="Payment History"
-        subtitle="View all student payment transactions - pending, approved, paid, and rejected"
+        title="Payment Management"
+        subtitle="View student payment transactions, manage methods, and maintain tuition settings"
         icon={Banknote}
+        actions={
+          canManagePaymentSettings ? (
+            <button
+              onClick={() => {
+                setSettingsDraft(paymentSettings);
+                setSettingsError("");
+                setConfirmationPassword("");
+                setShowSettingsModal(true);
+              }}
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-blue-700 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-blue-700/20 transition hover:bg-blue-800"
+            >
+              <Settings className="h-4 w-4" />
+              Settings
+            </button>
+          ) : null
+        }
       />
 
       {/* Stats Cards */}
@@ -373,7 +545,7 @@ export function BranchCoordinatorPayments() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600 mb-1">Total Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">₱{totalRevenue.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-gray-900">{formatCurrency(totalRevenue)}</p>
             </div>
             <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
               <Banknote className="w-6 h-6 text-green-600" />
@@ -572,7 +744,7 @@ export function BranchCoordinatorPayments() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className="text-sm font-bold text-gray-900">
-                        ₱{payment.amount.toLocaleString()}
+                        {formatCurrency(payment.amount)}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -786,6 +958,179 @@ export function BranchCoordinatorPayments() {
         </div>
       )}
 
+      {showSettingsModal && (
+        <div
+          className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
+          onClick={() => setShowSettingsModal(false)}
+        >
+          <div
+            className="max-h-[92vh] w-full max-w-5xl overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-slate-100 bg-blue-50 px-6 py-5">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Payment Settings</p>
+                <h2 className="mt-1 text-2xl font-bold text-slate-950">Payment Management Settings</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Changes reflect on student dashboards after save and require password confirmation.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="rounded-2xl p-2 text-slate-500 transition hover:bg-white hover:text-slate-900"
+                aria-label="Close payment settings"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="grid max-h-[calc(92vh-94px)] gap-6 overflow-y-auto p-6 lg:grid-cols-[1fr_360px]">
+              <div className="space-y-4">
+                {[
+                  {
+                    key: "bank" as const,
+                    title: "Bank Payment",
+                    active: settingsDraft.payment_bank_enabled,
+                    fields: (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="text-sm font-semibold text-slate-700">
+                          Account Name
+                          <input value={settingsDraft.payment_bank_account_name} onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_bank_account_name: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                        </label>
+                        <label className="text-sm font-semibold text-slate-700">
+                          Account Number
+                          <input value={settingsDraft.payment_bank_account_number} onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_bank_account_number: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                        </label>
+                        <label className="md:col-span-2 text-sm font-semibold text-slate-700">
+                          Bank Details
+                          <textarea value={settingsDraft.payment_bank_details} onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_bank_details: e.target.value })} rows={3} className="mt-2 w-full resize-none rounded-xl border border-slate-200 px-3 py-2" />
+                        </label>
+                      </div>
+                    ),
+                    toggle: () => setSettingsDraft({ ...settingsDraft, payment_bank_enabled: !settingsDraft.payment_bank_enabled }),
+                  },
+                  {
+                    key: "gcash" as const,
+                    title: "GCash Payment",
+                    active: settingsDraft.payment_gcash_enabled,
+                    fields: (
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <label className="text-sm font-semibold text-slate-700">
+                          Account Name
+                          <input value={settingsDraft.payment_gcash_account_name} onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_gcash_account_name: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                        </label>
+                        <label className="text-sm font-semibold text-slate-700">
+                          Account Number
+                          <input value={settingsDraft.payment_gcash_account_number} onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_gcash_account_number: e.target.value })} className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2" />
+                        </label>
+                        <label className="md:col-span-2 text-sm font-semibold text-slate-700">
+                          GCash Details
+                          <textarea value={settingsDraft.payment_gcash_details} onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_gcash_details: e.target.value })} rows={3} className="mt-2 w-full resize-none rounded-xl border border-slate-200 px-3 py-2" />
+                        </label>
+                      </div>
+                    ),
+                    toggle: () => setSettingsDraft({ ...settingsDraft, payment_gcash_enabled: !settingsDraft.payment_gcash_enabled }),
+                  },
+                  {
+                    key: "cash" as const,
+                    title: "Over-the-Counter Payment",
+                    active: settingsDraft.payment_cash_enabled,
+                    fields: (
+                      <p className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                        Disable this when campus cashier payment queues should be paused.
+                      </p>
+                    ),
+                    toggle: () => setSettingsDraft({ ...settingsDraft, payment_cash_enabled: !settingsDraft.payment_cash_enabled }),
+                  },
+                  {
+                    key: "tuition" as const,
+                    title: "Overall Tuition/Payment Amount",
+                    active: true,
+                    fields: (
+                      <label className="text-sm font-semibold text-slate-700">
+                        Tuition Fee Amount
+                        <input
+                          type="number"
+                          min={0}
+                          value={settingsDraft.payment_tuition_amount}
+                          onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_tuition_amount: Number(e.target.value) || 0 })}
+                          className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2"
+                        />
+                      </label>
+                    ),
+                    toggle: null,
+                  },
+                ].map((category) => (
+                  <section key={category.key} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="text-lg font-bold text-slate-950">{category.title}</h3>
+                        <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${category.active ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                          {category.active ? "Active" : "Under Maintenance"}
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        {category.toggle && (
+                          <button onClick={category.toggle} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                            {category.active ? "Disable" : "Enable"}
+                          </button>
+                        )}
+                        <button onClick={() => setEditingCategory(category.key)} className="inline-flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-sm font-bold text-white hover:bg-blue-800">
+                          <Edit3 className="h-4 w-4" />
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                    {editingCategory === category.key && <div className="mt-5">{category.fields}</div>}
+                  </section>
+                ))}
+              </div>
+
+              <aside className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="mb-5 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-950">Security Confirmation</h3>
+                    <p className="text-xs text-slate-500">Required before saving sensitive changes.</p>
+                  </div>
+                </div>
+                <label className="text-sm font-semibold text-slate-700">
+                  Your Password
+                  <input
+                    type="password"
+                    value={confirmationPassword}
+                    onChange={(e) => setConfirmationPassword(e.target.value)}
+                    className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2"
+                    autoComplete="current-password"
+                  />
+                </label>
+                {settingsError && (
+                  <p className={`mt-4 rounded-xl p-3 text-sm font-semibold ${settingsError.includes("saved only") ? "bg-amber-50 text-amber-800" : "bg-red-50 text-red-700"}`}>
+                    {settingsError}
+                  </p>
+                )}
+                <button
+                  onClick={handleSavePaymentSettings}
+                  disabled={Boolean(settingsLockedUntil && Date.now() < settingsLockedUntil)}
+                  className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Save className="h-4 w-4" />
+                  Save Settings
+                </button>
+                <button
+                  onClick={handleRestoreLastPaymentSettingsBackup}
+                  className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Restore Last Backup
+                </button>
+              </aside>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Legacy details modal retained inactive after redesign */}
       {false && showDetailsModal && selectedPayment && (
         <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-hidden lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowDetailsModal(false)}>
@@ -839,7 +1184,7 @@ export function BranchCoordinatorPayments() {
                   <div>
                     <p className="text-sm text-gray-600">Amount</p>
                     <p className="text-2xl font-bold text-blue-600">
-                      ₱{selectedPayment.amount.toLocaleString()}
+                      {formatCurrency(selectedPayment.amount)}
                     </p>
                   </div>
                   <div>

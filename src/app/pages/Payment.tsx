@@ -4,11 +4,47 @@ import { useAuth } from "../context/AuthContext";
 import { LoadingState } from "../components/LoadingState";
 import { useNavigate } from "react-router";
 import { supabase } from "../../supabase";
+import { getSystemSettings } from "../../services/systemSettingsService";
 
 type PaymentMode = "bank" | "gcash" | "cash" | null;
 
 const CASH_QUEUE_TIME_VALUE = "09:00:00";
 const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
+const RECEIPT_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
+
+type PaymentSettings = {
+  payment_bank_enabled: boolean;
+  payment_bank_account_name: string;
+  payment_bank_account_number: string;
+  payment_bank_details: string;
+  payment_gcash_enabled: boolean;
+  payment_gcash_account_name: string;
+  payment_gcash_account_number: string;
+  payment_gcash_details: string;
+  payment_cash_enabled: boolean;
+  payment_tuition_amount: number;
+};
+
+const defaultPaymentSettings: PaymentSettings = {
+  payment_bank_enabled: true,
+  payment_bank_account_name: "Electron College of Technological Education",
+  payment_bank_account_number: "007-123-456789",
+  payment_bank_details: "BDO Unibank",
+  payment_gcash_enabled: true,
+  payment_gcash_account_name: "Electron College",
+  payment_gcash_account_number: "0917-123-4567",
+  payment_gcash_details: "Official Electron Hub GCash payment channel",
+  payment_cash_enabled: true,
+  payment_tuition_amount: 15000,
+};
+
+const formatCurrency = (amount: number) =>
+  amount.toLocaleString("en-PH", {
+    style: "currency",
+    currency: "PHP",
+    maximumFractionDigits: 2,
+  });
 
 function formatCashQueueTime(timeValue?: string | null) {
   if (!timeValue) {
@@ -49,8 +85,43 @@ export function Payment() {
   const [copied, setCopied] = useState(false);
   const [paymentApproved, setPaymentApproved] = useState(false);
   const [approvedPaymentData, setApprovedPaymentData] = useState<any>(null);
+  const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
+  const [methodMessage, setMethodMessage] = useState("");
 
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const loadPaymentSettings = async () => {
+      const { data } = await getSystemSettings();
+      if (!isActive) return;
+
+      setPaymentSettings({
+        ...defaultPaymentSettings,
+        ...(data || {}),
+        payment_tuition_amount: Number(data?.payment_tuition_amount) || defaultPaymentSettings.payment_tuition_amount,
+      });
+    };
+
+    void loadPaymentSettings();
+
+    const channel = supabase
+      .channel("student-payment-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "system_settings" },
+        () => {
+          void loadPaymentSettings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      isActive = false;
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   // Check if payment already submitted or approved from Supabase
   useEffect(() => {
@@ -79,6 +150,7 @@ export function Payment() {
               paymentMode: mode,
               referenceNumber: payment.reference_number,
               queueNumber: payment.queue_number,
+              amount: Number(payment.amount) || paymentSettings.payment_tuition_amount,
               paidDate: payment.paid_at
                 ? new Date(payment.paid_at).toLocaleDateString()
                 : payment.verified_at
@@ -191,7 +263,7 @@ export function Payment() {
               )}
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Paid:</span>
-                <span className="font-bold text-lg text-green-600">₱15,000.00</span>
+                <span className="font-bold text-lg text-green-600">{formatCurrency(approvedPaymentData.amount || paymentSettings.payment_tuition_amount)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Date Verified:</span>
@@ -236,6 +308,8 @@ export function Payment() {
       description: "Transfer via online banking",
       icon: Building2,
       color: "#1E3A8A",
+      enabled: paymentSettings.payment_bank_enabled,
+      unavailableMessage: "Bank transfer is temporarily unavailable while our cashier team performs payment channel maintenance.",
     },
     {
       id: "gcash" as PaymentMode,
@@ -243,6 +317,8 @@ export function Payment() {
       description: "Pay using GCash e-wallet",
       icon: Wallet,
       color: "#0066FF",
+      enabled: paymentSettings.payment_gcash_enabled,
+      unavailableMessage: "GCash payment is temporarily unavailable while our cashier team performs payment channel maintenance.",
     },
     {
       id: "cash" as PaymentMode,
@@ -250,19 +326,57 @@ export function Payment() {
       description: "Pay in cash at campus",
       icon: Banknote,
       color: "#10B981",
+      enabled: paymentSettings.payment_cash_enabled,
+      unavailableMessage: "Over-the-counter payment is temporarily unavailable until further notice. Please choose another active payment method.",
     },
   ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setUploadedFile(e.target.files[0]);
+      const file = e.target.files[0];
+
+      if (!RECEIPT_FILE_TYPES.includes(file.type)) {
+        alert("Unsupported receipt file. Please upload a JPG, PNG, WEBP, or PDF file.");
+        e.target.value = "";
+        return;
+      }
+
+      if (file.size > MAX_RECEIPT_SIZE) {
+        alert("Receipt file is too large. Please upload a file up to 5MB only.");
+        e.target.value = "";
+        return;
+      }
+
+      setUploadedFile(file);
     }
   };
 
   const handleSubmitPayment = async () => {
     if (!userData?.id || !userData?.email || !uploadedFile || !referenceNumber) return;
+    if (selectedMode === "bank" && !paymentSettings.payment_bank_enabled) {
+      setMethodMessage("Bank transfer is temporarily unavailable while our cashier team performs payment channel maintenance.");
+      return;
+    }
+    if (selectedMode === "gcash" && !paymentSettings.payment_gcash_enabled) {
+      setMethodMessage("GCash payment is temporarily unavailable while our cashier team performs payment channel maintenance.");
+      return;
+    }
 
     try {
+      const { data: existingOpenPayment } = await supabase
+        .from("payments")
+        .select("id, status")
+        .eq("student_id", userData.id)
+        .in("status", ["pending", "submitted", "approved", "verified", "paid"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingOpenPayment) {
+        alert("You already have a payment submission on file. You can submit again only if the previous payment is rejected.");
+        return;
+      }
+
       // Upload receipt to Supabase Storage
       const timestamp = Date.now();
       const fileExt = uploadedFile.name.split(".").pop();
@@ -295,7 +409,7 @@ export function Payment() {
         student_id: userData.id,
         enrollment_id: enrollment?.id || null,
         payment_method: selectedMode,
-        amount: 15000,
+        amount: paymentSettings.payment_tuition_amount,
         reference_number: referenceNumber,
         receipt_file_path: storagePath,
         receipt_file_url: receiptUrl,
@@ -321,6 +435,10 @@ export function Payment() {
 
   const handleGenerateQueue = async () => {
     if (!userData?.id || !userData?.email) return;
+    if (!paymentSettings.payment_cash_enabled) {
+      setMethodMessage("Over-the-counter payment is temporarily unavailable until further notice. Please choose another active payment method.");
+      return;
+    }
 
     // Check if queue already exists in Supabase
     const { data: existingPayment } = await supabase
@@ -376,7 +494,7 @@ export function Payment() {
       student_id: userData.id,
       enrollment_id: enrollment?.id || null,
       payment_method: "cash",
-      amount: 15000,
+      amount: paymentSettings.payment_tuition_amount,
       queue_number: qNum,
       queue_schedule_date: scheduleDate.toISOString().split("T")[0],
       queue_schedule_time: CASH_QUEUE_TIME_VALUE,
@@ -528,7 +646,7 @@ export function Payment() {
               </li>
               <li className="flex items-start gap-2">
                 <span className="font-bold text-blue-600">2.</span>
-                <span>Bring the exact amount: <strong>₱15,000.00</strong></span>
+                <span>Bring the exact amount: <strong>{formatCurrency(paymentSettings.payment_tuition_amount)}</strong></span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="font-bold text-blue-600">3.</span>
@@ -598,6 +716,15 @@ export function Payment() {
               <button
                 key={mode.id}
                 onClick={() => {
+                  if (!mode.enabled) {
+                    setMethodMessage(mode.unavailableMessage);
+                    setSelectedMode(mode.id);
+                    setIsSubmitted(false);
+                    setUploadedFile(null);
+                    setReferenceNumber("");
+                    return;
+                  }
+                  setMethodMessage("");
                   setSelectedMode(mode.id);
                   setIsSubmitted(false);
                   setUploadedFile(null);
@@ -606,7 +733,7 @@ export function Payment() {
                 disabled={isSubmitted}
                 className={`bg-white rounded-xl p-8 border-2 transition-all hover:shadow-lg text-left ${
                   isSelected ? "ring-4" : ""
-                } ${isSubmitted ? "opacity-50 cursor-not-allowed" : ""}`}
+                } ${isSubmitted ? "opacity-50 cursor-not-allowed" : ""} ${!mode.enabled ? "border-dashed bg-slate-50" : ""}`}
                 style={{
                   borderColor: isSelected ? mode.color : "#E5E7EB",
                   "--tw-ring-color": mode.color,
@@ -622,6 +749,13 @@ export function Payment() {
                   {mode.title}
                 </h3>
                 <p className="text-sm text-gray-600">{mode.description}</p>
+                <span
+                  className={`mt-4 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                    mode.enabled ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                  }`}
+                >
+                  {mode.enabled ? "Active" : "Under Maintenance"}
+                </span>
                 {isSelected && (
                   <div className="mt-4 flex items-center gap-2 text-sm font-semibold" style={{ color: mode.color }}>
                     <CheckCircle2 className="w-5 h-5" />
@@ -633,8 +767,14 @@ export function Payment() {
           })}</div>
       </div>
 
+      {methodMessage && (
+        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm font-medium text-amber-800">
+          {methodMessage}
+        </div>
+      )}
+
       {/* Bank Transfer Details */}
-      {selectedMode === "bank" && !isSubmitted && (
+      {selectedMode === "bank" && paymentSettings.payment_bank_enabled && !isSubmitted && (
         <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
           <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
             Bank Transfer Details
@@ -648,19 +788,19 @@ export function Payment() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Bank Name:</span>
-                <span className="font-semibold">BDO Unibank</span>
+                <span className="font-semibold">{paymentSettings.payment_bank_details}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Account Name:</span>
-                <span className="font-semibold">Electron College of Technological Education</span>
+                <span className="font-semibold">{paymentSettings.payment_bank_account_name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Account Number:</span>
-                <span className="font-semibold">007-123-456789</span>
+                <span className="font-semibold">{paymentSettings.payment_bank_account_number}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Due:</span>
-                <span className="font-bold text-lg" style={{ color: "var(--electron-blue)" }}>₱15,000.00</span>
+                <span className="font-bold text-lg" style={{ color: "var(--electron-blue)" }}>{formatCurrency(paymentSettings.payment_tuition_amount)}</span>
               </div>
             </div>
           </div>
@@ -732,7 +872,7 @@ export function Payment() {
       )}
 
       {/* GCash Details */}
-      {selectedMode === "gcash" && !isSubmitted && (
+      {selectedMode === "gcash" && paymentSettings.payment_gcash_enabled && !isSubmitted && (
         <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200">
           <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-blue)" }}>
             GCash Payment Details
@@ -746,15 +886,19 @@ export function Payment() {
             <div className="space-y-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-600">Account Name:</span>
-                <span className="font-semibold">Electron College</span>
+                <span className="font-semibold">{paymentSettings.payment_gcash_account_name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">GCash Number:</span>
-                <span className="font-semibold">0917-123-4567</span>
+                <span className="font-semibold">{paymentSettings.payment_gcash_account_number}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Details:</span>
+                <span className="text-right font-semibold">{paymentSettings.payment_gcash_details}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Amount Due:</span>
-                <span className="font-bold text-lg" style={{ color: "var(--electron-blue)" }}>₱15,000.00</span>
+                <span className="font-bold text-lg" style={{ color: "var(--electron-blue)" }}>{formatCurrency(paymentSettings.payment_tuition_amount)}</span>
               </div>
             </div>
           </div>
@@ -826,7 +970,7 @@ export function Payment() {
       )}
 
       {/* Cash Payment */}
-      {selectedMode === "cash" && (
+      {selectedMode === "cash" && paymentSettings.payment_cash_enabled && (
         <div className="bg-white rounded-xl shadow-md p-8 border border-gray-200 text-center">
           <div
             className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
@@ -838,7 +982,7 @@ export function Payment() {
             Over-the-Counter Payment
           </h2>
           <p className="text-gray-600 mb-2">
-            Amount Due: <span className="font-bold text-xl" style={{ color: "var(--electron-blue)" }}>₱15,000.00</span>
+            Amount Due: <span className="font-bold text-xl" style={{ color: "var(--electron-blue)" }}>{formatCurrency(paymentSettings.payment_tuition_amount)}</span>
           </p>
           <p className="text-gray-600 mb-8">
             Generate a queue number and schedule your payment at the Cashier's office

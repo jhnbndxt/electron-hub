@@ -6,7 +6,7 @@ import { PortalShell, type PortalNavItem } from "../components/PortalShell";
 export function CashierLayout() {
   const navItems: PortalNavItem[] = [
     { path: "/cashier", label: "Payment Queue", icon: LayoutDashboard, exact: true },
-    { path: "/cashier/history", label: "Payment History", icon: History },
+    { path: "/cashier/history", label: "Payment Management", icon: History },
   ];
 
   return (

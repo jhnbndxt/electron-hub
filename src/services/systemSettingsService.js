@@ -108,12 +108,115 @@ export const SYSTEM_SETTINGS_DEFINITIONS = [
     defaultValue: false,
     description: 'Restrict general access for maintenance activities.',
   },
+  {
+    key: 'payment_bank_enabled',
+    type: 'boolean',
+    defaultValue: true,
+    description: 'Allow students to submit bank transfer payments.',
+  },
+  {
+    key: 'payment_bank_account_name',
+    type: 'string',
+    defaultValue: 'Electron College of Technological Education',
+    description: 'Bank account name shown to students.',
+  },
+  {
+    key: 'payment_bank_account_number',
+    type: 'string',
+    defaultValue: '007-123-456789',
+    description: 'Bank account number shown to students.',
+  },
+  {
+    key: 'payment_bank_details',
+    type: 'string',
+    defaultValue: 'BDO Unibank',
+    description: 'Bank name and transfer details shown to students.',
+  },
+  {
+    key: 'payment_gcash_enabled',
+    type: 'boolean',
+    defaultValue: true,
+    description: 'Allow students to submit GCash payments.',
+  },
+  {
+    key: 'payment_gcash_account_name',
+    type: 'string',
+    defaultValue: 'Electron College',
+    description: 'GCash account name shown to students.',
+  },
+  {
+    key: 'payment_gcash_account_number',
+    type: 'string',
+    defaultValue: '0917-123-4567',
+    description: 'GCash account number shown to students.',
+  },
+  {
+    key: 'payment_gcash_details',
+    type: 'string',
+    defaultValue: 'Official Electron Hub GCash payment channel',
+    description: 'GCash payment details shown to students.',
+  },
+  {
+    key: 'payment_cash_enabled',
+    type: 'boolean',
+    defaultValue: true,
+    description: 'Allow students to generate over-the-counter payment queue numbers.',
+  },
+  {
+    key: 'payment_tuition_amount',
+    type: 'number',
+    defaultValue: 15000,
+    description: 'Default tuition/payment amount used in student payment flows.',
+  },
 ];
 
 const SETTINGS_BY_KEY = SYSTEM_SETTINGS_DEFINITIONS.reduce((definitionMap, definition) => {
   definitionMap[definition.key] = definition;
   return definitionMap;
 }, {});
+
+const ENCRYPTED_VALUE_PREFIX = 'enc:v1:';
+const SENSITIVE_PAYMENT_SETTING_KEYS = new Set([
+  'payment_bank_account_name',
+  'payment_bank_account_number',
+  'payment_bank_details',
+  'payment_gcash_account_name',
+  'payment_gcash_account_number',
+  'payment_gcash_details',
+]);
+
+function encodeSensitiveValue(value) {
+  const normalizedValue = String(value ?? '').trim();
+  if (!normalizedValue) return '';
+
+  try {
+    if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
+      return `${ENCRYPTED_VALUE_PREFIX}${window.btoa(unescape(encodeURIComponent(normalizedValue)))}`;
+    }
+  } catch (_error) {
+    return normalizedValue;
+  }
+
+  return normalizedValue;
+}
+
+function decodeSensitiveValue(value) {
+  const normalizedValue = String(value ?? '');
+  if (!normalizedValue.startsWith(ENCRYPTED_VALUE_PREFIX)) {
+    return normalizedValue;
+  }
+
+  try {
+    const encodedValue = normalizedValue.slice(ENCRYPTED_VALUE_PREFIX.length);
+    if (typeof window !== 'undefined' && typeof window.atob === 'function') {
+      return decodeURIComponent(escape(window.atob(encodedValue)));
+    }
+  } catch (_error) {
+    return '';
+  }
+
+  return '';
+}
 
 function parseBoolean(value, fallbackValue) {
   if (typeof value === 'boolean') {
@@ -149,31 +252,33 @@ function parseNumber(value, fallbackValue) {
 }
 
 function parseStoredValue(value, type, fallbackValue) {
+  const rawValue = decodeSensitiveValue(value);
+
   if (type === 'boolean') {
-    return parseBoolean(value, fallbackValue);
+    return parseBoolean(rawValue, fallbackValue);
   }
 
   if (type === 'number') {
-    return parseNumber(value, fallbackValue);
+    return parseNumber(rawValue, fallbackValue);
   }
 
   if (type === 'json') {
-    if (value == null || value === '') {
+    if (rawValue == null || rawValue === '') {
       return fallbackValue;
     }
 
     try {
-      return typeof value === 'string' ? JSON.parse(value) : value;
+      return typeof rawValue === 'string' ? JSON.parse(rawValue) : rawValue;
     } catch (_error) {
       return fallbackValue;
     }
   }
 
-  const normalizedValue = String(value ?? '').trim();
+  const normalizedValue = String(rawValue ?? '').trim();
   return normalizedValue || String(fallbackValue ?? '');
 }
 
-function serializeStoredValue(value, type) {
+function serializeStoredValue(value, type, key = '') {
   if (type === 'json') {
     return JSON.stringify(value ?? null);
   }
@@ -187,7 +292,8 @@ function serializeStoredValue(value, type) {
     return String(parsedValue);
   }
 
-  return String(value ?? '').trim();
+  const normalizedValue = String(value ?? '').trim();
+  return SENSITIVE_PAYMENT_SETTING_KEYS.has(key) ? encodeSensitiveValue(normalizedValue) : normalizedValue;
 }
 
 function buildDefaultSettings() {
@@ -289,7 +395,7 @@ async function ensureRemoteDefaults(existingKeys, resolvedUserId) {
   const timestamp = new Date().toISOString();
   const payload = missingDefinitions.map((definition) => ({
     setting_key: definition.key,
-    setting_value: serializeStoredValue(definition.defaultValue, definition.type),
+    setting_value: serializeStoredValue(definition.defaultValue, definition.type, definition.key),
     description: definition.description,
     setting_type: definition.type,
     updated_at: timestamp,
@@ -372,7 +478,7 @@ export async function saveSystemSettings(nextSettings, actorReference) {
     const resolvedUserId = actorReference ? await resolveUserId(actorReference) : null;
     const payload = SYSTEM_SETTINGS_DEFINITIONS.map((definition) => ({
       setting_key: definition.key,
-      setting_value: serializeStoredValue(localPayload.settings[definition.key], definition.type),
+      setting_value: serializeStoredValue(localPayload.settings[definition.key], definition.type, definition.key),
       description: definition.description,
       setting_type: definition.type,
       updated_at: timestamp,

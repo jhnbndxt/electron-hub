@@ -7,7 +7,6 @@ import {
   DollarSign,
   Clock,
   User,
-  Mail,
   Phone,
   Hash,
   Calendar,
@@ -62,6 +61,9 @@ interface OnlinePayment {
   id: string;
   studentEmail: string;
   studentName: string;
+  profilePictureUrl?: string;
+  academicTrack?: string;
+  yearLevel?: string;
   paymentMode: "bank" | "gcash";
   referenceNumber: string;
   receiptFiles: string[];
@@ -80,6 +82,10 @@ interface CashPayment {
   queueNumber: string;
   studentEmail: string;
   studentName: string;
+  profilePictureUrl?: string;
+  academicTrack?: string;
+  yearLevel?: string;
+  amount: number;
   schedule: { date: string; time: string };
   status: "pending" | "paid" | "cancelled";
   generatedDate: string;
@@ -105,10 +111,9 @@ export function CashierDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
+  const [showRejectReasonModal, setShowRejectReasonModal] = useState(false);
   const [rejectionComment, setRejectionComment] = useState("");
   const [zoom, setZoom] = useState(100);
-  const [verificationNotes, setVerificationNotes] = useState("");
-  const [selectedReceiptIndex, setSelectedReceiptIndex] = useState(0);
 
   const actorReference = userData?.id || userData?.email;
   const actorName = userData?.name || "Cashier";
@@ -120,8 +125,7 @@ export function CashierDashboard() {
   useEffect(() => {
     if (selectedPayment) {
       setZoom(100);
-      setVerificationNotes("");
-      setSelectedReceiptIndex(0);
+      setRejectionComment("");
     }
   }, [selectedPayment]);
 
@@ -149,13 +153,55 @@ export function CashierDashboard() {
     const studentIds = [...new Set(allPayments.map((p: any) => p.student_id))];
     const { data: users } = await supabase
       .from("users")
-      .select("id, full_name, email")
+      .select("id, full_name, email, profile_picture_url")
       .in("id", studentIds);
 
-    const userMap: Record<string, { name: string; email: string }> = {};
+    const userMap: Record<string, { name: string; email: string; profilePictureUrl?: string }> = {};
     users?.forEach((u: any) => {
-      userMap[u.id] = { name: u.full_name, email: u.email };
+      userMap[u.id] = { name: u.full_name, email: u.email, profilePictureUrl: u.profile_picture_url };
     });
+
+    const enrollmentIds = [...new Set(allPayments.map((p: any) => p.enrollment_id).filter(Boolean))];
+    const studentEmails = [...new Set(Object.values(userMap).map((user) => user.email).filter(Boolean))];
+    const [{ data: enrollmentsById }, { data: enrollmentsByEmail }] = await Promise.all([
+      enrollmentIds.length
+        ? supabase
+            .from("enrollments")
+            .select("id, user_id, form_data")
+            .in("id", enrollmentIds)
+        : Promise.resolve({ data: [] as any[] }),
+      studentEmails.length
+        ? supabase
+            .from("enrollments")
+            .select("id, user_id, form_data, enrollment_date, created_at")
+            .in("user_id", studentEmails)
+            .order("enrollment_date", { ascending: false })
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    const enrollmentMap: Record<string, any> = {};
+    const enrollmentByEmailMap: Record<string, any> = {};
+    enrollmentsById?.forEach((enrollment: any) => {
+      enrollmentMap[enrollment.id] = enrollment.form_data || {};
+      if (enrollment.user_id) enrollmentByEmailMap[enrollment.user_id] = enrollment.form_data || {};
+    });
+    enrollmentsByEmail?.forEach((enrollment: any) => {
+      if (enrollment.user_id && !enrollmentByEmailMap[enrollment.user_id]) {
+        enrollmentByEmailMap[enrollment.user_id] = enrollment.form_data || {};
+      }
+    });
+
+    const getEnrollmentData = (payment: any) =>
+      enrollmentMap[payment.enrollment_id] ||
+      enrollmentByEmailMap[userMap[payment.student_id]?.email] ||
+      {};
+    const getAcademicTrack = (formData: any) =>
+      formData.preferredTrack ||
+      formData.preferred_track ||
+      formData.recommendedTrack ||
+      formData.recommended_track ||
+      formData.track ||
+      "Not set";
 
     // Separate online vs cash payments
     const onlinePending = allPayments
@@ -173,6 +219,9 @@ export function CashierDashboard() {
           id: p.id,
           studentEmail: userMap[p.student_id]?.email || p.student_id,
           studentName: userMap[p.student_id]?.name || 'Unknown Student',
+          profilePictureUrl: userMap[p.student_id]?.profilePictureUrl,
+          academicTrack: getAcademicTrack(getEnrollmentData(p)),
+          yearLevel: getEnrollmentData(p).yearLevel || getEnrollmentData(p).year_level || "Not set",
           paymentMode: p.payment_method as "bank" | "gcash",
           referenceNumber: p.reference_number || '',
           receiptFiles,
@@ -183,7 +232,7 @@ export function CashierDashboard() {
             ? new Date(p.submitted_at).toLocaleString()
             : new Date(p.created_at).toLocaleString(),
           submittedAt: p.submitted_at || p.created_at || "",
-          enrollmentData: {},
+          enrollmentData: getEnrollmentData(p),
           notes: p.notes || '',
         };
       });
@@ -196,6 +245,10 @@ export function CashierDashboard() {
         queueNumber: p.queue_number || '',
         studentEmail: userMap[p.student_id]?.email || p.student_id,
         studentName: userMap[p.student_id]?.name || 'Unknown Student',
+        profilePictureUrl: userMap[p.student_id]?.profilePictureUrl,
+        academicTrack: getAcademicTrack(getEnrollmentData(p)),
+        yearLevel: getEnrollmentData(p).yearLevel || getEnrollmentData(p).year_level || "Not set",
+        amount: Number(p.amount) || 0,
         schedule: {
           date: p.queue_schedule_date
             ? new Date(p.queue_schedule_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
@@ -205,7 +258,7 @@ export function CashierDashboard() {
         status: 'pending' as const,
         generatedDate: new Date(p.created_at).toLocaleDateString(),
         submittedAt: p.submitted_at || p.created_at || "",
-        enrollmentData: {},
+        enrollmentData: getEnrollmentData(p),
       }));
 
     setOnlinePayments(onlinePending);
@@ -246,8 +299,6 @@ export function CashierDashboard() {
     if (nextPending) {
       setSelectedPayment(nextPending);
       setZoom(100);
-      setVerificationNotes("");
-      setSelectedReceiptIndex(0);
       alert("Payment approved! Loading next pending payment.");
     } else {
       alert("Payment approved! No more pending payments.");
@@ -259,13 +310,13 @@ export function CashierDashboard() {
   };
 
   const handleRejectOnlinePayment = async () => {
-    if (!selectedPayment || !verificationNotes.trim()) {
+    if (!selectedPayment || !rejectionComment.trim()) {
       alert("Please provide a reason for rejection");
       return;
     }
 
     // Update payment status in Supabase
-  const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', actorReference, verificationNotes);
+  const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', actorReference, rejectionComment.trim());
 
     if (error) {
       alert(`Error rejecting payment: ${error}`);
@@ -276,7 +327,7 @@ export function CashierDashboard() {
     await createAuditLog(
       actorReference,
       'PAYMENT_REJECTED',
-      `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${verificationNotes}`,
+      `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment.trim()}`,
       'warning'
     );
 
@@ -290,8 +341,9 @@ export function CashierDashboard() {
     alert("Payment rejected. Student will be notified.");
     loadPayments();
     setShowReviewModal(false);
+    setShowRejectReasonModal(false);
     setSelectedPayment(null);
-    setVerificationNotes("");
+    setRejectionComment("");
   };
 
   const handleConfirmCashPayment = async () => {
@@ -701,7 +753,7 @@ export function CashierDashboard() {
                         <p className="text-xs text-slate-600">Inspect screenshot authenticity and transaction details</p>
                       </div>
                       <span className="rounded-full bg-white/20 backdrop-blur px-3 py-1 text-xs font-semibold text-slate-700">
-                        {selectedReceiptIndex + 1} of {selectedReceiptUrls.length || 1}
+                        Receipt preview
                       </span>
                     </div>
                     <div className="rounded-2xl portal-glass-panel p-3 flex items-center justify-between gap-3">
@@ -737,7 +789,7 @@ export function CashierDashboard() {
                           <Maximize className="w-4 h-4" />
                         </button>
                         <a
-                          href={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
+                          href={selectedReceiptUrls[0] || ''}
                           download={selectedPayment.receiptFileName}
                           className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
                         >
@@ -748,27 +800,21 @@ export function CashierDashboard() {
                   </div>
 
                   <div className="flex-1 overflow-hidden rounded-2xl border border-white/20 bg-black/30 backdrop-blur-sm receipt-preview mb-4">
-                    <img
-                      src={selectedReceiptUrls[selectedReceiptIndex] || selectedReceiptUrls[0] || ''}
-                      alt="Payment Receipt"
-                      className="w-full h-full object-contain"
-                      style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
-                    />
-                  </div>
-
-                  <div className="portal-glass-panel rounded-2xl p-4">
-                    <p className="text-sm font-semibold text-slate-900 mb-3">Receipt images</p>
-                    <div className="flex gap-3 overflow-x-auto pb-1">
-                      {(selectedReceiptUrls.length > 0 ? selectedReceiptUrls : ['']).map((url, index) => (
-                        <button
-                          key={`receipt-thumb-${index}`}
-                          onClick={() => setSelectedReceiptIndex(index)}
-                          className={`min-w-[86px] h-20 rounded-xl overflow-hidden border-2 transition-all ${ selectedReceiptIndex === index ? 'border-blue-500 ring-2 ring-blue-400/50' : 'border-white/20'} bg-white/10 backdrop-blur`}
-                        >
-                          <img src={url} alt={`Receipt ${index + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
+                    {selectedReceiptUrls[0] ? (
+                      <img
+                        src={selectedReceiptUrls[0]}
+                        alt="Payment Receipt"
+                        className="w-full h-full object-contain"
+                        style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
+                      />
+                    ) : (
+                      <div className="flex h-full min-h-[360px] items-center justify-center text-center text-slate-300">
+                        <div>
+                          <FileText className="mx-auto mb-3 h-12 w-12" />
+                          <p className="text-sm font-semibold">No receipt image available</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -777,22 +823,36 @@ export function CashierDashboard() {
                   {/* Student Information Card */}
                   <div className="portal-glass-panel rounded-2xl p-5 mb-6">
                     <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Student Information</h4>
+                    <div className="mb-5 flex items-center gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-blue-100 text-xl font-bold text-blue-700">
+                        {selectedPayment.profilePictureUrl ? (
+                          <img src={selectedPayment.profilePictureUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          selectedPayment.studentName
+                            .split(" ")
+                            .map((part) => part[0])
+                            .join("")
+                            .slice(0, 2)
+                            .toUpperCase()
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-lg font-bold text-slate-950">{selectedPayment.studentName}</p>
+                        <p className="truncate text-sm text-slate-600">{selectedPayment.studentEmail}</p>
+                      </div>
+                    </div>
                     <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-700">Name</span>
-                        <span className="text-sm font-medium text-slate-900">{selectedPayment.studentName}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-700">Email</span>
-                        <span className="text-sm font-medium text-slate-900">{selectedPayment.studentEmail}</span>
-                      </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-slate-700">Student ID</span>
                         <span className="text-sm font-medium text-slate-900">{selectedPayment.id}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-slate-700">Academic Track</span>
-                        <span className="text-sm font-medium text-slate-900">{selectedPayment.enrollmentData?.preferredTrack || 'Not set'}</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.academicTrack || 'Not set'}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm text-slate-700">Year Level</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.yearLevel || 'Not set'}</span>
                       </div>
                     </div>
                   </div>
@@ -840,27 +900,12 @@ export function CashierDashboard() {
                     </div>
                   )}
 
-                  {/* Verification Notes */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-semibold text-slate-900 mb-2">Verification Notes</label>
-                    <textarea
-                      value={verificationNotes}
-                      onChange={(e) => setVerificationNotes(e.target.value)}
-                      placeholder="Add notes about the verification process..."
-                      rows={4}
-                      className="w-full px-3 py-2 rounded-xl border border-white/20 bg-white/40 backdrop-blur placeholder-slate-500 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent resize-none"
-                    />
-                  </div>
-
                   {/* Action Buttons */}
                   <div className="flex gap-3 mt-auto">
                     <button
                       onClick={() => {
-                        if (!verificationNotes.trim()) {
-                          alert("Please provide a reason for rejection.");
-                          return;
-                        }
-                        handleRejectOnlinePayment();
+                        setRejectionComment("");
+                        setShowRejectReasonModal(true);
                       }}
                       className="flex-1 py-3 px-4 border border-red-300/50 bg-red-500/10 text-red-600 rounded-xl font-semibold hover:bg-red-500/20 transition-colors backdrop-blur"
                     >
@@ -881,70 +926,145 @@ export function CashierDashboard() {
         </div>
       )}
 
+      {showRejectReasonModal && selectedPayment && (
+        <div
+          className="fixed inset-y-0 right-0 left-0 z-[60] flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
+          onClick={() => setShowRejectReasonModal(false)}
+        >
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="border-b border-red-100 bg-red-50 px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-bold text-slate-950">Reject Payment</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Add a clear reason for rejecting reference {selectedPayment.referenceNumber || "N/A"}.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowRejectReasonModal(false)}
+                  className="rounded-xl p-2 text-slate-500 transition hover:bg-white hover:text-slate-800"
+                  aria-label="Close rejection reason modal"
+                >
+                  <XCircle className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-6">
+              <label className="mb-2 block text-sm font-semibold text-slate-900">
+                Rejection Reason <span className="text-red-600">*</span>
+              </label>
+              <textarea
+                value={rejectionComment}
+                onChange={(event) => setRejectionComment(event.target.value)}
+                placeholder="Explain what the student needs to correct or re-submit."
+                rows={5}
+                className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-red-300 focus:ring-4 focus:ring-red-100"
+              />
+              <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                <button
+                  onClick={() => setShowRejectReasonModal(false)}
+                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRejectOnlinePayment}
+                  disabled={!rejectionComment.trim()}
+                  className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Reject Payment
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Cash Payment Modal */}
       {showCashModal && selectedCashPayment && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 overflow-hidden lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowCashModal(false)}>
-          <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" />
-          <div className="absolute inset-y-0 right-0 flex max-w-full pl-10">
-            <div className="w-screen max-w-2xl" onClick={(e) => e.stopPropagation()}>
-              <div className="flex h-full flex-col bg-white shadow-xl">
-                {/* Header */}
-                <div className="px-6 py-6" style={{ background: "linear-gradient(135deg, #10B981 0%, #059669 100%)" }}>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h2 className="text-2xl font-bold text-white">Cash Payment</h2>
-                      <p className="text-green-100 mt-1 text-sm">Queue #{selectedCashPayment.queueNumber}</p>
-                    </div>
-                    <button
-                      onClick={() => setShowCashModal(false)}
-                      className="text-white hover:text-green-100 hover:bg-white/20 p-2 rounded-lg transition-colors"
-                    >
-                      <XCircle className="w-6 h-6" />
-                    </button>
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowCashModal(false)}>
+          <div className="w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="portal-glass-modal">
+                <div className="flex items-center justify-between px-8 py-6 border-b border-white/20">
+                  <div>
+                    <h2 className="text-2xl font-semibold text-slate-900">Payment Verification</h2>
+                    <p className="text-slate-600 mt-1 text-sm">Over-the-Counter Payment Review</p>
                   </div>
+                  <button
+                    onClick={() => setShowCashModal(false)}
+                    className="portal-glass-icon-button rounded-xl p-2 transition-colors"
+                  >
+                    <XCircle className="w-6 h-6 text-slate-700" />
+                  </button>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto p-6">
+                <div className="grid grid-cols-1 gap-6 overflow-y-auto p-6 lg:grid-cols-2 lg:items-start">
                   {/* Queue Info */}
-                  <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6 text-center">
-                    <p className="text-sm text-gray-600 mb-2">QUEUE NUMBER</p>
-                    <h2 className="text-5xl font-bold text-blue-600 mb-4">
+                  <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-8 text-center shadow-inner lg:row-span-4 lg:min-h-[520px] lg:flex lg:flex-col lg:justify-center">
+                    <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-700/20">
+                      <Hash className="h-10 w-10" />
+                    </div>
+                    <p className="text-sm font-black uppercase tracking-[0.24em] text-emerald-700">Queue Number</p>
+                    <h2 className="mb-5 mt-4 break-all font-mono text-6xl font-black text-emerald-700 sm:text-7xl">
                       {selectedCashPayment.queueNumber}
                     </h2>
-                    <div className="flex items-center justify-center gap-4 text-sm text-gray-700">
-                      <div className="flex items-center gap-2">
+                    <p className="mx-auto mb-8 max-w-md text-sm leading-6 text-slate-600">
+                      Verify this queue number with the student before confirming the in-person payment.
+                    </p>
+                    <div className="grid gap-3 text-sm text-gray-700 sm:grid-cols-2">
+                      <div className="rounded-2xl border border-white/70 bg-white/75 p-4 text-left shadow-sm">
                         <Calendar className="w-4 h-4" />
-                        <span>{selectedCashPayment.schedule.date}</span>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Schedule Date</p>
+                        <p className="mt-1 font-bold text-slate-950">{selectedCashPayment.schedule.date}</p>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="rounded-2xl border border-white/70 bg-white/75 p-4 text-left shadow-sm">
                         <Clock className="w-4 h-4" />
-                        <span>{selectedCashPayment.schedule.time}</span>
+                        <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Cashier Hours</p>
+                        <p className="mt-1 font-bold text-slate-950">{selectedCashPayment.schedule.time}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Student Info */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Student Information</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">Name:</span>
-                        <span className="font-medium text-gray-900">{selectedCashPayment.studentName}</span>
+                  <div className="portal-glass-panel rounded-2xl p-5">
+                    <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Student Information</h3>
+                    <div className="mb-5 flex items-center gap-4">
+                      <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-emerald-100 text-xl font-bold text-emerald-700">
+                        {selectedCashPayment.profilePictureUrl ? (
+                          <img src={selectedCashPayment.profilePictureUrl} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          selectedCashPayment.studentName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+                        )}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">Email:</span>
-                        <span className="font-medium text-gray-900">{selectedCashPayment.studentEmail}</span>
+                      <div className="min-w-0">
+                        <p className="truncate text-lg font-bold text-slate-950">{selectedCashPayment.studentName}</p>
+                        <p className="truncate text-sm text-slate-600">{selectedCashPayment.studentEmail}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600">Academic Track:</span>
+                        <span className="font-medium text-gray-900">{selectedCashPayment.academicTrack || "Not set"}</span>
+                      </div>
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600">Year Level:</span>
+                        <span className="font-medium text-gray-900">{selectedCashPayment.yearLevel || "Not set"}</span>
                       </div>
                     </div>
                   </div>
 
                   {/* Payment Details */}
-                  <div className="bg-green-50 rounded-lg p-4 mb-6">
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3">Payment Details</h3>
+                  <div className="portal-glass-panel-strong rounded-2xl p-5">
+                    <h3 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Payment Information</h3>
                     <div className="space-y-2 text-sm">
+                      <div className="flex justify-between gap-4">
+                        <span className="text-gray-600">Payment Method:</span>
+                        <span className="font-medium text-gray-900">Over-the-Counter</span>
+                      </div>
                       <div className="flex justify-between gap-4">
                         <span className="text-gray-600">Transaction ID:</span>
                         <span className="font-mono font-semibold break-all text-right text-gray-900">
@@ -953,7 +1073,13 @@ export function CashierDashboard() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Amount Due:</span>
-                        <span className="font-bold text-lg text-green-600">₱15,000.00</span>
+                        <span className="font-bold text-lg text-green-600">
+                          {selectedCashPayment.amount.toLocaleString("en-PH", {
+                            style: "currency",
+                            currency: "PHP",
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-600">Generated:</span>
@@ -968,30 +1094,9 @@ export function CashierDashboard() {
                     </div>
                   </div>
 
-                  {/* Enrollment Info */}
-                  {selectedCashPayment.enrollmentData && (
-                    <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">Enrollment Information</h3>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Track:</span>
-                          <span className="font-medium text-gray-900">
-                            {selectedCashPayment.enrollmentData.preferredTrack}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Year Level:</span>
-                          <span className="font-medium text-gray-900">
-                            {selectedCashPayment.enrollmentData.yearLevel}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
                   {/* Status */}
                   {selectedCashPayment.status === "paid" && (
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                    <div className="rounded-2xl border border-green-200 bg-green-50 p-5">
                       <div className="flex items-center gap-2">
                         <CheckCircle2 className="w-5 h-5 text-green-600" />
                         <p className="text-sm font-semibold text-green-900">
@@ -1004,22 +1109,21 @@ export function CashierDashboard() {
 
                 {/* Footer Actions */}
                 {selectedCashPayment.status === "pending" && (
-                  <div className="border-t border-gray-200 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
+                  <div className="border-t border-white/20 bg-white/45 p-6">
                     <button
                       onClick={handleConfirmCashPayment}
-                      className="w-full py-3 px-4 bg-green-600 text-white rounded-lg font-bold hover:bg-green-700 transition-all shadow-lg hover:shadow-xl"
+                      className="w-full rounded-2xl bg-emerald-600 px-4 py-3 font-bold text-white shadow-lg shadow-emerald-700/15 transition-all hover:bg-emerald-700 hover:shadow-xl"
                     >
                       Confirm Payment Received & Enroll
                     </button>
-                    <p className="text-xs text-gray-600 mt-3 text-center font-medium">
-                      ✓ Only click this button after receiving the payment in person
+                    <p className="mt-3 text-center text-xs font-medium text-slate-600">
+                      Only click this button after receiving the payment in person.
                     </p>
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
       )}
     </div>
   );

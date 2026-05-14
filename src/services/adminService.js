@@ -1073,6 +1073,25 @@ export const getAllPayments = async (status = null) => {
 // Update payment status
 export const updatePaymentStatus = async (paymentId, status, verifiedBy, rejectionComment = null) => {
   try {
+    const { data: currentPayment, error: currentPaymentError } = await supabase
+      .from('payments')
+      .select('id, status, receipt_file_url, updated_at')
+      .eq('id', paymentId)
+      .maybeSingle();
+
+    if (currentPaymentError) {
+      console.error('Payment status pre-check error:', currentPaymentError);
+      return { error: currentPaymentError.message, data: null };
+    }
+
+    if (!currentPayment) {
+      return { error: 'Payment record was not found.', data: null };
+    }
+
+    if (FINALIZED_PAYMENT_STATUSES.has(currentPayment.status) && FINALIZED_PAYMENT_STATUSES.has(status)) {
+      return { error: 'This payment has already been finalized and cannot be approved again.', data: currentPayment };
+    }
+
     const hasVerifierReference = verifiedBy !== undefined;
     const resolvedVerifierId = hasVerifierReference
       ? await resolveUserId(verifiedBy)
