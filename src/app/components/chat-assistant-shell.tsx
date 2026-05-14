@@ -11,6 +11,7 @@ import {
   MessageCircle,
   Send,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -119,9 +120,80 @@ const COMMON_REQUIREMENTS = [
   "Certificate of Completion or Grade 10 Diploma",
   "Form 137 or ESC Certificate if applicable",
 ];
+const CHAT_STORAGE_KEY = "electronHubChatConversation";
+
+interface StoredChatMessage extends Omit<ChatMessage, "timestamp" | "actions"> {
+  timestamp: string;
+  actions?: Array<Omit<AssistantAction, "icon"> & { iconName?: string }>;
+}
 
 function createMessageId(prefix: Sender) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function serializeMessage(message: ChatMessage): StoredChatMessage {
+  return {
+    ...message,
+    timestamp: message.timestamp.toISOString(),
+    actions: message.actions?.map((action) => ({
+      kind: action.kind,
+      label: action.label,
+      value: action.value,
+      to: action.to,
+    })),
+  };
+}
+
+function deserializeMessage(message: StoredChatMessage): ChatMessage {
+  return {
+    ...message,
+    timestamp: new Date(message.timestamp),
+    actions: message.actions?.map((action) => ({
+      kind: action.kind,
+      label: action.label,
+      value: action.value,
+      to: action.to,
+    })),
+  };
+}
+
+function loadStoredMessages() {
+  if (typeof window === "undefined") {
+    return [buildWelcomeMessage()];
+  }
+
+  try {
+    const stored = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!stored) {
+      return [buildWelcomeMessage()];
+    }
+
+    const parsed = JSON.parse(stored);
+    const storedMessages = Array.isArray(parsed?.messages) ? parsed.messages : [];
+    const messages = storedMessages
+      .map((message: StoredChatMessage) => deserializeMessage(message))
+      .filter((message: ChatMessage) => message.id && message.sender && message.text);
+
+    return messages.length > 0 ? messages : [buildWelcomeMessage()];
+  } catch (error) {
+    console.error("Failed to restore chatbot conversation:", error);
+    return [buildWelcomeMessage()];
+  }
+}
+
+function persistMessages(messages: ChatMessage[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(
+    CHAT_STORAGE_KEY,
+    JSON.stringify({
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      messages: messages.map(serializeMessage),
+    })
+  );
 }
 
 function normalizeInput(value: string) {
@@ -469,18 +541,42 @@ export function ChatAssistantShell({
   const { userRole, userData, enrollmentProgress, refreshEnrollmentProgress } = useAuth();
   const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
   const [internalIsOpen, setInternalIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([buildWelcomeMessage()]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadStoredMessages());
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [showClearConfirmation, setShowClearConfirmation] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const skipNextPersistRef = useRef(false);
 
   useEffect(() => {
     if (externalIsOpen !== undefined) {
       setInternalIsOpen(externalIsOpen);
     }
   }, [externalIsOpen]);
+
+  useEffect(() => {
+    if (skipNextPersistRef.current) {
+      skipNextPersistRef.current = false;
+      return;
+    }
+
+    persistMessages(messages);
+  }, [messages]);
+
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key !== CHAT_STORAGE_KEY) {
+        return;
+      }
+
+      setMessages(loadStoredMessages());
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -548,6 +644,8 @@ export function ChatAssistantShell({
     }),
     [enrollmentProgress, routes, userData?.name, userRole]
   );
+  const hasUserStartedConversation = messages.some((message) => message.sender === "user");
+  const shouldShowQuickPrompts = !hasUserStartedConversation;
 
   const openStateChange = (nextOpenState: boolean) => {
     if (externalIsOpen === undefined) {
@@ -557,6 +655,15 @@ export function ChatAssistantShell({
     }
 
     onToggle?.(nextOpenState);
+  };
+
+  const clearConversation = () => {
+    skipNextPersistRef.current = true;
+    localStorage.removeItem(CHAT_STORAGE_KEY);
+    setMessages([buildWelcomeMessage()]);
+    setInput("");
+    setIsTyping(false);
+    setShowClearConfirmation(false);
   };
 
   const requestAiReply = async (message: string, currentMessages: ChatMessage[]) => {
@@ -610,7 +717,9 @@ export function ChatAssistantShell({
 
     const localReply = buildAssistantReply(nextText, assistantContext);
 
-    setMessages((currentMessages) => [...currentMessages, userMessage]);
+    const nextMessages = [...messages, userMessage];
+
+    setMessages(nextMessages);
     setInput("");
     setIsTyping(true);
 
@@ -633,7 +742,7 @@ export function ChatAssistantShell({
       return;
     }
 
-    requestAiReply(nextText, messages)
+    requestAiReply(nextText, nextMessages)
       .then((result) => {
         const category = result?.category;
         const botMessage: ChatMessage = {
@@ -773,7 +882,7 @@ export function ChatAssistantShell({
                           AI Enrollment Assistant
                         </h2>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
-                          Smart FAQ, enrollment guide, and portal support
+                          Persistent enrollment support across Electron Hub
                         </p>
                       </div>
                     </div>
@@ -782,6 +891,17 @@ export function ChatAssistantShell({
                       <span className="inline-flex rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:px-2.5">
                         Online
                       </span>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowClearConfirmation(true)}
+                        disabled={messages.length <= 1 && !hasUserStartedConversation}
+                        className="rounded-2xl border border-slate-200/80 bg-white/80 p-1.5 text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-700 disabled:cursor-not-allowed disabled:opacity-40 sm:p-2"
+                        aria-label="Clear chat conversation"
+                        title="Clear conversation"
+                      >
+                        <Trash2 className="h-4.5 w-4.5" />
+                      </button>
 
                       <button
                         type="button"
@@ -800,23 +920,37 @@ export function ChatAssistantShell({
                   className="relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4 sm:px-5"
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
-                  <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
-                    {QUICK_PROMPTS.map((prompt) => {
-                      const PromptIcon = prompt.icon;
-                      return (
-                        <button
-                          key={prompt.label}
-                          type="button"
-                          onClick={() => handleSend(prompt.value)}
-                          disabled={isTyping}
-                          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3 py-2 text-xs font-semibold text-blue-900 shadow-sm transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                          <PromptIcon className="h-3.5 w-3.5" />
-                          {prompt.label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <AnimatePresence initial={false}>
+                    {shouldShowQuickPrompts && (
+                      <motion.div
+                        className="mb-4"
+                        initial={{ opacity: 0, y: -8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -8 }}
+                      >
+                        <p className="mb-2 px-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                          Quick questions
+                        </p>
+                        <div className="flex gap-2 overflow-x-auto pb-1">
+                          {QUICK_PROMPTS.map((prompt) => {
+                            const PromptIcon = prompt.icon;
+                            return (
+                              <button
+                                key={prompt.label}
+                                type="button"
+                                onClick={() => handleSend(prompt.value)}
+                                disabled={isTyping}
+                                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-blue-100 bg-white/85 px-3 py-2 text-xs font-semibold text-blue-900 shadow-sm transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                              >
+                                <PromptIcon className="h-3.5 w-3.5" />
+                                {prompt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
 
                   <div className="space-y-4">
                     <AnimatePresence initial={false}>
@@ -972,6 +1106,54 @@ export function ChatAssistantShell({
                 </div>
               </div>
             </motion.section>
+
+            <AnimatePresence>
+              {showClearConfirmation && (
+                <motion.div
+                  className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <motion.div
+                    role="alertdialog"
+                    aria-modal="true"
+                    aria-label="Clear chat conversation"
+                    className="w-full max-w-sm overflow-hidden rounded-3xl border border-white/70 bg-white shadow-[0_35px_90px_-45px_rgba(15,23,42,0.8)]"
+                    initial={{ opacity: 0, y: 16, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 12, scale: 0.98 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                  >
+                    <div className="border-b border-rose-100 bg-rose-50 px-6 py-5 text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-700">
+                        <Trash2 className="h-6 w-6" />
+                      </div>
+                      <h3 className="mt-4 text-lg font-bold text-slate-950">Clear conversation?</h3>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        This removes the saved chat history on this device and starts a fresh assistant session.
+                      </p>
+                    </div>
+                    <div className="grid gap-2 p-5 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowClearConfirmation(false)}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        Keep Chat
+                      </button>
+                      <button
+                        type="button"
+                        onClick={clearConversation}
+                        className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+                      >
+                        Clear Chat
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </>
         )}
       </AnimatePresence>
