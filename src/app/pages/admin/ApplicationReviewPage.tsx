@@ -174,6 +174,8 @@ export function ApplicationReviewPage() {
   const existingVoucherStatus = enrollment?.voucher_status || formData?.voucher?.voucher_status;
   const missingRequiredDocuments = documents.filter((doc) => doc.required && !doc.id);
   const unapprovedRequiredDocuments = documents.filter((doc) => doc.required && doc.id && doc.status !== "approved");
+  // Check for uploaded documents (required or optional) that are not yet approved
+  const unapprovedUploadedDocuments = documents.filter((doc) => doc.id && doc.status !== "approved");
 
   const requiredFieldGroups = [
     {
@@ -252,7 +254,7 @@ export function ApplicationReviewPage() {
   const approvalBlockers = [
     ...missingFieldGroups.flatMap((group) => group.fields.map((field) => `${group.label}: ${field}`)),
     ...missingRequiredDocuments.map((doc) => `Missing required document: ${doc.label}`),
-    ...unapprovedRequiredDocuments.map((doc) => `${doc.label} is ${doc.reviewState}`),
+    ...unapprovedUploadedDocuments.map((doc) => `${doc.label} requires review`),
     ...(voucherEligibility ? [] : ["Voucher eligibility decision is required"]),
   ];
   const canApproveApplication = approvalBlockers.length === 0;
