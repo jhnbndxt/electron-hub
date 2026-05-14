@@ -776,7 +776,7 @@ export function Results() {
         AI-Assisted Strand Assessment Results
       </div>
 
-      <div className="max-w-7xl mx-auto">
+      <div className="w-full">
         {/* Congratulations Hero Section */}
         <div
           className="relative mb-8 overflow-hidden rounded-[2rem] p-8 text-center shadow-2xl sm:p-10 lg:p-12"
@@ -810,7 +810,71 @@ export function Results() {
             </button>
           </div>
 
-          <section className="lg:col-span-2 rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.85fr] gap-6 mb-8 xl:gap-8">
+          <div className="space-y-6 xl:space-y-8">
+            <section className="relative overflow-hidden rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="absolute left-0 top-0 h-40 w-40 rounded-full bg-white/40 blur-3xl" />
+              <div className="absolute right-0 bottom-0 h-32 w-32 rounded-full bg-white/30 blur-2xl" />
+              <div className="relative z-10">
+                <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                  Recommended Track
+                </div>
+                <h2 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">{track}</h2>
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
+                  {trackNarrative}
+                </p>
+
+                <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Top strengths</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">{topDomainSummary}</p>
+                  </div>
+                  <div className="rounded-3xl bg-slate-50 p-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Interest match</p>
+                    <p className="mt-3 text-lg font-semibold text-slate-900">{topInterestSummary}</p>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Suggested Electives</p>
+                  <h3 className="mt-3 text-3xl font-bold text-slate-950">Courses that fit your profile</h3>
+                </div>
+                <span className="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
+                  Priority picks
+                </span>
+              </div>
+              <div className="mt-8 grid gap-4 sm:grid-cols-2">
+                {electiveExplanations.map(({ elective, explanation }, index) => (
+                  <div
+                    key={index}
+                    className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white text-lg font-bold">
+                        {index + 1}
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Elective {index + 1}</p>
+                        <h4 className="mt-2 text-lg font-semibold text-slate-950">{elective}</h4>
+                      </div>
+                    </div>
+                    {explanation ? (
+                      <p className="mt-4 text-sm leading-6 text-slate-600">
+                        {explanation}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
             <div className="flex items-center gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-3xl bg-blue-600 text-white shadow-lg">
                 <Sparkles className="w-6 h-6" />
@@ -835,7 +899,9 @@ export function Results() {
             </div>
           </section>
 
-          <aside className="space-y-8">
+          </div>
+
+          <aside className="space-y-6 xl:space-y-8">
             <section className="rounded-[2rem] border border-white/60 bg-white/90 p-6 shadow-2xl backdrop-blur-xl sm:p-8">
               <div className="flex items-center justify-between gap-4">
                 <div>
