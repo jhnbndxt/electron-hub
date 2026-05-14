@@ -653,11 +653,7 @@ export function ChatAssistantShell({
       body: requestBody,
     };
 
-    let response = await fetch("/api/chatbot", requestOptions);
-
-    if (!response.ok && window.location.hostname === "localhost") {
-      response = await fetch("http://localhost:3001/api/chatbot", requestOptions);
-    }
+    const response = await fetch("/api/ai/chat", requestOptions);
 
     if (!response.ok) {
       throw new Error("Chatbot API request failed");
