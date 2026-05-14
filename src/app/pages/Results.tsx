@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Award,
   ArrowRight,
@@ -18,6 +18,7 @@ import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
+import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 
 interface AssessmentResults {
   track: string;
@@ -44,15 +45,48 @@ interface AssessmentResults {
   };
 }
 
+const toInterestScore = (interests: string[], labels: string[], fallback = 35) => {
+  const normalizedInterests = interests.map((interest) => interest.toLowerCase());
+  return normalizedInterests.some((interest) =>
+    labels.some((label) => interest.includes(label))
+  )
+    ? 85
+    : fallback;
+};
+
+const buildAssessmentAiPayload = (result: AssessmentResults) => {
+  const { track, scores, topInterests, electives } = result;
+  const trackFallback = track === "Academic" ? 65 : 40;
+  const techFallback = track === "Technical-Professional" ? 70 : 35;
+
+  return {
+    track,
+    VA: scores.VA,
+    MA: scores.MA,
+    SA: scores.SA,
+    LRA: scores.LRA,
+    academicInterest: toInterestScore(topInterests, ["academic", "subject"], trackFallback),
+    communicationInterest: toInterestScore(topInterests, ["helping", "creative", "communication"], 45),
+    creativeInterest: toInterestScore(topInterests, ["creative"], 35),
+    leadershipInterest: toInterestScore(topInterests, ["business"], 35),
+    technicalInterest: toInterestScore(topInterests, ["technology", "practical"], techFallback),
+    socialInterest: toInterestScore(topInterests, ["helping"], 35),
+    electives,
+  };
+};
+
 export function Results() {
   const { userData } = useAuth();
   const [results, setResults] = useState<AssessmentResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isFetchingAiRecommendation, setIsFetchingAiRecommendation] = useState(false);
+  const attemptedAiRecommendationFetch = useRef(false);
 
   useEffect(() => {
     // Scroll to top instantly when component mounts
     window.scrollTo({ top: 0, behavior: "instant" });
+    attemptedAiRecommendationFetch.current = false;
 
     const loadResults = async () => {
       const userEmail = userData?.email || "student@gmail.com";
@@ -96,6 +130,60 @@ export function Results() {
 
     loadResults();
   }, [userData]);
+
+  useEffect(() => {
+    if (
+      !results ||
+      results.aiRecommendation ||
+      isFetchingAiRecommendation ||
+      attemptedAiRecommendationFetch.current
+    ) {
+      return;
+    }
+
+    let isActive = true;
+    attemptedAiRecommendationFetch.current = true;
+    const userEmail = userData?.email || "student@gmail.com";
+    const assessmentKey = `assessmentResults_${userEmail}`;
+
+    const fetchMissingRecommendation = async () => {
+      setIsFetchingAiRecommendation(true);
+
+      const aiRecommendation = await requestAssessmentAiRecommendation(
+        buildAssessmentAiPayload(results)
+      );
+
+      if (!isActive) {
+        return;
+      }
+
+      if (!aiRecommendation) {
+        setIsFetchingAiRecommendation(false);
+        return;
+      }
+
+      const mergedRecommendation = {
+        ...aiRecommendation,
+        recommendedTrack: aiRecommendation.recommendedTrack || results.track,
+        elective1: results.electives[0] || aiRecommendation.elective1,
+        elective2: results.electives[1] || aiRecommendation.elective2,
+      };
+      const updatedResults = {
+        ...results,
+        aiRecommendation: mergedRecommendation,
+      };
+
+      setResults(updatedResults);
+      localStorage.setItem(assessmentKey, JSON.stringify(updatedResults));
+      setIsFetchingAiRecommendation(false);
+    };
+
+    fetchMissingRecommendation();
+
+    return () => {
+      isActive = false;
+    };
+  }, [isFetchingAiRecommendation, results, userData]);
 
   if (loading) {
     return (

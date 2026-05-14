@@ -5,6 +5,7 @@ import { formatAssessmentResult } from "../../services/assessmentScoringService"
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
 import { LoadingState } from "../components/LoadingState";
+import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 
 interface Question {
   id: number;
@@ -662,46 +663,19 @@ export function PublicAssessment() {
     const recommendedTrack = formattedResult.track;
     let aiRecommendation: any = null;
 
-    try {
-      const response =
-        await fetch(
-          "/api/assessment-ai",
-
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-
-              track:
-                recommendedTrack,
-
-              VA,
-              MA,
-              SA,
-              LRA,
-
-              academicInterest,
-              communicationInterest,
-              creativeInterest,
-              leadershipInterest,
-              technicalInterest,
-              socialInterest,
-            }),
-          });
-
-      const aiData =
-        await response.json();
-
-      console.log(aiData);
-      aiRecommendation = aiData?.result || null;
-    } catch (error) {
-      console.error("Assessment AI request failed:", error);
-    }
+    aiRecommendation = await requestAssessmentAiRecommendation({
+      track: recommendedTrack,
+      VA,
+      MA,
+      SA,
+      LRA,
+      academicInterest,
+      communicationInterest,
+      creativeInterest,
+      leadershipInterest,
+      technicalInterest,
+      socialInterest,
+    });
 
     if (aiRecommendation && !aiRecommendation.raw) {
       const aiElectives = [aiRecommendation.elective1, aiRecommendation.elective2].filter(Boolean);

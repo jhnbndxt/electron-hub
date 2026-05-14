@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import OpenAI from "openai";
 
 import chatbotRouter from "./server/routes/chatbot.js";
+import assessmentAiHandler from "./api/assessment-ai.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -19,6 +20,7 @@ app.use(cors());
 app.use(express.json());
 
 app.use("/api/chatbot", chatbotRouter);
+app.all("/api/assessment-ai", assessmentAiHandler);
 
 const openai = new OpenAI({
 

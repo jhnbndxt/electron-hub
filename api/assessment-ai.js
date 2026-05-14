@@ -2,7 +2,11 @@ import electives from "../src/data/electives.js";
 
 console.log(
   "ENV:",
-  process.env.GROQ_API_KEY ? "GROQ_API_KEY is set" : "GROQ_API_KEY is missing"
+  process.env.GROQ_API_KEY
+    ? "GROQ_API_KEY is set"
+    : process.env.OPENROUTER_API_KEY
+    ? "OPENROUTER_API_KEY is set"
+    : "Assessment AI key is missing"
 );
 
 const jsonHeaders = {
@@ -70,6 +74,67 @@ function rankElectivesForAssessment(data) {
     .slice(0, 10);
 }
 
+function findElectiveByName(name, rankedElectives) {
+  const normalizedName = String(name || "").toLowerCase().trim();
+
+  return (
+    rankedElectives.find((elective) => elective.name.toLowerCase() === normalizedName) ||
+    rankedElectives.find((elective) => elective.name.toLowerCase().includes(normalizedName)) ||
+    rankedElectives.find((elective) => normalizedName.includes(elective.name.toLowerCase()))
+  );
+}
+
+function getStrongestDomain(data) {
+  const domains = [
+    { label: "verbal and communication skills", score: toScore(data.VA) },
+    { label: "mathematical ability", score: toScore(data.MA) },
+    { label: "scientific and technical aptitude", score: toScore(data.SA) },
+    { label: "logical reasoning", score: toScore(data.LRA) },
+  ];
+
+  return domains.sort((first, second) => second.score - first.score)[0];
+}
+
+function buildFallbackRecommendation(data, rankedElectives) {
+  const savedElectives = Array.isArray(data.electives)
+    ? data.electives.map((elective) => String(elective || "").trim()).filter(Boolean)
+    : [];
+  const selectedElectives = savedElectives.length
+    ? savedElectives.map((name) => ({
+        ...(findElectiveByName(name, rankedElectives) || {}),
+        name,
+      }))
+    : rankedElectives.slice(0, 2);
+  const [firstElective = rankedElectives[0], secondElective = rankedElectives[1]] = selectedElectives;
+  const strongestDomain = getStrongestDomain(data);
+  const courses = Array.from(
+    new Set(
+      [firstElective, secondElective]
+        .flatMap((elective) => elective?.relatedCourses || [])
+        .filter(Boolean)
+    )
+  );
+  const careerPathways = [firstElective, secondElective]
+    .filter(Boolean)
+    .map((elective) => ({
+      category: elective.group || elective.category || elective.name,
+      careers: (elective.careerPathways || []).slice(0, 4),
+    }))
+    .filter((pathway) => pathway.careers.length > 0);
+
+  return {
+    recommendedTrack: data.track,
+    trackExplanation: `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`,
+    elective1: firstElective?.name || "",
+    elective1Explanation: `${firstElective?.name || "This elective"} matches your profile because it connects with your strongest assessment areas and supports the direction of the ${data.track} Track.`,
+    elective2: secondElective?.name || "",
+    elective2Explanation: `${secondElective?.name || "This elective"} is a good second option because it adds another specialization that works with your interests, aptitude scores, and future study goals.`,
+    overallAnalysis: `Your result points toward the ${data.track} Track with electives that can help you turn your strengths into clearer college and career options.`,
+    suggestedCollegeCourses: courses,
+    careerPathways,
+  };
+}
+
 export default async function handler(request, response) {
   if (request.method === "OPTIONS") {
     return sendJson(response, 200, { ok: true });
@@ -80,13 +145,30 @@ export default async function handler(request, response) {
     return sendJson(response, 405, { error: "Method not allowed" });
   }
 
-  if (!process.env.GROQ_API_KEY) {
-    return sendJson(response, 500, { error: "GROQ_API_KEY is not configured" });
+  const data = request.body || {};
+  const rankedElectives = rankElectivesForAssessment(data);
+  const fallbackRecommendation = buildFallbackRecommendation(data, rankedElectives);
+  const provider = process.env.GROQ_API_KEY ? "groq" : "openrouter";
+  const apiKey =
+    provider === "groq" ? process.env.GROQ_API_KEY : process.env.OPENROUTER_API_KEY;
+  const apiUrl =
+    provider === "groq"
+      ? "https://api.groq.com/openai/v1/chat/completions"
+      : "https://openrouter.ai/api/v1/chat/completions";
+  const model =
+    provider === "groq"
+      ? process.env.GROQ_MODEL || "llama-3.1-8b-instant"
+      : process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat-v3-0324:free";
+
+  if (!apiKey) {
+    return sendJson(response, 200, {
+      success: true,
+      result: fallbackRecommendation,
+      fallback: true,
+    });
   }
 
   try {
-    const data = request.body || {};
-    const rankedElectives = rankElectivesForAssessment(data);
     const prompt = `
 
 You are an AI assessment recommendation system.
@@ -106,6 +188,9 @@ Your tasks:
 
 Track:
 ${data.track}
+
+SAVED ELECTIVES TO EXPLAIN, IF PROVIDED:
+${Array.isArray(data.electives) && data.electives.length ? JSON.stringify(data.electives) : "None"}
 
 APTITUDE SCORES:
 VA: ${data.VA}
@@ -139,6 +224,7 @@ Do not recommend broad or unrelated electives.
 Prioritize electives with the highest compatibility scores.
 Use ONLY electives from TOP MATCHING ELECTIVES.
 Ensure the chosen electives match the student's determined track.
+If saved electives are provided and they are valid for the determined track, explain those saved electives instead of replacing them.
 
 Return ONLY VALID JSON using this exact format:
 
@@ -211,14 +297,14 @@ Requirements:
       });
     }
 
-    const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    const aiResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+        model,
         messages: [
           {
             role: "system",
@@ -235,13 +321,14 @@ Requirements:
       }),
     });
 
-    const completion = await groqResponse.json();
+    const completion = await aiResponse.json();
 
-    if (!groqResponse.ok) {
-      console.error("Groq API error:", completion);
-      return sendJson(response, groqResponse.status, {
-        success: false,
-        error: completion?.error?.message || "Groq API request failed",
+    if (!aiResponse.ok) {
+      console.error("Assessment AI provider error:", completion);
+      return sendJson(response, 200, {
+        success: true,
+        result: fallbackRecommendation,
+        fallback: true,
       });
     }
 
@@ -258,9 +345,10 @@ Requirements:
     });
   } catch (error) {
     console.error("Assessment AI error:", error);
-    return sendJson(response, 500, {
-      success: false,
-      error: "Unable to generate assessment recommendation",
+    return sendJson(response, 200, {
+      success: true,
+      result: fallbackRecommendation,
+      fallback: true,
     });
   }
 }

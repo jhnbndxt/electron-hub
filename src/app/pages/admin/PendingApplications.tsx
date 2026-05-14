@@ -18,6 +18,7 @@ import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { getStudentPaymentStatus } from "../../../services/adminService";
 import { supabase } from "../../../supabase";
+import { loadProfileImageUrl } from "../../utils/profileImage";
 
 interface Student {
   id: number | string;
@@ -27,6 +28,7 @@ interface Student {
   currentStatus: string;
   strandApplied: string;
   email?: string;
+  profileImageUrl?: string;
   enrollmentData?: any;
   hasReuploadedDocuments?: boolean;
   queuePriority: number;
@@ -43,6 +45,7 @@ const COMPLETED_PAYMENT_STATUSES = new Set(["verified", "approved", "completed",
 const PENDING_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
 const APPROVED_MONITORING_STATUSES = new Set(["documents_verified", "approved"]);
 const ARCHIVED_ENROLLMENT_STATUSES = new Set(["rejected", "dropped", "unenrolled", "removed"]);
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const getRecordTimestamp = (record: any) => {
   const value = record?.updated_at || record?.uploaded_at || record?.created_at || record?.enrollment_date;
@@ -239,6 +242,18 @@ export function PendingApplications() {
     const formattedApps = await Promise.all(visibleApplications.map(async (app: any) => {
       const formData = app.form_data || {};
       const paymentStatusResponse = await getStudentPaymentStatus(app.user_id);
+      const userReference = String(app.user_id || formData.email || "");
+      const profileQuery = supabase
+        .from("users")
+        .select("id, email, profile_picture_url");
+      const { data: profile } = userReference
+        ? UUID_PATTERN.test(userReference)
+          ? await profileQuery.eq("id", userReference).maybeSingle()
+          : await profileQuery.eq("email", userReference).maybeSingle()
+        : { data: null };
+      const profileImageUrl =
+        profile?.profile_picture_url ||
+        (await loadProfileImageUrl(profile?.id || (UUID_PATTERN.test(userReference) ? userReference : ""), profile?.email || userReference));
       const docs = app.enrollment_documents || [];
       const approvedDocuments = docs.filter((doc: any) => doc.status === "approved" || doc.verified === true).length;
       const rejectedDocuments = docs.filter((doc: any) => doc.status === "rejected").length;
@@ -265,6 +280,7 @@ export function PendingApplications() {
         id: app.id,
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
         email: app.user_id || formData.email,
+        profileImageUrl,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         status: applicationStatus,
         currentStatus:
@@ -434,6 +450,13 @@ export function PendingApplications() {
     const statusStyle = getStatusStyle(student.status);
     const docStatus = getDocumentStatus(student);
     const isApproved = student.status === "approved";
+    const initials =
+      student.name
+        .split(" ")
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("") || "S";
 
     return (
       <tr
@@ -448,6 +471,13 @@ export function PendingApplications() {
       >
         <td className="px-6 py-4">
           <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-full border border-blue-100 bg-blue-50 text-sm font-bold text-blue-800">
+              {student.profileImageUrl ? (
+                <img src={student.profileImageUrl} alt={`${student.name} profile`} className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </div>
             {isApproved && (
               <CheckCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
             )}

@@ -32,9 +32,11 @@ import {
 } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { supabase } from "../../../supabase";
+import { loadProfileImageUrl } from "../../utils/profileImage";
 
 type DocumentStatus = "pending" | "approved" | "rejected" | "missing";
 type VoucherEligibility = "eligible" | "not_eligible" | null;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const DOCUMENTS = [
   { key: "form138", label: "Form 138", required: true },
@@ -105,6 +107,8 @@ export function ApplicationReviewPage() {
   const [docRejectReason, setDocRejectReason] = useState("");
   const [showApplicationReject, setShowApplicationReject] = useState(false);
   const [applicationRejectReason, setApplicationRejectReason] = useState("");
+  const [resolvedProfileImageUrl, setResolvedProfileImageUrl] = useState("");
+  const [rejectionConfirmation, setRejectionConfirmation] = useState<{ name: string; reason: string } | null>(null);
 
   const formData = useMemo(() => parseFormData(enrollment?.form_data), [enrollment]);
   const studentName =
@@ -121,6 +125,7 @@ export function ApplicationReviewPage() {
       .map((part: string) => part[0]?.toUpperCase())
       .join("") || "S";
   const studentProfilePictureUrl =
+    resolvedProfileImageUrl ||
     studentProfile?.profile_picture_url ||
     formData.profilePictureUrl ||
     formData.profile_picture_url ||
@@ -283,14 +288,20 @@ export function ApplicationReviewPage() {
     if (firstActionable) setSelectedDocKey(firstActionable.document_type);
 
     if (data.user_id) {
-      let profileQuery = supabase
+      const userReference = String(data.user_id);
+      const profileQuery = supabase
         .from("users")
         .select("id, email, full_name, profile_picture_url");
+      const { data: profile } = UUID_PATTERN.test(userReference)
+        ? await profileQuery.eq("id", userReference).maybeSingle()
+        : await profileQuery.eq("email", userReference).maybeSingle();
 
-      const { data: profile } = await profileQuery
-        .or(`email.eq.${data.user_id},id.eq.${data.user_id}`)
-        .maybeSingle();
       setStudentProfile(profile || null);
+
+      const imageUrl = await loadProfileImageUrl(profile?.id || (UUID_PATTERN.test(userReference) ? userReference : ""), profile?.email || userReference);
+      setResolvedProfileImageUrl(imageUrl);
+    } else {
+      setResolvedProfileImageUrl("");
     }
 
     const voucherStatus = data.voucher_status || parseFormData(data.form_data)?.voucher?.voucher_status;
@@ -524,8 +535,15 @@ export function ApplicationReviewPage() {
     await triggerNotification(enrollment.user_id, "ENROLLMENT_REJECTED", {
       reason: applicationRejectReason.trim(),
     });
-    toast.success("Application rejected. Student notified.");
-    navigate(`${basePath}/pending`);
+    setEnrollment((current: any) => ({
+      ...current,
+      status: "rejected",
+      rejection_reason: applicationRejectReason.trim(),
+      updated_at: new Date().toISOString(),
+    }));
+    setShowApplicationReject(false);
+    setRejectionConfirmation({ name: studentName, reason: applicationRejectReason.trim() });
+    setApplicationRejectReason("");
   };
 
   const moveToNextApplicant = async () => {
@@ -1135,6 +1153,43 @@ export function ApplicationReviewPage() {
               <div className="mt-4 flex justify-end gap-2">
                 <button onClick={() => setShowApplicationReject(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
                 <button onClick={rejectApplication} disabled={!applicationRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">Reject Application</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {rejectionConfirmation && (
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-rose-100 bg-rose-50 px-6 py-5 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-700">
+                <XCircle className="h-7 w-7" />
+              </div>
+              <h2 className="mt-4 text-xl font-black text-slate-950">Application Rejected</h2>
+              <p className="mt-1 text-sm font-medium text-rose-700">The student has been notified.</p>
+            </div>
+            <div className="p-6">
+              <p className="text-sm leading-6 text-slate-700">
+                {rejectionConfirmation.name}'s application was rejected and the reason will appear on the student's dashboard.
+              </p>
+              <div className="mt-4 rounded-xl border border-rose-100 bg-rose-50 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-rose-700">Reason</p>
+                <p className="mt-2 text-sm leading-6 text-slate-800">{rejectionConfirmation.reason}</p>
+              </div>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                <button
+                  onClick={() => setRejectionConfirmation(null)}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Stay Here
+                </button>
+                <button
+                  onClick={() => navigate(`${basePath}/pending`)}
+                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-rose-700"
+                >
+                  Back to Queue
+                </button>
               </div>
             </div>
           </div>

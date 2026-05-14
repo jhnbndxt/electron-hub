@@ -42,6 +42,8 @@ type EnrollmentSnapshot = {
   track?: string;
   gradeLevel?: string;
   submittedAt?: string;
+  rejectionReason?: string;
+  updatedAt?: string;
 };
 
 const requiredDocumentNames: Record<string, string> = {
@@ -86,7 +88,7 @@ export function Dashboard() {
       // Get the user's enrollment and documents
       const { data: enrollments } = await supabase
         .from('enrollments')
-        .select('id, enrollment_documents(*)')
+        .select('id, status, form_data, enrollment_date, created_at, updated_at, rejection_reason, enrollment_documents(*)')
         .eq('user_id', userData.email)
         .order('created_at', { ascending: false })
         .limit(1);
@@ -102,6 +104,8 @@ export function Dashboard() {
           track: formData.track || formData.selectedTrack || formData.preferredTrack,
           gradeLevel: formData.gradeLevel || formData.grade_level || formData.yearLevel,
           submittedAt: enrollment.enrollment_date || enrollment.created_at,
+          rejectionReason: enrollment.rejection_reason || formData.rejectionReason,
+          updatedAt: enrollment.updated_at,
         });
       } else {
         setEnrollmentSnapshot(null);
@@ -218,6 +222,8 @@ export function Dashboard() {
   const isFullyEnrolled = enrollmentSteps.find(step => step.name === "Enrolled")?.status === "completed";
 
   const currentStatusInfo = currentStep ? statusMessages[currentStep.name] : null;
+  const isApplicationRejected = enrollmentSnapshot?.status?.toLowerCase() === "rejected";
+  const rejectionReason = enrollmentSnapshot?.rejectionReason || "Please contact the registrar for more details.";
   const profileReadiness = [
     { label: "Email address", value: userData?.email, icon: Mail },
     { label: "Contact number", value: userData?.contactNumber, icon: Phone },
@@ -328,11 +334,15 @@ export function Dashboard() {
   const nextTask = upcomingTasks[0];
   const heroMessage = rejectedDocuments.length > 0
     ? "A few requirements still need your attention. Review the feedback below, update the affected documents, and continue your enrollment with confidence."
+    : isApplicationRejected
+    ? "Your enrollment application was not approved. Review the reason below and contact the registrar before submitting a new application."
     : isFullyEnrolled
     ? "Your enrollment is complete. Use your portal to stay organized, review your student details, and keep track of the updates that matter next."
     : currentStatusInfo?.message || "Let's continue your enrollment journey at Electron College.";
   const primaryAction = rejectedDocuments.length > 0
     ? { label: "Review document feedback", link: "/dashboard/enrollment" }
+    : isApplicationRejected
+    ? { label: "Review application details", link: "/dashboard/enrollment" }
     : isFullyEnrolled && nextTask
     ? { label: nextTask.title, link: nextTask.link }
     : nextTask
@@ -351,9 +361,13 @@ export function Dashboard() {
 
         <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.95fr)] lg:items-center">
           <div>
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/85 px-4 py-2 text-sm font-semibold text-blue-900 shadow-sm">
-              <Sparkles className="h-4 w-4" />
-              {isFullyEnrolled ? "Student access unlocked" : "Enrollment in motion"}
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-blue-200/80 bg-blue-50/85 px-4 py-2 text-sm font-semibold text-blue-900 shadow-sm">
+              {isApplicationRejected ? (
+                <XCircle className="h-4 w-4 text-red-600" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+              {isApplicationRejected ? "Application needs attention" : isFullyEnrolled ? "Student access unlocked" : "Enrollment in motion"}
             </div>
 
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-5xl lg:text-[3.65rem]">
@@ -389,6 +403,8 @@ export function Dashboard() {
                 )}
                 {rejectedDocuments.length > 0
                   ? `${rejectedDocuments.length} document${rejectedDocuments.length > 1 ? "s" : ""} need attention`
+                  : isApplicationRejected
+                  ? "Application rejected"
                   : isFullyEnrolled
                   ? "Enrollment complete"
                   : `${Math.max(enrollmentSteps.length - completedStepsCount, 0)} steps remaining`}
@@ -650,6 +666,33 @@ export function Dashboard() {
         </div>
 
         {/* Current Status Card */}
+        {isApplicationRejected && (
+          <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-600">
+                <XCircle className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="mb-2 text-lg font-bold text-red-700">Status: Application Rejected</h3>
+                <p className="text-sm leading-relaxed text-gray-700">
+                  Your application was reviewed by the registrar and was not approved.
+                </p>
+                <div className="mt-4 rounded-lg border border-red-200 bg-white p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Registrar feedback</p>
+                  <p className="mt-2 text-sm leading-6 text-gray-800">{rejectionReason}</p>
+                </div>
+                <Link
+                  to="/dashboard/enrollment"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                >
+                  Review enrollment details
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {currentStatusInfo && (
           <div 
             className="rounded-lg p-6 border-l-4"
