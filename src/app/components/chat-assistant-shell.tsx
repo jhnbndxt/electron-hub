@@ -89,7 +89,6 @@ const ACCOUNT_KEYWORDS = ["login", "register", "create account", "sign up", "acc
 const QUICK_PROMPTS = [
   { label: "How do I enroll?", value: "How do I enroll?", icon: Compass },
   { label: "What documents are required?", value: "What documents are required?", icon: FileCheck2 },
-  { label: "Am I eligible for the voucher program?", value: "Am I eligible for the voucher program?", icon: Sparkles },
   { label: "How do I re-upload documents?", value: "How do I re-upload documents?", icon: FileCheck2 },
   { label: "How do I pay tuition?", value: "How do I pay tuition?", icon: CreditCard },
   { label: "What track fits me?", value: "What track fits me?", icon: GraduationCap },
