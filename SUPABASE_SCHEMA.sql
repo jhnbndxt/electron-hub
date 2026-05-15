@@ -721,6 +721,35 @@ CREATE POLICY payments_update_staff ON payments FOR UPDATE
     )
   );
 
+-- Public assessment results are created before login and linked later by email
+CREATE POLICY assessment_results_insert_public_pending ON assessment_results FOR INSERT
+  WITH CHECK (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+    AND public_full_name IS NOT NULL
+  );
+
+CREATE POLICY assessment_results_select_public_pending ON assessment_results FOR SELECT
+  USING (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+  );
+
+CREATE POLICY assessment_results_update_public_pending ON assessment_results FOR UPDATE
+  USING (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+  )
+  WITH CHECK (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+    AND public_full_name IS NOT NULL
+  );
+
 CREATE POLICY payment_queue_select_staff ON payment_queue FOR SELECT
   USING (
     EXISTS (

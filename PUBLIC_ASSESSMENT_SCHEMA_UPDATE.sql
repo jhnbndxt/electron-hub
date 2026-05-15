@@ -30,3 +30,36 @@ CREATE INDEX IF NOT EXISTS idx_assessment_results_public_email
 CREATE UNIQUE INDEX IF NOT EXISTS idx_assessment_results_pending_public_email
   ON assessment_results(public_email)
   WHERE public_email IS NOT NULL AND student_id IS NULL;
+
+-- Public assessment is completed before login, so anonymous visitors must be
+-- allowed to create and update only their pending public assessment row.
+DROP POLICY IF EXISTS assessment_results_insert_public_pending ON assessment_results;
+CREATE POLICY assessment_results_insert_public_pending ON assessment_results FOR INSERT
+  WITH CHECK (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+    AND public_full_name IS NOT NULL
+  );
+
+DROP POLICY IF EXISTS assessment_results_select_public_pending ON assessment_results;
+CREATE POLICY assessment_results_select_public_pending ON assessment_results FOR SELECT
+  USING (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+  );
+
+DROP POLICY IF EXISTS assessment_results_update_public_pending ON assessment_results;
+CREATE POLICY assessment_results_update_public_pending ON assessment_results FOR UPDATE
+  USING (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+  )
+  WITH CHECK (
+    source = 'public'
+    AND student_id IS NULL
+    AND public_email IS NOT NULL
+    AND public_full_name IS NOT NULL
+  );

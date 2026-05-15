@@ -149,6 +149,29 @@ function buildAssessmentInsertPayload(studentId, assessmentData = {}, publicProf
   };
 }
 
+function getPublicAssessmentSaveErrorMessage(error) {
+  const message = String(error?.message || error?.details || error || '').toLowerCase();
+
+  if (
+    message.includes('row-level security') ||
+    message.includes('violates row-level security') ||
+    message.includes('permission denied')
+  ) {
+    return 'Database permissions for public assessment saves are not enabled yet. Please run PUBLIC_ASSESSMENT_SCHEMA_UPDATE.sql in Supabase.';
+  }
+
+  if (
+    message.includes('public_email') ||
+    message.includes('public_full_name') ||
+    message.includes('source') ||
+    message.includes('null value in column "student_id"')
+  ) {
+    return 'The assessment_results table is missing the public assessment update. Please run PUBLIC_ASSESSMENT_SCHEMA_UPDATE.sql in Supabase.';
+  }
+
+  return 'Unable to save to the database right now. Please try again later.';
+}
+
 /**
  * Get student user ID by email
  */
@@ -373,7 +396,7 @@ export async function savePublicAssessmentResult({ fullName, email, assessmentDa
 
   if (error) {
     console.error('Error saving pending public assessment result:', error);
-    throw new Error('Unable to save to the database right now. Please try again later.');
+    throw new Error(getPublicAssessmentSaveErrorMessage(error));
   }
 
   return {

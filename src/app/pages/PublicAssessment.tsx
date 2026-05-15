@@ -1349,6 +1349,10 @@ export function PublicAssessment() {
 
     setSaveStatus("saving");
     setSaveMessage("");
+    localStorage.setItem(
+      `publicAssessment_${normalizedEmail}`,
+      JSON.stringify({ ...results, userInfo: { fullName: saveInfo.fullName.trim(), email: normalizedEmail }, timestamp: new Date().toISOString() })
+    );
 
     try {
       const response = await savePublicAssessmentResult({
@@ -1356,16 +1360,15 @@ export function PublicAssessment() {
         email: normalizedEmail,
         assessmentData: results,
       });
-      localStorage.setItem(
-        `publicAssessment_${normalizedEmail}`,
-        JSON.stringify({ ...results, userInfo: { fullName: saveInfo.fullName.trim(), email: normalizedEmail }, timestamp: new Date().toISOString() })
-      );
       setSaveInfo((current) => ({ ...current, email: normalizedEmail }));
       setSaveStatus("saved");
       setSaveMessage(response?.message || "Your assessment result has been saved.");
     } catch (error: any) {
       setSaveStatus("error");
-      setSaveMessage(error?.message || "Unable to save your assessment result right now.");
+      setSaveMessage(
+        error?.message ||
+          "Your result was saved in this browser, but it could not be saved to the database right now."
+      );
     }
   }
 
