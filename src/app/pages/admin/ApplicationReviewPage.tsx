@@ -54,6 +54,20 @@ const DOCUMENTS = [
 const isAdmissionType = (formData: any, admissionType: string) =>
   String(formData?.admissionType || formData?.admission_type || "").toLowerCase() === admissionType.toLowerCase();
 
+const formatAdmissionType = (admissionType?: string | null) =>
+  admissionType === "New Regular" ? "Regular" : admissionType || "Regular";
+
+const getAdmissionTypeStyle = (admissionType?: string | null) => {
+  switch (admissionType) {
+    case "Transferee":
+      return "border-amber-200 bg-amber-50 text-amber-800";
+    case "Returnee":
+      return "border-blue-200 bg-blue-50 text-blue-800";
+    default:
+      return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+};
+
 const parseFormData = (raw: any) => {
   if (!raw) return {};
   if (typeof raw === "string") {
@@ -224,6 +238,8 @@ export function ApplicationReviewPage() {
   const formData = useMemo(() => applyGuardianSelection(parseFormData(enrollment?.form_data)), [enrollment]);
   const isTransferee = isAdmissionType(formData, "Transferee");
   const isReturnee = isAdmissionType(formData, "Returnee");
+  const admissionType = formData.admissionType || formData.admission_type || "New Regular";
+  const yearLevel = formData.yearLevel || formData.year_level || "Not set";
   const studentName =
     studentProfile?.full_name ||
     formData.studentName ||
@@ -969,6 +985,14 @@ export function ApplicationReviewPage() {
             <div className="min-w-0">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Applicant profile</p>
               <h2 className="mt-1 truncate text-3xl font-black tracking-tight text-slate-950">{studentName}</h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <span className={`inline-flex items-center rounded-full border px-4 py-2 text-xs font-black uppercase tracking-wide ${getAdmissionTypeStyle(admissionType)}`}>
+                  {formatAdmissionType(admissionType)}
+                </span>
+                <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-black uppercase tracking-wide text-slate-700">
+                  Enrolling to {yearLevel}
+                </span>
+              </div>
               <div className="mt-4 grid gap-x-6 gap-y-3 text-base sm:grid-cols-2 xl:grid-cols-3">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400">Email</p>

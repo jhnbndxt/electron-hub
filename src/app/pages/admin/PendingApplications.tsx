@@ -27,6 +27,8 @@ interface Student {
   status: "pending" | "re-submit" | "approved" | "rejected";
   currentStatus: string;
   strandApplied: string;
+  admissionType: string;
+  yearLevel: string;
   email?: string;
   profileImageUrl?: string;
   enrollmentData?: any;
@@ -209,6 +211,8 @@ export function PendingApplications() {
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [admissionTypeFilter, setAdmissionTypeFilter] = useState("all");
+  const [yearLevelFilter, setYearLevelFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
   const [dashboardStats, setDashboardStats] = useState<RegistrarDashboardStats>({
     pendingApplications: 0,
@@ -332,6 +336,8 @@ export function PendingApplications() {
                 documentsApproved: approvedDocuments,
               }),
         strandApplied: formData.preferredTrack || formData.track || app.preferred_track || 'Not Set',
+        admissionType: formData.admissionType || formData.admission_type || "New Regular",
+        yearLevel: formData.yearLevel || formData.year_level || "Not Set",
         enrollmentId: app.id,
         enrollmentData: app,
         hasReuploadedDocuments,
@@ -376,12 +382,26 @@ export function PendingApplications() {
     };
   };
 
-  let filteredStudents = students.filter((student) =>
-    student.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  let filteredStudents = students.filter((student) => {
+    const query = searchQuery.toLowerCase();
+    return (
+      student.name.toLowerCase().includes(query) ||
+      student.email?.toLowerCase().includes(query) ||
+      student.admissionType.toLowerCase().includes(query) ||
+      student.yearLevel.toLowerCase().includes(query)
+    );
+  });
 
   if (statusFilter !== "all") {
     filteredStudents = filteredStudents.filter((student) => student.status === statusFilter);
+  }
+
+  if (admissionTypeFilter !== "all") {
+    filteredStudents = filteredStudents.filter((student) => student.admissionType === admissionTypeFilter);
+  }
+
+  if (yearLevelFilter !== "all") {
+    filteredStudents = filteredStudents.filter((student) => student.yearLevel === yearLevelFilter);
   }
 
   const activeStudents = filteredStudents.filter((student) => student.status === "pending" || student.status === "re-submit");
@@ -477,6 +497,20 @@ export function PendingApplications() {
     return "border-amber-200 bg-amber-50 text-amber-700";
   };
 
+  const getAdmissionTypeStyle = (admissionType: string) => {
+    switch (admissionType) {
+      case "Transferee":
+        return "border-amber-200 bg-amber-50 text-amber-700";
+      case "Returnee":
+        return "border-blue-200 bg-blue-50 text-blue-700";
+      default:
+        return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    }
+  };
+
+  const formatAdmissionType = (admissionType: string) =>
+    admissionType === "New Regular" ? "Regular" : admissionType || "Regular";
+
   const renderStatusLabel = (student: Student) => {
     if (student.status === "approved") return "Monitoring";
     if (student.hasReuploadedDocuments) return "Re-uploaded";
@@ -534,19 +568,30 @@ export function PendingApplications() {
               {student.hasReuploadedDocuments && !isApproved && (
                 <p className="mt-1 text-xs font-semibold text-amber-700">Updated documents need review</p>
               )}
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${getAdmissionTypeStyle(student.admissionType)}`}>
+                  {formatAdmissionType(student.admissionType)}
+                </span>
+                <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-bold text-slate-700">
+                  {student.yearLevel}
+                </span>
+              </div>
             </div>
           </div>
         </td>
         <td className="px-6 py-4">
-          <span
-            className="inline-flex px-2 py-1 rounded text-xs font-medium"
-            style={{
-              backgroundColor: isApproved ? "#F8FAFC" : "#EEF2FF",
-              color: isApproved ? "#64748B" : "#4338CA",
-            }}
-          >
-            {student.strandApplied}
-          </span>
+          <div className="flex flex-col items-start gap-1.5">
+            <span
+              className="inline-flex px-2 py-1 rounded text-xs font-medium"
+              style={{
+                backgroundColor: isApproved ? "#F8FAFC" : "#EEF2FF",
+                color: isApproved ? "#64748B" : "#4338CA",
+              }}
+            >
+              {student.strandApplied}
+            </span>
+            <span className="text-xs font-semibold text-slate-500">{student.yearLevel}</span>
+          </div>
         </td>
         <td className="px-6 py-4">
           <p className="text-sm text-gray-600">
@@ -676,6 +721,33 @@ export function PendingApplications() {
             </select>
           </div>
 
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <select
+              value={admissionTypeFilter}
+              onChange={(e) => setAdmissionTypeFilter(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
+            >
+              <option value="all">All Student Types</option>
+              <option value="New Regular">Regular</option>
+              <option value="Returnee">Returnee</option>
+              <option value="Transferee">Transferee</option>
+            </select>
+          </div>
+
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <select
+              value={yearLevelFilter}
+              onChange={(e) => setYearLevelFilter(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2.5 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 bg-white/80 backdrop-blur-sm transition-all"
+              style={{ color: "#374151", "--tw-ring-color": "var(--electron-blue)" } as any}
+            >
+              <option value="all">All Grade Levels</option>
+              <option value="Grade 11">Grade 11</option>
+              <option value="Grade 12">Grade 12</option>
+            </select>
+          </div>
+
           <button
             onClick={loadApplications}
             className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
@@ -724,7 +796,7 @@ export function PendingApplications() {
                   Student Name
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
-                  Strand Applied
+                  Strand / Grade
                 </th>
                 <th className="text-left px-6 py-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Application Date
