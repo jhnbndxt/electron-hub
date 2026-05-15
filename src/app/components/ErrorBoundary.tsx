@@ -5,12 +5,22 @@ import { Button } from "./ui/button";
 export function ErrorBoundary() {
   const error = useRouteError() as any;
   const navigate = useNavigate();
+  const isPublicAssessmentRoute =
+    typeof window !== "undefined" && window.location.pathname === "/assessment";
   const isDevelopment = process.env.NODE_ENV === "development";
   const userMessage = error?.status === 404
     ? "The page you're looking for doesn't exist."
     : "The page could not be loaded. Please go back or return to your dashboard.";
 
   console.error("Route error:", error);
+
+  const restartPublicAssessment = () => {
+    localStorage.removeItem("publicAssessmentResults");
+    localStorage.removeItem("publicAssessmentProgress_guest");
+    localStorage.removeItem("assessment_questions");
+    navigate("/assessment", { replace: true });
+    window.location.reload();
+  };
 
   return (
     <div className="portal-glass-shell flex min-h-screen items-center justify-center px-4 py-8">
@@ -28,6 +38,15 @@ export function ErrorBoundary() {
         </p>
 
         <div className="flex flex-col justify-center gap-3 sm:flex-row">
+          {isPublicAssessmentRoute ? (
+            <Button
+              onClick={restartPublicAssessment}
+              variant="outline"
+              className="flex min-h-11 items-center gap-2 rounded-xl"
+            >
+              Restart Assessment
+            </Button>
+          ) : null}
           <Button
             onClick={() => navigate(-1)}
             variant="outline"

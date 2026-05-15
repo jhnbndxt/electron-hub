@@ -417,7 +417,7 @@ export function PublicAssessment() {
       }
       
       return [];
-    };
+      };
 
     const careerPathways = Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
       ? aiRecommendation.careerPathways.map((pathway: any) => ({
@@ -842,7 +842,8 @@ export function PublicAssessment() {
   };
 
   const handleSubmit = async () => {
-    const questionsByCategory: Record<string, Question[]> = {
+    try {
+      const questionsByCategory: Record<string, Question[]> = {
       Verbal: [],
       Math: [],
       Science: [],
@@ -876,19 +877,23 @@ export function PublicAssessment() {
     const recommendedTrack = formattedResult.track;
     let aiRecommendation: any = null;
 
-    aiRecommendation = await requestAssessmentAiRecommendation({
-      track: recommendedTrack,
-      VA,
-      MA,
-      SA,
-      LRA,
-      academicInterest,
-      communicationInterest,
-      creativeInterest,
-      leadershipInterest,
-      technicalInterest,
-      socialInterest,
-    });
+    try {
+      aiRecommendation = await requestAssessmentAiRecommendation({
+        track: recommendedTrack,
+        VA,
+        MA,
+        SA,
+        LRA,
+        academicInterest,
+        communicationInterest,
+        creativeInterest,
+        leadershipInterest,
+        technicalInterest,
+        socialInterest,
+      });
+    } catch (error) {
+      console.error("Public assessment AI recommendation failed; using scoring fallback:", error);
+    }
 
     if (aiRecommendation && !aiRecommendation.raw) {
       const aiElectives = [aiRecommendation.elective1, aiRecommendation.elective2].filter(Boolean);
@@ -915,13 +920,22 @@ export function PublicAssessment() {
       aiRecommendation,
     };
 
-    localStorage.setItem("publicAssessmentResults", JSON.stringify(assessmentResult));
+    const normalizedResult = normalizeAssessmentResult(assessmentResult);
+    if (!normalizedResult) {
+      console.error("Public assessment result normalization failed");
+      return;
+    }
+
+    localStorage.setItem("publicAssessmentResults", JSON.stringify(normalizedResult));
     localStorage.removeItem(assessmentProgressKey);
     localStorage.removeItem("publicAssessmentProgress_guest");
 
-    setResults(normalizeAssessmentResult(assessmentResult));
+    setResults(normalizedResult);
     setAssessmentCompleted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error("Public assessment submission failed:", error);
+    }
   };
 
   const handleStartAssessment = () => {
