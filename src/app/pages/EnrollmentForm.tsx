@@ -89,6 +89,15 @@ const guardianFields = [
   "guardianContact",
 ] as const;
 
+const normalizeSexForEnrollment = (value?: string | null) => {
+  const normalizedValue = String(value || "").trim().toLowerCase();
+
+  if (normalizedValue === "male") return "Male";
+  if (normalizedValue === "female") return "Female";
+
+  return value || "";
+};
+
 interface FormData {
   // Page 1: Basic Information
   admissionType: string;
@@ -308,13 +317,15 @@ export function EnrollmentForm() {
   };
 
   const applyRegistrationData = (source: any = {}) => {
+    const registrationSex = normalizeSexForEnrollment(source.sex || source.gender);
+
     setFormData(prev => ({
       ...prev,
       firstName: prev.firstName || source.firstName || source.first_name || "",
       lastName: prev.lastName || source.lastName || source.last_name || "",
       middleName: prev.middleName || source.middleName || source.middle_name || "",
       suffix: prev.suffix && prev.suffix !== "None" ? prev.suffix : source.suffix || "None",
-      sex: prev.sex || source.sex || source.gender || "",
+      sex: normalizeSexForEnrollment(prev.sex || registrationSex),
       birthday: prev.birthday || source.birthDate || source.birth_date || "",
       email: prev.email || source.email || userData?.email || "",
       contactNumber: prev.contactNumber || source.contactNumber || source.contact_number || "",
@@ -333,7 +344,7 @@ export function EnrollmentForm() {
 
   const mergeDraftWithRegistrationData = (draftData: Partial<FormData>, registrationSource: any = {}) => ({
     ...draftData,
-    sex: draftData.sex || registrationSource.sex || registrationSource.gender || "",
+    sex: normalizeSexForEnrollment(draftData.sex || registrationSource.sex || registrationSource.gender),
     birthday: draftData.birthday || registrationSource.birthDate || registrationSource.birth_date || "",
     contactNumber: draftData.contactNumber || registrationSource.contactNumber || registrationSource.contact_number || "",
   });
@@ -350,7 +361,7 @@ export function EnrollmentForm() {
       firstName: source.firstName || source.first_name || "",
       middleName: source.middleName || source.middle_name || "",
       suffix: source.suffix || "None",
-      sex: source.sex || "",
+      sex: normalizeSexForEnrollment(source.sex),
       civilStatus: source.civilStatus || source.civil_status || "",
       religion: source.religion || "",
       nationality: source.nationality || "Filipino",
@@ -824,6 +835,7 @@ export function EnrollmentForm() {
             setFormData(prev => ({
               ...prev,
               ...savedFormData,
+              sex: normalizeSexForEnrollment(savedFormData.sex),
               // Clear the file fields so user can re-upload
               form138: null,
               form137: null,
@@ -851,7 +863,8 @@ export function EnrollmentForm() {
     if (isSubmittedEnrollment) return;
     
     setFormData(prev => {
-      let newData = { ...prev, [field]: value };
+      const nextValue = field === "sex" && typeof value === "string" ? normalizeSexForEnrollment(value) : value;
+      let newData = { ...prev, [field]: nextValue };
       
       // Handle address cascade resets inline to avoid multiple useEffect chains
       if (field === "region") {
