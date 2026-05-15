@@ -1,14 +1,15 @@
-import { FileText, Upload, CheckCircle, AlertCircle, Download, XCircle, Bell } from "lucide-react";
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
+import { FileText, Upload, CheckCircle, AlertCircle, Download, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
+import { triggerNotification } from "../../services/notificationService";
 
 
 interface DocumentStatus {
   name: string;
   documentType: string;
-  status: "approved" | "rejected" | "pending" | "not_uploaded";
+  status: "approved" | "rejected" | "pending" | "reuploaded" | "not_uploaded";
   uploadDate?: string;
   fileSize?: string;
   fileUrl?: string;
@@ -42,17 +43,36 @@ const DOC_NAME_TO_KEY: Record<string, string> = {
 };
 
 export function MyDocuments() {
-  const navigate = useNavigate();
-  const { userData, logout } = useAuth();
+  const location = useLocation();
+  const { userData } = useAuth();
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const documentRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     if (userData?.email) {
       loadDocuments();
     }
   }, [userData]);
+
+  useEffect(() => {
+    if (documents.length === 0) return;
+
+    const requestedDocument = new URLSearchParams(location.search).get("document");
+    const targetDocument =
+      documents.find((doc) => doc.documentType === requestedDocument) ||
+      documents.find((doc) => doc.status === "rejected");
+
+    if (!targetDocument) return;
+
+    window.setTimeout(() => {
+      documentRefs.current[targetDocument.documentType]?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  }, [documents, location.search]);
 
   useEffect(() => {
     if (!enrollmentId) return;
@@ -136,6 +156,8 @@ export function MyDocuments() {
         docStatus = "approved";
       } else if (uploaded.status === "rejected") {
         docStatus = "rejected";
+      } else if (uploaded.status === "reuploaded") {
+        docStatus = "reuploaded";
       }
 
       return {
@@ -169,6 +191,44 @@ export function MyDocuments() {
     };
   };
 
+  const notifyDocumentReviewers = async ({
+    currentEnrollmentId,
+    docName,
+    docType,
+  }: {
+    currentEnrollmentId: string;
+    docName: string;
+    docType: string;
+  }) => {
+    const { data: reviewers, error } = await supabase
+      .from("users")
+      .select("id, role")
+      .in("role", ["registrar", "branchcoordinator"]);
+
+    if (error) {
+      console.error("Error loading document reviewers:", error);
+      return;
+    }
+
+    await Promise.all(
+      (reviewers || []).map((reviewer: any) =>
+        triggerNotification(reviewer.id, "DOCUMENT_REUPLOADED", {
+          studentName: userData?.name || userData?.email || "A student",
+          documentName: docName,
+          documentType: docType,
+          enrollmentId: currentEnrollmentId,
+          actionUrl:
+            reviewer.role === "branchcoordinator"
+              ? `/branchcoordinator/review/${currentEnrollmentId}`
+              : `/registrar/review/${currentEnrollmentId}`,
+        }).catch((notificationError) => {
+          console.error("Error notifying document reviewer:", notificationError);
+          return null;
+        })
+      )
+    );
+  };
+
   const renderDocumentChecklist = (docDefinitions: typeof REQUIRED_DOCS) => (
     <ul className="space-y-3">
       {docDefinitions.map((reqDoc, index) => {
@@ -187,7 +247,7 @@ export function MyDocuments() {
               >
                 {doc?.status === "approved" && <CheckCircle className="w-4 h-4 text-green-600" />}
                 {doc?.status === "rejected" && <XCircle className="w-4 h-4 text-red-600" />}
-                {doc?.status === "pending" && <AlertCircle className="w-4 h-4 text-yellow-600" />}
+                {(doc?.status === "pending" || doc?.status === "reuploaded") && <AlertCircle className="w-4 h-4 text-yellow-600" />}
               </div>
               <span className={isUploaded ? "text-gray-900 font-medium" : "text-gray-500"}>
                 {reqDoc.name}
@@ -268,10 +328,13 @@ export function MyDocuments() {
       // Check if a record for this document type already exists
       const { data: existingDoc } = await supabase
         .from("enrollment_documents")
-        .select("id")
+        .select("id, status")
         .eq("enrollment_id", currentEnrollmentId)
         .eq("document_type", docType)
         .maybeSingle();
+
+      const isRejectedCorrection = existingDoc?.status === "rejected";
+      const nextStatus = isRejectedCorrection ? "reuploaded" : "pending_review";
 
       if (existingDoc) {
         // Update the existing record
@@ -283,7 +346,7 @@ export function MyDocuments() {
             file_name: file.name,
             uploaded_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            status: "pending_review",
+            status: nextStatus,
             rejection_comment: null,
           })
           .eq("id", existingDoc.id);
@@ -295,10 +358,22 @@ export function MyDocuments() {
           file_url: urlData.publicUrl,
           file_path: storagePath,
           file_name: file.name,
-          status: "pending_review",
+          status: nextStatus,
           uploaded_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+      }
+
+      await supabase
+        .from("enrollments")
+        .update({
+          status: "pending_review",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", currentEnrollmentId);
+
+      if (isRejectedCorrection) {
+        await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });
       }
 
       await loadDocuments();
@@ -363,7 +438,13 @@ export function MyDocuments() {
               </div>
             ) : (
               documents.filter(doc => doc.status !== "not_uploaded").map((doc, index) => (
-                <div key={index} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                <div
+                  key={index}
+                  ref={(element) => {
+                    documentRefs.current[doc.documentType] = element;
+                  }}
+                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                >
                   <div className="flex items-start gap-4">
                     <FileText className="w-10 h-10 flex-shrink-0" style={{ color: "#1E3A8A" }} />
                     
@@ -418,6 +499,12 @@ export function MyDocuments() {
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
                           <AlertCircle className="w-4 h-4" />
                           Pending Review
+                        </span>
+                      )}
+                      {doc.status === "reuploaded" && (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                          <Upload className="w-4 h-4" />
+                          Re-uploaded
                         </span>
                       )}
                       {doc.status === "rejected" && (

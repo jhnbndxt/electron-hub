@@ -36,6 +36,7 @@ import {
   getDashboardAnalytics,
 } from "../../../services/adminService";
 import { supabase } from "../../../supabase";
+import { triggerNotification } from "../../../services/notificationService";
 
 interface Student {
   id: number | string;
@@ -387,12 +388,11 @@ export function AdminDashboard() {
 
       // Send notification to student
       try {
-        await supabase.from('notifications').insert({
-          user_id: reviewingStudent.user_id || await resolveUserId(reviewingStudent.email || ""),
-          type: 'DOCUMENT_REJECTED',
-          title: 'Document Rejected',
-          message: `Your ${selectedDocument.name} was rejected. Reason: ${documentRejectionComment}`,
-          is_read: false,
+        await triggerNotification(reviewingStudent.user_id || reviewingStudent.email || "", "DOCUMENT_REJECTED", {
+          documentName: selectedDocument.name,
+          documentType: selectedDocument.key,
+          reason: documentRejectionComment,
+          actionUrl: `/dashboard/my-documents?document=${selectedDocument.key}`,
         });
       } catch (notificationError) {
         console.error('Error creating notification:', notificationError);
@@ -567,8 +567,14 @@ export function AdminDashboard() {
           user_id: studentUserId,
           type: 'DOCUMENTS_REJECTED',
           title: 'Action Required: Document Rejected',
-          message: detailedMessage.trim(),
+          message: `${detailedMessage.trim()}. Please go to My Documents and re-upload the corrected document${rejectedDocs.length > 1 ? "s" : ""} to continue your enrollment process.`,
           is_read: false,
+          data: {
+            trigger: 'DOCUMENTS_REJECTED',
+            rejectedDocuments: rejectedDocs,
+            reason: detailedMessage.trim(),
+            actionUrl: '/dashboard/my-documents',
+          },
         });
       }
 

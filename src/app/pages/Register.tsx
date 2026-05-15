@@ -1,7 +1,7 @@
 // Register page component
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { CheckCircle2, Lock, Mail, Phone, User } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, User } from "lucide-react";
 import { registerUser } from "../../services/authService";
 import { motion } from "motion/react";
 import logo from "../../assets/electronLogo";
@@ -126,6 +126,8 @@ export function Register() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
 
   const fieldErrors = (Object.keys(initialFormData) as RegisterField[]).reduce((errors, field) => {
@@ -457,7 +459,7 @@ export function Register() {
                 <div className={getFieldSurfaceClassName("password")}>
                   <Lock className="h-5 w-5 text-slate-400" />
                   <input
-                    type="password"
+                    type={showPassword ? "text" : "password"}
                     id="password"
                     name="password"
                     value={formData.password}
@@ -466,9 +468,17 @@ export function Register() {
                     required
                     autoComplete="new-password"
                     aria-invalid={Boolean(getVisibleFieldError("password"))}
-                    className="min-w-0 text-sm placeholder:text-slate-400"
+                    className="min-w-0 flex-1 text-sm placeholder:text-slate-400"
                     placeholder="Create password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((isVisible) => !isVisible)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  >
+                    {showPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                  </button>
                 </div>
                 {getVisibleFieldError("password") && (
                   <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("password")}</p>
@@ -482,7 +492,7 @@ export function Register() {
                 <div className={getFieldSurfaceClassName("confirmPassword")}>
                   <Lock className="h-5 w-5 text-slate-400" />
                   <input
-                    type="password"
+                    type={showConfirmPassword ? "text" : "password"}
                     id="confirmPassword"
                     name="confirmPassword"
                     value={formData.confirmPassword}
@@ -491,9 +501,17 @@ export function Register() {
                     required
                     autoComplete="new-password"
                     aria-invalid={Boolean(getVisibleFieldError("confirmPassword"))}
-                    className="min-w-0 text-sm placeholder:text-slate-400"
+                    className="min-w-0 flex-1 text-sm placeholder:text-slate-400"
                     placeholder="Confirm password"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((isVisible) => !isVisible)}
+                    aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4.5 w-4.5" /> : <Eye className="h-4.5 w-4.5" />}
+                  </button>
                 </div>
                 {getVisibleFieldError("confirmPassword") && (
                   <p className="mt-1.5 text-xs font-medium text-red-600 sm:text-sm">{getVisibleFieldError("confirmPassword")}</p>

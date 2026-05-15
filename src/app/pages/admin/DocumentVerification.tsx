@@ -14,7 +14,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
-import { createAuditLog, resolveUserId } from "../../../services/adminService";
+import { createAuditLog } from "../../../services/adminService";
+import { triggerNotification } from "../../../services/notificationService";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
@@ -25,7 +26,7 @@ interface StudentDocument {
   documents: {
     [key: string]: {
       id: string;
-      status: "pending" | "approved" | "rejected";
+      status: "pending" | "approved" | "rejected" | "reuploaded";
       uploadDate: string;
       fileName: string;
       fileUrl: string;
@@ -132,12 +133,15 @@ export function DocumentVerification() {
   const getDocumentCounts = (docs: any) => {
     let pending = 0, approved = 0, rejected = 0;
     Object.values(docs).forEach((doc: any) => {
-      if (doc.status === "pending") pending++;
+      if (doc.status === "pending" || doc.status === "pending_review" || doc.status === "reuploaded") pending++;
       if (doc.status === "approved") approved++;
       if (doc.status === "rejected") rejected++;
     });
     return { pending, approved, rejected };
   };
+
+  const isReviewableStatus = (status: string) =>
+    status === "pending" || status === "pending_review" || status === "reuploaded";
 
   const filteredStudents = students.filter((student) =>
     student.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -267,16 +271,12 @@ export function DocumentVerification() {
       );
 
       // Create notification for student
-      const studentUserId = await resolveUserId(selectedStudent.email);
-      if (studentUserId) {
-      await supabase.from("notifications").insert({
-        user_id: studentUserId,
-        type: "document_rejected",
-        title: "Document Rejected",
-        message: `Your ${selectedDocument.name} has been rejected. Reason: ${rejectionComment.trim()}`,
-        is_read: false,
+      await triggerNotification(selectedStudent.email, "DOCUMENT_REJECTED", {
+        documentName: selectedDocument.name,
+        documentType: selectedDocument.key,
+        reason: rejectionComment.trim(),
+        actionUrl: `/dashboard/my-documents?document=${selectedDocument.key}`,
       });
-      }
 
       // Reload and close
       await loadStudentDocuments();
@@ -320,7 +320,7 @@ export function DocumentVerification() {
                   <p className="text-sm font-medium text-gray-600 mb-1">Pending Documents</p>
                   <p className="text-4xl font-bold" style={{ color: "var(--electron-blue)" }}>
                     {students.reduce((sum, student) => {
-                      return sum + Object.values(student.documents).filter((doc: any) => doc.status === "pending").length;
+                      return sum + Object.values(student.documents).filter((doc: any) => isReviewableStatus(doc.status)).length;
                     }, 0)}
                   </p>
                 </div>
@@ -458,7 +458,7 @@ export function DocumentVerification() {
                           {doc.status === "rejected" && (
                             <XCircle className="w-5 h-5 text-red-600" />
                           )}
-                          {doc.status === "pending" && (
+                          {isReviewableStatus(doc.status) && (
                             <AlertCircle className="w-5 h-5 text-yellow-600" />
                           )}
                         </div>
@@ -472,14 +472,14 @@ export function DocumentVerification() {
                         )}
                         <div
                           className={`w-full py-2.5 px-3 rounded-lg text-sm font-bold text-center transition-all ${
-                            doc.status === "pending"
+                            isReviewableStatus(doc.status)
                               ? "text-white"
                               : "bg-gray-200 text-gray-700"
                           }`}
-                          style={doc.status === "pending" ? { backgroundColor: "var(--electron-blue)", color: "white" } : {}}
+                          style={isReviewableStatus(doc.status) ? { backgroundColor: "var(--electron-blue)", color: "white" } : {}}
                         >
                           <Eye className="w-4 h-4 inline mr-1" />
-                          {doc.status === "pending" ? "Review Document" : "View Document"}
+                          {isReviewableStatus(doc.status) ? "Review Document" : "View Document"}
                         </div>
                       </div>
                     ))}
@@ -578,7 +578,7 @@ export function DocumentVerification() {
                   </div>
 
                   {/* Rejection Comment */}
-                  {selectedDocument.data.status === "pending" && (
+                  {isReviewableStatus(selectedDocument.data.status) && (
                     <div className="mb-6">
                       <label className="block text-sm font-semibold text-gray-900 mb-2">
                         Rejection Reason <span className="text-red-600">*</span>
@@ -603,7 +603,7 @@ export function DocumentVerification() {
                   )}
 
                   {/* Current Status */}
-                  {selectedDocument.data.status !== "pending" && (
+                  {!isReviewableStatus(selectedDocument.data.status) && (
                     <div className={`p-4 rounded-lg border-2 mb-4 ${ 
                       selectedDocument.data.status === "approved"
                         ? "bg-green-50 border-green-200"
@@ -621,7 +621,7 @@ export function DocumentVerification() {
                   )}
 
                   {/* Change Status Section for Non-Pending */}
-                  {selectedDocument.data.status !== "pending" && (
+                  {!isReviewableStatus(selectedDocument.data.status) && (
                     <div className="border border-gray-300 rounded-lg p-4">
                       <h3 className="text-sm font-semibold text-gray-900 mb-2">Change Status</h3>
                       <p className="text-xs text-gray-600 mb-3">
@@ -641,7 +641,7 @@ export function DocumentVerification() {
                 </div>
 
                 {/* Footer Actions */}
-                {selectedDocument.data.status === "pending" && (
+                {isReviewableStatus(selectedDocument.data.status) && (
                   <div className="border-t border-gray-200 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
                     <div className="flex gap-3">
                       <button
@@ -666,7 +666,7 @@ export function DocumentVerification() {
                 )}
                 
                 {/* Footer Actions for Approved/Rejected Documents */}
-                {selectedDocument.data.status !== "pending" && (
+                {!isReviewableStatus(selectedDocument.data.status) && (
                   <div className="border-t border-gray-200 p-6 bg-gradient-to-br from-slate-50 to-slate-100">
                     <div className="flex gap-3">
                       {selectedDocument.data.status === "approved" && (

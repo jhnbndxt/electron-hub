@@ -70,6 +70,8 @@ const hasReuploadedRejectedDocument = (docs: any[]) => {
   return Array.from(docsByType.values()).some((documentVersions) => {
     const sortedDocuments = [...documentVersions].sort((a, b) => getRecordTimestamp(a) - getRecordTimestamp(b));
     const latestDocument = sortedDocuments[sortedDocuments.length - 1];
+    if (latestDocument?.status === "reuploaded") return true;
+
     const previousRejectedDocument = sortedDocuments
       .slice(0, -1)
       .some((doc) => getNormalizedDocumentStatus(doc) === "rejected");

@@ -106,12 +106,20 @@ const NOTIFICATION_MAP = {
   DOCUMENTS_REJECTED: {
     title: 'Documents Rejected',
     message: (additionalData) =>
-      additionalData.message || 'One or more enrollment documents were rejected. Please review the feedback.',
+      additionalData.message ||
+      `One or more enrollment documents were rejected.${additionalData.reason ? ` Reason: ${additionalData.reason}` : ''} Please go to My Documents and re-upload the corrected file to continue your enrollment process.`,
   },
   DOCUMENT_REJECTED: {
     title: 'Document Rejected',
     message: (additionalData) =>
-      additionalData.message || 'A document was rejected. Please review and reupload.',
+      additionalData.message ||
+      `Your uploaded document '${additionalData.documentName || 'Document'}' was rejected${additionalData.reason ? ` due to ${additionalData.reason}` : ''}. Please upload a corrected copy in My Documents to continue your enrollment process.`,
+  },
+  DOCUMENT_REUPLOADED: {
+    title: 'Document Re-uploaded',
+    message: (additionalData) =>
+      additionalData.message ||
+      `${additionalData.studentName || 'A student'} re-uploaded ${additionalData.documentName || 'a document'} and is ready for priority review.`,
   },
   DOCUMENT_STATUS_UPDATED: {
     title: 'Document Status Updated',

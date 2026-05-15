@@ -181,7 +181,7 @@ export function ApplicationReviewPage() {
       const reuploadedForReview =
         Boolean(doc) &&
         latestStatus === "pending" &&
-        (hasRejectedVersion || Boolean(doc?.rejection_comment || doc?.rejection_reason));
+        (doc?.status === "reuploaded" || hasRejectedVersion || Boolean(doc?.rejection_comment || doc?.rejection_reason));
       return {
         ...definition,
         ...doc,

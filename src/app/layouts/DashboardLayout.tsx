@@ -49,6 +49,16 @@ function NotificationTimestamp({ timestamp }: { timestamp: string }) {
   );
 }
 
+const formatNotification = (notification: any) => ({
+  id: notification.id,
+  type: String(notification.data?.trigger || notification.type || "").toUpperCase(),
+  title: notification.title,
+  message: notification.message,
+  timestamp: notification.created_at,
+  read: Boolean(notification.is_read),
+  actionUrl: notification.data?.actionUrl,
+});
+
 function DashboardLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -213,6 +223,7 @@ function DashboardLayoutContent() {
       case 'PAYMENT_SUBMITTED':
       case 'ENROLLMENT_SUBMITTED':
       case 'DOCUMENTS_REJECTED':
+      case 'DOCUMENT_REJECTED':
       case 'ENROLLMENT_CLOSED':
         return 'warning';
 
@@ -267,6 +278,7 @@ function DashboardLayoutContent() {
       case "ASSESSMENT_COMPLETED":
         return CheckCircle;
       case "DOCUMENTS_REJECTED":
+      case "DOCUMENT_REJECTED":
       case "PAYMENT_REJECTED":
       case "ENROLLMENT_REJECTED":
       case "ENROLLMENT_UNENROLLED":
@@ -317,14 +329,7 @@ function DashboardLayoutContent() {
         .order('created_at', { ascending: false });
 
       if (!error && data) {
-        const formatted = data.map((n: any) => ({
-          id: n.id,
-          type: n.data?.trigger || n.type,
-          title: n.title,
-          message: n.message,
-          timestamp: n.created_at,
-          read: Boolean(n.is_read),
-        }));
+        const formatted = data.map(formatNotification);
         setNotifications(formatted);
       }
 
@@ -352,14 +357,7 @@ function DashboardLayoutContent() {
         .order('created_at', { ascending: false });
 
       if (notifData) {
-        const formatted = notifData.map((n: any) => ({
-          id: n.id,
-          type: n.data?.trigger || n.type,
-          title: n.title,
-          message: n.message,
-          timestamp: n.created_at,
-          read: Boolean(n.is_read),
-        }));
+        const formatted = notifData.map(formatNotification);
         setNotifications(formatted);
       }
     };
@@ -369,6 +367,43 @@ function DashboardLayoutContent() {
     const interval = setInterval(checkProgressUpdates, 5000);
 
     return () => clearInterval(interval);
+  }, [userData?.id]);
+
+  useEffect(() => {
+    if (!userData?.id) return;
+
+    const reloadNotifications = async () => {
+      const { data } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', userData.id)
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setNotifications(data.map(formatNotification));
+        setLoadingNotifications(false);
+      }
+    };
+
+    const channel = supabase
+      .channel(`dashboard-notifications-${userData.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${userData.id}`,
+        },
+        () => {
+          void reloadNotifications();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [userData?.id]);
 
   // Calculate unread notification count
@@ -417,11 +452,13 @@ function DashboardLayoutContent() {
     setShowNotifications(false);
 
     // Redirect based on notification type
-    if (notification.type === "DOCUMENTS_VERIFIED" && !isVoucherPaymentLocked) {
+    if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+    } else if (notification.type === "DOCUMENTS_VERIFIED" && !isVoucherPaymentLocked) {
       navigate("/dashboard/payment");
     } else if (notification.type === "VOUCHER_ELIGIBLE" || notification.type === "OFFICIALLY_ENROLLED") {
       navigate("/dashboard");
-    } else if (notification.type === "DOCUMENTS_REJECTED") {
+    } else if (notification.type === "DOCUMENTS_REJECTED" || notification.type === "DOCUMENT_REJECTED") {
       navigate("/dashboard/my-documents");
     } else if (notification.type === "PAYMENT_VERIFIED") {
       navigate("/dashboard");
@@ -779,7 +816,7 @@ function DashboardLayoutContent() {
                               );
                             }
 
-                            if (notification.type === "DOCUMENTS_REJECTED") {
+                            if (notification.type === "DOCUMENTS_REJECTED" || notification.type === "DOCUMENT_REJECTED") {
                               return (
                                 <button
                                   key={notification.id}
@@ -797,7 +834,7 @@ function DashboardLayoutContent() {
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-start justify-between gap-2">
                                         <p className="text-sm font-semibold leading-5 text-slate-900">
-                                          Action Required: Document Rejected
+                                          {notification.title || "Action Required: Document Rejected"}
                                         </p>
                                         {!notification.read && (
                                           <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${variantStyles.dot}`} />
@@ -807,7 +844,7 @@ function DashboardLayoutContent() {
                                         {notification.message}
                                       </p>
                                       <p className={`mt-1 text-xs font-medium hover:underline ${variantStyles.actionColor}`}>
-                                        Review document
+                                        Go to My Documents
                                       </p>
                                       <NotificationTimestamp timestamp={notification.timestamp} />
                                     </div>

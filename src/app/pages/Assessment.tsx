@@ -44,8 +44,21 @@ export function Assessment() {
     return typeof answer === "number";
   };
 
+  const scrollAssessmentToTop = () => {
+    window.requestAnimationFrame(() => {
+      const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
+      const behavior: ScrollBehavior = window.innerWidth < 768 ? "auto" : "smooth";
+
+      if (shellMain) {
+        shellMain.scrollTo({ top: 0, behavior });
+        return;
+      }
+
+      window.scrollTo({ top: 0, behavior });
+    });
+  };
+
   useEffect(() => {
-    window.scrollTo(0, 0);
     localStorage.removeItem("assessment_questions");
 
     const initializeAssessment = async () => {
@@ -121,12 +134,6 @@ export function Assessment() {
       })
     );
   }, [answers, assessmentCompleted, assessmentProgressKey, currentSection, loading, sections.length]);
-
-  useEffect(() => {
-    if (!loading && sections.length > 0) {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }
-  }, [currentSection, loading, sections.length]);
 
   useEffect(() => {
     const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
@@ -391,12 +398,14 @@ export function Assessment() {
   const handleNext = () => {
     if (currentSection < sections.length - 1) {
       setCurrentSection(currentSection + 1);
+      scrollAssessmentToTop();
     }
   };
 
   const handlePrevious = () => {
     if (currentSection > 0) {
       setCurrentSection(currentSection - 1);
+      scrollAssessmentToTop();
     }
   };
 
