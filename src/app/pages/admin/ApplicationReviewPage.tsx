@@ -191,6 +191,7 @@ export function ApplicationReviewPage() {
   const [applicationRejectReason, setApplicationRejectReason] = useState("");
   const [resolvedProfileImageUrl, setResolvedProfileImageUrl] = useState("");
   const [rejectionConfirmation, setRejectionConfirmation] = useState<{ name: string; reason: string } | null>(null);
+  const [showApprovalValidation, setShowApprovalValidation] = useState(false);
 
   const formData = useMemo(() => applyGuardianSelection(parseFormData(enrollment?.form_data)), [enrollment]);
   const studentName =
@@ -331,10 +332,18 @@ export function ApplicationReviewPage() {
     .filter((group) => group.fields.length > 0);
 
   const approvalBlockers = [
-    ...missingFieldGroups.flatMap((group) => group.fields.map((field) => `${group.label}: ${field}`)),
-    ...missingRequiredDocuments.map((doc) => `Missing required document: ${doc.label}`),
-    ...unapprovedUploadedDocuments.map((doc) => `${doc.label} requires review`),
-    ...(voucherEligibility ? [] : ["Voucher eligibility decision is required"]),
+    ...missingFieldGroups.flatMap((group) =>
+      group.fields.map((field) => `Missing required information: ${group.label} - ${field}.`)
+    ),
+    ...missingRequiredDocuments.map((doc) => `${doc.label} has not been uploaded.`),
+    ...unapprovedUploadedDocuments.map((doc) => {
+      if (doc.required) {
+        return `${doc.label} is not yet approved.`;
+      }
+
+      return `${doc.label} has been uploaded but has not yet been reviewed.`;
+    }),
+    ...(voucherEligibility ? [] : ["Voucher eligibility has not yet been selected."]),
   ];
   const canApproveApplication = approvalBlockers.length === 0;
 
@@ -558,7 +567,7 @@ export function ApplicationReviewPage() {
 
   const approveApplication = async () => {
     if (!canApproveApplication) {
-      toast.error("Complete all missing requirements before approving this application.");
+      setShowApprovalValidation(true);
       return;
     }
 
@@ -1192,8 +1201,8 @@ export function ApplicationReviewPage() {
             </button>
             <button
               onClick={approveApplication}
-              disabled={!canApproveApplication || isProcessing}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200/80 bg-white/65 px-4 py-3 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
+              disabled={isProcessing}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200/80 bg-white/65 px-4 py-3 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:cursor-wait disabled:opacity-70"
             >
               <ShieldCheck className="h-4 w-4" />
               Approve Application
@@ -1276,6 +1285,52 @@ export function ApplicationReviewPage() {
               <div className="mt-4 flex justify-end gap-2">
                 <button onClick={() => setShowApplicationReject(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
                 <button onClick={rejectApplication} disabled={!applicationRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">Reject Application</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showApprovalValidation && (
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-amber-100 bg-amber-50 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <AlertCircle className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-950">Cannot Approve Application Yet</h2>
+                  <p className="mt-1 text-sm font-medium leading-6 text-amber-800">
+                    Resolve the following requirement{approvalBlockers.length === 1 ? "" : "s"} before proceeding with approval.
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowApprovalValidation(false)} className="rounded-lg p-2 text-slate-500 transition hover:bg-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="max-h-[60vh] overflow-y-auto p-6">
+              <div className="rounded-2xl border border-amber-100 bg-amber-50/60 p-4">
+                <p className="text-sm font-bold text-slate-900">
+                  Cannot proceed with application approval because:
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {approvalBlockers.map((blocker, index) => (
+                    <li key={`${blocker}-${index}`} className="flex items-start gap-3 rounded-xl bg-white/75 p-3 text-sm font-medium leading-6 text-slate-700 ring-1 ring-amber-100">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <span>{blocker}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="mt-5 flex justify-end">
+                <button
+                  onClick={() => setShowApprovalValidation(false)}
+                  className="rounded-xl bg-blue-700 px-5 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-700/15 transition hover:-translate-y-0.5 hover:bg-blue-800 hover:shadow-xl"
+                >
+                  Review Requirements
+                </button>
               </div>
             </div>
           </div>
