@@ -284,7 +284,6 @@ export function ApplicationReviewPage() {
       label: "Address",
       fields: [
         ["Region", formData.region],
-        ["Province", formData.province],
         ["City / Municipality", formData.city],
         ["Barangay", formData.barangay],
         ["Home Address", formData.homeAddress],
