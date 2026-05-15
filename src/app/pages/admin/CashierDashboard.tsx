@@ -510,7 +510,7 @@ export function CashierDashboard() {
     <div className="p-4 sm:p-6 lg:p-8">
       <DashboardPageHeader
         badge="Payment Processing"
-        title="Cashier Queue"
+        title="Payment Queue"
         subtitle="Review and approve student payment submissions"
         icon={DollarSign}
       />
