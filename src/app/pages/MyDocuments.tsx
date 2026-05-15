@@ -406,6 +406,16 @@ export function MyDocuments() {
                 <p className="text-sm text-red-700 mb-3">
                   Some of your documents were not approved by the registrar. Please review the rejection reasons below and re-upload the corrected documents to continue with your enrollment.
                 </p>
+                <div className="mb-4 rounded-lg border border-red-200 bg-white p-4">
+                  <p className="text-sm font-bold text-red-900">How to re-upload:</p>
+                  <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-red-800">
+                    <li>Check the rejected document and read the reason for rejection.</li>
+                    <li>Prepare a clearer or corrected file using the required document type.</li>
+                    <li>Click <span className="font-semibold">Re-upload Document</span> under the rejected item.</li>
+                    <li>Select the corrected file and wait for the upload to finish.</li>
+                    <li>Your document status will change to <span className="font-semibold">Re-uploaded</span> while the registrar reviews it again.</li>
+                  </ol>
+                </div>
                 <div className="space-y-2">
                   {documents
                     .filter(doc => doc.status === "rejected")

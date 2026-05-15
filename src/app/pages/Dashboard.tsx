@@ -746,6 +746,15 @@ export function Dashboard() {
             <p className="text-sm text-gray-700 mb-3 leading-relaxed">
               Please resubmit the corrected documents to proceed with your enrollment.
             </p>
+            <div className="rounded-lg border border-red-200 bg-white p-4">
+              <p className="text-sm font-bold text-red-900">How to re-upload your corrected document:</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-gray-700">
+                <li>Open <span className="font-semibold">My Documents</span> from your student dashboard.</li>
+                <li>Find the rejected document and read the rejection reason.</li>
+                <li>Click <span className="font-semibold">Re-upload Document</span>, then choose the corrected file.</li>
+                <li>Wait for the registrar to review the new upload. The status will change to <span className="font-semibold">Re-uploaded</span> or <span className="font-semibold">Pending Review</span>.</li>
+              </ol>
+            </div>
           </div>
         )}
       </div>

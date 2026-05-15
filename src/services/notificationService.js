@@ -107,13 +107,13 @@ const NOTIFICATION_MAP = {
     title: 'Documents Rejected',
     message: (additionalData) =>
       additionalData.message ||
-      `One or more enrollment documents were rejected.${additionalData.reason ? ` Reason: ${additionalData.reason}` : ''} Please go to My Documents and re-upload the corrected file to continue your enrollment process.`,
+      `One or more enrollment documents were rejected.${additionalData.reason ? ` Reason: ${additionalData.reason}` : ''} Open My Documents, read the rejection reason, click Re-upload Document under the rejected item, choose the corrected file, and wait for registrar review.`,
   },
   DOCUMENT_REJECTED: {
     title: 'Document Rejected',
     message: (additionalData) =>
       additionalData.message ||
-      `Your uploaded document '${additionalData.documentName || 'Document'}' was rejected${additionalData.reason ? ` due to ${additionalData.reason}` : ''}. Please upload a corrected copy in My Documents to continue your enrollment process.`,
+      `Your uploaded document '${additionalData.documentName || 'Document'}' was rejected${additionalData.reason ? ` due to ${additionalData.reason}` : ''}. Open My Documents, click Re-upload Document for this item, select the corrected file, and wait for registrar review.`,
   },
   DOCUMENT_REUPLOADED: {
     title: 'Document Re-uploaded',
