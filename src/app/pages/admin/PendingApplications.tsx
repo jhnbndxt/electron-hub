@@ -157,6 +157,53 @@ const formatEnrollmentStatus = (status?: string | null) => {
     : "Application Submitted";
 };
 
+const getFormProfileImageUrl = (data: any = {}) =>
+  data.profilePictureUrl ||
+  data.profile_picture_url ||
+  data.profilePhotoUrl ||
+  data.profile_photo_url ||
+  data.photoUrl ||
+  data.photo_url ||
+  data.idPictureUrl ||
+  data.id_picture_url ||
+  "";
+
+const loadApplicantProfileImageUrl = async (app: any, formData: any) => {
+  const userReference = String(app.user_id || "").trim();
+  const formEmail = String(
+    formData.email ||
+      formData.emailAddress ||
+      formData.email_address ||
+      app.email ||
+      ""
+  ).trim();
+  const lookupReferences = Array.from(new Set([userReference, formEmail].filter(Boolean)));
+  let profile: any = null;
+
+  for (const reference of lookupReferences) {
+    const profileQuery = supabase
+      .from("users")
+      .select("id, email, profile_picture_url");
+    const { data } = UUID_PATTERN.test(reference)
+      ? await profileQuery.eq("id", reference).maybeSingle()
+      : await profileQuery.eq("email", reference).maybeSingle();
+
+    if (data) {
+      profile = data;
+      break;
+    }
+  }
+
+  const resolvedUserId = profile?.id || (UUID_PATTERN.test(userReference) ? userReference : "");
+  const resolvedEmail = profile?.email || formEmail || (!UUID_PATTERN.test(userReference) ? userReference : "");
+
+  return (
+    profile?.profile_picture_url ||
+    getFormProfileImageUrl(formData) ||
+    (await loadProfileImageUrl(resolvedUserId, resolvedEmail))
+  );
+};
+
 export function PendingApplications() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -244,18 +291,7 @@ export function PendingApplications() {
     const formattedApps = await Promise.all(visibleApplications.map(async (app: any) => {
       const formData = app.form_data || {};
       const paymentStatusResponse = await getStudentPaymentStatus(app.user_id);
-      const userReference = String(app.user_id || formData.email || "");
-      const profileQuery = supabase
-        .from("users")
-        .select("id, email, profile_picture_url");
-      const { data: profile } = userReference
-        ? UUID_PATTERN.test(userReference)
-          ? await profileQuery.eq("id", userReference).maybeSingle()
-          : await profileQuery.eq("email", userReference).maybeSingle()
-        : { data: null };
-      const profileImageUrl =
-        profile?.profile_picture_url ||
-        (await loadProfileImageUrl(profile?.id || (UUID_PATTERN.test(userReference) ? userReference : ""), profile?.email || userReference));
+      const profileImageUrl = await loadApplicantProfileImageUrl(app, formData);
       const docs = app.enrollment_documents || [];
       const approvedDocuments = docs.filter((doc: any) => doc.status === "approved" || doc.verified === true).length;
       const rejectedDocuments = docs.filter((doc: any) => doc.status === "rejected").length;

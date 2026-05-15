@@ -121,6 +121,53 @@ const isFilled = (value: any) => {
   return value !== undefined && value !== null && String(value).trim() !== "";
 };
 
+const getFormProfileImageUrl = (data: any = {}) =>
+  data.profilePictureUrl ||
+  data.profile_picture_url ||
+  data.profilePhotoUrl ||
+  data.profile_photo_url ||
+  data.photoUrl ||
+  data.photo_url ||
+  data.idPictureUrl ||
+  data.id_picture_url ||
+  "";
+
+const loadApplicantProfile = async (enrollmentRecord: any, loadedFormData: any) => {
+  const userReference = String(enrollmentRecord?.user_id || "").trim();
+  const formEmail = String(
+    loadedFormData?.email ||
+      loadedFormData?.emailAddress ||
+      loadedFormData?.email_address ||
+      enrollmentRecord?.email ||
+      ""
+  ).trim();
+  const lookupReferences = Array.from(new Set([userReference, formEmail].filter(Boolean)));
+  let profile: any = null;
+
+  for (const reference of lookupReferences) {
+    const profileQuery = supabase
+      .from("users")
+      .select("id, email, full_name, profile_picture_url");
+    const { data } = UUID_PATTERN.test(reference)
+      ? await profileQuery.eq("id", reference).maybeSingle()
+      : await profileQuery.eq("email", reference).maybeSingle();
+
+    if (data) {
+      profile = data;
+      break;
+    }
+  }
+
+  const resolvedUserId = profile?.id || (UUID_PATTERN.test(userReference) ? userReference : "");
+  const resolvedEmail = profile?.email || formEmail || (!UUID_PATTERN.test(userReference) ? userReference : "");
+  const imageUrl =
+    profile?.profile_picture_url ||
+    getFormProfileImageUrl(loadedFormData) ||
+    (await loadProfileImageUrl(resolvedUserId, resolvedEmail));
+
+  return { profile, imageUrl };
+};
+
 export function ApplicationReviewPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -162,11 +209,7 @@ export function ApplicationReviewPage() {
   const studentProfilePictureUrl =
     resolvedProfileImageUrl ||
     studentProfile?.profile_picture_url ||
-    formData.profilePictureUrl ||
-    formData.profile_picture_url ||
-    formData.profilePhotoUrl ||
-    formData.photoUrl ||
-    formData.idPictureUrl ||
+    getFormProfileImageUrl(formData) ||
     null;
 
   const documents = useMemo(() => {
@@ -318,20 +361,13 @@ export function ApplicationReviewPage() {
     );
     if (firstActionable) setSelectedDocKey(firstActionable.document_type);
 
-    if (data.user_id) {
-      const userReference = String(data.user_id);
-      const profileQuery = supabase
-        .from("users")
-        .select("id, email, full_name, profile_picture_url");
-      const { data: profile } = UUID_PATTERN.test(userReference)
-        ? await profileQuery.eq("id", userReference).maybeSingle()
-        : await profileQuery.eq("email", userReference).maybeSingle();
-
+    const loadedFormData = applyGuardianSelection(parseFormData(data.form_data));
+    if (data.user_id || loadedFormData.email) {
+      const { profile, imageUrl } = await loadApplicantProfile(data, loadedFormData);
       setStudentProfile(profile || null);
-
-      const imageUrl = await loadProfileImageUrl(profile?.id || (UUID_PATTERN.test(userReference) ? userReference : ""), profile?.email || userReference);
       setResolvedProfileImageUrl(imageUrl);
     } else {
+      setStudentProfile(null);
       setResolvedProfileImageUrl("");
     }
 
