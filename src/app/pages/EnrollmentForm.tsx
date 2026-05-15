@@ -81,6 +81,14 @@ const allElectives = Array.from(
   )
 );
 
+const guardianFields = [
+  "guardianLastName",
+  "guardianFirstName",
+  "guardianMiddleName",
+  "guardianOccupation",
+  "guardianContact",
+] as const;
+
 interface FormData {
   // Page 1: Basic Information
   admissionType: string;
@@ -254,6 +262,51 @@ export function EnrollmentForm() {
     return restData;
   };
 
+  const getGuardianFromParent = (data: Partial<FormData>, source = data.guardianSource) => {
+    if (source === "father") {
+      return {
+        guardianLastName: data.fatherLastName || "",
+        guardianFirstName: data.fatherFirstName || "",
+        guardianMiddleName: data.fatherMiddleName || "",
+        guardianOccupation: data.fatherOccupation || "",
+        guardianContact: data.fatherContact || "",
+      };
+    }
+
+    if (source === "mother") {
+      return {
+        guardianLastName: data.motherLastName || "",
+        guardianFirstName: data.motherFirstName || "",
+        guardianMiddleName: data.motherMiddleName || "",
+        guardianOccupation: data.motherOccupation || "",
+        guardianContact: data.motherContact || "",
+      };
+    }
+
+    return {
+      guardianLastName: data.guardianLastName || "",
+      guardianFirstName: data.guardianFirstName || "",
+      guardianMiddleName: data.guardianMiddleName || "",
+      guardianOccupation: data.guardianOccupation || "",
+      guardianContact: data.guardianContact || "",
+    };
+  };
+
+  const applyGuardianSelection = <T extends Partial<FormData>>(data: T): T => ({
+    ...data,
+    ...(data.guardianSource === "father" || data.guardianSource === "mother"
+      ? getGuardianFromParent(data, data.guardianSource)
+      : {}),
+  });
+
+  const clearGuardianFields = <T extends Partial<FormData>>(data: T): T => {
+    const nextData = { ...data };
+    guardianFields.forEach((field) => {
+      (nextData as Record<string, any>)[field] = "";
+    });
+    return nextData;
+  };
+
   const applyRegistrationData = (source: any = {}) => {
     setFormData(prev => ({
       ...prev,
@@ -415,7 +468,7 @@ export function EnrollmentForm() {
 
         if (restoredDraftData) {
           const restData = mergeDraftWithRegistrationData(restoredDraftData, registrationSource);
-          setFormData(prev => ({ ...prev, ...restData }));
+          setFormData(prev => applyGuardianSelection({ ...prev, ...restData }));
           restoredDraftData = restData;
         }
         
@@ -428,7 +481,7 @@ export function EnrollmentForm() {
               stripFileFields(rawDraftData as Partial<FormData>),
               registrationSource
             );
-            setFormData(prev => ({ ...prev, ...restData }));
+            setFormData(prev => applyGuardianSelection({ ...prev, ...restData }));
             if (Number.isInteger(draftPage)) {
               setCurrentPage(Math.min(Math.max(draftPage, 1), 7));
             }
@@ -679,6 +732,40 @@ export function EnrollmentForm() {
     }
   }, [userData?.email, userData?.firstName]);
 
+  useEffect(() => {
+    if (isSubmittedEnrollment || (formData.guardianSource !== "father" && formData.guardianSource !== "mother")) {
+      return;
+    }
+
+    const syncedGuardian = getGuardianFromParent(formData, formData.guardianSource);
+    const needsSync = guardianFields.some((field) => formData[field] !== syncedGuardian[field]);
+
+    if (needsSync) {
+      setFormData(prev => ({
+        ...prev,
+        ...getGuardianFromParent(prev, prev.guardianSource),
+      }));
+    }
+  }, [
+    formData.fatherLastName,
+    formData.fatherFirstName,
+    formData.fatherMiddleName,
+    formData.fatherOccupation,
+    formData.fatherContact,
+    formData.motherLastName,
+    formData.motherFirstName,
+    formData.motherMiddleName,
+    formData.motherOccupation,
+    formData.motherContact,
+    formData.guardianSource,
+    formData.guardianLastName,
+    formData.guardianFirstName,
+    formData.guardianMiddleName,
+    formData.guardianOccupation,
+    formData.guardianContact,
+    isSubmittedEnrollment,
+  ]);
+
   // Autosave effect - save draft on every form data change
   useEffect(() => {
     const userEmail = userData?.email;
@@ -764,7 +851,7 @@ export function EnrollmentForm() {
     if (isSubmittedEnrollment) return;
     
     setFormData(prev => {
-      const newData = { ...prev, [field]: value };
+      let newData = { ...prev, [field]: value };
       
       // Handle address cascade resets inline to avoid multiple useEffect chains
       if (field === "region") {
@@ -782,15 +869,33 @@ export function EnrollmentForm() {
       if (field === "admissionType" && value === "New Regular") {
         newData.yearLevel = "Grade 11";
       }
+
+      if (field === "guardianSource") {
+        const nextSource = value === prev.guardianSource ? "" : String(value);
+        newData = {
+          ...newData,
+          guardianSource: nextSource,
+          ...(nextSource === "father" || nextSource === "mother"
+            ? getGuardianFromParent(newData, nextSource)
+            : getGuardianFromParent(clearGuardianFields(newData), "")),
+        };
+      } else if (newData.guardianSource === "father" || newData.guardianSource === "mother") {
+        newData = applyGuardianSelection(newData);
+      }
       
       return newData;
     });
     
     // Clear error when user starts typing
-    if (errors[field]) {
+    if (errors[field] || field === "guardianSource") {
       setErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[field];
+        if (field === "guardianSource") {
+          guardianFields.forEach((guardianField) => {
+            delete newErrors[guardianField];
+          });
+        }
         return newErrors;
       });
     }
@@ -889,15 +994,14 @@ export function EnrollmentForm() {
         newErrors.motherContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
       }
       
-      if (!formData.guardianSource) {
-        if (!formData.guardianLastName) newErrors.guardianLastName = "This field is required";
-        if (!formData.guardianFirstName) newErrors.guardianFirstName = "This field is required";
-        if (!formData.guardianOccupation) newErrors.guardianOccupation = "This field is required";
-        if (!formData.guardianContact) {
-          newErrors.guardianContact = "This field is required";
-        } else if (!validatePhoneNumber(formData.guardianContact)) {
-          newErrors.guardianContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
-        }
+      const guardianData = getGuardianFromParent(formData, formData.guardianSource);
+      if (!guardianData.guardianLastName) newErrors.guardianLastName = "This field is required";
+      if (!guardianData.guardianFirstName) newErrors.guardianFirstName = "This field is required";
+      if (!guardianData.guardianOccupation) newErrors.guardianOccupation = "This field is required";
+      if (!guardianData.guardianContact) {
+        newErrors.guardianContact = "This field is required";
+      } else if (!validatePhoneNumber(guardianData.guardianContact)) {
+        newErrors.guardianContact = "Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).";
       }
     }
 
@@ -950,6 +1054,11 @@ export function EnrollmentForm() {
       return;
     }
 
+    if (!validatePage(3)) {
+      setCurrentPage(3);
+      return;
+    }
+
     if (!validatePage(6)) return;
 
     const userEmail = userData?.email;
@@ -962,13 +1071,15 @@ export function EnrollmentForm() {
     try {
       const userId = userEmail; // Use email as user identifier (custom auth, not Supabase Auth)
       
+      const syncedFormData = applyGuardianSelection(formData);
+
       // Create enrollment submission data
       const enrollmentData = {
-        studentName: `${formData.firstName} ${formData.middleName} ${formData.lastName}`,
-        email: formData.email,
-        contactNumber: formData.contactNumber,
+        studentName: `${syncedFormData.firstName} ${syncedFormData.middleName} ${syncedFormData.lastName}`,
+        email: syncedFormData.email,
+        contactNumber: syncedFormData.contactNumber,
         submissionDate: new Date().toISOString(),
-        ...formData,
+        ...syncedFormData,
         // Exclude file objects
         form138: undefined,
         form137: undefined,
@@ -1098,7 +1209,8 @@ export function EnrollmentForm() {
     field: keyof FormData,
     type: string = "text",
     required: boolean = true,
-    placeholder?: string
+    placeholder?: string,
+    disabled: boolean = false
   ) => {
     // Get max date for birthday (today)
     const maxDate = type === "date" ? new Date().toISOString().split('T')[0] : undefined;
@@ -1113,10 +1225,10 @@ export function EnrollmentForm() {
           value={formData[field] as string}
           onChange={(e) => handleInputChange(field, e.target.value)}
           max={maxDate}
-          disabled={isSubmittedEnrollment}
+          disabled={isSubmittedEnrollment || disabled}
           className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
             errors[field] ? "border-red-500" : "border-gray-300"
-          } ${isSubmittedEnrollment ? "bg-gray-50 cursor-not-allowed opacity-60" : ""}`}
+          } ${isSubmittedEnrollment || disabled ? "bg-gray-50 cursor-not-allowed opacity-60" : ""}`}
           placeholder={placeholder}
         />
         {errors[field] && (
@@ -1412,7 +1524,8 @@ export function EnrollmentForm() {
               name="guardianSource"
               value="father"
               checked={formData.guardianSource === "father"}
-              onChange={(e) => handleInputChange("guardianSource", e.target.value)}
+              readOnly
+              onClick={() => handleInputChange("guardianSource", "father")}
               disabled={isSubmittedEnrollment}
               className="w-4 h-4 text-blue-600 disabled:cursor-not-allowed"
             />
@@ -1424,28 +1537,26 @@ export function EnrollmentForm() {
               name="guardianSource"
               value="mother"
               checked={formData.guardianSource === "mother"}
-              onChange={(e) => handleInputChange("guardianSource", e.target.value)}
+              readOnly
+              onClick={() => handleInputChange("guardianSource", "mother")}
               disabled={isSubmittedEnrollment}
               className="w-4 h-4 text-blue-600 disabled:cursor-not-allowed"
             />
             <span className="text-sm font-medium text-gray-700">Same as Mother's Information</span>
           </label>
+          <p className="text-xs text-gray-500">Select an option again to clear it and enter guardian details manually.</p>
         </div>
       </div>
 
-      {!formData.guardianSource && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {renderInput("Last Name", "guardianLastName")}
-            {renderInput("First Name", "guardianFirstName")}
-            {renderInput("Middle Name", "guardianMiddleName", "text", false)}
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {renderInput("Occupation", "guardianOccupation")}
-            {renderInput("Contact Number", "guardianContact", "tel", true, "09XXXXXXXXX or +639XXXXXXXXX")}
-          </div>
-        </>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {renderInput("Last Name", "guardianLastName", "text", true, undefined, Boolean(formData.guardianSource))}
+        {renderInput("First Name", "guardianFirstName", "text", true, undefined, Boolean(formData.guardianSource))}
+        {renderInput("Middle Name", "guardianMiddleName", "text", false, undefined, Boolean(formData.guardianSource))}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {renderInput("Occupation", "guardianOccupation", "text", true, undefined, Boolean(formData.guardianSource))}
+        {renderInput("Contact Number", "guardianContact", "tel", true, "09XXXXXXXXX or +639XXXXXXXXX", Boolean(formData.guardianSource))}
+      </div>
 
       <div>
         <label className="flex items-center gap-2">
@@ -1642,13 +1753,19 @@ export function EnrollmentForm() {
 
   // Page 7: Summary
   const renderPage7 = () => {
-    const summaryData = submittedSummaryData || formData;
+    const summaryData = applyGuardianSelection(submittedSummaryData || formData);
     const fullName = [summaryData.firstName, summaryData.middleName, summaryData.lastName]
       .filter(Boolean)
       .join(" ");
     const nameDisplay = [fullName, summaryData.suffix && summaryData.suffix !== "None" ? summaryData.suffix : ""]
       .filter(Boolean)
       .join(" ");
+    const guardianRelationship =
+      summaryData.guardianSource === "father"
+        ? "Father"
+        : summaryData.guardianSource === "mother"
+        ? "Mother"
+        : "Manual";
     const documents = summaryData.documents || [];
     const hasDocument = (key: string) => {
       if (documents.some((doc: any) => doc.document_type === key || doc.type === key)) {
@@ -1751,14 +1868,12 @@ export function EnrollmentForm() {
                 <div><span className="text-gray-500">Contact Number:</span> <span className="font-medium">{summaryData.motherContact}</span></div>
               </div>
 
-              {summaryData.guardianSource && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div><span className="text-gray-500">Guardian Relationship:</span> <span className="font-medium">{summaryData.guardianSource}</span></div>
-                  <div><span className="text-gray-500">Guardian Name:</span> <span className="font-medium">{summaryData.guardianLastName}, {summaryData.guardianFirstName} {summaryData.guardianMiddleName}</span></div>
-                  <div><span className="text-gray-500">Occupation:</span> <span className="font-medium">{summaryData.guardianOccupation}</span></div>
-                  <div><span className="text-gray-500">Contact Number:</span> <span className="font-medium">{summaryData.guardianContact}</span></div>
-                </div>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><span className="text-gray-500">Guardian Relationship:</span> <span className="font-medium">{guardianRelationship}</span></div>
+                <div><span className="text-gray-500">Guardian Name:</span> <span className="font-medium">{summaryData.guardianLastName}, {summaryData.guardianFirstName} {summaryData.guardianMiddleName}</span></div>
+                <div><span className="text-gray-500">Occupation:</span> <span className="font-medium">{summaryData.guardianOccupation}</span></div>
+                <div><span className="text-gray-500">Contact Number:</span> <span className="font-medium">{summaryData.guardianContact}</span></div>
+              </div>
 
               <div><span className="text-gray-500">4Ps Member:</span> <span className="font-medium">{summaryData.is4PsMember ? "Yes" : "No"}</span></div>
             </div>

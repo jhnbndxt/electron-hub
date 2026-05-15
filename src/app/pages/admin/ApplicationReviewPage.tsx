@@ -60,6 +60,41 @@ const parseFormData = (raw: any) => {
   return raw;
 };
 
+const getGuardianFromParent = (data: any = {}) => {
+  if (data.guardianSource === "father" || data.guardian_source === "father") {
+    return {
+      guardianLastName: data.fatherLastName || data.father_last_name || "",
+      guardianFirstName: data.fatherFirstName || data.father_first_name || "",
+      guardianMiddleName: data.fatherMiddleName || data.father_middle_name || "",
+      guardianOccupation: data.fatherOccupation || data.father_occupation || "",
+      guardianContact: data.fatherContact || data.father_contact || "",
+    };
+  }
+
+  if (data.guardianSource === "mother" || data.guardian_source === "mother") {
+    return {
+      guardianLastName: data.motherLastName || data.mother_last_name || "",
+      guardianFirstName: data.motherFirstName || data.mother_first_name || "",
+      guardianMiddleName: data.motherMiddleName || data.mother_middle_name || "",
+      guardianOccupation: data.motherOccupation || data.mother_occupation || "",
+      guardianContact: data.motherContact || data.mother_contact || "",
+    };
+  }
+
+  return {
+    guardianLastName: data.guardianLastName || data.guardian_last_name || "",
+    guardianFirstName: data.guardianFirstName || data.guardian_first_name || "",
+    guardianMiddleName: data.guardianMiddleName || data.guardian_middle_name || "",
+    guardianOccupation: data.guardianOccupation || data.guardian_occupation || "",
+    guardianContact: data.guardianContact || data.guardian_contact || "",
+  };
+};
+
+const applyGuardianSelection = (data: any = {}) => ({
+  ...data,
+  ...getGuardianFromParent(data),
+});
+
 const publicUrl = (filePath?: string | null, fileUrl?: string | null) => {
   if (fileUrl) return fileUrl;
   if (!filePath) return null;
@@ -110,7 +145,7 @@ export function ApplicationReviewPage() {
   const [resolvedProfileImageUrl, setResolvedProfileImageUrl] = useState("");
   const [rejectionConfirmation, setRejectionConfirmation] = useState<{ name: string; reason: string } | null>(null);
 
-  const formData = useMemo(() => parseFormData(enrollment?.form_data), [enrollment]);
+  const formData = useMemo(() => applyGuardianSelection(parseFormData(enrollment?.form_data)), [enrollment]);
   const studentName =
     studentProfile?.full_name ||
     formData.studentName ||
@@ -223,14 +258,10 @@ export function ApplicationReviewPage() {
         ["Mother's Occupation", formData.motherOccupation],
         ["Mother's Contact Number", formData.motherContact],
         ["Guardian Source / Relationship", formData.guardianSource || formData.guardianFirstName],
-        ...(formData.guardianSource
-          ? []
-          : [
-              ["Guardian Last Name", formData.guardianLastName],
-              ["Guardian First Name", formData.guardianFirstName],
-              ["Guardian Occupation", formData.guardianOccupation],
-              ["Guardian Contact Number", formData.guardianContact],
-            ]),
+        ["Guardian Last Name", formData.guardianLastName],
+        ["Guardian First Name", formData.guardianFirstName],
+        ["Guardian Occupation", formData.guardianOccupation],
+        ["Guardian Contact Number", formData.guardianContact],
       ],
     },
     {
@@ -590,6 +621,12 @@ export function ApplicationReviewPage() {
   const fatherName = `${formData.fatherLastName || ""}, ${formData.fatherFirstName || ""} ${formData.fatherMiddleName || ""}`.trim();
   const motherName = `${formData.motherLastName || ""}, ${formData.motherFirstName || ""} ${formData.motherMiddleName || ""}`.trim();
   const guardianName = `${formData.guardianLastName || ""}, ${formData.guardianFirstName || ""} ${formData.guardianMiddleName || ""}`.trim();
+  const guardianRelationship =
+    formData.guardianSource === "father"
+      ? "Father"
+      : formData.guardianSource === "mother"
+      ? "Mother"
+      : "Manual";
   const hasDocument = (documentKey: string) => documents.some((doc) => doc.key === documentKey && doc.id);
 
   const renderSubmittedField = (label: string, value: any, className = "") => (
@@ -775,8 +812,8 @@ export function ApplicationReviewPage() {
                     {renderSubmittedField("Contact Number", formData.motherContact)}
                   </div>
                   <div className="grid grid-cols-1 gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2">
-                    {renderSubmittedField("Guardian Relationship", formData.guardianSource || "N/A")}
-                    {renderSubmittedField("Guardian Name", guardianName || (formData.guardianSource === "father" ? fatherName : formData.guardianSource === "mother" ? motherName : ""))}
+                    {renderSubmittedField("Guardian Relationship", guardianRelationship)}
+                    {renderSubmittedField("Guardian Name", guardianName)}
                     {renderSubmittedField("Occupation", formData.guardianOccupation)}
                     {renderSubmittedField("Contact Number", formData.guardianContact)}
                   </div>

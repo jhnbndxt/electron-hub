@@ -15,6 +15,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import chatbotLogo from "../../assets/chatbot-logo.png";
 import { findDirectFaq, retrieveChatbotKnowledge } from "../../data/chatbotKnowledge.js";
 
 export interface ChatAssistantShellProps {
@@ -461,7 +462,7 @@ function buildAssistantReply(input: string, context: AssistantContext) {
 
   if (hasKeyword(normalizedInput, IDENTITY_KEYWORDS)) {
     return {
-      text: "I am the Electron Hub AI Enrollment Assistant. I combine quick FAQ answers, enrollment knowledge, and AI support to guide students through the portal.",
+      text: "I am the EHub AI Assistant. I combine quick FAQ answers, enrollment knowledge, and AI support to guide students through the portal.",
       source: "local" as const,
       actions: [
         promptAction("What can you do?", "What can you do?", Sparkles),
@@ -815,8 +816,10 @@ export function ChatAssistantShell({
 
             <motion.section
               role="dialog"
-              aria-label="Electron Hub AI Assistant"
-              className="fixed inset-x-3 bottom-3 z-[80] flex h-[min(82vh,760px)] min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/55 bg-white/80 shadow-[0_42px_120px_-50px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[430px] sm:max-w-[calc(100vw-3rem)] lg:bottom-8 lg:right-8"
+              aria-label="EHub AI Assistant"
+              className={`fixed inset-x-3 bottom-3 z-[80] flex min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/55 bg-white/80 shadow-[0_42px_120px_-50px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[430px] sm:max-w-[calc(100vw-3rem)] lg:bottom-8 lg:right-8 ${
+                isConversationEmpty ? "h-auto max-h-[calc(100vh-1.5rem)]" : "h-[min(82vh,760px)]"
+              }`}
               initial={{ opacity: 0, y: 24, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.98 }}
@@ -856,13 +859,18 @@ export function ChatAssistantShell({
                         animate={{ rotate: [0, -2, 2, 0] }}
                         transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
                       >
-                        <MessageCircle className="h-5 w-5" />
+                        <img
+                          src={chatbotLogo}
+                          alt=""
+                          className="h-6 w-6 object-contain"
+                          aria-hidden="true"
+                        />
                         <Sparkles className="absolute -right-0.5 -top-0.5 h-3.5 w-3.5 text-amber-200" />
                       </motion.div>
 
                       <div className="min-w-0">
                         <h2 className="text-base font-semibold leading-tight text-slate-900 sm:text-lg">
-                          AI Enrollment Assistant
+                          EHub AI Assistant
                         </h2>
                         <p className="mt-0.5 truncate text-xs text-slate-500">
                           Persistent enrollment support across Electron Hub
@@ -900,29 +908,31 @@ export function ChatAssistantShell({
 
                 <div
                   ref={scrollContainerRef}
-                  className={`relative min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-4 pt-4 sm:px-5 ${
-                    isConversationEmpty ? "flex items-center" : ""
+                  className={`relative min-h-0 px-4 pb-4 pt-4 sm:px-5 ${
+                    isConversationEmpty
+                      ? "shrink-0 overflow-visible"
+                      : "flex-1 overflow-y-auto overscroll-y-contain"
                   }`}
                   style={{ WebkitOverflowScrolling: "touch" }}
                 >
                   <AnimatePresence initial={false}>
                     {shouldShowQuickPrompts && (
                       <motion.div
-                        className="mx-auto w-full max-w-sm py-8 text-center"
+                        className="mx-auto h-auto w-full max-w-sm py-3 text-center sm:py-5"
                         initial={{ opacity: 0, y: 10, scale: 0.98 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8, scale: 0.98 }}
                       >
-                        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
-                          <Sparkles className="h-7 w-7" />
+                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-700 ring-1 ring-blue-100 sm:h-14 sm:w-14">
+                          <Sparkles className="h-6 w-6 sm:h-7 sm:w-7" />
                         </div>
-                        <h3 className="mt-4 text-xl font-bold tracking-tight text-slate-950">
+                        <h3 className="mt-3 text-lg font-bold tracking-tight text-slate-950 sm:mt-4 sm:text-xl">
                           How can I help you today?
                         </h3>
-                        <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-slate-500">
+                        <p className="mx-auto mt-1 max-w-xs text-xs leading-5 text-slate-500 sm:mt-2 sm:text-sm sm:leading-6">
                           Ask about enrollment, documents, voucher eligibility, payments, or your track options.
                         </p>
-                        <div className="mt-6 grid gap-2">
+                        <div className="mt-4 grid h-auto gap-1.5 sm:mt-6 sm:gap-2">
                           {QUICK_PROMPTS.map((prompt) => {
                             const PromptIcon = prompt.icon;
                             return (
@@ -931,7 +941,7 @@ export function ChatAssistantShell({
                                 type="button"
                                 onClick={() => handleSend(prompt.value)}
                                 disabled={isTyping}
-                                className="group inline-flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 text-left text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-900 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+                                className="group inline-flex w-full items-center gap-3 rounded-2xl border border-slate-200 bg-white/85 px-4 py-2.5 text-left text-sm font-semibold text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-900 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 sm:py-3"
                               >
                                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-blue-700 transition group-hover:bg-white">
                                   <PromptIcon className="h-4.5 w-4.5" />
