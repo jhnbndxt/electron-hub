@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router";
-import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase } from "lucide-react";
+import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase, AlertTriangle } from "lucide-react";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
@@ -175,6 +175,308 @@ function getSuggestedCoursesForPublicResult(track: string, elective: string): st
   }
 
   return [];
+}
+
+interface PublicAssessmentResultsViewProps {
+  result: AssessmentResult | null;
+  saveInfo: { fullName: string; email: string };
+  saveErrors: { fullName: string; email: string };
+  saveStatus: "idle" | "saving" | "saved" | "error";
+  saveMessage: string;
+  onSaveInfoChange: (nextSaveInfo: { fullName: string; email: string }) => void;
+  onSaveErrorsChange: (nextSaveErrors: { fullName: string; email: string }) => void;
+  onSave: () => void;
+  onRestart: () => void;
+}
+
+function PublicAssessmentResultsView({
+  result,
+  saveInfo,
+  saveErrors,
+  saveStatus,
+  saveMessage,
+  onSaveInfoChange,
+  onSaveErrorsChange,
+  onSave,
+  onRestart,
+}: PublicAssessmentResultsViewProps) {
+  const normalizedResult = normalizeAssessmentResult(result);
+
+  if (!normalizedResult) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-16">
+        <div className="mx-auto max-w-xl rounded-2xl bg-white p-8 text-center shadow-xl">
+          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+            <AlertTriangle className="h-7 w-7" />
+          </div>
+          <h1 className="text-2xl font-bold text-slate-950">We could not load this result</h1>
+          <p className="mt-3 leading-7 text-slate-600">
+            The saved result data is incomplete. Restart the public assessment to generate a fresh recommendation.
+          </p>
+          <button
+            onClick={onRestart}
+            className="mt-6 rounded-xl bg-[var(--electron-blue)] px-6 py-3 font-semibold text-white shadow-lg"
+          >
+            Restart Assessment
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const track = normalizeResultText(normalizedResult.track, "General");
+  const electives = normalizedResult.electives.length > 0 ? normalizedResult.electives : ["Elective recommendation pending"];
+  const topDomains = normalizedResult.topDomains.length > 0 ? normalizedResult.topDomains : ["Balanced aptitude profile"];
+  const topInterests = normalizedResult.topInterests.length > 0 ? normalizedResult.topInterests : ["General academic interests"];
+  const scores = normalizedResult.scores;
+  const overallScore = Math.round(normalizeResultScore(normalizedResult.overallScore));
+  const aiRecommendation = normalizedResult.aiRecommendation || {};
+  const aiExplanation =
+    normalizeResultText(aiRecommendation.overallAnalysis) ||
+    `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`;
+  const trackExplanation =
+    normalizeResultText(aiRecommendation.trackExplanation) ||
+    (track === "Academic"
+      ? "This path supports college-preparatory learning, research, and academic specialization."
+      : "This path supports practical training, technical competencies, and career-ready preparation.");
+  const scoreRows = [
+    { label: "Verbal Aptitude", value: scores.VA, icon: Brain },
+    { label: "Mathematical Ability", value: scores.MA, icon: Calculator },
+    { label: "Science / Spatial Ability", value: scores.SA, icon: Beaker },
+    { label: "Logical Reasoning", value: scores.LRA, icon: Lightbulb },
+  ];
+  const pathwayRows =
+    Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
+      ? aiRecommendation.careerPathways.map((pathway: any) => ({
+          category: normalizeResultText(pathway?.category || pathway?.name, "Career Pathway"),
+          careers: normalizeResultArray(pathway?.careers ?? pathway?.courses ?? pathway?.items),
+        }))
+      : electives.map((elective) => ({
+          category: elective,
+          careers: getSuggestedCoursesForPublicResult(track, elective),
+        }));
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFC]">
+      <section className="bg-[var(--electron-blue)] px-4 py-14 text-white sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold">
+            <CheckCircle className="h-4 w-4" />
+            Assessment Complete
+          </div>
+          <div className="mt-6 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+            <div>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Your Public Assessment Result</h1>
+              <p className="mt-4 max-w-3xl text-lg leading-8 text-blue-100">
+                Review your recommended track, electives, strengths, and next-step options. You can save this result by email below.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-100">Recommended Track</p>
+              <p className="mt-2 text-4xl font-bold">{track}</p>
+              <p className="mt-3 text-sm leading-6 text-blue-100">{trackExplanation}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+          <section className="rounded-2xl bg-white p-6 shadow-lg">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">Overall Score</p>
+              <p className="mt-3 text-6xl font-bold text-[var(--electron-blue)]">{overallScore}%</p>
+              <p className="mt-2 text-sm text-slate-500">
+                {overallScore >= 80 ? "Excellent readiness" : overallScore >= 60 ? "Good readiness" : "Developing readiness"}
+              </p>
+            </div>
+            <div className="mt-8 space-y-4">
+              {scoreRows.map((row) => {
+                const Icon = row.icon;
+                const score = Math.max(0, Math.min(100, Math.round(normalizeResultScore(row.value))));
+                return (
+                  <div key={row.label}>
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                        <Icon className="h-4 w-4 text-slate-500" />
+                        {row.label}
+                      </div>
+                      <span className="text-sm font-bold text-[var(--electron-blue)]">{score}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-slate-100">
+                      <div className="h-2 rounded-full bg-[var(--electron-blue)]" style={{ width: `${score}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="space-y-6">
+            <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="flex items-start gap-4">
+                <Award className="mt-1 h-8 w-8 text-[var(--electron-blue)]" />
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-950">Recommended Electives</h2>
+                  <p className="mt-2 text-slate-600">These subjects best match your assessment profile.</p>
+                </div>
+              </div>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                {electives.map((elective, index) => (
+                  <div key={`${elective}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50 p-5">
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Elective {index + 1}</p>
+                    <p className="mt-2 text-xl font-bold text-slate-950">{normalizeResultText(elective, "Elective")}</p>
+                    {getSuggestedCoursesForPublicResult(track, elective).length > 0 && (
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        Leads to: {getSuggestedCoursesForPublicResult(track, elective).join(", ")}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-white p-6 shadow-lg">
+              <div className="flex items-start gap-4">
+                <Sparkles className="mt-1 h-8 w-8 text-[var(--electron-red)]" />
+                <div>
+                  <h2 className="text-2xl font-bold text-slate-950">Why This Fits You</h2>
+                  <p className="mt-3 leading-7 text-slate-700">{aiExplanation}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <section className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="rounded-2xl bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-950">Profile Summary</h2>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-bold text-slate-900">Top Strengths</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{topDomains.join(", ")}</p>
+              </div>
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-bold text-slate-900">Key Interests</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{topInterests.join(", ")}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-950">Possible Pathways</h2>
+            <div className="mt-4 space-y-3">
+              {pathwayRows.filter((pathway) => pathway.careers.length > 0).slice(0, 4).map((pathway, index) => (
+                <div key={`${pathway.category}-${index}`} className="rounded-xl bg-slate-50 p-4">
+                  <p className="text-sm font-bold text-slate-900">{pathway.category}</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">{pathway.careers.join(", ")}</p>
+                </div>
+              ))}
+              {pathwayRows.every((pathway) => pathway.careers.length === 0) && (
+                <p className="text-sm leading-6 text-slate-600">
+                  Your track and electives can support college and career options connected to your strengths.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+            <div>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-800">
+                <FileText className="h-4 w-4" />
+                Optional Save
+              </div>
+              <h2 className="text-2xl font-bold text-slate-950">Save your assessment results</h2>
+              <p className="mt-3 leading-7 text-slate-600">
+                Enter your name and email after seeing your result. If the email already has an official assessment, it will not be overwritten.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Full Name</label>
+                  <input
+                    type="text"
+                    value={saveInfo.fullName}
+                    onChange={(event) => {
+                      onSaveInfoChange({ ...saveInfo, fullName: event.target.value });
+                      onSaveErrorsChange({ ...saveErrors, fullName: "" });
+                    }}
+                    className={`w-full rounded-xl border-2 bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
+                      saveErrors.fullName ? "border-red-300 focus:ring-red-200" : "border-gray-200 focus:ring-blue-200"
+                    }`}
+                    placeholder="Your full name"
+                  />
+                  {saveErrors.fullName && <p className="mt-2 text-sm text-red-600">{saveErrors.fullName}</p>}
+                </div>
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">Email Address</label>
+                  <input
+                    type="email"
+                    value={saveInfo.email}
+                    onChange={(event) => {
+                      onSaveInfoChange({ ...saveInfo, email: event.target.value.trimStart().toLowerCase() });
+                      onSaveErrorsChange({ ...saveErrors, email: "" });
+                    }}
+                    className={`w-full rounded-xl border-2 bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
+                      saveErrors.email ? "border-red-300 focus:ring-red-200" : "border-gray-200 focus:ring-blue-200"
+                    }`}
+                    placeholder="name@example.com"
+                  />
+                  {saveErrors.email && <p className="mt-2 text-sm text-red-600">{saveErrors.email}</p>}
+                </div>
+              </div>
+
+              <button
+                onClick={onSave}
+                disabled={saveStatus === "saving" || saveStatus === "saved"}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--electron-blue)] px-5 py-3 font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Result Saved" : "Save Result to Email"}
+              </button>
+
+              {saveMessage && (
+                <div
+                  className={`mt-4 rounded-xl border p-4 text-sm font-medium ${
+                    saveStatus === "error"
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {saveMessage}
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white p-6 text-center shadow-lg">
+          <h2 className="text-2xl font-bold text-slate-950">Ready to Enroll?</h2>
+          <p className="mt-2 text-slate-600">Create an account or log in to continue with your enrollment application.</p>
+          <div className="mt-6 flex flex-col justify-center gap-4 sm:flex-row">
+            <Link
+              to="/register"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--electron-blue)] px-6 py-4 font-semibold text-white shadow-md"
+            >
+              <FileText className="h-5 w-5" />
+              Create Account & Enroll
+            </Link>
+            <Link
+              to="/login"
+              state={{ fromPublicLogin: true }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-[var(--electron-blue)] bg-white px-6 py-4 font-semibold text-[var(--electron-blue)] shadow-md"
+            >
+              <ArrowRight className="h-5 w-5" />
+              Login to Continue
+            </Link>
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }
 
 export function PublicAssessment() {
@@ -413,6 +715,33 @@ export function PublicAssessment() {
           compact
         />
       </div>
+    );
+  }
+
+  if (assessmentCompleted) {
+    return (
+      <PublicAssessmentResultsView
+        result={results}
+        saveInfo={saveInfo}
+        saveErrors={saveErrors}
+        saveStatus={saveStatus}
+        saveMessage={saveMessage}
+        onSaveInfoChange={setSaveInfo}
+        onSaveErrorsChange={setSaveErrors}
+        onSave={handleSaveResult}
+        onRestart={() => {
+          localStorage.removeItem("publicAssessmentResults");
+          localStorage.removeItem(assessmentProgressKey);
+          localStorage.removeItem("publicAssessmentProgress_guest");
+          setAssessmentCompleted(false);
+          setResults(null);
+          setAssessmentStarted(false);
+          setCurrentSection(0);
+          setAnswers({});
+          setSaveStatus("idle");
+          setSaveMessage("");
+        }}
+      />
     );
   }
 
@@ -985,7 +1314,7 @@ export function PublicAssessment() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSaveResult = async () => {
+  async function handleSaveResult() {
     if (!results) return;
 
     const nextErrors = { fullName: "", email: "" };
@@ -1028,7 +1357,7 @@ export function PublicAssessment() {
       setSaveStatus("error");
       setSaveMessage(error?.message || "Unable to save your assessment result right now.");
     }
-  };
+  }
 
   const allCurrentQuestionsAnswered = currentSectionData.questions.every(
     (question) => isQuestionAnswered(question)
