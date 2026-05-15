@@ -51,6 +51,9 @@ const DOCUMENTS = [
   { key: "escCertificate", label: "ESC Certificate", required: false },
 ];
 
+const isAdmissionType = (formData: any, admissionType: string) =>
+  String(formData?.admissionType || formData?.admission_type || "").toLowerCase() === admissionType.toLowerCase();
+
 const parseFormData = (raw: any) => {
   if (!raw) return {};
   if (typeof raw === "string") {
@@ -219,6 +222,8 @@ export function ApplicationReviewPage() {
   const [showApprovalValidation, setShowApprovalValidation] = useState(false);
 
   const formData = useMemo(() => applyGuardianSelection(parseFormData(enrollment?.form_data)), [enrollment]);
+  const isTransferee = isAdmissionType(formData, "Transferee");
+  const isReturnee = isAdmissionType(formData, "Returnee");
   const studentName =
     studentProfile?.full_name ||
     formData.studentName ||
@@ -241,6 +246,9 @@ export function ApplicationReviewPage() {
   const documents = useMemo(() => {
     const uploaded = enrollment?.enrollment_documents || [];
     return DOCUMENTS.map((definition) => {
+      const required =
+        definition.required ||
+        (isTransferee && (definition.key === "form137" || definition.key === "goodMoral"));
       const documentVersions = uploaded
         .filter((item: any) => item.document_type === definition.key)
         .sort((a: any, b: any) => getRecordTimestamp(b) - getRecordTimestamp(a));
@@ -253,6 +261,7 @@ export function ApplicationReviewPage() {
         (doc?.status === "reuploaded" || hasRejectedVersion || Boolean(doc?.rejection_comment || doc?.rejection_reason));
       return {
         ...definition,
+        required,
         ...doc,
         status: latestStatus,
         versions: documentVersions,
@@ -271,7 +280,7 @@ export function ApplicationReviewPage() {
         rejectionComment: doc?.rejection_comment || doc?.rejection_reason || "",
       };
     });
-  }, [enrollment]);
+  }, [enrollment, isTransferee]);
 
   const selectedDocument = documents.find((doc) => doc.key === selectedDocKey) || documents[0];
   const canReviewDocument = (doc: any) => Boolean(doc?.id) && (doc.status === "pending" || doc.reuploadedForReview);
@@ -291,6 +300,23 @@ export function ApplicationReviewPage() {
       label: "Basic Information",
       fields: [
         ["Admission Type", formData.admissionType],
+        ...(isReturnee ? [["Previous Student ID", formData.previousStudentId || formData.previous_student_id]] : []),
+        ...(isTransferee
+          ? [
+              ["Previous School Name", formData.previousSchoolName || formData.previous_school_name],
+              ["Previous School Address", formData.previousSchoolAddress || formData.previous_school_address],
+              ["Previous Track / Strand", formData.previousTrack || formData.previous_track],
+              ["Last Grade Level Completed", formData.lastGradeLevelCompleted || formData.last_grade_level_completed],
+              ["Reason for Transfer", formData.transferReason || formData.transfer_reason],
+            ]
+          : []),
+        ...(isReturnee
+          ? [
+              ["Last Grade Level Completed", formData.lastGradeLevelCompleted || formData.last_grade_level_completed],
+              ["Last School Year Attended", formData.lastSchoolYearAttended || formData.last_school_year_attended],
+              ["Reason for Returning", formData.returneeReason || formData.returnee_reason],
+            ]
+          : []),
         ["LRN", formData.lrn],
         ["First Name", formData.firstName],
         ["Last Name", formData.lastName],
@@ -988,6 +1014,13 @@ export function ApplicationReviewPage() {
                 <div className="grid grid-cols-1 gap-3 text-base text-slate-700 sm:grid-cols-2">
                   {renderSubmittedField("Admission Type", formData.admissionType)}
                   {renderSubmittedField("Previous Student ID", formData.previousStudentId || "N/A")}
+                  {isTransferee && renderSubmittedField("Previous School", formData.previousSchoolName || formData.previous_school_name)}
+                  {isTransferee && renderSubmittedField("Previous School Address", formData.previousSchoolAddress || formData.previous_school_address)}
+                  {isTransferee && renderSubmittedField("Previous Track / Strand", formData.previousTrack || formData.previous_track)}
+                  {(isTransferee || isReturnee) && renderSubmittedField("Last Grade Level Completed", formData.lastGradeLevelCompleted || formData.last_grade_level_completed)}
+                  {isTransferee && renderSubmittedField("Reason for Transfer", formData.transferReason || formData.transfer_reason, "sm:col-span-2")}
+                  {isReturnee && renderSubmittedField("Last School Year Attended", formData.lastSchoolYearAttended || formData.last_school_year_attended)}
+                  {isReturnee && renderSubmittedField("Reason for Returning", formData.returneeReason || formData.returnee_reason, "sm:col-span-2")}
                   {renderSubmittedField("LRN", formData.lrn)}
                   {renderSubmittedField("Name", fullName)}
                   {renderSubmittedField("Suffix", formData.suffix || "None")}

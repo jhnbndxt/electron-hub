@@ -102,6 +102,13 @@ interface FormData {
   // Page 1: Basic Information
   admissionType: string;
   previousStudentId: string;
+  previousSchoolName: string;
+  previousSchoolAddress: string;
+  previousTrack: string;
+  lastGradeLevelCompleted: string;
+  transferReason: string;
+  lastSchoolYearAttended: string;
+  returneeReason: string;
   lrn: string;
   isWorkingStudent: boolean;
   lastName: string;
@@ -207,6 +214,13 @@ export function EnrollmentForm() {
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
     previousStudentId: "",
+    previousSchoolName: "",
+    previousSchoolAddress: "",
+    previousTrack: "",
+    lastGradeLevelCompleted: "",
+    transferReason: "",
+    lastSchoolYearAttended: "",
+    returneeReason: "",
     lrn: "",
     isWorkingStudent: false,
     lastName: "",
@@ -355,6 +369,13 @@ export function EnrollmentForm() {
     return {
       admissionType: source.admissionType || source.admission_type || "",
       previousStudentId: source.previousStudentId || source.previous_student_id || "",
+      previousSchoolName: source.previousSchoolName || source.previous_school_name || "",
+      previousSchoolAddress: source.previousSchoolAddress || source.previous_school_address || "",
+      previousTrack: source.previousTrack || source.previous_track || "",
+      lastGradeLevelCompleted: source.lastGradeLevelCompleted || source.last_grade_level_completed || "",
+      transferReason: source.transferReason || source.transfer_reason || "",
+      lastSchoolYearAttended: source.lastSchoolYearAttended || source.last_school_year_attended || "",
+      returneeReason: source.returneeReason || source.returnee_reason || "",
       lrn: source.lrn || "",
       isWorkingStudent: source.isWorkingStudent ?? source.is_working_student ?? false,
       lastName: source.lastName || source.last_name || "",
@@ -883,6 +904,20 @@ export function EnrollmentForm() {
         newData.yearLevel = "Grade 11";
       }
 
+      if (field === "admissionType" && value !== "Transferee") {
+        newData.previousSchoolName = "";
+        newData.previousSchoolAddress = "";
+        newData.previousTrack = "";
+        newData.lastGradeLevelCompleted = "";
+        newData.transferReason = "";
+      }
+
+      if (field === "admissionType" && value !== "Returnee") {
+        newData.previousStudentId = "";
+        newData.lastSchoolYearAttended = "";
+        newData.returneeReason = "";
+      }
+
       if (field === "guardianSource") {
         const nextSource = value === prev.guardianSource ? "" : String(value);
         newData = {
@@ -947,8 +982,20 @@ export function EnrollmentForm() {
 
     if (page === 1) {
       if (!formData.admissionType) newErrors.admissionType = "This field is required";
+      if (formData.admissionType === "Transferee") {
+        if (!formData.previousSchoolName) newErrors.previousSchoolName = "This field is required for Transferees";
+        if (!formData.previousSchoolAddress) newErrors.previousSchoolAddress = "This field is required for Transferees";
+        if (!formData.previousTrack) newErrors.previousTrack = "This field is required for Transferees";
+        if (!formData.lastGradeLevelCompleted) newErrors.lastGradeLevelCompleted = "This field is required for Transferees";
+        if (!formData.transferReason) newErrors.transferReason = "This field is required for Transferees";
+      }
       if (formData.admissionType === "Returnee" && !formData.previousStudentId) {
         newErrors.previousStudentId = "This field is required for Returnees";
+      }
+      if (formData.admissionType === "Returnee") {
+        if (!formData.lastGradeLevelCompleted) newErrors.lastGradeLevelCompleted = "This field is required for Returnees";
+        if (!formData.lastSchoolYearAttended) newErrors.lastSchoolYearAttended = "This field is required for Returnees";
+        if (!formData.returneeReason) newErrors.returneeReason = "This field is required for Returnees";
       }
       if (!formData.lrn) newErrors.lrn = "This field is required";
       if (formData.lrn && formData.lrn.length > 12) newErrors.lrn = "LRN must not exceed 12 digits";
@@ -1040,6 +1087,12 @@ export function EnrollmentForm() {
 
     if (page === 6) {
       if (!formData.form138) newErrors.form138 = "This document is required";
+      if (formData.admissionType === "Transferee" && !formData.form137) {
+        newErrors.form137 = "Form 137 is required for Transferees";
+      }
+      if (formData.admissionType === "Transferee" && !formData.goodMoral) {
+        newErrors.goodMoral = "Good Moral Certificate is required for Transferees";
+      }
       if (!formData.birthCertificate) newErrors.birthCertificate = "This document is required";
       if (!formData.idPicture) newErrors.idPicture = "This document is required";
       if (!formData.diploma) newErrors.diploma = "This document is required";
@@ -1350,8 +1403,47 @@ export function EnrollmentForm() {
 
       {renderSelect("Admission Type", "admissionType", ["New Regular", "Transferee", "Returnee"])}
 
+      {formData.admissionType === "Transferee" && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+          <div className="mb-4 flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 text-amber-700" />
+            <div>
+              <h3 className="font-bold text-amber-900">Transferee Validation</h3>
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                Transferee applications require registrar validation of previous school records and subject crediting before final approval.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {renderInput("Previous School Name", "previousSchoolName", "text", true, "School last attended")}
+            {renderInput("Previous School Address", "previousSchoolAddress", "text", true, "City / province")}
+            {renderSelect("Previous Track / Strand", "previousTrack", ["Academic", "Technical-Professional", "TVL", "STEM", "ABM", "HUMSS", "GAS", "Other"])}
+            {renderSelect("Last Grade Level Completed", "lastGradeLevelCompleted", ["Grade 10", "Grade 11", "Grade 12"])}
+            <div className="md:col-span-2">
+              {renderInput("Reason for Transfer", "transferReason", "text", true, "Brief reason for transferring")}
+            </div>
+          </div>
+        </div>
+      )}
+
       {formData.admissionType === "Returnee" && (
-        renderInput("Previous Student ID Number", "previousStudentId", "text", true, "Enter previous ID")
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+          <div className="mb-4 flex items-start gap-3">
+            <Info className="mt-0.5 h-5 w-5 text-blue-700" />
+            <div>
+              <h3 className="font-bold text-blue-900">Returnee Record Check</h3>
+              <p className="mt-1 text-sm leading-6 text-blue-800">
+                Returnee applications will be checked against previous Electron records before approval.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {renderInput("Previous Student ID Number", "previousStudentId", "text", true, "Enter previous ID")}
+            {renderSelect("Last Grade Level Completed", "lastGradeLevelCompleted", ["Grade 10", "Grade 11", "Grade 12"])}
+            {renderInput("Last School Year Attended", "lastSchoolYearAttended", "text", true, "Example: 2025-2026")}
+            {renderInput("Reason for Returning", "returneeReason", "text", true, "Brief reason for returning")}
+          </div>
+        </div>
       )}
 
       {renderInput("LRN (Learner Reference Number)", "lrn", "text", true, "Max 12 digits")}
@@ -1725,6 +1817,20 @@ export function EnrollmentForm() {
       {formData.admissionType === "New Regular" && (
         renderInput("Grade 10 Adviser", "grade10Adviser", "text", true, "Full name of adviser")
       )}
+
+      {formData.admissionType === "Transferee" && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+          <p className="font-bold">Registrar note for transferees</p>
+          <p>Final year level, track, and credited subjects may be adjusted after the registrar reviews Form 137, Form 138, and previous school records.</p>
+        </div>
+      )}
+
+      {formData.admissionType === "Returnee" && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-900">
+          <p className="font-bold">Registrar note for returnees</p>
+          <p>Continuation will depend on previous Electron records, last completed grade level, and any pending requirements.</p>
+        </div>
+      )}
     </motion.div>
   );
 
@@ -1745,8 +1851,8 @@ export function EnrollmentForm() {
       <p className="text-gray-600">Please upload clear and readable copies of the following documents:</p>
 
       {renderFileUpload("Form 138 (Report Card)", "form138")}
-      {renderFileUpload("Form 137", "form137", false)}
-      {renderFileUpload("Certificate of Good Moral", "goodMoral", false)}
+      {renderFileUpload("Form 137", "form137", formData.admissionType === "Transferee")}
+      {renderFileUpload("Certificate of Good Moral", "goodMoral", formData.admissionType === "Transferee")}
       {renderFileUpload("PSA Authenticated Birth Certificate (2 copies)", "birthCertificate")}
       {renderFileUpload("2\"x2\" ID Picture (White Background, 2 copies)", "idPicture")}
       {renderFileUpload("Photocopy of Grade 10 Diploma", "diploma")}
@@ -1824,6 +1930,9 @@ export function EnrollmentForm() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-700">
               <div><span className="text-gray-500">Admission Type:</span> <span className="font-medium">{summaryData.admissionType}</span></div>
+              {summaryData.admissionType === "Returnee" && (
+                <div><span className="text-gray-500">Previous Student ID:</span> <span className="font-medium">{summaryData.previousStudentId}</span></div>
+              )}
               <div><span className="text-gray-500">LRN:</span> <span className="font-medium">{summaryData.lrn}</span></div>
               <div><span className="text-gray-500">Name:</span> <span className="font-medium">{nameDisplay}</span></div>
               <div><span className="text-gray-500">Sex:</span> <span className="font-medium">{summaryData.sex}</span></div>
@@ -1838,6 +1947,28 @@ export function EnrollmentForm() {
               <div><span className="text-gray-500">Facebook / Messenger Name:</span> <span className="font-medium">{summaryData.facebookName}</span></div>
               <div><span className="text-gray-500">Working Student:</span> <span className="font-medium">{summaryData.isWorkingStudent ? "Yes" : "No"}</span></div>
             </div>
+            {summaryData.admissionType === "Transferee" && (
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <h4 className="font-bold text-amber-900">Transferee Details</h4>
+                <div className="mt-3 grid grid-cols-1 gap-4 text-sm text-amber-900 sm:grid-cols-2">
+                  <div><span className="text-amber-700">Previous School:</span> <span className="font-medium">{summaryData.previousSchoolName}</span></div>
+                  <div><span className="text-amber-700">School Address:</span> <span className="font-medium">{summaryData.previousSchoolAddress}</span></div>
+                  <div><span className="text-amber-700">Previous Track:</span> <span className="font-medium">{summaryData.previousTrack}</span></div>
+                  <div><span className="text-amber-700">Last Grade Completed:</span> <span className="font-medium">{summaryData.lastGradeLevelCompleted}</span></div>
+                  <div className="sm:col-span-2"><span className="text-amber-700">Reason:</span> <span className="font-medium">{summaryData.transferReason}</span></div>
+                </div>
+              </div>
+            )}
+            {summaryData.admissionType === "Returnee" && (
+              <div className="mt-5 rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                <h4 className="font-bold text-blue-900">Returnee Details</h4>
+                <div className="mt-3 grid grid-cols-1 gap-4 text-sm text-blue-900 sm:grid-cols-2">
+                  <div><span className="text-blue-700">Last Grade Completed:</span> <span className="font-medium">{summaryData.lastGradeLevelCompleted}</span></div>
+                  <div><span className="text-blue-700">Last School Year:</span> <span className="font-medium">{summaryData.lastSchoolYearAttended}</span></div>
+                  <div className="sm:col-span-2"><span className="text-blue-700">Reason:</span> <span className="font-medium">{summaryData.returneeReason}</span></div>
+                </div>
+              </div>
+            )}
           </section>
 
           <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-sm">
