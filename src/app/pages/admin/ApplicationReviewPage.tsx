@@ -4,7 +4,9 @@ import {
   BookOpen,
   ChevronDown,
   CheckCircle,
+  Download,
   FileCheck,
+  FileQuestion,
   FileText,
   GraduationCap,
   MapPin,
@@ -102,6 +104,28 @@ const publicUrl = (filePath?: string | null, fileUrl?: string | null) => {
   if (filePath.startsWith("http://") || filePath.startsWith("https://")) return filePath;
   return supabase.storage.from("enrollment_documents").getPublicUrl(filePath).data?.publicUrl || null;
 };
+
+const getFileExtension = (fileNameOrUrl?: string | null) => {
+  const cleanValue = String(fileNameOrUrl || "").split("?")[0].split("#")[0];
+  const extension = cleanValue.split(".").pop();
+  return extension && extension !== cleanValue ? extension.toLowerCase() : "";
+};
+
+const getDocumentPreviewType = (fileName?: string | null, fileUrl?: string | null) => {
+  const extension = getFileExtension(fileName) || getFileExtension(fileUrl);
+
+  if (["jpg", "jpeg", "png", "gif", "webp", "bmp", "svg", "avif"].includes(extension)) return "image";
+  if (extension === "pdf") return "pdf";
+  if (["txt", "csv", "json", "xml", "html", "htm"].includes(extension)) return "text";
+  if (["doc", "docx", "ppt", "pptx", "xls", "xlsx"].includes(extension)) return "office";
+  if (["mp4", "webm", "ogg", "mov"].includes(extension)) return "video";
+  if (["mp3", "wav", "m4a", "aac", "oga"].includes(extension)) return "audio";
+
+  return "download";
+};
+
+const getOfficePreviewUrl = (fileUrl: string) =>
+  `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(fileUrl)}`;
 
 const normalizeStatus = (doc: any): DocumentStatus => {
   if (!doc) return "missing";
@@ -751,6 +775,104 @@ export function ApplicationReviewPage() {
     </section>
   );
 
+  const renderDocumentPreview = () => {
+    if (!selectedDocument?.fileUrl) {
+      return (
+        <div className="flex h-full min-h-[52vh] items-center justify-center text-center text-slate-400">
+          <div>
+            <FileText className="mx-auto h-12 w-12 text-slate-300" />
+            <p className="mt-2 text-sm font-black">No uploaded file</p>
+            <p className="mt-1 text-xs">Select another document or ask the student to upload this requirement.</p>
+          </div>
+        </div>
+      );
+    }
+
+    const fileUrl = selectedDocument.fileUrl;
+    const previewType = getDocumentPreviewType(selectedDocument.fileName, fileUrl);
+    const scaledStyle = { transform: `scale(${zoom / 100})`, transformOrigin: "center" };
+
+    if (previewType === "image") {
+      return (
+        <div className="flex h-full w-full items-center justify-center overflow-auto rounded-2xl bg-white/60">
+          <img
+            src={fileUrl}
+            alt={selectedDocument.label}
+            style={scaledStyle}
+            className="max-h-full max-w-full origin-center rounded bg-white object-contain transition-transform"
+          />
+        </div>
+      );
+    }
+
+    if (previewType === "pdf" || previewType === "text") {
+      return (
+        <div className="h-full w-full overflow-hidden rounded-2xl bg-white">
+          <object data={fileUrl} type={previewType === "pdf" ? "application/pdf" : "text/plain"} className="h-full w-full rounded bg-white">
+            <iframe src={fileUrl} title={selectedDocument.label} style={scaledStyle} className="h-full w-full rounded bg-white transition-transform" />
+          </object>
+        </div>
+      );
+    }
+
+    if (previewType === "office") {
+      return (
+        <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-white">
+          <iframe
+            src={getOfficePreviewUrl(fileUrl)}
+            title={selectedDocument.label}
+            className="min-h-0 flex-1 rounded bg-white"
+          />
+          <div className="border-t border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold text-slate-600">
+            If the Office preview stays blank, open or download the file using the buttons above.
+          </div>
+        </div>
+      );
+    }
+
+    if (previewType === "video") {
+      return (
+        <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-950 p-4">
+          <video src={fileUrl} controls className="max-h-full max-w-full rounded-xl" />
+        </div>
+      );
+    }
+
+    if (previewType === "audio") {
+      return (
+        <div className="flex h-full min-h-[52vh] items-center justify-center rounded-2xl bg-white text-center">
+          <div className="w-full max-w-lg px-6">
+            <FileText className="mx-auto h-12 w-12 text-blue-500" />
+            <p className="mt-3 text-sm font-black text-slate-900">{selectedDocument.fileName}</p>
+            <audio src={fileUrl} controls className="mt-5 w-full" />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex h-full min-h-[52vh] items-center justify-center rounded-2xl bg-white p-6 text-center">
+        <div className="max-w-md">
+          <FileQuestion className="mx-auto h-14 w-14 text-slate-300" />
+          <p className="mt-3 text-base font-black text-slate-900">Preview is not available for this file type</p>
+          <p className="mt-2 text-sm font-medium leading-6 text-slate-500">
+            The file is uploaded and can still be reviewed by opening it in a new tab or downloading the original copy.
+          </p>
+          <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm">
+              <Maximize2 className="h-4 w-4" />
+              Open File
+            </a>
+            <a href={fileUrl} download className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm">
+              <Download className="h-4 w-4" />
+              Download
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   if (isLoading) {
     return <LoadingState message="Loading application review..." subtext="Preparing document workspace." />;
   }
@@ -1128,43 +1250,20 @@ export function ApplicationReviewPage() {
                     <Plus className="h-4 w-4" />
                   </button>
                   {selectedDocument?.fileUrl && (
-                    <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Fullscreen">
+                    <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Open file">
                       <Maximize2 className="h-4 w-4" />
+                    </a>
+                  )}
+                  {selectedDocument?.fileUrl && (
+                    <a href={selectedDocument.fileUrl} download className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Download file">
+                      <Download className="h-4 w-4" />
                     </a>
                   )}
                 </div>
               </div>
 
               <div className="min-h-0 flex-1 overflow-hidden bg-white/60 p-3 backdrop-blur-xl">
-                {selectedDocument?.fileUrl ? (
-                  selectedDocument.fileUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                    <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-white/60">
-                      <img
-                        src={selectedDocument.fileUrl}
-                        alt={selectedDocument.label}
-                        style={{ transform: `scale(${zoom / 100})` }}
-                        className="max-h-full max-w-full origin-center rounded bg-white object-contain transition-transform"
-                      />
-                    </div>
-                  ) : (
-                    <div className="h-full w-full overflow-hidden rounded-2xl bg-white">
-                    <iframe
-                      src={selectedDocument.fileUrl}
-                      title={selectedDocument.label}
-                      style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center" }}
-                      className="h-full w-full rounded bg-white transition-transform"
-                    />
-                    </div>
-                  )
-                ) : (
-                  <div className="flex h-full min-h-[52vh] items-center justify-center text-center text-slate-400">
-                    <div>
-                      <FileText className="mx-auto h-12 w-12 text-slate-300" />
-                      <p className="mt-2 text-sm font-black">No uploaded file</p>
-                      <p className="mt-1 text-xs">Select another document or ask the student to upload this requirement.</p>
-                    </div>
-                  </div>
-                )}
+                {renderDocumentPreview()}
               </div>
             </section>
           </div>

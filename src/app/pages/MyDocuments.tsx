@@ -261,7 +261,7 @@ export function MyDocuments() {
                 <input
                   type="file"
                   className="hidden"
-                  accept="image/*,.pdf"
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
                   disabled={uploadingDoc !== null}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -476,7 +476,7 @@ export function MyDocuments() {
                             <input
                               type="file"
                               className="hidden"
-                              accept="image/*,.pdf"
+                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) handleFileUpload(doc.name, file);

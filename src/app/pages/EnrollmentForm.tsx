@@ -1301,7 +1301,7 @@ export function EnrollmentForm() {
       >
         <input
           type="file"
-          accept=".pdf,.jpg,.jpeg,.png"
+          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
           onChange={(e) => handleFileChange(field, e.target.files?.[0] || null)}
           disabled={isSubmittedEnrollment}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1312,7 +1312,7 @@ export function EnrollmentForm() {
             <p className="text-sm text-gray-700">
               {formData[field] ? (formData[field] as File).name : "Click to upload or drag and drop"}
             </p>
-            <p className="text-xs text-gray-500">PDF, JPG, or PNG</p>
+            <p className="text-xs text-gray-500">PDF, image, Office document, or text file</p>
           </div>
           {formData[field] && !isSubmittedEnrollment && (
             <button
