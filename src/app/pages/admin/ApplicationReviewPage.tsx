@@ -234,6 +234,7 @@ export function ApplicationReviewPage() {
   const [resolvedProfileImageUrl, setResolvedProfileImageUrl] = useState("");
   const [rejectionConfirmation, setRejectionConfirmation] = useState<{ name: string; reason: string } | null>(null);
   const [showApprovalValidation, setShowApprovalValidation] = useState(false);
+  const [showApprovalConfirm, setShowApprovalConfirm] = useState(false);
 
   const formData = useMemo(() => applyGuardianSelection(parseFormData(enrollment?.form_data)), [enrollment]);
   const isTransferee = isAdmissionType(formData, "Transferee");
@@ -637,6 +638,7 @@ export function ApplicationReviewPage() {
       return;
     }
 
+    setShowApprovalConfirm(false);
     setIsProcessing(true);
     try {
       const savedEnrollment = await saveVoucherDecision();
@@ -701,7 +703,7 @@ export function ApplicationReviewPage() {
         await triggerNotification(enrollment.user_id, "DOCUMENTS_VERIFIED");
         toast.success("Application approved. Student can proceed to payment.");
       }
-      void loadReview(false);
+      navigate(`${basePath}/pending`);
     } catch (error: any) {
       toast.error(error?.message || "Unable to approve application.");
     } finally {
@@ -1356,7 +1358,13 @@ export function ApplicationReviewPage() {
               Reject Application
             </button>
             <button
-              onClick={approveApplication}
+              onClick={() => {
+                if (!canApproveApplication) {
+                  setShowApprovalValidation(true);
+                  return;
+                }
+                setShowApprovalConfirm(true);
+              }}
               disabled={isProcessing}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200/80 bg-white/65 px-4 py-3 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:cursor-wait disabled:opacity-70"
             >
@@ -1441,6 +1449,55 @@ export function ApplicationReviewPage() {
               <div className="mt-4 flex justify-end gap-2">
                 <button onClick={() => setShowApplicationReject(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
                 <button onClick={rejectApplication} disabled={!applicationRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">Reject Application</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showApprovalConfirm && (
+        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-start justify-between gap-4 border-b border-blue-100 bg-blue-50 px-6 py-5">
+              <div className="flex items-start gap-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-950">Approve Application?</h2>
+                  <p className="mt-1 text-sm font-medium leading-6 text-blue-800">
+                    Confirm that {studentName} has complete approved documents and the voucher decision is final.
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setShowApprovalConfirm(false)} className="rounded-lg p-2 text-slate-500 transition hover:bg-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                <p><span className="font-bold text-slate-900">Student:</span> {studentName}</p>
+                <p><span className="font-bold text-slate-900">Type:</span> {formatAdmissionType(admissionType)}</p>
+                <p><span className="font-bold text-slate-900">Enrolling to:</span> {yearLevel}</p>
+                <p><span className="font-bold text-slate-900">Voucher:</span> {voucherEligibility === "eligible" ? "Eligible" : "Not eligible"}</p>
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                After approval, this page will return to the Pending Applications queue.
+              </p>
+              <div className="mt-5 flex justify-end gap-2">
+                <button
+                  onClick={() => setShowApprovalConfirm(false)}
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={approveApplication}
+                  disabled={isProcessing}
+                  className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-700/15 transition hover:bg-blue-800 disabled:cursor-wait disabled:bg-slate-300"
+                >
+                  Confirm Approval
+                </button>
               </div>
             </div>
           </div>
