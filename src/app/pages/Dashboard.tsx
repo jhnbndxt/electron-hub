@@ -44,6 +44,10 @@ type EnrollmentSnapshot = {
   submittedAt?: string;
   rejectionReason?: string;
   updatedAt?: string;
+  voucherStatus?: string;
+  isTuitionFree?: boolean;
+  tuitionBalanceDue?: number;
+  tuitionPaymentLocked?: boolean;
 };
 
 const requiredDocumentNames: Record<string, string> = {
@@ -51,6 +55,8 @@ const requiredDocumentNames: Record<string, string> = {
   birthCertificate: "PSA Birth Certificate",
   idPicture: "2x2 ID Picture",
 };
+
+const inactiveEnrollmentStatuses = new Set(["rejected", "dropped", "unenrolled", "removed"]);
 
 export function Dashboard() {
   const navigate = useNavigate();
@@ -98,6 +104,15 @@ export function Dashboard() {
 
       if (enrollment) {
         const formData = enrollment.form_data || {};
+        const voucherData = formData.voucher || {};
+        const voucherStatus = enrollment.voucher_status || formData.voucher_status || voucherData.voucher_status;
+        const isTuitionFree = Boolean(
+          enrollment.is_tuition_free ||
+          formData.is_tuition_free ||
+          voucherData.is_tuition_free ||
+          formData.tuition_payment_locked ||
+          voucherData.tuition_payment_locked
+        );
         setEnrollmentSnapshot({
           status: enrollment.status || "submitted",
           strand: formData.strand || formData.selectedStrand || formData.preferredStrand || formData.program,
@@ -106,6 +121,10 @@ export function Dashboard() {
           submittedAt: enrollment.enrollment_date || enrollment.created_at,
           rejectionReason: enrollment.rejection_reason || formData.rejectionReason,
           updatedAt: enrollment.updated_at,
+          voucherStatus,
+          isTuitionFree,
+          tuitionBalanceDue: Number(enrollment.tuition_balance_due ?? formData.tuition_balance_due ?? voucherData.tuition_balance_due ?? (isTuitionFree ? 0 : 15000)),
+          tuitionPaymentLocked: Boolean(enrollment.tuition_payment_locked || formData.tuition_payment_locked || voucherData.tuition_payment_locked),
         });
       } else {
         setEnrollmentSnapshot(null);
@@ -222,7 +241,13 @@ export function Dashboard() {
   const isFullyEnrolled = enrollmentSteps.find(step => step.name === "Enrolled")?.status === "completed";
 
   const currentStatusInfo = currentStep ? statusMessages[currentStep.name] : null;
-  const isApplicationRejected = enrollmentSnapshot?.status?.toLowerCase() === "rejected";
+  const enrollmentStatus = enrollmentSnapshot?.status?.toLowerCase() || "";
+  const isApplicationRejected = enrollmentStatus === "rejected";
+  const isApplicationInactive = enrollmentStatus ? inactiveEnrollmentStatuses.has(enrollmentStatus) : false;
+  const isVoucherCovered =
+    enrollmentSnapshot?.voucherStatus === "eligible" ||
+    enrollmentSnapshot?.isTuitionFree === true ||
+    enrollmentSnapshot?.tuitionPaymentLocked === true;
   const rejectionReason = enrollmentSnapshot?.rejectionReason || "Please contact the registrar for more details.";
   const profileReadiness = [
     { label: "Email address", value: userData?.email, icon: Mail },
@@ -288,7 +313,7 @@ export function Dashboard() {
     }
     
     // Task 4: Complete Payment (if documents approved but payment not done)
-    if (documentsVerified && !paymentCompleted && !hasVisitedPayment) {
+    if (documentsVerified && !paymentCompleted && !hasVisitedPayment && !isVoucherCovered) {
       tasks.push({
         title: "Complete Your Payment",
         description: "Review payment options and complete your enrollment fee to secure your slot",
@@ -367,7 +392,7 @@ export function Dashboard() {
               ) : (
                 <Sparkles className="h-4 w-4" />
               )}
-              {isApplicationRejected ? "Application needs attention" : isFullyEnrolled ? "Student access unlocked" : "Enrollment in motion"}
+              {isApplicationInactive ? "Enrollment status changed" : isFullyEnrolled ? "Student access unlocked" : "Enrollment in motion"}
             </div>
 
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-[-0.03em] text-slate-900 sm:text-5xl lg:text-[3.65rem]">
@@ -568,6 +593,28 @@ export function Dashboard() {
         </div>
       )}
 
+      {isVoucherCovered && (
+        <div className="mb-8 rounded-[1.75rem] border border-emerald-200 bg-emerald-50/90 p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-white">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">DepEd SHS Voucher Program</p>
+              <h3 className="mt-1 text-xl font-bold text-emerald-950">Voucher-covered tuition</h3>
+              <p className="mt-2 text-sm leading-6 text-emerald-900">
+                Congratulations! Your tuition fees are covered by the DepEd Senior High School Voucher Program. No payment is required, and your payment section is locked.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-emerald-800">
+                <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-emerald-200">Tuition balance: ₱0</span>
+                <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-emerald-200">Officially Enrolled</span>
+                <span className="rounded-full bg-white/80 px-3 py-1 ring-1 ring-emerald-200">Payment not required</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Enrollment Progress Tracker */}
       <div className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-md sm:p-8">
         <div className="flex items-center gap-3 mb-8">
@@ -666,16 +713,20 @@ export function Dashboard() {
         </div>
 
         {/* Current Status Card */}
-        {isApplicationRejected && (
+        {isApplicationInactive && (
           <div className="mb-6 rounded-lg border border-red-200 bg-red-50 p-6">
             <div className="flex items-start gap-4">
               <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-600">
                 <XCircle className="h-6 w-6 text-white" />
               </div>
               <div className="flex-1">
-                <h3 className="mb-2 text-lg font-bold text-red-700">Status: Application Rejected</h3>
+                <h3 className="mb-2 text-lg font-bold text-red-700">
+                  Status: {isApplicationRejected ? "Application Rejected" : "Unenrolled"}
+                </h3>
                 <p className="text-sm leading-relaxed text-gray-700">
-                  Your application was reviewed by the registrar and was not approved.
+                  {isApplicationRejected
+                    ? "Your application was reviewed by the registrar and was not approved."
+                    : "You have been unenrolled from the enrollment system. Please contact the registrar for more information."}
                 </p>
                 <div className="mt-4 rounded-lg border border-red-200 bg-white p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Registrar feedback</p>

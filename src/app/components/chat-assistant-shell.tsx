@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import chatbotLogo from "../../assets/chatbot-logo.png";
+import convoAiLogo from "../../assets/convo-ai-logo.png";
 import { findDirectFaq, retrieveChatbotKnowledge } from "../../data/chatbotKnowledge.js";
 
 export interface ChatAssistantShellProps {
@@ -773,7 +774,7 @@ export function ChatAssistantShell({
           type="button"
           onClick={() => openStateChange(!isOpen)}
           aria-label={isOpen ? "Close chat assistant" : "Open chat assistant"}
-          className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/25 text-white shadow-[0_24px_50px_-24px_rgba(15,23,42,0.7)]"
+          className="relative flex h-[4.75rem] w-[4.75rem] items-center justify-center rounded-full border border-white/30 text-white shadow-[0_28px_58px_-24px_rgba(15,23,42,0.72)] sm:h-20 sm:w-20"
           style={{
             background:
               "linear-gradient(135deg, var(--electron-blue) 0%, #2d5cc9 55%, var(--electron-red) 100%)",
@@ -788,16 +789,20 @@ export function ChatAssistantShell({
             transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
           />
           <span className="absolute inset-[6px] rounded-full bg-white/12 backdrop-blur" />
-          {isOpen ? (
-            <X className="relative h-6 w-6" />
-          ) : (
-            <>
-              <MessageCircle className="relative h-7 w-7" />
-              <span className="absolute right-3 top-3 flex h-4.5 w-4.5 items-center justify-center rounded-full bg-white/16 ring-1 ring-white/35">
-                <Sparkles className="h-2.5 w-2.5 text-amber-200" />
-              </span>
-            </>
-          )}
+          <span className="absolute inset-[0.6rem] rounded-full bg-white/12 shadow-inner shadow-white/20" />
+          <img
+            src={chatbotLogo}
+            alt=""
+            className="relative h-12 w-12 object-contain drop-shadow-[0_8px_14px_rgba(15,23,42,0.22)] sm:h-14 sm:w-14"
+            aria-hidden="true"
+          />
+          <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/40 sm:right-3 sm:top-3">
+            {isOpen ? (
+              <X className="h-3 w-3 text-white" />
+            ) : (
+              <Sparkles className="h-3 w-3 text-amber-200" />
+            )}
+          </span>
         </motion.button>
       </motion.div>
 
@@ -970,8 +975,13 @@ export function ChatAssistantShell({
                             className={`flex items-end gap-2 ${isBot ? "justify-start" : "justify-end"}`}
                           >
                             {isBot && (
-                              <div className="mb-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[var(--electron-blue)]">
-                                <Sparkles className="h-4 w-4" />
+                              <div className="mb-1 flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/80 bg-white/90 shadow-[0_12px_30px_-22px_rgba(15,23,42,0.6)] ring-1 ring-blue-100/70">
+                                <img
+                                  src={convoAiLogo}
+                                  alt=""
+                                  className="h-7 w-7 object-contain"
+                                  aria-hidden="true"
+                                />
                               </div>
                             )}
 

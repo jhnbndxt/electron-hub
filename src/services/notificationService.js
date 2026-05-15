@@ -79,6 +79,15 @@ const NOTIFICATION_MAP = {
     title: 'Enrollment Approved',
     message: 'Your enrollment has been approved. Welcome!',
   },
+  VOUCHER_ELIGIBLE: {
+    title: 'Voucher Eligibility Confirmed',
+    message:
+      'Congratulations! You are eligible for the DepEd Senior High School Voucher Program. Your tuition fees are covered.',
+  },
+  OFFICIALLY_ENROLLED: {
+    title: 'Officially Enrolled',
+    message: 'Congratulations! You are now officially enrolled.',
+  },
   ENROLLMENT_REJECTED: {
     title: 'Enrollment Rejected',
     message: 'Your enrollment was not approved. Please review the feedback.',
@@ -89,9 +98,10 @@ const NOTIFICATION_MAP = {
       additionalData.message || `Your enrollment status has been updated to ${additionalData.status || 'a new status'}.`,
   },
   ENROLLMENT_UNENROLLED: {
-    title: 'Enrollment Removed',
+    title: 'Unenrolled from Enrollment System',
     message: additionalData =>
-      `Your enrollment has been removed. Official reason: ${additionalData.reason || 'No reason provided'}. If you believe this was a mistake or want to appeal, please contact the office.`,
+      additionalData.message ||
+      `You have been unenrolled from the enrollment system. Please contact the registrar for more information.${additionalData.reason ? ` Official reason: ${additionalData.reason}` : ''}`,
   },
   DOCUMENTS_REJECTED: {
     title: 'Documents Rejected',

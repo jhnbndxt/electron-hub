@@ -234,12 +234,20 @@ export function StudentProfile() {
 
   const latestPayment = payments[0];
   const totalPaid = payments.reduce((total: number, payment: any) => total + Number(payment.amount || 0), 0);
+  const voucherData = formData.voucher || {};
+  const isVoucherCovered =
+    read("voucher_status") === "eligible" ||
+    voucherData.voucher_status === "eligible" ||
+    read("is_tuition_free") === true ||
+    voucherData.is_tuition_free === true ||
+    read("tuition_payment_locked") === true ||
+    voucherData.tuition_payment_locked === true;
 
   const overviewMetrics = [
     { label: "Status", value: normalizeStatus(enrollment.status), icon: BadgeCheck },
     { label: "Track", value: read("preferredTrack", "preferred_track", "recommendedTrack", "recommended_track", "track") || "Not Set", icon: BookOpen },
     { label: "Documents", value: `${documentStatusCounts.approved}/${documentStatusCounts.total || 0} Approved`, icon: FileText },
-    { label: "Payments", value: payments.length ? formatCurrency(totalPaid) : "No records", icon: CreditCard },
+    { label: "Payments", value: isVoucherCovered ? "Voucher Covered" : payments.length ? formatCurrency(totalPaid) : "No records", icon: CreditCard },
   ];
 
   const personalFields = [
@@ -441,9 +449,14 @@ export function StudentProfile() {
             </div>
           </RecordSection>
 
-          <RecordSection title="Payment Records" description={latestPayment ? `Latest status: ${normalizeStatus(latestPayment.status)}` : "No latest payment available."} icon={CreditCard}>
+          <RecordSection title="Payment Records" description={isVoucherCovered ? "Tuition is fully covered by the DepEd SHS Voucher Program." : latestPayment ? `Latest status: ${normalizeStatus(latestPayment.status)}` : "No latest payment available."} icon={CreditCard}>
             <div className="space-y-3">
-              {payments.length === 0 ? (
+              {isVoucherCovered ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800">
+                  <p className="font-bold text-emerald-950">Voucher-covered tuition</p>
+                  <p className="mt-1">No payment record is required. Tuition balance is ₱0 and payment workflow is skipped.</p>
+                </div>
+              ) : payments.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">
                   No payment records found.
                 </div>

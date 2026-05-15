@@ -736,7 +736,7 @@ export const unenrollStudent = async (enrollmentId, reason, removedBy = 'admin')
     const { data, error } = await supabase
       .from('enrollments')
       .update({
-        status: 'dropped',
+        status: 'unenrolled',
         updated_at: new Date().toISOString(),
         notes: `Unenrolled by ${removedBy}. Reason: ${trimmedReason}`,
         rejection_reason: trimmedReason,
@@ -765,11 +765,16 @@ export const unenrollStudent = async (enrollmentId, reason, removedBy = 'admin')
       }
     }
 
-    await notifyStudent(enrollmentRecord.user_id, 'ENROLLMENT_UNENROLLED', {
+    const notification = await notifyStudent(enrollmentRecord.user_id, 'ENROLLMENT_UNENROLLED', {
       reason: trimmedReason,
       enrollmentId,
-      status: 'dropped',
+      status: 'unenrolled',
+      message: 'You have been unenrolled from the enrollment system. Please contact the registrar for more information.',
     });
+
+    if (!notification) {
+      console.warn('Unenroll notification was not created for student:', enrollmentRecord.user_id);
+    }
 
     await createAuditLog(
       removedBy,

@@ -85,6 +85,7 @@ export function Payment() {
   const [copied, setCopied] = useState(false);
   const [paymentApproved, setPaymentApproved] = useState(false);
   const [approvedPaymentData, setApprovedPaymentData] = useState<any>(null);
+  const [voucherCoverage, setVoucherCoverage] = useState<any>(null);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
   const [methodMessage, setMethodMessage] = useState("");
 
@@ -132,6 +133,38 @@ export function Payment() {
       }
 
       try {
+        if (userData?.email) {
+          const { data: enrollment } = await supabase
+            .from("enrollments")
+            .select("id, status, form_data")
+            .eq("user_id", userData.email)
+            .neq("status", "rejected")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const formData = enrollment?.form_data || {};
+          const voucherData = formData.voucher || {};
+          const isCovered =
+            formData.voucher_status === "eligible" ||
+            voucherData.voucher_status === "eligible" ||
+            formData.is_tuition_free === true ||
+            voucherData.is_tuition_free === true ||
+            formData.tuition_payment_locked === true ||
+            voucherData.tuition_payment_locked === true;
+
+          if (isCovered) {
+            setVoucherCoverage({
+              enrollmentId: enrollment?.id,
+              status: enrollment?.status,
+              voucherType: voucherData.voucher_type || "DepEd SHS Voucher Program",
+              tuitionBalanceDue: 0,
+            });
+            setIsLoading(false);
+            return;
+          }
+        }
+
         const { data: payment } = await supabase
           .from("payments")
           .select("*")
@@ -183,17 +216,17 @@ export function Payment() {
 
   // Redirect if documents aren't verified
   useEffect(() => {
-    if (!isDocumentsVerified) {
+    if (!isDocumentsVerified && !voucherCoverage) {
       navigate("/dashboard", { replace: true });
     }
-  }, [isDocumentsVerified, navigate]);
+  }, [isDocumentsVerified, navigate, voucherCoverage]);
 
   // Mark payment as visited when component mounts
   useEffect(() => {
-    if (isDocumentsVerified) {
+    if (isDocumentsVerified && !voucherCoverage) {
       markPaymentVisited();
     }
-  }, [isDocumentsVerified, markPaymentVisited]);
+  }, [isDocumentsVerified, markPaymentVisited, voucherCoverage]);
 
   useEffect(() => {
     const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
@@ -219,6 +252,54 @@ export function Payment() {
   }, [paymentApproved]);
 
   // If payment is already approved, show success message immediately
+  if (voucherCoverage) {
+    return (
+      <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:h-[calc(100dvh-5rem)] lg:min-h-0 lg:overflow-hidden lg:p-8">
+        <div className="portal-glass-panel-strong w-full max-w-4xl rounded-2xl border p-6 text-center shadow-xl sm:p-10 lg:p-12" style={{ borderColor: "rgba(16, 185, 129, 0.42)" }}>
+          <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-emerald-600">
+            <CheckCircle2 className="h-16 w-16 text-white" />
+          </div>
+          <h1 className="mb-4 text-3xl font-bold text-emerald-600 sm:text-4xl">
+            Tuition Covered by Voucher
+          </h1>
+          <p className="mx-auto mb-8 max-w-2xl text-lg leading-7 text-gray-600 sm:text-xl">
+            Congratulations! You are eligible for the DepEd Senior High School Voucher Program. Your tuition balance is ₱0 and no payment is required.
+          </p>
+
+          <div className="portal-glass-panel mx-auto mb-8 max-w-lg rounded-xl p-6 text-left">
+            <h3 className="mb-4 text-center text-lg font-semibold text-gray-900">Voucher Coverage</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Program:</span>
+                <span className="font-semibold text-gray-900">{voucherCoverage.voucherType}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Tuition Balance:</span>
+                <span className="text-lg font-bold text-emerald-600">₱0</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Payment Status:</span>
+                <span className="font-semibold text-emerald-700">Not required</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Enrollment Status:</span>
+                <span className="font-semibold text-emerald-700">Officially Enrolled</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="w-full rounded-lg px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:opacity-90 sm:w-auto sm:px-12 sm:text-lg"
+            style={{ backgroundColor: "var(--electron-blue)" }}
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (paymentApproved && approvedPaymentData) {
     return (
       <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:h-[calc(100dvh-5rem)] lg:min-h-0 lg:overflow-hidden lg:p-8">
@@ -352,6 +433,7 @@ export function Payment() {
   };
 
   const handleSubmitPayment = async () => {
+    if (voucherCoverage) return;
     if (!userData?.id || !userData?.email || !uploadedFile || !referenceNumber) return;
     if (selectedMode === "bank" && !paymentSettings.payment_bank_enabled) {
       setMethodMessage("Bank transfer is temporarily unavailable while our cashier team performs payment channel maintenance.");
@@ -434,6 +516,7 @@ export function Payment() {
   };
 
   const handleGenerateQueue = async () => {
+    if (voucherCoverage) return;
     if (!userData?.id || !userData?.email) return;
     if (!paymentSettings.payment_cash_enabled) {
       setMethodMessage("Over-the-counter payment is temporarily unavailable until further notice. Please choose another active payment method.");

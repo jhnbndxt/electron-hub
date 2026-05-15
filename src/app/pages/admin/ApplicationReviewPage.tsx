@@ -492,8 +492,11 @@ export function ApplicationReviewPage() {
     const nextFormData = {
       ...formData,
       voucher: voucherPayload,
+      voucher_status: voucherEligibility,
+      is_tuition_free: eligible,
       tuition_balance_due: eligible ? 0 : formData.tuition_balance_due,
       tuition_payment_locked: eligible,
+      payment_required: !eligible,
     };
 
     let result = await supabase
@@ -525,21 +528,68 @@ export function ApplicationReviewPage() {
 
     setIsProcessing(true);
     try {
-      await saveVoucherDecision();
-      const { error } = await approveEnrollment(enrollment.id, actorReference);
-      if (error) throw new Error(error);
+      const savedEnrollment = await saveVoucherDecision();
+      const isVoucherEligible = voucherEligibility === "eligible";
+
+      if (isVoucherEligible) {
+        const { error } = await supabase
+          .from("enrollments")
+          .update({
+            status: "enrolled",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", enrollment.id);
+        if (error) throw new Error(error);
+
+        await createAuditLog(
+          actorReference,
+          "STUDENT_ENROLLED_VOUCHER",
+          `Student enrolled via DepEd SHS Voucher coverage: ${enrollment.user_id} (Enrollment: ${enrollment.id})`,
+          "success"
+        );
+      } else {
+        const { error } = await approveEnrollment(enrollment.id, actorReference);
+        if (error) throw new Error(error);
+      }
 
       const studentUserId = await resolveUserId(enrollment.user_id);
       if (studentUserId) {
-        await upsertEnrollmentProgress(studentUserId, [
-          { step_name: "Documents Submitted", status: "completed" },
-          { step_name: "Documents Verified", status: "completed" },
-          { step_name: "Payment Submitted", status: "current" },
-        ]);
+        if (isVoucherEligible) {
+          await upsertEnrollmentProgress(studentUserId, [
+            { step_name: "Documents Submitted", status: "completed" },
+            { step_name: "Documents Verified", status: "completed" },
+            { step_name: "Payment Submitted", status: "completed" },
+            { step_name: "Payment Verified", status: "completed" },
+            { step_name: "Enrolled", status: "completed" },
+          ]);
+        } else {
+          await upsertEnrollmentProgress(studentUserId, [
+            { step_name: "Documents Submitted", status: "completed" },
+            { step_name: "Documents Verified", status: "completed" },
+            { step_name: "Payment Submitted", status: "current" },
+          ]);
+        }
       }
 
-      await triggerNotification(enrollment.user_id, "DOCUMENTS_VERIFIED");
-      toast.success("Application approved. Student can proceed to payment.");
+      if (isVoucherEligible) {
+        await triggerNotification(enrollment.user_id, "VOUCHER_ELIGIBLE", {
+          enrollmentId: enrollment.id,
+          tuitionBalanceDue: 0,
+        });
+        await triggerNotification(enrollment.user_id, "OFFICIALLY_ENROLLED", {
+          enrollmentId: enrollment.id,
+          status: "enrolled",
+        });
+        setEnrollment((current: any) => ({
+          ...current,
+          ...(savedEnrollment || {}),
+          status: "enrolled",
+        }));
+        toast.success("Application approved. Voucher covers tuition and the student is officially enrolled.");
+      } else {
+        await triggerNotification(enrollment.user_id, "DOCUMENTS_VERIFIED");
+        toast.success("Application approved. Student can proceed to payment.");
+      }
       void loadReview(false);
     } catch (error: any) {
       toast.error(error?.message || "Unable to approve application.");

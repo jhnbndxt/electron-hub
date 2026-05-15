@@ -48,6 +48,25 @@ export function PaymentHistory() {
         return;
       }
 
+      const { data: enrollment } = await supabase
+        .from("enrollments")
+        .select("status, form_data, updated_at")
+        .eq("user_id", userData.email)
+        .neq("status", "rejected")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const formData = enrollment?.form_data || {};
+      const voucherData = formData.voucher || {};
+      const isVoucherCovered =
+        formData.voucher_status === "eligible" ||
+        voucherData.voucher_status === "eligible" ||
+        formData.is_tuition_free === true ||
+        voucherData.is_tuition_free === true ||
+        formData.tuition_payment_locked === true ||
+        voucherData.tuition_payment_locked === true;
+
       const allPayments: PaymentRecord[] = (paymentRecords || []).map((p: any) => {
         let status = "pending";
         if (p.status === "verified" || p.status === "approved" || p.status === "completed" || p.status === "paid") {
@@ -74,6 +93,19 @@ export function PaymentHistory() {
         };
       });
 
+      if (isVoucherCovered && allPayments.length === 0) {
+        allPayments.push({
+          id: "voucher-covered",
+          description: "DepEd SHS Voucher Tuition Coverage",
+          amount: "₱0",
+          rawAmount: 0,
+          date: enrollment?.updated_at ? new Date(enrollment.updated_at).toLocaleDateString() : new Date().toLocaleDateString(),
+          status: "completed",
+          paymentMethod: "Voucher",
+          referenceNo: "DepEd SHS Voucher Program",
+        });
+      }
+
       setPayments(allPayments);
 
       // Calculate summary
@@ -85,7 +117,8 @@ export function PaymentHistory() {
         .filter((p: any) => p.status === "pending")
         .reduce((sum: number, p: any) => sum + (p.rawAmount || 15000), 0);
 
-      const balanceDue = allPayments.length === 0 ? 15000 :
+      const balanceDue = isVoucherCovered ? 0 :
+                         allPayments.length === 0 ? 15000 :
                          totalPaid >= 15000 ? 0 :
                          15000 - totalPaid;
 

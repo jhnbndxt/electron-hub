@@ -71,6 +71,7 @@ function DashboardLayoutContent() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [systemSettings, setSystemSettings] = useState<any>(null);
+  const [isVoucherPaymentLocked, setIsVoucherPaymentLocked] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [maintenanceCountdown, setMaintenanceCountdown] = useState(5);
   const [showMaintenanceNotice, setShowMaintenanceNotice] = useState(false);
@@ -110,6 +111,44 @@ function DashboardLayoutContent() {
         step.name === "Enrolled") &&
       step.status !== "pending"
   );
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadVoucherLock() {
+      if (!userData?.email) {
+        if (active) setIsVoucherPaymentLocked(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("enrollments")
+        .select("status, form_data")
+        .eq("user_id", userData.email)
+        .neq("status", "rejected")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const formData = data?.form_data || {};
+      const voucherData = formData.voucher || {};
+      const isLocked =
+        formData.voucher_status === "eligible" ||
+        voucherData.voucher_status === "eligible" ||
+        formData.is_tuition_free === true ||
+        voucherData.is_tuition_free === true ||
+        formData.tuition_payment_locked === true ||
+        voucherData.tuition_payment_locked === true;
+
+      if (active) setIsVoucherPaymentLocked(isLocked);
+    }
+
+    void loadVoucherLock();
+
+    return () => {
+      active = false;
+    };
+  }, [userData?.email, enrollmentProgress]);
 
   const isMaintenanceModeActive = systemSettings?.maintenance_mode === true;
   const isStudentUser = userRole === "student" || userData?.role === "student";
@@ -179,6 +218,7 @@ function DashboardLayoutContent() {
 
       case 'PAYMENT_REJECTED':
       case 'ENROLLMENT_REJECTED':
+      case 'ENROLLMENT_UNENROLLED':
         return 'error';
 
       default:
@@ -229,6 +269,7 @@ function DashboardLayoutContent() {
       case "DOCUMENTS_REJECTED":
       case "PAYMENT_REJECTED":
       case "ENROLLMENT_REJECTED":
+      case "ENROLLMENT_UNENROLLED":
         return XCircle;
       case "PAYMENT_SUBMITTED":
       case "ENROLLMENT_SUBMITTED":
@@ -376,8 +417,10 @@ function DashboardLayoutContent() {
     setShowNotifications(false);
 
     // Redirect based on notification type
-    if (notification.type === "DOCUMENTS_VERIFIED") {
+    if (notification.type === "DOCUMENTS_VERIFIED" && !isVoucherPaymentLocked) {
       navigate("/dashboard/payment");
+    } else if (notification.type === "VOUCHER_ELIGIBLE" || notification.type === "OFFICIALLY_ENROLLED") {
+      navigate("/dashboard");
     } else if (notification.type === "DOCUMENTS_REJECTED") {
       navigate("/dashboard/my-documents");
     } else if (notification.type === "PAYMENT_VERIFIED") {
@@ -503,7 +546,7 @@ function DashboardLayoutContent() {
               const Icon = link.icon;
               const isActive = location.pathname === link.path;
               const isPayment = link.path === "/dashboard/payment";
-              const isLocked = isPayment && !isDocumentsVerified;
+              const isLocked = isPayment && (!isDocumentsVerified || isVoucherPaymentLocked);
               
               // If it's the payment link and documents aren't verified, show locked state
               if (isLocked) {
@@ -528,7 +571,9 @@ function DashboardLayoutContent() {
                       <div className="mt-2 rounded-lg bg-gray-900 px-3 py-2 text-xs shadow-lg lg:absolute lg:left-full lg:top-1/2 lg:z-50 lg:mt-0 lg:ml-2 lg:w-64 lg:-translate-y-1/2">
                         <div className="bg-gray-900 text-white text-xs rounded-lg px-3 py-2 shadow-lg">
                           <p className="leading-relaxed">
-                            Access restricted. Please wait for the Registrar to verify your documents first.
+                            {isVoucherPaymentLocked
+                              ? "Payment is not required. Your tuition is covered by the DepEd SHS Voucher Program."
+                              : "Access restricted. Please wait for the Registrar to verify your documents first."}
                           </p>
                           {/* Arrow pointing left */}
                           <div
@@ -547,7 +592,7 @@ function DashboardLayoutContent() {
               }
               
               // If payment is unlocked, show with red badge
-              if (isPayment && isDocumentsVerified) {
+              if (isPayment && isDocumentsVerified && !isVoucherPaymentLocked) {
                 return (
                   <li key={link.path} className="relative">
                     <Link
@@ -961,7 +1006,7 @@ function DashboardLayoutContent() {
                       <button
                         onClick={() => {
                           setShowProfileMenu(false);
-                          setShowLogoutModal(true);
+                          handleLogout();
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors text-left"
                       >

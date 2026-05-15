@@ -50,6 +50,7 @@ const initialEnrollmentSteps: EnrollmentStep[] = [
 
 const PENDING_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
 const COMPLETED_PAYMENT_STATUSES = new Set(["verified", "approved", "completed", "paid"]);
+const INACTIVE_ENROLLMENT_STATUSES = new Set(["rejected", "dropped", "unenrolled", "removed"]);
 
 function getPaymentVisitedStorageKey(userEmail?: string | null) {
   return userEmail ? `payment_page_visited_${userEmail}` : null;
@@ -116,15 +117,21 @@ function areProgressStatesEqual(left: EnrollmentStep[], right: EnrollmentStep[])
 function deriveEnrollmentProgressState({
   hasAssessment,
   enrollmentStatus,
+  isVoucherCovered,
   paymentStatus,
   paymentMethod,
 }: {
   hasAssessment: boolean;
   enrollmentStatus?: string | null;
+  isVoucherCovered?: boolean;
   paymentStatus?: string | null;
   paymentMethod?: string | null;
 }) {
-  if (enrollmentStatus === "enrolled" || (paymentStatus && COMPLETED_PAYMENT_STATUSES.has(paymentStatus))) {
+  if (enrollmentStatus && INACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus)) {
+    return cloneInitialEnrollmentSteps();
+  }
+
+  if (isVoucherCovered || enrollmentStatus === "enrolled" || (paymentStatus && COMPLETED_PAYMENT_STATUSES.has(paymentStatus))) {
     return buildProgressState("Enrolled", "completed");
   }
 
@@ -218,7 +225,7 @@ async function buildRemoteEnrollmentProgress(studentId: string, userEmail: strin
       .maybeSingle(),
     supabase
       .from("enrollments")
-      .select("id, status")
+      .select("id, status, form_data")
       .eq("user_id", userEmail)
       .order("created_at", { ascending: false })
       .limit(1)
@@ -237,12 +244,20 @@ async function buildRemoteEnrollmentProgress(studentId: string, userEmail: strin
   }
 
   let enrollmentStatus = enrollmentResponse.data?.status?.toLowerCase() || null;
+  const enrollmentFormData = enrollmentResponse.data?.form_data || {};
+  const voucherData = enrollmentFormData.voucher || {};
+  const isVoucherCovered =
+    enrollmentFormData.voucher_status === "eligible" ||
+    voucherData.voucher_status === "eligible" ||
+    enrollmentFormData.is_tuition_free === true ||
+    voucherData.is_tuition_free === true ||
+    enrollmentFormData.tuition_payment_locked === true ||
+    voucherData.tuition_payment_locked === true;
   const paymentStatus = paymentResponse.data?.status?.toLowerCase() || null;
   const paymentMethod = paymentResponse.data?.payment_method?.toLowerCase() || null;
 
   if (
-    paymentStatus &&
-    COMPLETED_PAYMENT_STATUSES.has(paymentStatus) &&
+    (isVoucherCovered || (paymentStatus && COMPLETED_PAYMENT_STATUSES.has(paymentStatus))) &&
     enrollmentStatus !== "enrolled" &&
     enrollmentResponse.data?.id
   ) {
@@ -264,6 +279,7 @@ async function buildRemoteEnrollmentProgress(studentId: string, userEmail: strin
   const canonicalProgress = deriveEnrollmentProgressState({
     hasAssessment: Boolean(assessmentResponse.data),
     enrollmentStatus,
+    isVoucherCovered,
     paymentStatus,
     paymentMethod,
   });
@@ -448,14 +464,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = () => {
+    const currentEmail = userData?.email;
     setUserRole(null);
     setUserData(null);
     setIsAdminAuthenticated(false);
     setEnrollmentProgress(cloneInitialEnrollmentSteps());
     setIsDocumentsVerified(false);
     setHasVisitedPayment(false);
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userData');
+
+    const keysToRemove = ["userRole", "userData", "lastVisitedRoute", "currentUser"];
+    if (currentEmail) {
+      keysToRemove.push(`enrollment_progress_${currentEmail}`);
+      const paymentVisitedStorageKey = getPaymentVisitedStorageKey(currentEmail);
+      if (paymentVisitedStorageKey) {
+        keysToRemove.push(paymentVisitedStorageKey);
+      }
+    }
+
+    keysToRemove.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+
+    void supabase.auth.signOut().catch((error) => {
+      console.error("[AuthContext] Error signing out Supabase session:", error);
+    });
   };
 
   const updateUserData = (nextUserData: Partial<UserData>) => {
