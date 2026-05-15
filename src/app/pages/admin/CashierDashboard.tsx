@@ -6,7 +6,6 @@ import {
   XCircle,
   DollarSign,
   Clock,
-  User,
   Phone,
   Hash,
   Calendar,
@@ -28,6 +27,7 @@ import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
+import { loadProfileImageUrl } from "../../utils/profileImage";
 
 const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
 
@@ -59,6 +59,7 @@ function formatCashQueueTime(timeValue?: string | null) {
 
 interface OnlinePayment {
   id: string;
+  studentId: string;
   studentEmail: string;
   studentName: string;
   profilePictureUrl?: string;
@@ -79,6 +80,7 @@ interface OnlinePayment {
 
 interface CashPayment {
   id: string;
+  studentId: string;
   queueNumber: string;
   studentEmail: string;
   studentName: string;
@@ -101,6 +103,41 @@ const getPaymentSubmissionTime = (payment: any) => {
 };
 
 const OPEN_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
+
+const normalizeText = (value?: string | null) => String(value || "").trim();
+
+const buildFullName = (...parts: Array<string | null | undefined>) =>
+  parts
+    .map(normalizeText)
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const resolveEnrollmentName = (formData: any) =>
+  normalizeText(formData?.studentName) ||
+  normalizeText(formData?.fullName) ||
+  normalizeText(formData?.full_name) ||
+  buildFullName(formData?.firstName, formData?.middleName, formData?.lastName) ||
+  buildFullName(formData?.first_name, formData?.middle_name, formData?.last_name);
+
+const resolveProfilePictureUrl = (userProfile: any, formData: any) =>
+  normalizeText(userProfile?.profilePictureUrl) ||
+  normalizeText(formData?.profilePictureUrl) ||
+  normalizeText(formData?.profile_picture_url) ||
+  normalizeText(formData?.profileImageUrl) ||
+  normalizeText(formData?.profile_image_url);
+
+const getStudentInitials = (name: string, email = "") => {
+  const source = normalizeText(name) && name !== "Unknown Student" ? name : email;
+  return source
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "ST";
+};
 
 export function CashierDashboard() {
   const { userData } = useAuth();
@@ -151,16 +188,42 @@ export function CashierDashboard() {
       return;
     }
 
-    // Fetch user details for student names
-    const studentIds = [...new Set(allPayments.map((p: any) => p.student_id))];
-    const { data: users } = await supabase
+    // Fetch user details for student names and profile photos.
+    const studentIds = [...new Set(allPayments.map((p: any) => p.student_id).filter(Boolean))];
+    const { data: users, error: usersError } = studentIds.length
+      ? await supabase
       .from("users")
-      .select("id, full_name, email, profile_picture_url")
-      .in("id", studentIds);
+          .select("id, full_name, first_name, middle_name, last_name, email, profile_picture_url")
+          .in("id", studentIds)
+      : { data: [] as any[], error: null };
+
+    if (usersError) {
+      console.error("Error loading cashier queue student profiles:", usersError);
+    }
+
+    const userProfiles = await Promise.all(
+      (users || []).map(async (u: any) => {
+        const name = normalizeText(u.full_name) || buildFullName(u.first_name, u.middle_name, u.last_name);
+        const profilePictureUrl =
+          normalizeText(u.profile_picture_url) ||
+          (await loadProfileImageUrl(u.id, u.email));
+
+        return {
+          id: u.id,
+          name,
+          email: normalizeText(u.email),
+          profilePictureUrl,
+        };
+      })
+    );
 
     const userMap: Record<string, { name: string; email: string; profilePictureUrl?: string }> = {};
-    users?.forEach((u: any) => {
-      userMap[u.id] = { name: u.full_name, email: u.email, profilePictureUrl: u.profile_picture_url };
+    userProfiles.forEach((user) => {
+      userMap[user.id] = {
+        name: user.name,
+        email: user.email,
+        profilePictureUrl: user.profilePictureUrl,
+      };
     });
 
     const enrollmentIds = [...new Set(allPayments.map((p: any) => p.enrollment_id).filter(Boolean))];
@@ -197,6 +260,24 @@ export function CashierDashboard() {
       enrollmentMap[payment.enrollment_id] ||
       enrollmentByEmailMap[userMap[payment.student_id]?.email] ||
       {};
+    const getStudentProfile = (payment: any) => {
+      const formData = getEnrollmentData(payment);
+      const userProfile = userMap[payment.student_id] || {};
+      const email = normalizeText(userProfile.email) || normalizeText(formData.email) || normalizeText(payment.student_id);
+      const name =
+        normalizeText(userProfile.name) ||
+        resolveEnrollmentName(formData) ||
+        (email.includes("@") ? email.split("@")[0].replace(/[._-]+/g, " ") : "") ||
+        "Unknown Student";
+
+      return {
+        id: normalizeText(payment.student_id),
+        email,
+        name,
+        profilePictureUrl: resolveProfilePictureUrl(userProfile, formData),
+        enrollmentData: formData,
+      };
+    };
     const getAcademicTrack = (formData: any) =>
       formData.preferredTrack ||
       formData.preferred_track ||
@@ -217,13 +298,16 @@ export function CashierDashboard() {
               .filter(Boolean)
           : [];
 
+        const studentProfile = getStudentProfile(p);
+
         return {
           id: p.id,
-          studentEmail: userMap[p.student_id]?.email || p.student_id,
-          studentName: userMap[p.student_id]?.name || 'Unknown Student',
-          profilePictureUrl: userMap[p.student_id]?.profilePictureUrl,
-          academicTrack: getAcademicTrack(getEnrollmentData(p)),
-          yearLevel: getEnrollmentData(p).yearLevel || getEnrollmentData(p).year_level || "Not set",
+          studentId: studentProfile.id,
+          studentEmail: studentProfile.email,
+          studentName: studentProfile.name,
+          profilePictureUrl: studentProfile.profilePictureUrl,
+          academicTrack: getAcademicTrack(studentProfile.enrollmentData),
+          yearLevel: studentProfile.enrollmentData.yearLevel || studentProfile.enrollmentData.year_level || "Not set",
           paymentMode: p.payment_method as "bank" | "gcash",
           referenceNumber: p.reference_number || '',
           receiptFiles,
@@ -234,7 +318,7 @@ export function CashierDashboard() {
             ? new Date(p.submitted_at).toLocaleString()
             : new Date(p.created_at).toLocaleString(),
           submittedAt: p.submitted_at || p.created_at || "",
-          enrollmentData: getEnrollmentData(p),
+          enrollmentData: studentProfile.enrollmentData,
           notes: p.notes || '',
         };
       });
@@ -242,26 +326,31 @@ export function CashierDashboard() {
     const cashPending = allPayments
       .filter((p: any) => p.payment_method === 'cash' && OPEN_PAYMENT_STATUSES.has(String(p.status || "").toLowerCase()))
       .sort((a: any, b: any) => getPaymentSubmissionTime(a) - getPaymentSubmissionTime(b))
-      .map((p: any) => ({
-        id: p.id,
-        queueNumber: p.queue_number || '',
-        studentEmail: userMap[p.student_id]?.email || p.student_id,
-        studentName: userMap[p.student_id]?.name || 'Unknown Student',
-        profilePictureUrl: userMap[p.student_id]?.profilePictureUrl,
-        academicTrack: getAcademicTrack(getEnrollmentData(p)),
-        yearLevel: getEnrollmentData(p).yearLevel || getEnrollmentData(p).year_level || "Not set",
-        amount: Number(p.amount) || 0,
-        schedule: {
-          date: p.queue_schedule_date
-            ? new Date(p.queue_schedule_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-            : '',
-          time: formatCashQueueTime(p.queue_schedule_time),
-        },
-        status: 'pending' as const,
-        generatedDate: new Date(p.created_at).toLocaleDateString(),
-        submittedAt: p.submitted_at || p.created_at || "",
-        enrollmentData: getEnrollmentData(p),
-      }));
+      .map((p: any) => {
+        const studentProfile = getStudentProfile(p);
+
+        return {
+          id: p.id,
+          studentId: studentProfile.id,
+          queueNumber: p.queue_number || '',
+          studentEmail: studentProfile.email,
+          studentName: studentProfile.name,
+          profilePictureUrl: studentProfile.profilePictureUrl,
+          academicTrack: getAcademicTrack(studentProfile.enrollmentData),
+          yearLevel: studentProfile.enrollmentData.yearLevel || studentProfile.enrollmentData.year_level || "Not set",
+          amount: Number(p.amount) || 0,
+          schedule: {
+            date: p.queue_schedule_date
+              ? new Date(p.queue_schedule_date).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+              : '',
+            time: formatCashQueueTime(p.queue_schedule_time),
+          },
+          status: 'pending' as const,
+          generatedDate: new Date(p.created_at).toLocaleDateString(),
+          submittedAt: p.submitted_at || p.created_at || "",
+          enrollmentData: studentProfile.enrollmentData,
+        };
+      });
 
     setOnlinePayments(onlinePending);
     setCashPayments(cashPending);
@@ -556,8 +645,12 @@ export function CashierDashboard() {
                   <tr key={payment.id} className="hover:bg-gray-50">
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                          <User className="w-5 h-5 text-blue-600" />
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0 overflow-hidden text-sm font-bold text-blue-700">
+                          {payment.profilePictureUrl ? (
+                            <img src={payment.profilePictureUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            getStudentInitials(payment.studentName, payment.studentEmail)
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-gray-900 truncate">{payment.studentName}</div>
@@ -663,8 +756,12 @@ export function CashierDashboard() {
                     </td>
                     <td className="px-4 sm:px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                          <User className="w-5 h-5 text-green-600" />
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 overflow-hidden text-sm font-bold text-green-700">
+                          {payment.profilePictureUrl ? (
+                            <img src={payment.profilePictureUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            getStudentInitials(payment.studentName, payment.studentEmail)
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-gray-900 truncate">{payment.studentName}</div>
@@ -830,12 +927,7 @@ export function CashierDashboard() {
                         {selectedPayment.profilePictureUrl ? (
                           <img src={selectedPayment.profilePictureUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          selectedPayment.studentName
-                            .split(" ")
-                            .map((part) => part[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()
+                          getStudentInitials(selectedPayment.studentName, selectedPayment.studentEmail)
                         )}
                       </div>
                       <div className="min-w-0">
@@ -846,7 +938,7 @@ export function CashierDashboard() {
                     <div className="space-y-3">
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-slate-700">Student ID</span>
-                        <span className="text-sm font-medium text-slate-900">{selectedPayment.id}</span>
+                        <span className="text-sm font-medium text-slate-900">{selectedPayment.studentId || "Not provided"}</span>
                       </div>
                       <div className="flex justify-between items-center">
                         <span className="text-sm text-slate-700">Academic Track</span>
@@ -1039,7 +1131,7 @@ export function CashierDashboard() {
                         {selectedCashPayment.profilePictureUrl ? (
                           <img src={selectedCashPayment.profilePictureUrl} alt="" className="h-full w-full object-cover" />
                         ) : (
-                          selectedCashPayment.studentName.split(" ").map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+                          getStudentInitials(selectedCashPayment.studentName, selectedCashPayment.studentEmail)
                         )}
                       </div>
                       <div className="min-w-0">
