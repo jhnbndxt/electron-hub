@@ -100,6 +100,8 @@ const getPaymentSubmissionTime = (payment: any) => {
   return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
 };
 
+const OPEN_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
+
 export function CashierDashboard() {
   const { userData } = useAuth();
   const [activeTab, setActiveTab] = useState<"online" | "cash">("online");
@@ -205,7 +207,7 @@ export function CashierDashboard() {
 
     // Separate online vs cash payments
     const onlinePending = allPayments
-      .filter((p: any) => (p.payment_method === 'bank' || p.payment_method === 'gcash') && p.status === 'pending')
+      .filter((p: any) => (p.payment_method === 'bank' || p.payment_method === 'gcash') && OPEN_PAYMENT_STATUSES.has(String(p.status || "").toLowerCase()))
       .sort((a: any, b: any) => getPaymentSubmissionTime(a) - getPaymentSubmissionTime(b))
       .map((p: any) => {
         const receiptFiles = p.receipt_file_url
@@ -238,7 +240,7 @@ export function CashierDashboard() {
       });
 
     const cashPending = allPayments
-      .filter((p: any) => p.payment_method === 'cash' && p.status === 'pending')
+      .filter((p: any) => p.payment_method === 'cash' && OPEN_PAYMENT_STATUSES.has(String(p.status || "").toLowerCase()))
       .sort((a: any, b: any) => getPaymentSubmissionTime(a) - getPaymentSubmissionTime(b))
       .map((p: any) => ({
         id: p.id,

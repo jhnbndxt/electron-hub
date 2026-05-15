@@ -116,7 +116,8 @@ CREATE TABLE enrollments (
   
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  notes TEXT
+  notes TEXT,
+  rejection_comment TEXT
 );
 
 CREATE INDEX idx_enrollments_student_id ON enrollments(student_id);
@@ -166,8 +167,12 @@ CREATE UNIQUE INDEX idx_enrollment_progress_unique ON enrollment_progress(studen
 
 CREATE TABLE assessment_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  student_id UUID REFERENCES users(id) ON DELETE CASCADE,
   assessment_date DATE NOT NULL,
+  source VARCHAR(50) NOT NULL DEFAULT 'student' CHECK (source IN ('student', 'public')),
+  public_email VARCHAR(255),
+  public_full_name VARCHAR(255),
+  public_linked_at TIMESTAMP WITH TIME ZONE,
   
   -- Results
   recommended_track VARCHAR(100),
@@ -191,23 +196,14 @@ CREATE TABLE assessment_results (
 
 CREATE INDEX idx_assessment_results_student_id ON assessment_results(student_id);
 CREATE INDEX idx_assessment_results_date ON assessment_results(assessment_date);
-
-CREATE TABLE public_assessment_results (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) NOT NULL UNIQUE,
-  full_name VARCHAR(255) NOT NULL,
-  result_data JSONB NOT NULL,
-  recommended_track VARCHAR(100),
-  elective_1 VARCHAR(100),
-  elective_2 VARCHAR(100),
-  linked_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-  linked_at TIMESTAMP WITH TIME ZONE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_public_assessment_results_email ON public_assessment_results(email);
-CREATE INDEX idx_public_assessment_results_linked_user_id ON public_assessment_results(linked_user_id);
+CREATE INDEX idx_assessment_results_public_email ON assessment_results(public_email);
+CREATE UNIQUE INDEX idx_assessment_results_pending_public_email
+  ON assessment_results(public_email)
+  WHERE public_email IS NOT NULL AND student_id IS NULL;
+ALTER TABLE assessment_results
+  ADD CONSTRAINT assessment_results_owner_check CHECK (
+    student_id IS NOT NULL OR public_email IS NOT NULL
+  );
 
 -- ============================================================================
 -- 5.5 ASSESSMENT QUESTIONS (FLEXIBLE - ANY NUMBER OF QUESTIONS)
@@ -694,6 +690,58 @@ CREATE POLICY notifications_select_own ON notifications FOR SELECT
 -- Students can mark their own notifications as read
 CREATE POLICY notifications_update_own ON notifications FOR UPDATE
   USING (auth.uid()::uuid = user_id);
+
+-- Students can manage their own payment records
+CREATE POLICY payments_select_own ON payments FOR SELECT
+  USING (auth.uid()::uuid = student_id);
+
+CREATE POLICY payments_insert_own ON payments FOR INSERT
+  WITH CHECK (auth.uid()::uuid = student_id);
+
+-- Cashiers and admins can review and update payment records
+CREATE POLICY payments_select_staff ON payments FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid
+      AND u.role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+CREATE POLICY payments_update_staff ON payments FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid
+      AND u.role IN ('branchcoordinator', 'cashier', 'superadmin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid
+      AND u.role IN ('branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+CREATE POLICY payment_queue_select_staff ON payment_queue FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid
+      AND u.role IN ('branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
+
+CREATE POLICY payment_queue_update_staff ON payment_queue FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid
+      AND u.role IN ('branchcoordinator', 'cashier', 'superadmin')
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u WHERE u.id = auth.uid()::uuid
+      AND u.role IN ('branchcoordinator', 'cashier', 'superadmin')
+    )
+  );
 
 -- ============================================================================
 -- VIEWS FOR COMMON QUERIES

@@ -935,101 +935,92 @@ export function PublicAssessment() {
 
         <section className="py-20" style={{ backgroundColor: "#F8FAFC" }}>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.95fr)] lg:items-start">
-              <div>
-                <div className="mb-12">
-                  <h2 className="mb-4 text-4xl font-bold md:text-5xl" style={{ color: "#1E3A8A" }}>
-                    What you will get
-                  </h2>
-                  <p className="text-lg text-gray-600">
-                    The assessment gives you a clearer direction before you submit enrollment requirements.
-                  </p>
-                  <div className="mx-auto mt-4 h-1 w-24 rounded-full lg:mx-0" style={{ backgroundColor: "#B91C1C" }}></div>
-                </div>
+            <div className="mb-12 text-center">
+              <h2 className="mb-4 text-4xl font-bold md:text-5xl" style={{ color: "#1E3A8A" }}>
+                What you will get
+              </h2>
+              <p className="mx-auto max-w-3xl text-lg text-gray-600">
+                The assessment gives you a clearer direction before you submit enrollment requirements.
+              </p>
+              <div className="mx-auto mt-4 h-1 w-24 rounded-full" style={{ backgroundColor: "#B91C1C" }}></div>
+            </div>
 
-                <div className="grid gap-6">
+            <div className="grid gap-6 lg:grid-cols-4">
                   {assessmentHighlights.map((highlight, index) => {
                     const HighlightIcon = highlight.icon;
                     const accentColor = index % 2 === 0 ? "#1E3A8A" : "#B91C1C";
 
                     return (
-                      <div key={highlight.title} className="rounded-2xl bg-white p-8 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                      <div key={highlight.title} className="rounded-2xl bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl xl:p-8">
                         <div
                           className="mb-4 flex h-16 w-16 items-center justify-center rounded-full shadow-md"
                           style={{ backgroundColor: accentColor }}
                         >
                           <HighlightIcon className="h-8 w-8 text-white" />
                         </div>
-                        <h3 className="mb-3 text-2xl font-bold text-gray-900">{highlight.title}</h3>
+                        <h3 className="mb-3 text-xl font-bold text-gray-900 xl:text-2xl">{highlight.title}</h3>
                         <p className="leading-relaxed text-gray-600">{highlight.description}</p>
                       </div>
                     );
                   })}
 
-                  <div className="rounded-2xl bg-white p-8 shadow-lg">
-                    <h3 className="mb-4 text-2xl font-bold" style={{ color: "#1E3A8A" }}>
-                      Assessment coverage
-                    </h3>
-                    <div className="flex flex-wrap gap-3">
-                      {sections.map((section) => {
-                        const SectionIcon = section.icon;
-                        return (
-                          <div key={section.name} className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-900">
-                            <SectionIcon className="h-4 w-4" />
-                            {section.name}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+              <div className="rounded-2xl bg-white p-6 shadow-lg xl:p-8">
+                <h3 className="mb-4 text-xl font-bold xl:text-2xl" style={{ color: "#1E3A8A" }}>
+                  Assessment coverage
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {sections.map((section) => {
+                    const SectionIcon = section.icon;
+                    return (
+                      <div key={section.name} className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-900">
+                        <SectionIcon className="h-4 w-4" />
+                        {section.name}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+            </div>
 
-              <div className="rounded-2xl bg-white p-6 shadow-xl sm:p-8 lg:sticky lg:top-24">
-                <div className="mb-6 flex items-start justify-between gap-4">
+            <div className="mx-auto mt-12 max-w-3xl rounded-2xl bg-white p-6 text-center shadow-xl sm:p-8">
+              <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1E3A8A] text-white shadow-lg">
+                <Brain className="h-6 w-6" />
+              </div>
+              <p className="text-sm font-bold tracking-[0.16em] text-red-600 uppercase">Start Here</p>
+              <h2 className="mt-3 text-3xl font-bold text-gray-900">Begin Assessment Instantly</h2>
+              <p className="mx-auto mt-2 max-w-2xl text-gray-600">
+                No sign-up, email, or personal information is needed before you start. You can save your results after seeing your recommendation.
+              </p>
+
+              <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <p className="text-sm font-bold tracking-[0.16em] text-red-600 uppercase">Start Here</p>
-                    <h2 className="mt-3 text-3xl font-bold text-gray-900">Begin Assessment Instantly</h2>
-                    <p className="mt-2 text-gray-600">
-                      No sign-up, email, or personal information is needed before you start. You can save your results after seeing your recommendation.
-                    </p>
+                    <p className="text-2xl font-bold text-blue-900">{totalQuestions}</p>
+                    <p className="mt-1 text-xs font-semibold text-blue-700">Questions</p>
                   </div>
-                  <div className="hidden h-14 w-14 items-center justify-center rounded-2xl bg-[#1E3A8A] text-white shadow-lg sm:flex">
-                    <Brain className="h-6 w-6" />
+                  <div>
+                    <p className="text-2xl font-bold text-blue-900">{sections.length}</p>
+                    <p className="mt-1 text-xs font-semibold text-blue-700">Focus Areas</p>
                   </div>
-                </div>
-
-                <div className="space-y-5">
-                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
-                    <div className="grid grid-cols-3 gap-3 text-center">
-                      <div>
-                        <p className="text-2xl font-bold text-blue-900">{totalQuestions}</p>
-                        <p className="mt-1 text-xs font-semibold text-blue-700">Questions</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-blue-900">{sections.length}</p>
-                        <p className="mt-1 text-xs font-semibold text-blue-700">Focus Areas</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-blue-900">0</p>
-                        <p className="mt-1 text-xs font-semibold text-blue-700">Forms First</p>
-                      </div>
-                    </div>
+                  <div>
+                    <p className="text-2xl font-bold text-blue-900">0</p>
+                    <p className="mt-1 text-xs font-semibold text-blue-700">Forms First</p>
                   </div>
-                  <button
-                    onClick={handleStartAssessment}
-                    className="flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-5 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
-                    style={{ backgroundColor: "var(--electron-blue)" }}
-                  >
-                    Start Assessment
-                    <ArrowRight className="h-5 w-5" />
-                  </button>
-
-                  <p className="text-center text-sm text-gray-500">
-                    Your results appear immediately after the final section. Saving by email happens only after you choose to save.
-                  </p>
                 </div>
               </div>
+
+              <button
+                onClick={handleStartAssessment}
+                className="mx-auto mt-6 flex w-full max-w-md items-center justify-center gap-3 rounded-2xl px-6 py-5 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
+                style={{ backgroundColor: "var(--electron-blue)" }}
+              >
+                Start Assessment
+                <ArrowRight className="h-5 w-5" />
+              </button>
+
+              <p className="mt-5 text-center text-sm text-gray-500">
+                Your results appear immediately after the final section. Saving by email happens only after you choose to save.
+              </p>
             </div>
           </div>
         </section>
