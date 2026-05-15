@@ -255,6 +255,13 @@ function PublicAssessmentResultsView({
           category: elective,
           careers: getSuggestedCoursesForPublicResult(track, elective),
         }));
+  const electiveExplanations = [
+    normalizeResultText(aiRecommendation.elective1Explanation),
+    normalizeResultText(aiRecommendation.elective2Explanation),
+  ];
+  const getElectiveExplanation = (elective: string, index: number) =>
+    electiveExplanations[index] ||
+    `${normalizeResultText(elective, "This elective")} is recommended because it connects with your strongest assessment areas, your interests, and the learning direction of the ${track} Track.`;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -266,7 +273,7 @@ function PublicAssessmentResultsView({
           </div>
           <div className="mt-6 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
             <div>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Your Public Assessment Result</h1>
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Your Assessment Result</h1>
               <p className="mt-4 max-w-3xl text-lg leading-8 text-blue-100">
                 Review your recommended track, electives, strengths, and next-step options. You can save this result by email below.
               </p>
@@ -326,8 +333,11 @@ function PublicAssessmentResultsView({
                   <div key={`${elective}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50 p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Elective {index + 1}</p>
                     <p className="mt-2 text-xl font-bold text-slate-950">{normalizeResultText(elective, "Elective")}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {getElectiveExplanation(elective, index)}
+                    </p>
                     {getSuggestedCoursesForPublicResult(track, elective).length > 0 && (
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-3 border-t border-blue-100 pt-3 text-sm leading-6 text-slate-600">
                         Leads to: {getSuggestedCoursesForPublicResult(track, elective).join(", ")}
                       </p>
                     )}

@@ -92,7 +92,16 @@ export function Results() {
       const userEmail = userData?.email || "student@gmail.com";
       const assessmentKey = `assessmentResults_${userEmail}`;
       const storedResultsRaw = localStorage.getItem(assessmentKey);
-      const storedResults = storedResultsRaw ? JSON.parse(storedResultsRaw) : null;
+      const publicResultsRaw = localStorage.getItem("publicAssessmentResults");
+      const storedResults = storedResultsRaw
+        ? JSON.parse(storedResultsRaw)
+        : publicResultsRaw
+        ? JSON.parse(publicResultsRaw)
+        : null;
+
+      if (!storedResultsRaw && publicResultsRaw && storedResults) {
+        localStorage.setItem(assessmentKey, JSON.stringify(storedResults));
+      }
 
       try {
         const latestResult = await getLatestAssessmentResult(userEmail);
