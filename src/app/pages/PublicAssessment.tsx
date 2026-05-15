@@ -6,6 +6,7 @@ import { getDefaultAssessmentQuestions } from "../../services/assessmentService"
 import { supabase } from "../../supabase";
 import { LoadingState } from "../components/LoadingState";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
+import { savePublicAssessmentResult } from "../../services/assessmentResultService";
 
 interface Question {
   id: number;
@@ -47,10 +48,11 @@ export function PublicAssessment() {
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const [results, setResults] = useState<AssessmentResult | null>(null);
   const [assessmentStarted, setAssessmentStarted] = useState(false);
-  const [userInfo, setUserInfo] = useState({ fullName: "", email: "" });
-  const assessmentProgressKey = `publicAssessmentProgress_${userInfo.email || "guest"}`;
-  const [agreeToPrivacy, setAgreeToPrivacy] = useState(false);
-  const [errors, setErrors] = useState({ fullName: "", email: "", privacy: "" });
+  const [saveInfo, setSaveInfo] = useState({ fullName: "", email: "" });
+  const assessmentProgressKey = "publicAssessmentProgress_guest";
+  const [saveErrors, setSaveErrors] = useState({ fullName: "", email: "" });
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveMessage, setSaveMessage] = useState("");
   const hasRestoredProgress = useRef(false);
   const publicAssessmentShellStyle = {
     background:
@@ -71,14 +73,10 @@ export function PublicAssessment() {
 
     const initializeAssessment = async () => {
       const existingResults = localStorage.getItem("publicAssessmentResults");
-      const storedUserInfo = localStorage.getItem("publicAssessmentUserInfo");
 
       if (existingResults) {
         setAssessmentCompleted(true);
         setResults(JSON.parse(existingResults));
-        if (storedUserInfo) {
-          setUserInfo(JSON.parse(storedUserInfo));
-        }
         setLoading(false);
         return;
       }
@@ -109,17 +107,6 @@ export function PublicAssessment() {
         setCurrentSection(Math.min(Math.max(parsedProgress.currentSection, 0), sections.length - 1));
       }
 
-      if (parsedProgress?.userInfo) {
-        setUserInfo((currentUserInfo) => ({
-          ...currentUserInfo,
-          ...parsedProgress.userInfo,
-        }));
-      }
-
-      if (typeof parsedProgress?.agreeToPrivacy === "boolean") {
-        setAgreeToPrivacy(parsedProgress.agreeToPrivacy);
-      }
-
       if (typeof parsedProgress?.assessmentStarted === "boolean") {
         setAssessmentStarted(parsedProgress.assessmentStarted);
       }
@@ -137,17 +124,11 @@ export function PublicAssessment() {
       answers,
       currentSection,
       assessmentStarted,
-      userInfo,
-      agreeToPrivacy,
       updatedAt: new Date().toISOString(),
     });
 
     localStorage.setItem(assessmentProgressKey, progressPayload);
-    if (assessmentProgressKey !== "publicAssessmentProgress_guest") {
-      localStorage.removeItem("publicAssessmentProgress_guest");
-    }
   }, [
-    agreeToPrivacy,
     answers,
     assessmentCompleted,
     assessmentProgressKey,
@@ -155,7 +136,6 @@ export function PublicAssessment() {
     currentSection,
     loading,
     sections.length,
-    userInfo,
   ]);
 
   useEffect(() => {
@@ -290,6 +270,17 @@ export function PublicAssessment() {
     const { track, electives, scores, topDomains, topInterests, overallScore } = results;
     const trackColor = "var(--electron-blue)";
     const secondaryColor = "var(--electron-red)";
+    const aiRecommendation = results.aiRecommendation || {};
+    const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest learning areas";
+    const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your interests";
+    const aiExplanation =
+      aiRecommendation.overallAnalysis ||
+      `You are showing a strong fit for the ${track} Track because your assessment points to strengths in ${topDomainSummary} and interests connected to ${topInterestSummary}. This path can help you build on how you already think, learn, and solve problems while giving you room to explore future study and career options.`;
+    const trackExplanation =
+      aiRecommendation.trackExplanation ||
+      (track === "Academic"
+        ? "You are likely to benefit from a college-preparatory path with structured academic subjects, research tasks, and university-oriented learning."
+        : "You are likely to benefit from a practical, skills-based path with hands-on learning, technical competencies, and career-ready preparation.");
 
     const getSuggestedCourses = (track: string, elective: string): string[] => {
       const normalizedElective = elective.toLowerCase();
@@ -334,6 +325,13 @@ export function PublicAssessment() {
       
       return [];
     };
+
+    const careerPathways = Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
+      ? aiRecommendation.careerPathways
+      : electives.map((elective) => ({
+          category: elective,
+          careers: getSuggestedCourses(track, elective),
+        })).filter((pathway) => pathway.careers.length > 0);
 
     return (
       <div className="min-h-screen p-4 sm:p-6 lg:p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
@@ -479,6 +477,46 @@ export function PublicAssessment() {
             </div>
           </div>
 
+          {/* AI Explanation and Career Pathways */}
+          <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
+            <div className="mb-6 flex items-center gap-3">
+              <Sparkles className="h-8 w-8" style={{ color: trackColor }} />
+              <div>
+                <p className="text-sm font-bold uppercase tracking-[0.16em] text-blue-700">AI Analysis</p>
+                <h2 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
+                  Why this recommendation fits you
+                </h2>
+              </div>
+            </div>
+
+            <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
+                <p className="text-base leading-7 text-slate-700">{aiExplanation}</p>
+                <p className="mt-4 text-sm leading-6 text-slate-600">{trackExplanation}</p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h3 className="font-bold text-slate-900">Recommended Pathways</h3>
+                <div className="mt-4 space-y-3">
+                  {careerPathways.length > 0 ? (
+                    careerPathways.slice(0, 4).map((pathway: any, index: number) => (
+                      <div key={`${pathway.category}-${index}`} className="rounded-xl bg-slate-50 p-3">
+                        <p className="text-sm font-bold text-slate-900">{pathway.category}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {(pathway.careers || []).join(", ")}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-600">
+                      Your recommended track and electives can open study and career options connected to your strengths and interests.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Available Tracks */}
           <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
             <h2 className="text-2xl font-bold mb-6" style={{ color: "var(--electron-dark-gray)" }}>
@@ -535,6 +573,85 @@ export function PublicAssessment() {
                     ))}
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Save Result */}
+          <div className="bg-white rounded-xl shadow-lg p-5 sm:p-8 mb-6">
+            <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+              <div>
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-800">
+                  <FileText className="h-4 w-4" />
+                  Optional Save
+                </div>
+                <h2 className="text-2xl font-bold" style={{ color: "var(--electron-dark-gray)" }}>
+                  Save your assessment results
+                </h2>
+                <p className="mt-3 leading-7 text-gray-600">
+                  Save your assessment results to your email so you can access them later or use them when creating your student account.
+                </p>
+                <p className="mt-3 text-sm text-gray-500">
+                  If your email already has an official assessment result, we will preserve the existing result and will not overwrite it.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Full Name</label>
+                    <input
+                      type="text"
+                      value={saveInfo.fullName}
+                      onChange={(event) => {
+                        setSaveInfo((current) => ({ ...current, fullName: event.target.value }));
+                        setSaveErrors((current) => ({ ...current, fullName: "" }));
+                      }}
+                      className={`w-full rounded-xl border-2 bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
+                        saveErrors.fullName ? "border-red-300 focus:ring-red-200" : "border-gray-200 focus:ring-blue-200"
+                      }`}
+                      placeholder="Your full name"
+                    />
+                    {saveErrors.fullName && <p className="mt-2 text-sm text-red-600">{saveErrors.fullName}</p>}
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-sm font-semibold text-gray-700">Email Address</label>
+                    <input
+                      type="email"
+                      value={saveInfo.email}
+                      onChange={(event) => {
+                        setSaveInfo((current) => ({ ...current, email: event.target.value.trimStart().toLowerCase() }));
+                        setSaveErrors((current) => ({ ...current, email: "" }));
+                      }}
+                      className={`w-full rounded-xl border-2 bg-white px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
+                        saveErrors.email ? "border-red-300 focus:ring-red-200" : "border-gray-200 focus:ring-blue-200"
+                      }`}
+                      placeholder="name@example.com"
+                    />
+                    {saveErrors.email && <p className="mt-2 text-sm text-red-600">{saveErrors.email}</p>}
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSaveResult}
+                  disabled={saveStatus === "saving" || saveStatus === "saved"}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl px-5 py-3 font-bold text-white shadow-md transition hover:-translate-y-0.5 hover:shadow-lg disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{ backgroundColor: "var(--electron-blue)" }}
+                >
+                  {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Result Saved" : "Save Result to Email"}
+                </button>
+
+                {saveMessage && (
+                  <div
+                    className={`mt-4 rounded-xl border p-4 text-sm font-medium ${
+                      saveStatus === "error"
+                        ? "border-red-200 bg-red-50 text-red-700"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    }`}
+                  >
+                    {saveMessage}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -703,12 +820,8 @@ export function PublicAssessment() {
     };
 
     localStorage.setItem("publicAssessmentResults", JSON.stringify(assessmentResult));
-    localStorage.setItem("publicAssessmentUserInfo", JSON.stringify(userInfo));
     localStorage.removeItem(assessmentProgressKey);
     localStorage.removeItem("publicAssessmentProgress_guest");
-
-    const emailKey = `publicAssessment_${userInfo.email}`;
-    localStorage.setItem(emailKey, JSON.stringify({ ...assessmentResult, userInfo, timestamp: new Date().toISOString() }));
 
     setResults(assessmentResult);
     setAssessmentCompleted(true);
@@ -716,33 +829,52 @@ export function PublicAssessment() {
   };
 
   const handleStartAssessment = () => {
-    // Validate form
-    const newErrors = { fullName: "", email: "", privacy: "" };
+    setAssessmentStarted(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleSaveResult = async () => {
+    if (!results) return;
+
+    const nextErrors = { fullName: "", email: "" };
+    const normalizedEmail = saveInfo.email.trim().toLowerCase();
     let hasError = false;
 
-    if (!userInfo.fullName.trim()) {
-      newErrors.fullName = "Full name is required";
+    if (!saveInfo.fullName.trim()) {
+      nextErrors.fullName = "Full name is required.";
       hasError = true;
     }
 
-    if (!userInfo.email.trim()) {
-      newErrors.email = "Email address is required";
+    if (!normalizedEmail) {
+      nextErrors.email = "Email address is required.";
       hasError = true;
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userInfo.email)) {
-      newErrors.email = "Please enter a valid email address";
-      hasError = true;
-    }
-
-    if (!agreeToPrivacy) {
-      newErrors.privacy = "You must agree to the data privacy policy to continue";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      nextErrors.email = "Please enter a valid email address.";
       hasError = true;
     }
 
-    setErrors(newErrors);
+    setSaveErrors(nextErrors);
+    if (hasError) return;
 
-    if (!hasError) {
-      setAssessmentStarted(true);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+    setSaveStatus("saving");
+    setSaveMessage("");
+
+    try {
+      const response = await savePublicAssessmentResult({
+        fullName: saveInfo.fullName.trim(),
+        email: normalizedEmail,
+        assessmentData: results,
+      });
+      localStorage.setItem(
+        `publicAssessment_${normalizedEmail}`,
+        JSON.stringify({ ...results, userInfo: { fullName: saveInfo.fullName.trim(), email: normalizedEmail }, timestamp: new Date().toISOString() })
+      );
+      setSaveInfo((current) => ({ ...current, email: normalizedEmail }));
+      setSaveStatus("saved");
+      setSaveMessage(response?.message || "Your assessment result has been saved.");
+    } catch (error: any) {
+      setSaveStatus("error");
+      setSaveMessage(error?.message || "Unable to save your assessment result right now.");
     }
   };
 
@@ -857,9 +989,9 @@ export function PublicAssessment() {
                 <div className="mb-6 flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-bold tracking-[0.16em] text-red-600 uppercase">Start Here</p>
-                    <h2 className="mt-3 text-3xl font-bold text-gray-900">Begin Assessment</h2>
+                    <h2 className="mt-3 text-3xl font-bold text-gray-900">Begin Assessment Instantly</h2>
                     <p className="mt-2 text-gray-600">
-                      Enter your details so your results can be saved and linked to your account later.
+                      No sign-up, email, or personal information is needed before you start. You can save your results after seeing your recommendation.
                     </p>
                   </div>
                   <div className="hidden h-14 w-14 items-center justify-center rounded-2xl bg-[#1E3A8A] text-white shadow-lg sm:flex">
@@ -867,83 +999,34 @@ export function PublicAssessment() {
                   </div>
                 </div>
 
-                <div className="space-y-6">
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Full Name <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={userInfo.fullName}
-                      onChange={(e) => {
-                        setUserInfo({ ...userInfo, fullName: e.target.value });
-                        setErrors({ ...errors, fullName: "" });
-                      }}
-                      className={`w-full rounded-xl border-2 px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
-                        errors.fullName
-                          ? "border-red-300 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-blue-200"
-                      }`}
-                      placeholder="Enter your full name"
-                    />
-                    {errors.fullName && <p className="mt-2 text-sm text-red-600">{errors.fullName}</p>}
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-blue-900">{totalQuestions}</p>
+                        <p className="mt-1 text-xs font-semibold text-blue-700">Questions</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-blue-900">{sections.length}</p>
+                        <p className="mt-1 text-xs font-semibold text-blue-700">Focus Areas</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-blue-900">0</p>
+                        <p className="mt-1 text-xs font-semibold text-blue-700">Forms First</p>
+                      </div>
+                    </div>
                   </div>
-
-                  <div>
-                    <label className="mb-2 block text-sm font-semibold text-gray-700">
-                      Email Address <span className="text-red-600">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={userInfo.email}
-                      onChange={(e) => {
-                        setUserInfo({ ...userInfo, email: e.target.value });
-                        setErrors({ ...errors, email: "" });
-                      }}
-                      className={`w-full rounded-xl border-2 px-4 py-3 text-sm outline-none transition-all focus:ring-2 ${
-                        errors.email
-                          ? "border-red-300 focus:ring-red-200"
-                          : "border-gray-300 focus:ring-blue-200"
-                      }`}
-                      placeholder="Enter your email address"
-                    />
-                    {errors.email && <p className="mt-2 text-sm text-red-600">{errors.email}</p>}
-                  </div>
-
-                  <div className="rounded-lg border-2 border-blue-200 bg-blue-50 p-4">
-                    <p className="text-sm leading-relaxed text-gray-700">
-                      <strong className="text-gray-900">Data Privacy Notice:</strong> Your name and email are collected in accordance with the Data Privacy Act of 2012. They are used only to generate your assessment results and associate them with your account. Your data will remain confidential and will not be shared with unauthorized parties.
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="flex cursor-pointer items-start gap-3">
-                      <input
-                        type="checkbox"
-                        checked={agreeToPrivacy}
-                        onChange={(e) => {
-                          setAgreeToPrivacy(e.target.checked);
-                          setErrors({ ...errors, privacy: "" });
-                        }}
-                        className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
-                      />
-                      <span className="text-sm text-gray-700">
-                        I agree to the collection and use of my personal data for assessment purposes. <span className="text-red-600">*</span>
-                      </span>
-                    </label>
-                    {errors.privacy && <p className="mt-2 text-sm text-red-600">{errors.privacy}</p>}
-                  </div>
-
                   <button
                     onClick={handleStartAssessment}
-                    className="w-full rounded-lg px-6 py-4 text-lg font-bold text-white shadow-lg transition-all hover:shadow-xl"
+                    className="flex w-full items-center justify-center gap-3 rounded-2xl px-6 py-5 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
                     style={{ backgroundColor: "var(--electron-blue)" }}
                   >
                     Start Assessment
+                    <ArrowRight className="h-5 w-5" />
                   </button>
 
                   <p className="text-center text-sm text-gray-500">
-                    Your results appear immediately after the last section and can be linked to your portal later.
+                    Your results appear immediately after the final section. Saving by email happens only after you choose to save.
                   </p>
                 </div>
               </div>

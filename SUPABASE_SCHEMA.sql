@@ -192,6 +192,23 @@ CREATE TABLE assessment_results (
 CREATE INDEX idx_assessment_results_student_id ON assessment_results(student_id);
 CREATE INDEX idx_assessment_results_date ON assessment_results(assessment_date);
 
+CREATE TABLE public_assessment_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) NOT NULL UNIQUE,
+  full_name VARCHAR(255) NOT NULL,
+  result_data JSONB NOT NULL,
+  recommended_track VARCHAR(100),
+  elective_1 VARCHAR(100),
+  elective_2 VARCHAR(100),
+  linked_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  linked_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_public_assessment_results_email ON public_assessment_results(email);
+CREATE INDEX idx_public_assessment_results_linked_user_id ON public_assessment_results(linked_user_id);
+
 -- ============================================================================
 -- 5.5 ASSESSMENT QUESTIONS (FLEXIBLE - ANY NUMBER OF QUESTIONS)
 -- ============================================================================

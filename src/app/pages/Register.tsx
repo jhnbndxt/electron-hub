@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, User } from "lucide-react";
 import { registerUser } from "../../services/authService";
+import { linkPendingPublicAssessmentResult } from "../../services/assessmentResultService";
 import { motion } from "motion/react";
 import logo from "../../assets/electronLogo";
 import { ChatAssistant } from "../components/ChatAssistant";
@@ -203,6 +204,11 @@ export function Register() {
       if (registerError || !user) {
         setError(registerError || "Unable to create your account right now.");
         return;
+      }
+      try {
+        await linkPendingPublicAssessmentResult(normalizedEmail);
+      } catch (syncError) {
+        console.error("Unable to sync pending public assessment result:", syncError);
       }
       setFormData({
         ...formData,

@@ -117,6 +117,31 @@ function mapAssessmentResult(result) {
   };
 }
 
+function buildAssessmentInsertPayload(studentId, assessmentData = {}) {
+  const scores = normalizeScores(assessmentData);
+  const track = assessmentData.recommended_track || assessmentData.track || 'General';
+  const electives = Array.isArray(assessmentData.electives)
+    ? assessmentData.electives.filter(Boolean)
+    : [assessmentData.elective_1, assessmentData.elective_2].filter(Boolean);
+  const topDomains = normalizeArray(assessmentData.topDomains ?? assessmentData.top_domains);
+  const topInterests = normalizeArray(assessmentData.topInterests ?? assessmentData.top_interests);
+
+  return {
+    student_id: studentId,
+    assessment_date: new Date().toISOString().split('T')[0],
+    recommended_track: track,
+    elective_1: electives[0] || null,
+    elective_2: electives[1] || null,
+    verbal_ability_score: scores.verbal_ability_score,
+    mathematical_ability_score: scores.mathematical_ability_score,
+    spatial_ability_score: scores.spatial_ability_score,
+    logical_reasoning_score: scores.logical_reasoning_score,
+    overall_score: scores.overall_score,
+    top_domains: topDomains,
+    top_interests: topInterests,
+  };
+}
+
 /**
  * Get student user ID by email
  */
@@ -134,6 +159,48 @@ async function getStudentIdByEmail(email) {
     console.error('Error getting student ID:', error);
     throw error;
   }
+}
+
+async function findStudentByEmail(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('id, email')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error finding student by email:', error);
+    return null;
+  }
+
+  return data || null;
+}
+
+async function hasAssessmentResult(studentId) {
+  if (!studentId) return false;
+
+  const { data, error } = await supabase
+    .from('assessment_results')
+    .select('id')
+    .eq('student_id', studentId)
+    .limit(1);
+
+  if (error) throw error;
+  return Boolean(data?.length);
+}
+
+async function insertAssessmentResult(studentId, assessmentData) {
+  const { data, error } = await supabase
+    .from('assessment_results')
+    .insert(buildAssessmentInsertPayload(studentId, assessmentData))
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
 }
 
 /**
@@ -205,6 +272,109 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
     console.error('Error saving assessment result:', error);
     throw error;
   }
+}
+
+/**
+ * Save an optional public assessment result by email without overwriting official account results.
+ * If the account exists and has no assessment, the result is linked immediately.
+ * If the account does not exist, the result is stored in public_assessment_results for later sync.
+ */
+export async function savePublicAssessmentResult({ fullName, email, assessmentData }) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  const normalizedName = String(fullName || '').trim();
+
+  if (!normalizedName) {
+    throw new Error('Full name is required.');
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new Error('Please enter a valid email address.');
+  }
+
+  const student = await findStudentByEmail(normalizedEmail);
+
+  if (student?.id) {
+    if (await hasAssessmentResult(student.id)) {
+      return {
+        status: 'existing_account_result_preserved',
+        message: 'This email already has an official assessment result, so your existing result was preserved.',
+      };
+    }
+
+    const savedResult = await insertAssessmentResult(student.id, assessmentData);
+    try {
+      await triggerNotification(student.id, 'ASSESSMENT_UPDATED', {
+        track: assessmentData.track || assessmentData.recommended_track,
+        electives: assessmentData.electives,
+        assessmentResultId: savedResult?.id,
+      });
+    } catch (notificationError) {
+      console.error('Error creating public assessment sync notification:', notificationError);
+    }
+
+    return {
+      status: 'linked_to_existing_account',
+      message: 'Your assessment result was linked to your existing student account.',
+      data: savedResult,
+    };
+  }
+
+  const pendingPayload = {
+    full_name: normalizedName,
+    email: normalizedEmail,
+    result_data: assessmentData,
+    recommended_track: assessmentData.track || assessmentData.recommended_track || 'General',
+    elective_1: assessmentData.electives?.[0] || assessmentData.elective_1 || null,
+    elective_2: assessmentData.electives?.[1] || assessmentData.elective_2 || null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  const { data, error } = await supabase
+    .from('public_assessment_results')
+    .upsert(pendingPayload, { onConflict: 'email' })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error saving pending public assessment result:', error);
+    throw new Error('Unable to save to the database right now. Please try again later.');
+  }
+
+  return {
+    status: 'saved_for_future_account',
+    message: 'Your assessment result was saved. Use the same email when creating your student account to sync it later.',
+    data,
+  };
+}
+
+export async function linkPendingPublicAssessmentResult(userEmail) {
+  const normalizedEmail = String(userEmail || '').trim().toLowerCase();
+  if (!normalizedEmail) return null;
+
+  const student = await findStudentByEmail(normalizedEmail);
+  if (!student?.id || (await hasAssessmentResult(student.id))) {
+    return null;
+  }
+
+  const { data: pendingResult, error: pendingError } = await supabase
+    .from('public_assessment_results')
+    .select('*')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (pendingError || !pendingResult?.result_data) {
+    if (pendingError) console.error('Error loading pending public assessment result:', pendingError);
+    return null;
+  }
+
+  const savedResult = await insertAssessmentResult(student.id, pendingResult.result_data);
+  await supabase
+    .from('public_assessment_results')
+    .update({ linked_user_id: student.id, linked_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq('id', pendingResult.id);
+
+  return savedResult;
 }
 
 /**
