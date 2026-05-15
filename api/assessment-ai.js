@@ -157,7 +157,7 @@ export default async function handler(request, response) {
       : "https://openrouter.ai/api/v1/chat/completions";
   const model =
     provider === "groq"
-      ? process.env.GROQ_MODEL || "llama-3.1-8b-instant"
+      ? process.env.GROQ_MODEL || "llama-3.3-70b-versatile"
       : process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat-v3-0324:free";
 
   if (!apiKey) {
