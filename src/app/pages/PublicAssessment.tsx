@@ -133,6 +133,50 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
   };
 };
 
+function getSuggestedCoursesForPublicResult(track: string, elective: string): string[] {
+  const normalizedElective = normalizeResultText(elective).toLowerCase();
+
+  if (track === "Academic") {
+    if (normalizedElective.includes("biology")) {
+      return ["Medicine", "Nursing", "Biology"];
+    } else if (normalizedElective.includes("physics")) {
+      return ["Engineering (Civil, Electrical, Mechanical)", "Applied Physics"];
+    } else if (normalizedElective.includes("psychology")) {
+      return ["Psychology", "Education", "Social Work"];
+    } else if (normalizedElective.includes("creative writing")) {
+      return ["Communication", "Journalism", "Literature"];
+    } else if (normalizedElective.includes("entrepreneurship") || normalizedElective.includes("marketing")) {
+      return ["Business Administration", "Marketing", "Management"];
+    } else if (normalizedElective.includes("media arts") || normalizedElective.includes("visual arts")) {
+      return ["Multimedia Arts", "Film", "Graphic Design"];
+    } else if (normalizedElective.includes("coaching") || normalizedElective.includes("fitness")) {
+      return ["Physical Education", "Sports Science", "Sports Management"];
+    }
+  } else if (track === "Technical-Professional") {
+    if (normalizedElective.includes("ict")) {
+      return ["Information Technology", "Computer Science", "Software Engineering"];
+    } else if (normalizedElective.includes("programming")) {
+      return ["Software Engineering", "Computer Engineering"];
+    } else if (normalizedElective.includes("cookery")) {
+      return ["Culinary Arts", "Hospitality Management", "Tourism"];
+    } else if (normalizedElective.includes("bread") || normalizedElective.includes("pastry")) {
+      return ["Culinary Arts", "Baking & Pastry"];
+    } else if (normalizedElective.includes("automotive")) {
+      return ["Mechanical Engineering", "Automotive Technology"];
+    } else if (normalizedElective.includes("electrical")) {
+      return ["Electrical Engineering", "Electronics Engineering"];
+    } else if (normalizedElective.includes("agriculture")) {
+      return ["Agriculture", "Agribusiness"];
+    } else if (normalizedElective.includes("fishery")) {
+      return ["Fisheries", "Marine Biology"];
+    } else if (normalizedElective.includes("fitness") || normalizedElective.includes("coaching")) {
+      return ["Physical Education", "Sports Management"];
+    }
+  }
+
+  return [];
+}
+
 export function PublicAssessment() {
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState(0);
@@ -416,50 +460,6 @@ export function PublicAssessment() {
         ? "You are likely to benefit from a college-preparatory path with structured academic subjects, research tasks, and university-oriented learning."
         : "You are likely to benefit from a practical, skills-based path with hands-on learning, technical competencies, and career-ready preparation.");
 
-    const getSuggestedCourses = (track: string, elective: string): string[] => {
-      const normalizedElective = elective.toLowerCase();
-      
-      if (track === "Academic") {
-        if (normalizedElective.includes("biology")) {
-          return ["Medicine", "Nursing", "Biology"];
-        } else if (normalizedElective.includes("physics")) {
-          return ["Engineering (Civil, Electrical, Mechanical)", "Applied Physics"];
-        } else if (normalizedElective.includes("psychology")) {
-          return ["Psychology", "Education", "Social Work"];
-        } else if (normalizedElective.includes("creative writing")) {
-          return ["Communication", "Journalism", "Literature"];
-        } else if (normalizedElective.includes("entrepreneurship") || normalizedElective.includes("marketing")) {
-          return ["Business Administration", "Marketing", "Management"];
-        } else if (normalizedElective.includes("media arts") || normalizedElective.includes("visual arts")) {
-          return ["Multimedia Arts", "Film", "Graphic Design"];
-        } else if (normalizedElective.includes("coaching") || normalizedElective.includes("fitness")) {
-          return ["Physical Education", "Sports Science", "Sports Management"];
-        }
-      } else if (track === "Technical-Professional") {
-        if (normalizedElective.includes("ict")) {
-          return ["Information Technology", "Computer Science", "Software Engineering"];
-        } else if (normalizedElective.includes("programming")) {
-          return ["Software Engineering", "Computer Engineering"];
-        } else if (normalizedElective.includes("cookery")) {
-          return ["Culinary Arts", "Hospitality Management", "Tourism"];
-        } else if (normalizedElective.includes("bread") || normalizedElective.includes("pastry")) {
-          return ["Culinary Arts", "Baking & Pastry"];
-        } else if (normalizedElective.includes("automotive")) {
-          return ["Mechanical Engineering", "Automotive Technology"];
-        } else if (normalizedElective.includes("electrical")) {
-          return ["Electrical Engineering", "Electronics Engineering"];
-        } else if (normalizedElective.includes("agriculture")) {
-          return ["Agriculture", "Agribusiness"];
-        } else if (normalizedElective.includes("fishery")) {
-          return ["Fisheries", "Marine Biology"];
-        } else if (normalizedElective.includes("fitness") || normalizedElective.includes("coaching")) {
-          return ["Physical Education", "Sports Management"];
-        }
-      }
-      
-      return [];
-      };
-
     const careerPathways = Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
       ? aiRecommendation.careerPathways.map((pathway: any) => ({
           category: normalizeResultText(pathway?.category || pathway?.name, "Recommended Pathway"),
@@ -467,7 +467,7 @@ export function PublicAssessment() {
         }))
       : electives.map((elective) => ({
           category: elective,
-          careers: getSuggestedCourses(track, elective),
+          careers: getSuggestedCoursesForPublicResult(track, elective),
         })).filter((pathway) => pathway.careers.length > 0);
 
     return (
@@ -520,9 +520,9 @@ export function PublicAssessment() {
                         <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: trackColor }} />
                         <div className="flex-1">
                           <p className="font-semibold text-gray-800">{elective}</p>
-                          {getSuggestedCourses(track, elective).length > 0 && (
+                          {getSuggestedCoursesForPublicResult(track, elective).length > 0 && (
                             <p className="text-sm text-gray-500 mt-1">
-                              Leads to: {getSuggestedCourses(track, elective).join(", ")}
+                              Leads to: {getSuggestedCoursesForPublicResult(track, elective).join(", ")}
                             </p>
                           )}
                         </div>
