@@ -67,6 +67,45 @@ const normalizeResultArray = (value: any): string[] => {
   return [];
 };
 
+const normalizeResultText = (value: any, fallback = ""): string => {
+  if (typeof value === "string") {
+    return value.trim() || fallback;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return normalizeResultArray(value).join(", ") || fallback;
+  }
+
+  if (value && typeof value === "object") {
+    const likelyText =
+      value.text ||
+      value.description ||
+      value.explanation ||
+      value.summary ||
+      value.analysis ||
+      value.name ||
+      value.label ||
+      value.value ||
+      value.category;
+
+    if (likelyText) {
+      return normalizeResultText(likelyText, fallback);
+    }
+
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return fallback;
+    }
+  }
+
+  return fallback;
+};
+
 const normalizeResultScore = (value: any) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue) ? numericValue : 0;
@@ -79,7 +118,7 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
   const electives = normalizeResultArray(result.electives ?? [result.elective_1, result.elective_2]);
 
   return {
-    track: String(result.track || result.recommended_track || "General"),
+    track: normalizeResultText(result.track || result.recommended_track, "General"),
     electives,
     scores: {
       VA: normalizeResultScore(rawScores.VA ?? rawScores.verbal_ability_score ?? result.verbal_ability_score),
@@ -366,11 +405,13 @@ export function PublicAssessment() {
     const aiRecommendation = normalizedResults.aiRecommendation || {};
     const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest learning areas";
     const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your interests";
+    const aiOverallAnalysis = normalizeResultText(aiRecommendation.overallAnalysis);
+    const aiTrackExplanation = normalizeResultText(aiRecommendation.trackExplanation);
     const aiExplanation =
-      aiRecommendation.overallAnalysis ||
+      aiOverallAnalysis ||
       `You are showing a strong fit for the ${track} Track because your assessment points to strengths in ${topDomainSummary} and interests connected to ${topInterestSummary}. This path can help you build on how you already think, learn, and solve problems while giving you room to explore future study and career options.`;
     const trackExplanation =
-      aiRecommendation.trackExplanation ||
+      aiTrackExplanation ||
       (track === "Academic"
         ? "You are likely to benefit from a college-preparatory path with structured academic subjects, research tasks, and university-oriented learning."
         : "You are likely to benefit from a practical, skills-based path with hands-on learning, technical competencies, and career-ready preparation.");
@@ -421,7 +462,7 @@ export function PublicAssessment() {
 
     const careerPathways = Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
       ? aiRecommendation.careerPathways.map((pathway: any) => ({
-          category: String(pathway?.category || pathway?.name || "Recommended Pathway"),
+          category: normalizeResultText(pathway?.category || pathway?.name, "Recommended Pathway"),
           careers: normalizeResultArray(pathway?.careers ?? pathway?.courses ?? pathway?.items),
         }))
       : electives.map((elective) => ({
@@ -896,10 +937,11 @@ export function PublicAssessment() {
     }
 
     if (aiRecommendation && !aiRecommendation.raw) {
-      const aiElectives = [aiRecommendation.elective1, aiRecommendation.elective2].filter(Boolean);
+      const aiElectives = normalizeResultArray([aiRecommendation.elective1, aiRecommendation.elective2]);
 
-      formattedResult.track = aiRecommendation.recommendedTrack || formattedResult.track;
-      formattedResult.recommended_track = aiRecommendation.recommendedTrack || formattedResult.recommended_track;
+      const aiTrack = normalizeResultText(aiRecommendation.recommendedTrack);
+      formattedResult.track = aiTrack || formattedResult.track;
+      formattedResult.recommended_track = aiTrack || formattedResult.recommended_track;
       formattedResult.electives = aiElectives.length > 0 ? aiElectives : formattedResult.electives;
       formattedResult.elective_1 = aiElectives[0] || formattedResult.elective_1;
       formattedResult.elective_2 = aiElectives[1] || formattedResult.elective_2;
