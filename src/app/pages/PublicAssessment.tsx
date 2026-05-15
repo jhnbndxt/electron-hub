@@ -39,6 +39,61 @@ interface AssessmentResult {
   aiRecommendation?: any;
 }
 
+const normalizeResultArray = (value: any): string[] => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+
+    if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+      try {
+        return normalizeResultArray(JSON.parse(trimmed));
+      } catch {
+        return [];
+      }
+    }
+
+    return trimmed
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+};
+
+const normalizeResultScore = (value: any) => {
+  const numericValue = Number(value);
+  return Number.isFinite(numericValue) ? numericValue : 0;
+};
+
+const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
+  if (!result || typeof result !== "object") return null;
+
+  const rawScores = result.scores || {};
+  const electives = normalizeResultArray(result.electives ?? [result.elective_1, result.elective_2]);
+
+  return {
+    track: String(result.track || result.recommended_track || "General"),
+    electives,
+    scores: {
+      VA: normalizeResultScore(rawScores.VA ?? rawScores.verbal_ability_score ?? result.verbal_ability_score),
+      MA: normalizeResultScore(rawScores.MA ?? rawScores.mathematical_ability_score ?? result.mathematical_ability_score),
+      SA: normalizeResultScore(rawScores.SA ?? rawScores.spatial_ability_score ?? result.spatial_ability_score),
+      LRA: normalizeResultScore(rawScores.LRA ?? rawScores.logical_reasoning_score ?? result.logical_reasoning_score),
+    },
+    topDomains: normalizeResultArray(result.topDomains ?? result.top_domains),
+    topInterests: normalizeResultArray(result.topInterests ?? result.top_interests),
+    overallScore: normalizeResultScore(result.overallScore ?? result.overall_score ?? rawScores.overall_score),
+    aiRecommendation: result.aiRecommendation || {},
+  };
+};
+
 export function PublicAssessment() {
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState(0);
@@ -75,10 +130,22 @@ export function PublicAssessment() {
       const existingResults = localStorage.getItem("publicAssessmentResults");
 
       if (existingResults) {
-        setAssessmentCompleted(true);
-        setResults(JSON.parse(existingResults));
-        setLoading(false);
-        return;
+        let restoredResult: AssessmentResult | null = null;
+
+        try {
+          restoredResult = normalizeAssessmentResult(JSON.parse(existingResults));
+        } catch (error) {
+          console.error("Failed to restore public assessment result:", error);
+        }
+
+        if (restoredResult) {
+          setAssessmentCompleted(true);
+          setResults(restoredResult);
+          setLoading(false);
+          return;
+        }
+
+        localStorage.removeItem("publicAssessmentResults");
       }
 
       await loadQuestionsFromSupabase();
@@ -267,10 +334,36 @@ export function PublicAssessment() {
   }
 
   if (assessmentCompleted && results) {
-    const { track, electives, scores, topDomains, topInterests, overallScore } = results;
+    const normalizedResults = normalizeAssessmentResult(results);
+
+    if (!normalizedResults) {
+      return (
+        <div className="min-h-screen flex items-center justify-center p-6" style={publicAssessmentShellStyle}>
+          <div className="max-w-lg rounded-2xl bg-white p-8 text-center shadow-xl">
+            <h1 className="text-2xl font-bold text-slate-950">Unable to load result</h1>
+            <p className="mt-3 text-slate-600">
+              Please restart the assessment so we can generate a complete recommendation.
+            </p>
+            <button
+              onClick={() => {
+                localStorage.removeItem("publicAssessmentResults");
+                setAssessmentCompleted(false);
+                setResults(null);
+                setAssessmentStarted(false);
+              }}
+              className="mt-6 rounded-xl bg-[var(--electron-blue)] px-5 py-3 font-semibold text-white"
+            >
+              Restart Assessment
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    const { track, electives, scores, topDomains, topInterests, overallScore } = normalizedResults;
     const trackColor = "var(--electron-blue)";
     const secondaryColor = "var(--electron-red)";
-    const aiRecommendation = results.aiRecommendation || {};
+    const aiRecommendation = normalizedResults.aiRecommendation || {};
     const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest learning areas";
     const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your interests";
     const aiExplanation =
@@ -327,7 +420,10 @@ export function PublicAssessment() {
     };
 
     const careerPathways = Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
-      ? aiRecommendation.careerPathways
+      ? aiRecommendation.careerPathways.map((pathway: any) => ({
+          category: String(pathway?.category || pathway?.name || "Recommended Pathway"),
+          careers: normalizeResultArray(pathway?.careers ?? pathway?.courses ?? pathway?.items),
+        }))
       : electives.map((elective) => ({
           category: elective,
           careers: getSuggestedCourses(track, elective),
@@ -503,7 +599,7 @@ export function PublicAssessment() {
                       <div key={`${pathway.category}-${index}`} className="rounded-xl bg-slate-50 p-3">
                         <p className="text-sm font-bold text-slate-900">{pathway.category}</p>
                         <p className="mt-1 text-sm text-slate-600">
-                          {(pathway.careers || []).join(", ")}
+                          {normalizeResultArray(pathway.careers).join(", ")}
                         </p>
                       </div>
                     ))
@@ -823,7 +919,7 @@ export function PublicAssessment() {
     localStorage.removeItem(assessmentProgressKey);
     localStorage.removeItem("publicAssessmentProgress_guest");
 
-    setResults(assessmentResult);
+    setResults(normalizeAssessmentResult(assessmentResult));
     setAssessmentCompleted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
