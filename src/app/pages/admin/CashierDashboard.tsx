@@ -898,12 +898,12 @@ export function CashierDashboard() {
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-hidden rounded-2xl border border-white/20 bg-black/30 backdrop-blur-sm receipt-preview mb-4">
+                  <div className="h-[480px] overflow-hidden rounded-2xl border border-white/20 bg-black/30 backdrop-blur-sm receipt-preview mb-4 flex items-center justify-center">
                     {selectedReceiptUrls[0] ? (
                       <img
                         src={selectedReceiptUrls[0]}
                         alt="Payment Receipt"
-                        className="w-full h-full object-contain"
+                        className="max-h-full max-w-full object-contain"
                         style={{ transform: `scale(${zoom / 100})`, transformOrigin: 'center' }}
                       />
                     ) : (

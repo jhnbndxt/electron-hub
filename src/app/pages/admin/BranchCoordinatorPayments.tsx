@@ -942,9 +942,9 @@ export function BranchCoordinatorPayments() {
                     </div>
                   </div>
 
-                  <div className="flex flex-1 items-center justify-center overflow-hidden bg-slate-50/70 p-5">
+                  <div className="h-[480px] flex items-center justify-center overflow-hidden bg-slate-50/70 p-5">
                     {selectedPayment.receiptUrl ? (
-                      <div className="flex h-full w-full items-center justify-center rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-inner">
+                      <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-inner h-full w-full">
                         <img
                           src={selectedPayment.receiptUrl}
                           alt="Uploaded receipt preview"
