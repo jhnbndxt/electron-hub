@@ -372,7 +372,8 @@ CREATE TABLE payments (
   
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  notes TEXT
+  notes TEXT,
+  rejection_comment TEXT
 );
 
 CREATE INDEX idx_payments_student_id ON payments(student_id);

@@ -596,10 +596,42 @@ export function SectionManagement() {
 
       for (const section of newSections) {
         const plannedYearLevel = getMostCommonYearLevel(section.plannedStudents);
+        let sectionCode = section.name;
+        let attemptNumber = 1;
+        
+        // Check for duplicate section_code and append suffix if needed
+        while (attemptNumber <= 10) {
+          const { data: existingSection, error: checkError } = await supabase
+            .from("sections")
+            .select("id")
+            .eq("section_code", sectionCode)
+            .single();
+
+          // If no error (meaning no duplicate found) or PGRST116 (not found), we can use this code
+          if (checkError?.code === "PGRST116" || (!existingSection && !checkError)) {
+            break;
+          }
+          
+          if (checkError && checkError.code !== "PGRST116") {
+            alert(`Failed to check section code: ${checkError.message}`);
+            return;
+          }
+
+          // Duplicate found, try next variant
+          const baseName = section.name.replace(/\s*\(\d{4}-\d{4}\)\s*$/, "");
+          sectionCode = `${baseName}-${attemptNumber} (${currentSchoolYear})`;
+          attemptNumber++;
+        }
+
+        if (attemptNumber > 10) {
+          alert(`Failed to save section: Could not generate unique section code after multiple attempts.`);
+          return;
+        }
+
         const { data: insertedSection, error: sectionInsertError } = await supabase
           .from("sections")
           .insert({
-            section_code: section.name,
+            section_code: sectionCode,
             grade_level: toDatabaseGradeLevel(plannedYearLevel),
             track: section.track,
             capacity: maxStudentsPerSection,
@@ -688,6 +720,25 @@ export function SectionManagement() {
 
   const handleSaveEdit = async (sectionId: string) => {
     const normalizedSectionName = ensureSectionNameForSchoolYear(editForm.name, currentSchoolYear);
+
+    // Check if section_code already exists (excluding current section)
+    const { data: existingSection, error: checkError } = await supabase
+      .from("sections")
+      .select("id")
+      .eq("section_code", normalizedSectionName)
+      .neq("id", sectionId)
+      .single();
+
+    if (checkError && checkError.code !== "PGRST116") {
+      // PGRST116 is "no rows found" which is what we want
+      alert(`Failed to check section code: ${checkError.message}`);
+      return;
+    }
+
+    if (existingSection) {
+      alert(`Failed to update section: A section with code "${normalizedSectionName}" already exists.`);
+      return;
+    }
 
     const { error } = await supabase
       .from("sections")
