@@ -30,6 +30,7 @@ import {
   getDefaultAssessmentQuestions,
   syncInterestChecklistQuestions,
   syncDefaultAssessmentQuestions,
+  RIASEC_TYPES,
 } from "../../../services/assessmentService";
 
 interface AssessmentQuestion {
@@ -38,6 +39,7 @@ interface AssessmentQuestion {
   options: string[];
   correctAnswer?: number;
   category: string;
+  interestType?: string | null;
 }
 
 const categories = [
@@ -79,42 +81,51 @@ const categories = [
 ];
 
 const DEFAULT_OPTION_COUNT = 4;
+const INTEREST_OPTION_COUNT = 5;
 
 const isInterestCategory = (categoryName: string) => categoryName === "Interests";
 
 const createBlankOptions = (optionCount = DEFAULT_OPTION_COUNT) =>
   Array.from({ length: optionCount }, () => "");
 
-const ensureOptionSlots = (options: string[] = []) => {
+const ensureOptionSlots = (options: string[] = [], optionCount = DEFAULT_OPTION_COUNT) => {
   const normalizedOptions = Array.isArray(options)
     ? options.map((option) => (typeof option === "string" ? option : ""))
     : [];
-  const totalSlots = Math.max(DEFAULT_OPTION_COUNT, normalizedOptions.length);
+  const totalSlots = Math.max(optionCount, normalizedOptions.length);
 
   return Array.from({ length: totalSlots }, (_, index) => normalizedOptions[index] ?? "");
 };
 
 const createEmptyQuestionDraft = (categoryName?: string): Partial<AssessmentQuestion> => ({
   question: "",
-  options: createBlankOptions(),
+  options: createBlankOptions(categoryName && isInterestCategory(categoryName) ? INTEREST_OPTION_COUNT : DEFAULT_OPTION_COUNT),
   correctAnswer: categoryName && isInterestCategory(categoryName) ? undefined : 0,
   category: categoryName,
+  interestType: categoryName && isInterestCategory(categoryName) ? "Investigative" : null,
 });
 
-const normalizeDraftOptions = (options: string[] = []) => {
-  return ensureOptionSlots(options).map((option) => option.trim());
+const normalizeDraftOptions = (options: string[] = [], categoryName?: string) => {
+  return ensureOptionSlots(
+    options,
+    categoryName && isInterestCategory(categoryName) ? INTEREST_OPTION_COUNT : DEFAULT_OPTION_COUNT
+  ).map((option) => option.trim());
 };
 
 const formatAssessmentQuestion = (question: any): AssessmentQuestion => ({
   id: question.id,
   question: question.question,
-  options: ensureOptionSlots(question.options || []),
+  options: ensureOptionSlots(
+    question.options || [],
+    isInterestCategory(question.category) ? INTEREST_OPTION_COUNT : DEFAULT_OPTION_COUNT
+  ),
   correctAnswer: isInterestCategory(question.category)
     ? undefined
     : typeof question.correctAnswer === "number"
       ? question.correctAnswer
       : question.correct_answer,
   category: question.category,
+  interestType: question.interestType || question.interest_type || null,
 });
 
 const validateQuestionDraft = (
@@ -125,13 +136,17 @@ const validateQuestionDraft = (
     return "Question text is required.";
   }
 
-  const normalizedOptions = normalizeDraftOptions(questionDraft.options || []);
+  const normalizedOptions = normalizeDraftOptions(questionDraft.options || [], categoryName);
 
   if (normalizedOptions.some((option) => !option)) {
     return "Fill in every option before saving the question.";
   }
 
-  if (!isInterestCategory(categoryName)) {
+  if (isInterestCategory(categoryName)) {
+    if (!RIASEC_TYPES.includes(String(questionDraft.interestType || ""))) {
+      return "Select the RIASEC interest type before saving the question.";
+    }
+  } else {
     if (
       typeof questionDraft.correctAnswer !== "number" ||
       questionDraft.correctAnswer < 0 ||
@@ -149,9 +164,10 @@ const buildQuestionPayload = (
   categoryName: string
 ) => ({
   question: questionDraft.question?.trim() || "",
-  options: normalizeDraftOptions(questionDraft.options || []),
+  options: normalizeDraftOptions(questionDraft.options || [], categoryName),
   correctAnswer: isInterestCategory(categoryName) ? undefined : questionDraft.correctAnswer,
   category: categoryName,
+  interestType: isInterestCategory(categoryName) ? questionDraft.interestType : null,
 });
 
 export function AssessmentManagement() {
@@ -257,7 +273,14 @@ export function AssessmentManagement() {
 
   const handleEdit = (question: AssessmentQuestion) => {
     setEditingId(question.id);
-    setEditedQuestion({ ...question, options: ensureOptionSlots(question.options) });
+    setEditedQuestion({
+      ...question,
+      options: ensureOptionSlots(
+        question.options,
+        isInterestCategory(question.category) ? INTEREST_OPTION_COUNT : DEFAULT_OPTION_COUNT
+      ),
+      interestType: isInterestCategory(question.category) ? question.interestType || "Investigative" : null,
+    });
   };
 
   const handleSave = async (id: number) => {
@@ -332,6 +355,7 @@ export function AssessmentManagement() {
       options: newQ.options,
       correctAnswer: newQ.correctAnswer,
       category: newQ.category,
+      interestType: newQ.interestType,
     });
 
     if (error) {
@@ -575,6 +599,27 @@ export function AssessmentManagement() {
                                 />
                               </div>
 
+                              {checklistCategory && (
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    RIASEC Interest Type
+                                  </label>
+                                  <select
+                                    value={newQuestion.interestType || "Investigative"}
+                                    onChange={(e) =>
+                                      setNewQuestion({ ...newQuestion, interestType: e.target.value })
+                                    }
+                                    className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                  >
+                                    {RIASEC_TYPES.map((type) => (
+                                      <option key={type} value={type}>
+                                        {type}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                   {checklistCategory ? "Likert Scale Options" : "Answer Options"}
@@ -673,7 +718,7 @@ export function AssessmentManagement() {
                                     </div>
                                     {checklistCategory && (
                                       <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
-                                        Likert
+                                        {editedQuestion?.interestType || "RIASEC"}
                                       </span>
                                     )}
                                   </div>
@@ -695,6 +740,30 @@ export function AssessmentManagement() {
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                                       />
                                     </div>
+
+                                    {checklistCategory && (
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                          RIASEC Interest Type
+                                        </label>
+                                        <select
+                                          value={editedQuestion?.interestType || "Investigative"}
+                                          onChange={(e) =>
+                                            setEditedQuestion({
+                                              ...editedQuestion!,
+                                              interestType: e.target.value,
+                                            })
+                                          }
+                                          className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        >
+                                          {RIASEC_TYPES.map((type) => (
+                                            <option key={type} value={type}>
+                                              {type}
+                                            </option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    )}
 
                                     <div>
                                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -787,7 +856,7 @@ export function AssessmentManagement() {
                                         </span>
                                         {checklistCategory && (
                                           <span className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-red-700">
-                                            Likert
+                                            {question.interestType || "RIASEC"}
                                           </span>
                                         )}
                                       </div>
@@ -836,7 +905,7 @@ export function AssessmentManagement() {
 
                                   {checklistCategory && (
                                     <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-                                      These options appear to students as a 5-point Likert scale and contribute to their interest-cluster score by rating.
+                                      These options appear to students as a 5-point Likert scale. The selected RIASEC type is used by the assessment recommendation formula.
                                     </div>
                                   )}
                                 </div>

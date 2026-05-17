@@ -14,6 +14,7 @@ interface Question {
   options: string[];
   correctAnswer?: number;
   category: string;
+  interestType?: string | null;
 }
 
 type AnswerValue = number;
@@ -624,6 +625,7 @@ export function PublicAssessment() {
         options: question.options || [],
         correctAnswer: question.correct_answer,
         category: question.category,
+        interestType: question.interest_type || null,
       }));
 
       const organizedSections: Section[] = [
@@ -713,6 +715,7 @@ export function PublicAssessment() {
       options: q.options,
       correctAnswer: q.correctAnswer,
       category: q.category,
+      interestType: q.interestType || null,
     }));
   };
 

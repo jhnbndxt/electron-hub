@@ -15,6 +15,7 @@ interface Question {
   options: string[];
   correctAnswer?: number;
   category: string;
+  interestType?: string | null;
 }
 
 type AnswerValue = number;
@@ -179,6 +180,7 @@ export function Assessment() {
         options: question.options || [],
         correctAnswer: question.correct_answer,
         category: question.category,
+        interestType: question.interest_type || null,
       }));
 
       console.log(`✅ Loaded ${questions.length} questions from Supabase`);
@@ -270,6 +272,7 @@ export function Assessment() {
       options: question.options,
       correctAnswer: question.correctAnswer,
       category: question.category,
+      interestType: question.interestType || null,
     }));
   };
 

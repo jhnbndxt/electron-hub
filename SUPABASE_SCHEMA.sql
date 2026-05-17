@@ -215,6 +215,16 @@ CREATE TABLE assessment_questions (
   options JSONB NOT NULL DEFAULT '[]',
   correct_answer SMALLINT,
   category VARCHAR(50) NOT NULL CHECK (category IN ('Verbal', 'Math', 'Science', 'Logical', 'Interests')),
+  interest_type VARCHAR(20) CHECK (
+    interest_type IS NULL OR interest_type IN (
+      'Realistic',
+      'Investigative',
+      'Artistic',
+      'Social',
+      'Enterprising',
+      'Conventional'
+    )
+  ),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

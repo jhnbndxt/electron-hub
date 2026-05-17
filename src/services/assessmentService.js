@@ -8,6 +8,15 @@ import { createAuditLog } from './adminService';
 
 const INTERESTS_CATEGORY = 'Interests';
 
+export const RIASEC_TYPES = [
+  'Realistic',
+  'Investigative',
+  'Artistic',
+  'Social',
+  'Enterprising',
+  'Conventional',
+];
+
 const LIKERT_OPTIONS = [
   '5 - Strongly Agree',
   '4 - Agree',
@@ -16,22 +25,22 @@ const LIKERT_OPTIONS = [
   '1 - Strongly Disagree',
 ];
 
-const INTEREST_LIKERT_QUESTIONS = [
-  'I enjoy solving math problems.',
-  'I like science experiments.',
-  'I enjoy public speaking.',
-  'I like drawing or designing.',
-  'I enjoy helping people.',
-  'I like business activities.',
-  'I enjoy coding or computers.',
-  'I like fixing things.',
-  'I enjoy writing essays.',
-  'I like organizing records.',
-  'I enjoy leading groups.',
-  'I like nature or science topics.',
-  'I enjoy teaching others.',
-  'I like creating videos or music.',
-  'I enjoy building projects.',
+export const INTEREST_LIKERT_QUESTIONS = [
+  { question: 'I enjoy working with numbers and solving mathematical problems.', interestType: 'Investigative' },
+  { question: 'I am interested in conducting scientific activities or experiments.', interestType: 'Investigative' },
+  { question: 'I feel confident when speaking or presenting in front of other people.', interestType: 'Enterprising' },
+  { question: 'I enjoy creating designs, illustrations, or artistic outputs.', interestType: 'Artistic' },
+  { question: 'I like helping, assisting, or supporting other people.', interestType: 'Social' },
+  { question: 'I am interested in business-related tasks and entrepreneurship activities.', interestType: 'Enterprising' },
+  { question: 'I enjoy working with computers, technology, or programming tasks.', interestType: 'Investigative' },
+  { question: 'I like repairing, assembling, or troubleshooting objects or equipment.', interestType: 'Realistic' },
+  { question: 'I enjoy expressing ideas through writing or communication activities.', interestType: 'Artistic' },
+  { question: 'I prefer organizing files, schedules, or structured information.', interestType: 'Conventional' },
+  { question: 'I enjoy leading teams or managing group activities.', interestType: 'Enterprising' },
+  { question: 'I am interested in nature, environmental topics, or scientific discoveries.', interestType: 'Investigative' },
+  { question: 'I enjoy sharing knowledge or teaching others.', interestType: 'Social' },
+  { question: 'I am interested in multimedia, music, video editing, or creative production.', interestType: 'Artistic' },
+  { question: 'I enjoy building, designing, or developing practical projects.', interestType: 'Realistic' },
 ];
 
 const isInterestCategory = (category = '') => String(category || '').trim() === INTERESTS_CATEGORY;
@@ -44,6 +53,11 @@ const normalizeQuestionOptions = (options = []) => {
   return sourceOptions
     .map((option) => String(option || '').trim())
     .filter((option) => option.length > 0);
+};
+
+const normalizeInterestType = (interestType) => {
+  const normalizedType = String(interestType || '').trim();
+  return RIASEC_TYPES.includes(normalizedType) ? normalizedType : null;
 };
 
 export const getDefaultAssessmentQuestions = () => [
@@ -107,7 +121,12 @@ export const getDefaultAssessmentQuestions = () => [
   { question: 'Alphabetically first', options: ['Apple', 'Banana', 'Carrot', 'Date'], correctAnswer: 0, category: 'Logical' },
   { question: 'Sun : Day = Moon :', options: ['Morning', 'Night', 'Noon', 'Summer'], correctAnswer: 1, category: 'Logical' },
   { question: '3, 6, 9, 12, __', options: ['13', '14', '15', '16'], correctAnswer: 2, category: 'Logical' },
-  ...INTEREST_LIKERT_QUESTIONS.map((question) => ({ question, options: LIKERT_OPTIONS, category: 'Interests' })),
+  ...INTEREST_LIKERT_QUESTIONS.map(({ question, interestType }) => ({
+    question,
+    options: LIKERT_OPTIONS,
+    category: 'Interests',
+    interestType,
+  })),
 ];
 
 const normalizeCorrectAnswer = (correctAnswer, options, category) => {
@@ -131,6 +150,7 @@ const buildQuestionPayload = (questionData = {}) => {
     options,
     correct_answer: normalizeCorrectAnswer(questionData.correctAnswer, options, category),
     category,
+    interest_type: isInterestCategory(category) ? normalizeInterestType(questionData.interestType) : null,
     updated_at: new Date().toISOString(),
   };
 };
@@ -306,7 +326,7 @@ export const syncInterestChecklistQuestions = async () => {
   try {
     const { data, error } = await supabase
       .from('assessment_questions')
-      .select('id, question, options, correct_answer, category')
+      .select('id, question, options, correct_answer, category, interest_type')
       .eq('category', INTERESTS_CATEGORY)
       .order('id', { ascending: true });
 
@@ -323,13 +343,16 @@ export const syncInterestChecklistQuestions = async () => {
       .slice(0, INTEREST_LIKERT_QUESTIONS.length)
       .map((question, index) => {
         const currentQuestionText = normalizeQuestionText(question.question);
-        const nextQuestionText = INTEREST_LIKERT_QUESTIONS[index];
+        const nextQuestion = INTEREST_LIKERT_QUESTIONS[index];
+        const nextQuestionText = nextQuestion.question;
+        const nextInterestType = nextQuestion.interestType;
         const currentOptions = normalizeQuestionOptions(question.options);
         const shouldRewriteQuestion = nextQuestionText !== currentQuestionText;
         const shouldRewriteOptions = JSON.stringify(currentOptions) !== JSON.stringify(LIKERT_OPTIONS);
+        const shouldRewriteInterestType = question.interest_type !== nextInterestType;
         const shouldClearCorrectAnswer = question.correct_answer !== null && question.correct_answer !== undefined;
 
-        if (!shouldRewriteQuestion && !shouldRewriteOptions && !shouldClearCorrectAnswer) {
+        if (!shouldRewriteQuestion && !shouldRewriteOptions && !shouldRewriteInterestType && !shouldClearCorrectAnswer) {
           return null;
         }
 
@@ -337,6 +360,7 @@ export const syncInterestChecklistQuestions = async () => {
           id: question.id,
           question: nextQuestionText,
           options: LIKERT_OPTIONS,
+          interest_type: nextInterestType,
           updated_at: new Date().toISOString(),
         };
       })
@@ -354,6 +378,7 @@ export const syncInterestChecklistQuestions = async () => {
         .update({
           question: question.question,
           options: question.options,
+          interest_type: question.interest_type,
           correct_answer: null,
           updated_at: question.updated_at,
         })
@@ -395,7 +420,7 @@ export const syncDefaultAssessmentQuestions = async () => {
     const defaultQuestions = getDefaultAssessmentQuestions();
     const { data, error } = await supabase
       .from('assessment_questions')
-      .select('id, question, options, correct_answer, category')
+      .select('id, question, options, correct_answer, category, interest_type')
       .order('id', { ascending: true });
 
     if (error) {
@@ -419,7 +444,8 @@ export const syncDefaultAssessmentQuestions = async () => {
         normalizeQuestionText(currentQuestion.question) !== nextPayload.question ||
         currentQuestion.category !== nextPayload.category ||
         JSON.stringify(currentOptions) !== JSON.stringify(nextPayload.options) ||
-        currentQuestion.correct_answer !== nextPayload.correct_answer;
+        currentQuestion.correct_answer !== nextPayload.correct_answer ||
+        currentQuestion.interest_type !== nextPayload.interest_type;
 
       if (!shouldUpdate) {
         continue;

@@ -30,6 +30,33 @@ const INTEREST_CLUSTER_CONFIG = {
   physical: { label: 'Physical Activities', slots: [15] },
 };
 
+const RIASEC_CLUSTER_WEIGHTS = {
+  Realistic: { practical: 0.45, tech: 0.25, outdoor: 0.15, physical: 0.15 },
+  Investigative: { academic: 0.7, tech: 0.2, practical: 0.1 },
+  Artistic: { creative: 0.75, academic: 0.15, helping: 0.1 },
+  Social: { helping: 0.8, academic: 0.1, creative: 0.1 },
+  Enterprising: { business: 0.75, helping: 0.15, creative: 0.1 },
+  Conventional: { home: 0.45, practical: 0.35, business: 0.2 },
+};
+
+const LEGACY_INTEREST_TYPE_BY_SLOT = {
+  1: 'Investigative',
+  2: 'Investigative',
+  3: 'Enterprising',
+  4: 'Artistic',
+  5: 'Social',
+  6: 'Enterprising',
+  7: 'Investigative',
+  8: 'Realistic',
+  9: 'Artistic',
+  10: 'Conventional',
+  11: 'Enterprising',
+  12: 'Investigative',
+  13: 'Social',
+  14: 'Artistic',
+  15: 'Realistic',
+};
+
 const INTEREST_OPTION_CLUSTER_WEIGHTS = {
   physics: { academic: 1 },
   'computer science': { tech: 1 },
@@ -271,6 +298,10 @@ function getSelectedInterestOptions(question, answers) {
 }
 
 function calculateLegacyInterestClusterScores(answers, interestQuestions) {
+  if (interestQuestions.some((question) => question?.interest_type || question?.interestType)) {
+    return calculateRiasecInterestClusterScores(answers, interestQuestions);
+  }
+
   return Object.entries(INTEREST_CLUSTER_CONFIG).reduce((clusters, [key, config]) => {
     const total = config.slots.reduce(
       (sum, slot) => sum + getLegacyInterestResponse(interestQuestions, answers, slot),
@@ -280,6 +311,46 @@ function calculateLegacyInterestClusterScores(answers, interestQuestions) {
     clusters[key] = Math.round((total / config.slots.length) * 20);
     return clusters;
   }, buildEmptyInterestClusters());
+}
+
+function addRiasecRatingToClusters(clusterTotals, riasecType, rating) {
+  const weights = RIASEC_CLUSTER_WEIGHTS[riasecType];
+
+  if (!weights || rating <= 0) {
+    return;
+  }
+
+  Object.entries(weights).forEach(([clusterKey, weight]) => {
+    clusterTotals[clusterKey] += rating * weight;
+  });
+}
+
+function calculateRiasecInterestClusterScores(answers, interestQuestions) {
+  const clusterTotals = buildEmptyInterestClusters();
+  let maxRatingTotal = 0;
+
+  interestQuestions.forEach((question, index) => {
+    const response = Number(answers?.[question.id]);
+    const rating = Number.isFinite(response) && response >= 1 && response <= 5 ? response : 0;
+    const interestType = question?.interest_type || question?.interestType || LEGACY_INTEREST_TYPE_BY_SLOT[index + 1];
+
+    if (!interestType || rating <= 0) {
+      return;
+    }
+
+    addRiasecRatingToClusters(clusterTotals, interestType, rating);
+    maxRatingTotal += 5;
+  });
+
+  if (maxRatingTotal === 0) {
+    return clusterTotals;
+  }
+
+  Object.keys(clusterTotals).forEach((clusterKey) => {
+    clusterTotals[clusterKey] = Math.round((clusterTotals[clusterKey] / maxRatingTotal) * 100);
+  });
+
+  return clusterTotals;
 }
 
 function calculateOptionBasedInterestClusterScores(answers, interestQuestions) {
@@ -390,7 +461,7 @@ export async function getQuestionsByCategory() {
   try {
     const { data, error } = await supabase
       .from('assessment_questions')
-      .select('id, question, options, correct_answer, category')
+      .select('id, question, options, correct_answer, category, interest_type')
       .order('id', { ascending: true });
 
     if (error) throw error;
