@@ -25,6 +25,8 @@ import toast, { Toaster } from "react-hot-toast";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { LoadingState } from "../../components/LoadingState";
+import { ProcessingModal } from "../../components/modals/ProcessingModal";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
 import {
   approveEnrollment,
   createAuditLog,
@@ -221,6 +223,15 @@ export function ApplicationReviewPage() {
   const [studentProfile, setStudentProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingState, setProcessingState] = useState<{
+    active: boolean;
+    title: string;
+    message: string;
+  }>({
+    active: false,
+    title: "Processing",
+    message: "Please wait...",
+  });
   const [selectedDocKey, setSelectedDocKey] = useState(DOCUMENTS[0].key);
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [zoom, setZoom] = useState(100);
@@ -504,9 +515,15 @@ export function ApplicationReviewPage() {
       return;
     }
 
-    setIsProcessing(true);
+    setProcessingState({
+      active: true,
+      title: `Approving ${doc.label}`,
+      message: "Processing document approval...",
+    });
+
     const { data, error } = await updateDocumentStatus(doc.id, "approved");
-    setIsProcessing(false);
+
+    setProcessingState({ active: false, title: "", message: "" });
 
     if (error) {
       toast.error(error);
@@ -526,14 +543,19 @@ export function ApplicationReviewPage() {
       return;
     }
 
-    setIsProcessing(true);
+    setProcessingState({
+      active: true,
+      title: `Rejecting ${targetKeys.length > 1 ? "Documents" : "Document"}`,
+      message: "Processing document rejection...",
+    });
+
     for (const key of targetKeys) {
       const doc = documents.find((item) => item.key === key);
       if (!doc?.id || !canReviewDocument(doc)) continue;
 
       const { data, error } = await updateDocumentStatus(doc.id, "rejected", docRejectReason.trim());
       if (error) {
-        setIsProcessing(false);
+        setProcessingState({ active: false, title: "", message: "" });
         toast.error(error);
         return;
       }
@@ -547,7 +569,7 @@ export function ApplicationReviewPage() {
       await createAuditLog(actorReference, "DOCUMENT_REJECTED", `Rejected ${doc.label} for ${studentName}`, "warning");
     }
 
-    setIsProcessing(false);
+    setProcessingState({ active: false, title: "", message: "" });
     toast.success(`${targetKeys.length} document${targetKeys.length === 1 ? "" : "s"} rejected. Student notified.`);
     setDocRejectKey(null);
     setDocRejectKeys([]);
@@ -566,20 +588,25 @@ export function ApplicationReviewPage() {
       return;
     }
 
-    setIsProcessing(true);
+    setProcessingState({
+      active: true,
+      title: `Approving ${keys.length} Document${keys.length === 1 ? "" : "s"}`,
+      message: "Processing bulk document approval...",
+    });
+
     for (const key of keys) {
       const doc = documents.find((item) => item.key === key);
       if (!doc?.id || !canReviewDocument(doc)) continue;
       const { data, error } = await updateDocumentStatus(doc.id, "approved");
       if (error) {
-        setIsProcessing(false);
+        setProcessingState({ active: false, title: "", message: "" });
         toast.error(error);
         return;
       }
       updateLocalDocument(doc.id, { ...(data || {}), status: "approved", rejection_comment: null });
       await createAuditLog(actorReference, "DOCUMENT_APPROVED", `Approved ${doc.label} for ${studentName}`, "success");
     }
-    setIsProcessing(false);
+    setProcessingState({ active: false, title: "", message: "" });
     setSelectedDocs([]);
     toast.success(`${keys.length} document${keys.length === 1 ? "" : "s"} approved.`);
     goToNextPendingDocument(keys[0]);
@@ -639,7 +666,12 @@ export function ApplicationReviewPage() {
     }
 
     setShowApprovalConfirm(false);
-    setIsProcessing(true);
+    setProcessingState({
+      active: true,
+      title: "Approving Application",
+      message: "Processing application approval and enrollment...",
+    });
+
     try {
       const savedEnrollment = await saveVoucherDecision();
       const isVoucherEligible = voucherEligibility === "eligible";
@@ -707,7 +739,7 @@ export function ApplicationReviewPage() {
     } catch (error: any) {
       toast.error(error?.message || "Unable to approve application.");
     } finally {
-      setIsProcessing(false);
+      setProcessingState({ active: false, title: "", message: "" });
     }
   };
 
@@ -717,9 +749,14 @@ export function ApplicationReviewPage() {
       return;
     }
 
-    setIsProcessing(true);
+    setProcessingState({
+      active: true,
+      title: "Rejecting Application",
+      message: "Processing application rejection...",
+    });
+
     const { error } = await rejectEnrollment(enrollment.id, applicationRejectReason.trim(), actorReference);
-    setIsProcessing(false);
+    setProcessingState({ active: false, title: "", message: "" });
 
     if (error) {
       toast.error(error);
@@ -940,6 +977,12 @@ export function ApplicationReviewPage() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.24),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(14,165,233,0.18),transparent_30%),linear-gradient(135deg,#f8fafc_0%,#eef6ff_45%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
       <Toaster position="top-right" />
 
+      <ProcessingModal
+        isOpen={processingState.active}
+        title={processingState.title}
+        message={processingState.message}
+      />
+
       {isProcessing && (
         <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
           <div className="inline-flex items-center gap-3 rounded-xl bg-white px-5 py-4 text-sm font-bold shadow-xl">
@@ -965,7 +1008,8 @@ export function ApplicationReviewPage() {
             </button>
             <button
               onClick={moveToNextApplicant}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-700/90 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-700/15 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-700/20"
+              disabled={processingState.active}
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-700/90 px-4 py-2.5 text-sm font-black text-white shadow-lg shadow-blue-700/15 transition hover:-translate-y-0.5 hover:bg-blue-700 hover:shadow-xl hover:shadow-blue-700/20 disabled:cursor-wait disabled:opacity-60"
             >
               Move to Next Applicant
             </button>
@@ -1165,14 +1209,14 @@ export function ApplicationReviewPage() {
                     setDocRejectKeys(keys);
                     setDocRejectReason("");
                   }}
-                  disabled={selectedActionableDocs.length === 0 || isProcessing}
+                  disabled={selectedActionableDocs.length === 0 || processingState.active}
                   className="rounded-xl border border-rose-200/80 bg-white/65 px-4 py-2 text-sm font-black text-rose-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
                 >
                   Bulk Reject
                 </button>
                 <button
                   onClick={approveSelectedDocuments}
-                  disabled={selectedActionableDocs.length === 0 || isProcessing}
+                  disabled={selectedActionableDocs.length === 0 || processingState.active}
                   className="rounded-xl border border-blue-200/80 bg-white/65 px-4 py-2 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
                 >
                   Bulk Approve
@@ -1237,7 +1281,7 @@ export function ApplicationReviewPage() {
                     setDocRejectKeys([]);
                     setDocRejectReason(selectedDocument?.rejectionComment || "");
                   }}
-                  disabled={!canReviewDocument(selectedDocument) || isProcessing}
+                  disabled={!canReviewDocument(selectedDocument) || processingState.active}
                   className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black shadow-sm backdrop-blur-xl transition ${
                     selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview
                       ? "pointer-events-none border-rose-200 bg-rose-50/80 text-rose-700 shadow-none"
@@ -1253,7 +1297,7 @@ export function ApplicationReviewPage() {
                 </button>
                 <button
                   onClick={() => approveDocument()}
-                  disabled={!canReviewDocument(selectedDocument) || isProcessing}
+                  disabled={!canReviewDocument(selectedDocument) || processingState.active}
                   className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black shadow-sm backdrop-blur-xl transition ${
                     selectedDocument?.status === "approved"
                       ? "pointer-events-none border-emerald-200 bg-emerald-50/80 text-emerald-700 shadow-none"
@@ -1352,7 +1396,8 @@ export function ApplicationReviewPage() {
           <div className="grid gap-3 lg:grid-cols-2">
             <button
               onClick={() => setShowApplicationReject(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300/80 bg-white/65 px-4 py-3 text-sm font-black text-rose-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md"
+              disabled={processingState.active}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300/80 bg-white/65 px-4 py-3 text-sm font-black text-rose-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md disabled:cursor-wait disabled:opacity-70"
             >
               <XCircle className="h-4 w-4" />
               Reject Application
@@ -1365,7 +1410,7 @@ export function ApplicationReviewPage() {
                 }
                 setShowApprovalConfirm(true);
               }}
-              disabled={isProcessing}
+              disabled={processingState.active}
               className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200/80 bg-white/65 px-4 py-3 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:cursor-wait disabled:opacity-70"
             >
               <ShieldCheck className="h-4 w-4" />
@@ -1419,7 +1464,7 @@ export function ApplicationReviewPage() {
                 >
                   Cancel
                 </button>
-                <button onClick={confirmDocumentReject} disabled={!docRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">
+                <button onClick={confirmDocumentReject} disabled={!docRejectReason.trim() || processingState.active} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">
                   Reject {docRejectKeys.length > 1 ? "Documents" : "Document"}
                 </button>
               </div>
@@ -1448,7 +1493,7 @@ export function ApplicationReviewPage() {
               />
               <div className="mt-4 flex justify-end gap-2">
                 <button onClick={() => setShowApplicationReject(false)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-bold text-slate-700">Cancel</button>
-                <button onClick={rejectApplication} disabled={!applicationRejectReason.trim()} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">Reject Application</button>
+                <button onClick={rejectApplication} disabled={!applicationRejectReason.trim() || processingState.active} className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-bold text-white disabled:bg-slate-300">Reject Application</button>
               </div>
             </div>
           </div>
@@ -1493,7 +1538,7 @@ export function ApplicationReviewPage() {
                 </button>
                 <button
                   onClick={approveApplication}
-                  disabled={isProcessing}
+                  disabled={processingState.active}
                   className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-700/15 transition hover:bg-blue-800 disabled:cursor-wait disabled:bg-slate-300"
                 >
                   Confirm Approval

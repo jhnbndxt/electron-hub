@@ -22,9 +22,12 @@ import {
   Save,
 } from "lucide-react";
 import bcrypt from "bcryptjs";
+import toast, { Toaster } from "react-hot-toast";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
@@ -188,6 +191,12 @@ export function BranchCoordinatorPayments() {
   const [settingsError, setSettingsError] = useState("");
   const [failedSettingsAttempts, setFailedSettingsAttempts] = useState(0);
   const [settingsLockedUntil, setSettingsLockedUntil] = useState<number | null>(null);
+  const [processingState, setProcessingState] = useState({
+    active: false,
+    title: "Processing Request...",
+    message: "Please wait while we apply the changes.",
+  });
+  const [showSaveSettingsConfirm, setShowSaveSettingsConfirm] = useState(false);
   const canManagePaymentSettings = userRole === "branchcoordinator" || userRole === "cashier";
 
   useEffect(() => {
@@ -345,38 +354,7 @@ export function BranchCoordinatorPayments() {
       return;
     }
 
-    if (!window.confirm("Save these payment settings? This will immediately affect student payment options.")) {
-      return;
-    }
-
-    try {
-      await verifySettingsPassword();
-      const timestamp = new Date().toISOString();
-      localStorage.setItem(
-        `payment_settings_backup_${timestamp}`,
-        JSON.stringify({ settings: paymentSettings, backedUpAt: timestamp, actor: userData?.email || userData?.id })
-      );
-
-      const currentSettingsResult = await getSystemSettings();
-      const { warning } = await saveSystemSettings(
-        { ...(currentSettingsResult.data || {}), ...settingsDraft },
-        userData?.id || userData?.email
-      );
-      setPaymentSettings(settingsDraft);
-      setConfirmationPassword("");
-      setEditingCategory(null);
-      setSettingsError(warning || "");
-      setFailedSettingsAttempts(0);
-      setSettingsLockedUntil(null);
-      await loadPaymentSettings();
-    } catch (error) {
-      const nextFailedAttempts = failedSettingsAttempts + 1;
-      setFailedSettingsAttempts(nextFailedAttempts);
-      if (nextFailedAttempts >= 3) {
-        setSettingsLockedUntil(Date.now() + 5 * 60 * 1000);
-      }
-      setSettingsError(error instanceof Error ? error.message : "Unable to save payment settings.");
-    }
+    setShowSaveSettingsConfirm(true);
   };
 
   const handleRestoreLastPaymentSettingsBackup = () => {
@@ -400,6 +378,49 @@ export function BranchCoordinatorPayments() {
       }
     } catch (_error) {
       setSettingsError("Unable to read the latest payment settings backup.");
+    }
+  };
+
+  const confirmSavePaymentSettings = async () => {
+    setShowSaveSettingsConfirm(false);
+    setProcessingState({
+      active: true,
+      title: "Saving Payment Settings",
+      message: "Applying your payment configuration changes...",
+    });
+
+    try {
+      await verifySettingsPassword();
+      const timestamp = new Date().toISOString();
+      localStorage.setItem(
+        `payment_settings_backup_${timestamp}`,
+        JSON.stringify({ settings: paymentSettings, backedUpAt: timestamp, actor: userData?.email || userData?.id })
+      );
+
+      const currentSettingsResult = await getSystemSettings();
+      const { warning } = await saveSystemSettings(
+        { ...(currentSettingsResult.data || {}), ...settingsDraft },
+        userData?.id || userData?.email
+      );
+      setPaymentSettings(settingsDraft);
+      setConfirmationPassword("");
+      setEditingCategory(null);
+      setSettingsError(warning || "");
+      setFailedSettingsAttempts(0);
+      setSettingsLockedUntil(null);
+      await loadPaymentSettings();
+      toast.success("Payment settings saved successfully.");
+    } catch (error) {
+      const nextFailedAttempts = failedSettingsAttempts + 1;
+      setFailedSettingsAttempts(nextFailedAttempts);
+      if (nextFailedAttempts >= 3) {
+        setSettingsLockedUntil(Date.now() + 5 * 60 * 1000);
+      }
+      const message = error instanceof Error ? error.message : "Unable to save payment settings.";
+      setSettingsError(message);
+      toast.error(message);
+    } finally {
+      setProcessingState({ active: false, title: "", message: "" });
     }
   };
 
@@ -504,6 +525,12 @@ export function BranchCoordinatorPayments() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
+      <Toaster position="top-right" />
+      <ProcessingModal
+        isOpen={processingState.active}
+        title={processingState.title}
+        message={processingState.message}
+      />
       <DashboardPageHeader
         badge="Payment Administration"
         title="Payment Management"
@@ -1113,11 +1140,11 @@ export function BranchCoordinatorPayments() {
                 )}
                 <button
                   onClick={handleSavePaymentSettings}
-                  disabled={Boolean(settingsLockedUntil && Date.now() < settingsLockedUntil)}
+                  disabled={processingState.active || Boolean(settingsLockedUntil && Date.now() < settingsLockedUntil)}
                   className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
-                  Save Settings
+                  {processingState.active ? "Saving..." : "Save Settings"}
                 </button>
                 <button
                   onClick={handleRestoreLastPaymentSettingsBackup}
@@ -1130,6 +1157,23 @@ export function BranchCoordinatorPayments() {
           </div>
         </div>
       )}
+
+      <ProcessingModal
+        isOpen={processingState.active}
+        title={processingState.title}
+        message={processingState.message}
+      />
+
+      <ConfirmationModal
+        isOpen={showSaveSettingsConfirm}
+        onClose={() => setShowSaveSettingsConfirm(false)}
+        onConfirm={confirmSavePaymentSettings}
+        title="Save Payment Settings"
+        message="Are you sure you want to save these payment settings? This will immediately affect student payment options."
+        confirmText="Save Settings"
+        cancelText="Cancel"
+        type="warning"
+      />
 
       {/* Legacy details modal retained inactive after redesign */}
       {false && showDetailsModal && selectedPayment && (

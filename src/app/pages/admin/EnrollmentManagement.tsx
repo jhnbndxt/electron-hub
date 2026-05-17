@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
 import { Search, CheckCircle, User, FileText, CreditCard, GraduationCap } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 import { getEnrollmentManagementStudents, enrollStudent, getStudentPaymentStatus } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 interface StudentApplication {
@@ -26,6 +28,11 @@ export function EnrollmentManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<"all" | "ready" | "enrolled">("ready");
   const [pendingEnrollment, setPendingEnrollment] = useState<StudentApplication | null>(null);
+  const [processingState, setProcessingState] = useState({
+    active: false,
+    title: "Processing",
+    message: "Please wait...",
+  });
 
   useEffect(() => {
     void loadApplications();
@@ -87,7 +94,7 @@ export function EnrollmentManagement() {
 
   const handleEnrollStudent = async (student: StudentApplication) => {
     if (!isPaymentVerified(student.email)) {
-      alert("Payment must be verified before enrolling the student. Please verify payment first.");
+      toast.error("Payment must be verified before enrolling the student. Please verify payment first.");
       return;
     }
 
@@ -99,10 +106,22 @@ export function EnrollmentManagement() {
       return;
     }
 
+    setProcessingState({
+      active: true,
+      title: "Enrolling Student",
+      message: "Processing student enrollment...",
+    });
+
     const { error } = await enrollStudent(pendingEnrollment.id, pendingEnrollment.email);
 
+    setProcessingState({
+      active: false,
+      title: "",
+      message: "",
+    });
+
     if (error) {
-      alert(`Error enrolling student: ${error}`);
+      toast.error(`Error enrolling student: ${error}`);
       return;
     }
 
@@ -112,7 +131,8 @@ export function EnrollmentManagement() {
       console.error('Error creating notification:', error);
     }
 
-    alert(`${pendingEnrollment.studentName} has been successfully enrolled!`);
+    toast.success(`${pendingEnrollment.studentName} has been successfully enrolled!`);
+    setPendingEnrollment(null);
     void loadApplications();
   };
 
@@ -139,6 +159,13 @@ export function EnrollmentManagement() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+      <Toaster position="top-right" />
+      <ProcessingModal
+        isOpen={processingState.active}
+        title={processingState.title}
+        message={processingState.message}
+      />
+
       <DashboardPageHeader
         badge="Enrollment Processing"
         title="Enrollment Management"
@@ -294,14 +321,16 @@ export function EnrollmentManagement() {
                     {!enrolled ? (
                       <button
                         onClick={() => handleEnrollStudent(app)}
-                        disabled={!paymentVerified}
+                        disabled={!paymentVerified || processingState.active}
                         className={`w-full justify-center px-6 py-3 rounded-lg font-semibold transition-colors flex items-center gap-2 ${
-                          paymentVerified
+                          paymentVerified && !processingState.active
                             ? "bg-blue-600 text-white hover:bg-blue-700"
                             : "bg-gray-300 text-gray-500 cursor-not-allowed"
                         }`}
                         title={
-                          paymentVerified
+                          processingState.active
+                            ? "Processing enrollment..."
+                            : paymentVerified
                             ? "Mark as enrolled"
                             : "Payment must be verified first"
                         }
