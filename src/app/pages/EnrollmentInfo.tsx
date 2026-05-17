@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { CheckCircle, FileText, Send, Sparkles, GraduationCap, UserPlus, Brain, CreditCard } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getSystemSettings } from "../../services/systemSettingsService";
+import electivesDataset from "../../data/electives";
 
 function formatDateLabel(dateValue) {
   if (!dateValue) {
@@ -35,6 +36,40 @@ function getDefaultEnrollmentWindow(academicYear) {
     start: `${normalizedYear}-03-01`,
     end: `${normalizedYear}-04-30`,
   };
+}
+
+const electiveTrackConfig = [
+  {
+    track: "Academic",
+    title: "ACADEMIC TRACK ELECTIVES",
+    color: "#1E3A8A",
+  },
+  {
+    track: "Technical-Professional",
+    title: "TECHNICAL-PROFESSIONAL ELECTIVES",
+    color: "#B91C1C",
+  },
+];
+
+function groupElectivesByTrack(track) {
+  return (electivesDataset || [])
+    .filter((elective) => elective.track === track)
+    .reduce((groups, elective) => {
+      const groupName = elective.group || elective.category || "Other Programs";
+      const existingGroup = groups.find((group) => group.name === groupName);
+
+      if (existingGroup) {
+        existingGroup.electives.push(elective.name);
+        return groups;
+      }
+
+      groups.push({
+        name: groupName,
+        electives: [elective.name],
+      });
+
+      return groups;
+    }, []);
 }
 
 export function EnrollmentInfo() {
@@ -334,196 +369,46 @@ export function EnrollmentInfo() {
 
           {/* Two Column Layout */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-            {/* Left Column: Academic Track */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-2xl font-bold mb-6 pb-4 border-b-4" style={{ color: "#1E3A8A", borderColor: "#1E3A8A" }}>
-                ACADEMIC TRACK ELECTIVES
-              </h3>
+            {electiveTrackConfig.map((trackConfig) => {
+              const groups = groupElectivesByTrack(trackConfig.track);
 
-              {/* Arts, Social Sciences, & Humanities */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#1E3A8A" }}>
-                  Arts, Social Sciences, & Humanities
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Creative Composition 1</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Philippine Governance</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Leadership & Management in the Arts</span>
-                  </li>
-                </ul>
-              </div>
+              return (
+                <div key={trackConfig.track} className="bg-white rounded-2xl shadow-lg p-8">
+                  <div className="mb-6 border-b-4 pb-4" style={{ borderColor: trackConfig.color }}>
+                    <h3 className="text-2xl font-bold" style={{ color: trackConfig.color }}>
+                      {trackConfig.title}
+                    </h3>
+                    <p className="mt-2 text-sm font-medium text-gray-500">
+                      {groups.reduce((total, group) => total + group.electives.length, 0)} offered electives and programs
+                    </p>
+                  </div>
 
-              {/* Business & Entrepreneurship */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#1E3A8A" }}>
-                  Business & Entrepreneurship
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Basic Accounting</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Business Economics</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Contemporary Marketing</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* STEM */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#1E3A8A" }}>
-                  STEM
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Finite Mathematics 1 & 2</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Biology 1 & 2</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Physics 1 & 2</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Sports, Health, & Wellness */}
-              <div>
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#1E3A8A" }}>
-                  Sports, Health, & Wellness
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Human Movement 1</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Sports Activity Management</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-600 mt-1">•</span>
-                    <span>Sports Coaching</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-
-            {/* Right Column: Technical-Professional Track */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h3 className="text-2xl font-bold mb-6 pb-4 border-b-4" style={{ color: "#B91C1C", borderColor: "#B91C1C" }}>
-                TECHNICAL-PROFESSIONAL ELECTIVES
-              </h3>
-
-              {/* Aesthetic, Wellness, & Care */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#B91C1C" }}>
-                  Aesthetic, Wellness, & Care
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Beauty Care NC II</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Caregiving NC II</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Agri-Fishery & Food */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#B91C1C" }}>
-                  Agri-Fishery & Food
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Food Processing NC II</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Agricultural Crops NC II</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* ICT Support & Programming */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#B91C1C" }}>
-                  ICT Support & Programming
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Java NC III</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>.NET Technology NC III</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Computer Systems Servicing NC II</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Hospitality & Tourism */}
-              <div className="mb-8">
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#B91C1C" }}>
-                  Hospitality & Tourism
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Events Management NC II</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Bakery Operations NC II</span>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Industrial & Automotive */}
-              <div>
-                <h4 className="font-semibold text-lg mb-3" style={{ color: "#B91C1C" }}>
-                  Industrial & Automotive
-                </h4>
-                <ul className="space-y-2 text-gray-700">
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Automotive Servicing NC II</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-red-600 mt-1">•</span>
-                    <span>Mechatronics NC II</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
+                  <div className="space-y-8">
+                    {groups.map((group) => (
+                      <div key={group.name}>
+                        <h4 className="font-semibold text-lg mb-3" style={{ color: trackConfig.color }}>
+                          {group.name}
+                        </h4>
+                        <ul className="grid gap-2 text-gray-700 sm:grid-cols-2">
+                          {group.electives.map((electiveName) => (
+                            <li key={electiveName} className="flex items-start gap-2">
+                              <span
+                                className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                                style={{ backgroundColor: trackConfig.color }}
+                              />
+                              <span>{electiveName}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
-
       {/* CTA Section */}
       <section className="py-16 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
