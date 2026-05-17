@@ -159,7 +159,25 @@ export function CashierDashboard() {
 
   useEffect(() => {
     loadPayments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const handleWindowFocus = () => {
+      loadPayments();
+    };
+
+    window.addEventListener("focus", handleWindowFocus);
+    return () => window.removeEventListener("focus", handleWindowFocus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (showReviewModal || showCashModal) {
+      loadPayments();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReviewModal, showCashModal]);
 
   useEffect(() => {
     if (selectedPayment) {
@@ -168,7 +186,23 @@ export function CashierDashboard() {
     }
   }, [selectedPayment]);
 
-  const loadPayments = async () => {
+  useEffect(() => {
+    if (selectedPayment) {
+      const refreshedPayment = onlinePayments.find((p) => p.id === selectedPayment.id);
+      if (refreshedPayment && refreshedPayment !== selectedPayment) {
+        setSelectedPayment(refreshedPayment);
+      }
+    }
+
+    if (selectedCashPayment) {
+      const refreshedCashPayment = cashPayments.find((p) => p.id === selectedCashPayment.id);
+      if (refreshedCashPayment && refreshedCashPayment !== selectedCashPayment) {
+        setSelectedCashPayment(refreshedCashPayment);
+      }
+    }
+  }, [onlinePayments, cashPayments, selectedPayment, selectedCashPayment]);
+
+  async function loadPayments() {
     setIsLoading(true);
     // Load all payments from Supabase
     const { data: allPayments, error } = await getAllPayments();
@@ -407,7 +441,12 @@ export function CashierDashboard() {
     }
 
     // Update payment status in Supabase
-  const { error } = await updatePaymentStatus(selectedPayment.id, 'rejected', actorReference, rejectionComment.trim());
+  const { error } = await updatePaymentStatus(
+      selectedPayment.id,
+      'rejected',
+      actorReference,
+      rejectionComment.trim() as any
+    );
 
     if (error) {
       alert(`Error rejecting payment: ${error}`);

@@ -1075,7 +1075,13 @@ export const getAllPayments = async (status = null) => {
   }
 };
 
-// Update payment status
+/**
+ * Update payment status.
+ * @param {string} paymentId
+ * @param {string} status
+ * @param {string|null|undefined} verifiedBy
+ * @param {string|null} rejectionComment
+ */
 export const updatePaymentStatus = async (paymentId, status, verifiedBy, rejectionComment = null) => {
   try {
     const { data: currentPayment, error: currentPaymentError } = await supabase
