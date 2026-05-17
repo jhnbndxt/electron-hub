@@ -623,9 +623,10 @@ export function Assessment() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {isInterestQuestion(question) ? (
                     <div className="sm:col-span-2">
-                      <p className="mb-4 text-sm font-medium text-red-600">
-                        Rate this statement from 5 - Strongly Agree to 1 - Strongly Disagree.
-                      </p>
+                      <div className="mb-4 flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between">
+                        <span className="font-semibold">Choose the response that best matches you.</span>
+                        <span className="text-xs font-medium text-blue-700">Higher ratings mean stronger agreement.</span>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
                         {question.options.map((option, optionIndex) => {
                           const ratingValue = 5 - optionIndex;
@@ -634,9 +635,9 @@ export function Assessment() {
                           return (
                             <label
                               key={optionIndex}
-                              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 px-3 py-4 text-center transition-all ${
+                              className={`flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 px-3 py-4 text-center transition-all ${
                                 isSelected
-                                  ? "border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
+                                  ? "border-blue-500 bg-blue-50 text-blue-900 shadow-sm ring-2 ring-blue-100"
                                   : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
                               }`}
                             >
@@ -647,7 +648,8 @@ export function Assessment() {
                                 onChange={() => handleAnswer(question.id, ratingValue)}
                                 className="h-5 w-5 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
                               />
-                              <span className="text-xs font-semibold leading-5">{option}</span>
+                              <span className="text-lg font-bold leading-none">{ratingValue}</span>
+                              <span className="text-xs font-semibold leading-5">{option.replace(/^\d+\s*-\s*/, "")}</span>
                             </label>
                           );
                         })}

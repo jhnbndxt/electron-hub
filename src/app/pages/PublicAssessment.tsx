@@ -1657,7 +1657,7 @@ export function PublicAssessment() {
                       : "Answer every question carefully before moving to the next section."}
                   </p>
                 </div>
-                <div className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700">
                   <BarChart3 className="h-4 w-4" />
                   {currentSectionData.questions.length} Questions
                 </div>
@@ -1675,9 +1675,10 @@ export function PublicAssessment() {
 
                     {isInterestQuestion(question) ? (
                       <div>
-                        <p className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-red-600">
-                          5 - Strongly Agree to 1 - Strongly Disagree
-                        </p>
+                        <div className="mb-4 flex flex-col gap-2 rounded-xl border border-blue-100 bg-blue-50/70 px-4 py-3 text-sm text-blue-900 sm:flex-row sm:items-center sm:justify-between">
+                          <span className="font-semibold">Choose the response that best matches you.</span>
+                          <span className="text-xs font-medium text-blue-700">Higher ratings mean stronger agreement.</span>
+                        </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
                           {question.options.map((option, optIndex) => {
                             const ratingValue = 5 - optIndex;
@@ -1686,9 +1687,9 @@ export function PublicAssessment() {
                             return (
                               <label
                                 key={optIndex}
-                                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 px-3 py-4 text-center transition-all ${
+                                className={`flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 px-3 py-4 text-center transition-all ${
                                   isSelected
-                                    ? "border-blue-200 bg-blue-50 text-blue-900 shadow-sm"
+                                    ? "border-blue-500 bg-blue-50 text-blue-900 shadow-sm ring-2 ring-blue-100"
                                     : "border-gray-300 bg-white text-gray-700 hover:border-blue-300"
                                 }`}
                               >
@@ -1699,7 +1700,8 @@ export function PublicAssessment() {
                                   onChange={() => handleAnswer(question.id, ratingValue)}
                                   className="h-5 w-5 border-gray-300 text-blue-600 focus:ring-2 focus:ring-blue-200"
                                 />
-                                <span className="text-xs font-semibold leading-5">{option}</span>
+                                <span className="text-lg font-bold leading-none">{ratingValue}</span>
+                                <span className="text-xs font-semibold leading-5">{option.replace(/^\d+\s*-\s*/, "")}</span>
                               </label>
                             );
                           })}
