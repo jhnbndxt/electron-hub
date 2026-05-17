@@ -20,9 +20,12 @@ import {
   RotateCcw,
   AlertTriangle,
 } from "lucide-react";
+import toast, { Toaster } from "react-hot-toast";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { useAuth } from "../../context/AuthContext";
 import { supabase } from "../../../supabase";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
@@ -151,6 +154,15 @@ export function CashierDashboard() {
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [showRejectReasonModal, setShowRejectReasonModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<"approveOnline" | "rejectOnline" | "confirmCash" | null>(null);
+  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmMessage, setConfirmMessage] = useState("");
+  const [confirmText, setConfirmText] = useState("Confirm");
+  const [confirmType, setConfirmType] = useState<"danger" | "warning" | "info" | "success">("info");
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingTitle, setProcessingTitle] = useState("Processing Request");
+  const [processingMessage, setProcessingMessage] = useState("Please wait while we process your request...");
   const [rejectionComment, setRejectionComment] = useState("");
   const [zoom, setZoom] = useState(100);
 
@@ -391,121 +403,179 @@ export function CashierDashboard() {
     setIsLoading(false);
   };
 
+  const openConfirmModal = (
+    action: "approveOnline" | "rejectOnline" | "confirmCash",
+    title: string,
+    message: string,
+    confirmLabel: string,
+    type: "danger" | "warning" | "info" | "success" = "info"
+  ) => {
+    setConfirmAction(action);
+    setConfirmTitle(title);
+    setConfirmMessage(message);
+    setConfirmText(confirmLabel);
+    setConfirmType(type);
+    setShowConfirmModal(true);
+  };
+
   const handleApproveOnlinePayment = async () => {
     if (!selectedPayment) return;
 
-    // Update payment status in Supabase
-    const { error } = await updatePaymentStatus(selectedPayment.id, 'approved', actorReference);
+    setIsProcessing(true);
+    setProcessingTitle("Approving Payment...");
+    setProcessingMessage("Verifying payment and enrolling student. Please wait.");
 
-    if (error) {
-      alert(`Error approving payment: ${error}`);
-      return;
-    }
-
-    // Create audit log
-    await createAuditLog(
-      actorReference,
-      'PAYMENT_VERIFIED',
-      `Payment approved by ${actorName}: ${selectedPayment.referenceNumber}`,
-      'success'
-    );
-
-    // Create notification
     try {
-      await triggerNotification(selectedPayment.studentEmail, 'PAYMENT_VERIFIED');
+      const { error } = await updatePaymentStatus(selectedPayment.id, 'approved', actorReference);
+
+      if (error) {
+        toast.error("Failed to approve payment. Please try again.");
+        return;
+      }
+
+      await createAuditLog(
+        actorReference,
+        'PAYMENT_VERIFIED',
+        `Payment approved by ${actorName}: ${selectedPayment.referenceNumber}`,
+        'success'
+      );
+
+      try {
+        await triggerNotification(selectedPayment.studentEmail, 'PAYMENT_VERIFIED');
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      toast.success("Payment verified successfully. Student enrolled.");
+      await loadPayments();
+
+      const currentIndex = onlinePayments.findIndex((p) => p.id === selectedPayment.id);
+      const nextPending = onlinePayments.slice(currentIndex + 1).find((p) => p.status === 'pending');
+
+      if (nextPending) {
+        setSelectedPayment(nextPending);
+        setZoom(100);
+      } else {
+        setShowReviewModal(false);
+        setSelectedPayment(null);
+      }
     } catch (error) {
-      console.error('Error creating notification:', error);
+      console.error('Approve payment error:', error);
+      toast.error('Something went wrong while approving the payment.');
+    } finally {
+      setIsProcessing(false);
     }
-
-    // Auto-load next pending payment
-    const currentIndex = onlinePayments.findIndex(p => p.id === selectedPayment!.id);
-    const nextPending = onlinePayments.slice(currentIndex + 1).find(p => p.status === 'pending');
-
-    if (nextPending) {
-      setSelectedPayment(nextPending);
-      setZoom(100);
-      alert("Payment approved! Loading next pending payment.");
-    } else {
-      alert("Payment approved! No more pending payments.");
-      setShowReviewModal(false);
-      setSelectedPayment(null);
-    }
-
-    loadPayments();
   };
 
   const handleRejectOnlinePayment = async () => {
     if (!selectedPayment || !rejectionComment.trim()) {
-      alert("Please provide a reason for rejection");
+      toast.error("Please provide a reason for rejection.");
       return;
     }
 
-    // Update payment status in Supabase
-  const { error } = await updatePaymentStatus(
-      selectedPayment.id,
-      'rejected',
-      actorReference,
-      rejectionComment.trim() as any
-    );
+    setIsProcessing(true);
+    setProcessingTitle("Rejecting Payment...");
+    setProcessingMessage("Updating payment status and notifying the student. Please wait.");
 
-    if (error) {
-      alert(`Error rejecting payment: ${error}`);
-      return;
-    }
-
-    // Create audit log
-    await createAuditLog(
-      actorReference,
-      'PAYMENT_REJECTED',
-      `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment.trim()}`,
-      'warning'
-    );
-
-    // Create notification
     try {
-      await triggerNotification(selectedPayment.studentEmail, 'PAYMENT_REJECTED');
-    } catch (error) {
-      console.error('Error creating notification:', error);
-    }
+      const { error } = await updatePaymentStatus(
+        selectedPayment.id,
+        'rejected',
+        actorReference,
+        rejectionComment.trim() as any
+      );
 
-    alert("Payment rejected. Student will be notified.");
-    loadPayments();
-    setShowReviewModal(false);
-    setShowRejectReasonModal(false);
-    setSelectedPayment(null);
-    setRejectionComment("");
+      if (error) {
+        toast.error("Failed to reject payment. Please try again.");
+        return;
+      }
+
+      await createAuditLog(
+        actorReference,
+        'PAYMENT_REJECTED',
+        `Payment rejected by ${actorName}: ${selectedPayment.referenceNumber} - Reason: ${rejectionComment.trim()}`,
+        'warning'
+      );
+
+      try {
+        await triggerNotification(selectedPayment.studentEmail, 'PAYMENT_REJECTED');
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      toast.success("Payment rejected and student notified.");
+      await loadPayments();
+      setShowReviewModal(false);
+      setShowRejectReasonModal(false);
+      setSelectedPayment(null);
+      setRejectionComment("");
+    } catch (error) {
+      console.error('Reject payment error:', error);
+      toast.error('Something went wrong while rejecting the payment.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleConfirmCashPayment = async () => {
     if (!selectedCashPayment) return;
 
-    // Update payment status in Supabase
-    const { error } = await updatePaymentStatus(selectedCashPayment.id, 'paid', actorReference);
+    setIsProcessing(true);
+    setProcessingTitle("Confirming Cash Payment...");
+    setProcessingMessage("Finalizing cash payment verification. Please wait.");
 
-    if (error) {
-      alert(`Error confirming cash payment: ${error}`);
+    try {
+      const { error } = await updatePaymentStatus(selectedCashPayment.id, 'paid', actorReference);
+
+      if (error) {
+        toast.error("Failed to confirm cash payment. Please try again.");
+        return;
+      }
+
+      await createAuditLog(
+        actorReference,
+        'PAYMENT_VERIFIED',
+        `Cash payment confirmed by ${actorName}: Queue #${selectedCashPayment.queueNumber}`,
+        'success'
+      );
+
+      try {
+        await triggerNotification(selectedCashPayment.studentEmail, 'PAYMENT_VERIFIED');
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      await loadPayments();
+      setShowCashModal(false);
+      setSelectedCashPayment(null);
+      toast.success("Cash payment verified successfully.");
+    } catch (error) {
+      console.error('Cash payment confirmation error:', error);
+      toast.error('Something went wrong while confirming the cash payment.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmAction = async () => {
+    if (!confirmAction) {
+      setShowConfirmModal(false);
       return;
     }
 
-    // Create audit log
-    await createAuditLog(
-      actorReference,
-      'PAYMENT_VERIFIED',
-      `Cash payment confirmed by ${actorName}: Queue #${selectedCashPayment.queueNumber}`,
-      'success'
-    );
-
-    // Create notification
-    try {
-      await triggerNotification(selectedCashPayment.studentEmail, 'PAYMENT_VERIFIED');
-    } catch (error) {
-      console.error('Error creating notification:', error);
+    switch (confirmAction) {
+      case 'approveOnline':
+        await handleApproveOnlinePayment();
+        break;
+      case 'rejectOnline':
+        await handleRejectOnlinePayment();
+        break;
+      case 'confirmCash':
+        await handleConfirmCashPayment();
+        break;
     }
 
-    loadPayments();
-    setShowCashModal(false);
-    setSelectedCashPayment(null);
-    alert("Cash payment confirmed! Student has been enrolled successfully.");
+    setShowConfirmModal(false);
   };
 
   // Filter payments
@@ -547,6 +617,21 @@ export function CashierDashboard() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
+      <Toaster position="top-right" />
+      <ProcessingModal
+        isOpen={isProcessing}
+        title={processingTitle}
+        message={processingMessage}
+      />
+      <ConfirmationModal
+        isOpen={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        onConfirm={handleConfirmAction}
+        title={confirmTitle}
+        message={confirmMessage}
+        confirmText={confirmText}
+        type={confirmType}
+      />
       <DashboardPageHeader
         badge="Payment Processing"
         title="Payment Queue"
@@ -741,7 +826,8 @@ export function CashierDashboard() {
                           setSelectedPayment(payment);
                           setShowReviewModal(true);
                         }}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-blue-600 hover:text-blue-800 font-medium transition-colors"
+                        disabled={isProcessing}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 font-medium transition-colors ${isProcessing ? 'cursor-not-allowed text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
                       >
                         <Eye className="w-4 h-4" />
                         Review
@@ -838,7 +924,8 @@ export function CashierDashboard() {
                           setSelectedCashPayment(payment);
                           setShowCashModal(true);
                         }}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-green-600 hover:text-green-800 font-medium transition-colors"
+                        disabled={isProcessing}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 font-medium transition-colors ${isProcessing ? 'cursor-not-allowed text-gray-400' : 'text-green-600 hover:text-green-800'}`}
                       >
                         <Eye className="w-4 h-4" />
                         {payment.status === "pending" ? "Process" : "View"}
@@ -1040,14 +1127,24 @@ export function CashierDashboard() {
                         setRejectionComment("");
                         setShowRejectReasonModal(true);
                       }}
-                      className="flex-1 py-3 px-4 border border-red-300/50 bg-red-500/10 text-red-600 rounded-xl font-semibold hover:bg-red-500/20 transition-colors backdrop-blur"
+                      disabled={isProcessing}
+                      className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all backdrop-blur ${isProcessing ? 'cursor-not-allowed border border-red-200 bg-red-100 text-red-400' : 'border border-red-300/50 bg-red-500/10 text-red-600 hover:bg-red-500/20'}`}
                     >
                       Reject Payment
                     </button>
                     <button
-                      onClick={handleApproveOnlinePayment}
-                      className="flex-1 py-3 px-4 rounded-xl font-semibold hover:shadow-lg transition-all text-white"
-                      style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
+                      onClick={() =>
+                        openConfirmModal(
+                          'approveOnline',
+                          'Confirm student enrollment?',
+                          'Are you sure you want to verify and enroll this payment?',
+                          'Approve & Enroll',
+                          'success'
+                        )
+                      }
+                      disabled={isProcessing}
+                      className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all text-white ${isProcessing ? 'cursor-not-allowed bg-blue-300' : ''}`}
+                      style={isProcessing ? undefined : { background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',boxShadow: '0 10px 25px rgba(37, 99, 235, 0.2)' }}
                     >
                       Approve & Enroll
                     </button>
@@ -1099,13 +1196,26 @@ export function CashierDashboard() {
               <div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
                   onClick={() => setShowRejectReasonModal(false)}
-                  className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  disabled={isProcessing}
+                  className={`rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold transition ${isProcessing ? 'cursor-not-allowed text-slate-400 bg-slate-100' : 'text-slate-700 hover:bg-slate-50'}`}
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={handleRejectOnlinePayment}
-                  disabled={!rejectionComment.trim()}
+                  onClick={() => {
+                    if (!rejectionComment.trim()) {
+                      toast.error("Please provide a reason for rejection.");
+                      return;
+                    }
+                    openConfirmModal(
+                      'rejectOnline',
+                      'Reject payment? ',
+                      'Are you sure you want to reject this payment and notify the student?',
+                      'Reject Payment',
+                      'danger'
+                    );
+                  }}
+                  disabled={isProcessing || !rejectionComment.trim()}
                   className="rounded-xl bg-red-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Reject Payment
@@ -1244,8 +1354,17 @@ export function CashierDashboard() {
                 {selectedCashPayment.status === "pending" && (
                   <div className="border-t border-white/20 bg-white/45 p-6">
                     <button
-                      onClick={handleConfirmCashPayment}
-                      className="w-full rounded-2xl bg-emerald-600 px-4 py-3 font-bold text-white shadow-lg shadow-emerald-700/15 transition-all hover:bg-emerald-700 hover:shadow-xl"
+                      onClick={() =>
+                        openConfirmModal(
+                          'confirmCash',
+                          'Confirm student enrollment?',
+                          'Are you sure you want to verify this cash payment?',
+                          'Verify Payment',
+                          'success'
+                        )
+                      }
+                      disabled={isProcessing}
+                      className={`w-full rounded-2xl px-4 py-3 font-bold text-white transition-all ${isProcessing ? 'cursor-not-allowed bg-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-700/15 hover:shadow-xl'}`}
                     >
                       Confirm Payment Received & Enroll
                     </button>
