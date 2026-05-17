@@ -317,6 +317,11 @@ export function ApplicationReviewPage() {
     const doc = documents.find((item) => item.key === key);
     return canReviewDocument(doc);
   });
+  const hasBulkSelection = selectedActionableDocs.length > 1;
+  const activeReviewDocument = selectedActionableDocs.length === 1
+    ? documents.find((doc) => doc.key === selectedActionableDocs[0]) || selectedDocument
+    : selectedDocument;
+  const reviewActionEnabled = hasBulkSelection ? selectedActionableDocs.length > 0 : canReviewDocument(activeReviewDocument);
   const existingVoucherStatus = enrollment?.voucher_status || formData?.voucher?.voucher_status;
   const missingRequiredDocuments = documents.filter((doc) => doc.required && !doc.id);
   const unapprovedRequiredDocuments = documents.filter((doc) => doc.required && doc.id && doc.status !== "approved");
@@ -610,6 +615,14 @@ export function ApplicationReviewPage() {
     setSelectedDocs([]);
     toast.success(`${keys.length} document${keys.length === 1 ? "" : "s"} approved.`);
     goToNextPendingDocument(keys[0]);
+  };
+
+  const handleApproveAction = async () => {
+    if (hasBulkSelection) {
+      await approveSelectedDocuments();
+      return;
+    }
+    await approveDocument(activeReviewDocument?.key);
   };
 
   const saveVoucherDecision = async () => {
@@ -1198,29 +1211,7 @@ export function ApplicationReviewPage() {
                   />
                   Select all documents ({actionableDocuments.length})
                 </label>
-                <button
-                  onClick={() => {
-                    const keys = selectedActionableDocs;
-                    if (keys.length === 0) {
-                      toast.error("Select at least one document that is pending review or re-uploaded for review.");
-                      return;
-                    }
-                    setDocRejectKey(null);
-                    setDocRejectKeys(keys);
-                    setDocRejectReason("");
-                  }}
-                  disabled={selectedActionableDocs.length === 0 || processingState.active}
-                  className="rounded-xl border border-rose-200/80 bg-white/65 px-4 py-2 text-sm font-black text-rose-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
-                >
-                  Bulk Reject
-                </button>
-                <button
-                  onClick={approveSelectedDocuments}
-                  disabled={selectedActionableDocs.length === 0 || processingState.active}
-                  className="rounded-xl border border-blue-200/80 bg-white/65 px-4 py-2 text-sm font-black text-blue-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md disabled:pointer-events-none disabled:border-slate-200 disabled:bg-slate-100/70 disabled:text-slate-400 disabled:shadow-none"
-                >
-                  Bulk Approve
-                </button>
+                <span className="text-xs font-semibold text-slate-500">Selected: {selectedActionableDocs.length}</span>
               </div>
 
               <div className="mt-4 overflow-hidden rounded-2xl border border-white/70 bg-white/45 shadow-sm backdrop-blur-xl">
@@ -1277,39 +1268,45 @@ export function ApplicationReviewPage() {
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => {
-                    setDocRejectKey(selectedDocument?.key || null);
+                    if (hasBulkSelection) {
+                      setDocRejectKey(null);
+                      setDocRejectKeys(selectedActionableDocs);
+                      setDocRejectReason("");
+                      return;
+                    }
+                    setDocRejectKey(activeReviewDocument?.key || null);
                     setDocRejectKeys([]);
-                    setDocRejectReason(selectedDocument?.rejectionComment || "");
+                    setDocRejectReason(activeReviewDocument?.rejectionComment || "");
                   }}
-                  disabled={!canReviewDocument(selectedDocument) || processingState.active}
+                  disabled={!reviewActionEnabled || processingState.active}
                   className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black shadow-sm backdrop-blur-xl transition ${
-                    selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview
+                    activeReviewDocument?.status === "rejected" && !activeReviewDocument?.reuploadedForReview
                       ? "pointer-events-none border-rose-200 bg-rose-50/80 text-rose-700 shadow-none"
-                    : selectedDocument?.status === "approved"
+                    : activeReviewDocument?.status === "approved"
                       ? "pointer-events-none border-emerald-200 bg-emerald-50/80 text-emerald-700 shadow-none"
-                    : !canReviewDocument(selectedDocument)
+                    : !canReviewDocument(activeReviewDocument)
                       ? "pointer-events-none border-slate-200 bg-slate-100/70 text-slate-400 shadow-none"
                       : "border-rose-200/80 bg-white/65 text-rose-700 hover:-translate-y-0.5 hover:bg-rose-50 hover:shadow-md"
                   }`}
                 >
                   <XCircle className="h-4 w-4" />
-                  {selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview ? "Rejected" : "Reject"}
+                  {hasBulkSelection ? `Reject Selected (${selectedActionableDocs.length})` : activeReviewDocument?.status === "rejected" && !activeReviewDocument?.reuploadedForReview ? "Rejected" : "Reject"}
                 </button>
                 <button
-                  onClick={() => approveDocument()}
-                  disabled={!canReviewDocument(selectedDocument) || processingState.active}
+                  onClick={handleApproveAction}
+                  disabled={!reviewActionEnabled || processingState.active}
                   className={`inline-flex items-center justify-center gap-2 rounded-xl border px-4 py-3 text-sm font-black shadow-sm backdrop-blur-xl transition ${
-                    selectedDocument?.status === "approved"
+                    activeReviewDocument?.status === "approved"
                       ? "pointer-events-none border-emerald-200 bg-emerald-50/80 text-emerald-700 shadow-none"
-                    : selectedDocument?.status === "rejected" && !selectedDocument?.reuploadedForReview
+                    : activeReviewDocument?.status === "rejected" && !activeReviewDocument?.reuploadedForReview
                       ? "pointer-events-none border-rose-200 bg-rose-50/80 text-rose-700 shadow-none"
-                    : !canReviewDocument(selectedDocument)
+                    : !canReviewDocument(activeReviewDocument)
                       ? "pointer-events-none border-slate-200 bg-slate-100/70 text-slate-400 shadow-none"
                       : "border-blue-200/80 bg-white/65 text-blue-700 hover:-translate-y-0.5 hover:bg-blue-50 hover:shadow-md"
                   }`}
                 >
                   <CheckCircle className="h-4 w-4" />
-                  {selectedDocument?.status === "approved" ? "Approved" : "Approve"}
+                  {hasBulkSelection ? `Approve Selected (${selectedActionableDocs.length})` : activeReviewDocument?.status === "approved" ? "Approved" : "Approve"}
                 </button>
               </div>
             </aside>
