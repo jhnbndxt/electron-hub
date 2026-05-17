@@ -120,7 +120,7 @@ export function ConfirmationModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-y-0 right-0 left-0 z-50 bg-white/35 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
+            className="fixed inset-y-0 right-0 left-0 z-[90] bg-white/35 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
             onClick={() => {
               if (!isConfirming) {
                 onClose();
@@ -128,7 +128,7 @@ export function ConfirmationModal({
             }}
           />
 
-          <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center p-4 pointer-events-none lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="fixed inset-y-0 right-0 left-0 z-[91] flex items-center justify-center p-4 pointer-events-none lg:left-[var(--dashboard-sidebar-offset,0px)]">
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 28 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
