@@ -232,6 +232,11 @@ export function SectionManagement() {
   const [isSectionDataReady, setIsSectionDataReady] = useState(false);
   const [isAssignmentSyncing, setIsAssignmentSyncing] = useState(false);
   const [isAutoGenerating, setIsAutoGenerating] = useState(false);
+  const [sectionActionProcessing, setSectionActionProcessing] = useState({
+    active: false,
+    title: "Updating Sections",
+    message: "Please wait while the section records are updated.",
+  });
   const [pendingConfirmation, setPendingConfirmation] = useState<SectionConfirmation>(null);
   const [autoGenerateSettings, setAutoGenerateSettings] = useState({
     maxStudentsPerSection: 50,
@@ -785,6 +790,16 @@ export function SectionManagement() {
   };
 
   const confirmDeleteSection = async (sectionId: string) => {
+    const { error: assignmentDeleteError } = await supabase
+      .from("section_assignments")
+      .delete()
+      .eq("section_id", sectionId);
+
+    if (assignmentDeleteError) {
+      alert(`Failed to unassign students from section: ${assignmentDeleteError.message}`);
+      return;
+    }
+
     const { error } = await supabase
       .from("sections")
       .delete()
@@ -836,18 +851,36 @@ export function SectionManagement() {
       return;
     }
 
-    switch (pendingConfirmation.type) {
-      case "delete-section":
-        await confirmDeleteSection(pendingConfirmation.sectionId);
-        break;
-      case "remove-student":
-        await confirmRemoveStudentFromSection(
-          pendingConfirmation.sectionId,
-          pendingConfirmation.enrollmentId
-        );
-        break;
-      default:
-        break;
+    const actionToRun = pendingConfirmation;
+    setPendingConfirmation(null);
+    setSectionActionProcessing({
+      active: true,
+      title: actionToRun.type === "delete-section" ? "Deleting Section" : "Removing Student",
+      message:
+        actionToRun.type === "delete-section"
+          ? "Removing the section and clearing its student assignments. Please wait."
+          : "Removing the student from the section. Please wait.",
+    });
+
+    try {
+      switch (actionToRun.type) {
+        case "delete-section":
+          await confirmDeleteSection(actionToRun.sectionId);
+          break;
+        case "remove-student":
+          await confirmRemoveStudentFromSection(
+            actionToRun.sectionId,
+            actionToRun.enrollmentId
+          );
+          break;
+        default:
+          break;
+      }
+    } finally {
+      setSectionActionProcessing((currentState) => ({
+        ...currentState,
+        active: false,
+      }));
     }
   };
 
@@ -1425,9 +1458,13 @@ export function SectionManagement() {
       </div>
 
       <ProcessingModal
-        isOpen={isAutoGenerating}
-        title="Organizing Sections"
-        message="Auto-generating sections from enrolled students. Please wait while the system updates assignments."
+        isOpen={isAutoGenerating || sectionActionProcessing.active}
+        title={isAutoGenerating ? "Organizing Sections" : sectionActionProcessing.title}
+        message={
+          isAutoGenerating
+            ? "Auto-generating sections from enrolled students. Please wait while the system updates assignments."
+            : sectionActionProcessing.message
+        }
       />
       <ConfirmationModal
         isOpen={Boolean(pendingConfirmation)}

@@ -225,12 +225,6 @@ export function PendingApplications() {
     ? "/branchcoordinator"
     : "/registrar";
   const isRegistrarView = reviewBasePath === "/registrar";
-  const alert = (message: string) => {
-    const text = String(message || "");
-    if (text.includes("âœ…") || text.includes("✅")) return;
-    window.alert(message);
-  };
-
   useEffect(() => {
     loadApplications();
   }, []);

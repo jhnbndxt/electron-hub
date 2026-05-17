@@ -1,6 +1,4 @@
-import { LayoutDashboard, History, Search } from "lucide-react";
-import {
-} from "lucide-react";
+import { LayoutDashboard, History } from "lucide-react";
 import { PortalShell, type PortalNavItem } from "../components/PortalShell";
 
 export function CashierLayout() {

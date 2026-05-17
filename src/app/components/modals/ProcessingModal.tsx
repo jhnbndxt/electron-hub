@@ -1,5 +1,5 @@
+import { useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2 } from "lucide-react";
 
 interface ProcessingModalProps {
   isOpen: boolean;
@@ -14,6 +14,19 @@ export function ProcessingModal({
   message = "Please wait while we process your request...",
   description,
 }: ProcessingModalProps) {
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isOpen]);
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -23,7 +36,7 @@ export function ProcessingModal({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-y-0 right-0 left-0 z-[80] bg-black/40 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
+            className="fixed inset-y-0 right-0 left-0 z-[100] bg-black/45 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
           />
 
           {/* Modal */}
@@ -32,7 +45,11 @@ export function ProcessingModal({
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-y-0 right-0 left-0 z-[80] flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]"
+            className="fixed inset-y-0 right-0 left-0 z-[101] flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]"
+            role="dialog"
+            aria-modal="true"
+            aria-live="polite"
+            aria-labelledby="processing-modal-title"
           >
             <div className="relative max-w-sm w-full rounded-2xl border border-white/40 bg-white/95 shadow-2xl backdrop-blur-xl overflow-hidden">
               {/* Gradient background */}
@@ -53,7 +70,7 @@ export function ProcessingModal({
                 </motion.div>
 
                 {/* Title */}
-                <h3 className="text-lg font-semibold text-slate-950 mb-2">
+                <h3 id="processing-modal-title" className="text-lg font-semibold text-slate-950 mb-2">
                   {title}
                 </h3>
 

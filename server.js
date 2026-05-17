@@ -11,8 +11,6 @@ import assessmentAiHandler from "./api/assessment-ai.js";
 
 dotenv.config({ path: "./.env" });
 
-console.log("OPENROUTER_API_KEY=", process.env.OPENROUTER_API_KEY);
-
 const app = express();
 
 app.use(cors());

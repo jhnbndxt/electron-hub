@@ -1,6 +1,6 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { createBrowserRouter, RouterProvider, Navigate } from "react-router";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { initializeTestUsers } from "../services/seedTestUsers";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { DashboardLayout } from "./layouts/DashboardLayout";
@@ -50,6 +50,58 @@ import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SystemPresenceTracker } from "./components/SystemPresenceTracker";
 
+type AppRole = "student" | "registrar" | "branchcoordinator" | "cashier";
+
+function RequireRole({ roles, children }: { roles: AppRole[]; children: ReactNode }) {
+  const { userRole, userData } = useAuth();
+
+  if (!userData || !userRole || !roles.includes(userRole)) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function StudentDashboardRoute() {
+  return (
+    <RequireRole roles={["student"]}>
+      <DashboardLayout />
+    </RequireRole>
+  );
+}
+
+function StudentAccountRoute() {
+  return (
+    <RequireRole roles={["student"]}>
+      <StudentAccount />
+    </RequireRole>
+  );
+}
+
+function RegistrarRoute() {
+  return (
+    <RequireRole roles={["registrar"]}>
+      <AdminLayout />
+    </RequireRole>
+  );
+}
+
+function BranchCoordinatorRoute() {
+  return (
+    <RequireRole roles={["branchcoordinator"]}>
+      <SuperAdminLayout />
+    </RequireRole>
+  );
+}
+
+function CashierRoute() {
+  return (
+    <RequireRole roles={["cashier"]}>
+      <CashierLayout />
+    </RequireRole>
+  );
+}
+
 export default function App() {
   // Initialize test users on app load
   useEffect(() => {
@@ -65,7 +117,7 @@ export default function App() {
       // If user tries to navigate to removed /dashboard/strands, redirect
       if (window.location.pathname.includes('/dashboard/strands') || 
           window.location.pathname.includes('/dashboard/courses')) {
-        console.log('⚠️ Redirecting from removed route:', window.location.pathname);
+        console.log('Redirecting from removed route:', window.location.pathname);
         window.location.replace('/dashboard');
       }
     } catch (e) {
@@ -108,7 +160,7 @@ export default function App() {
         },
         {
           path: "/dashboard",
-          Component: DashboardLayout,
+          Component: StudentDashboardRoute,
           ErrorBoundary: ErrorBoundary,
           children: [
             { index: true, Component: Dashboard },
@@ -128,13 +180,13 @@ export default function App() {
         // Student Account - standalone page without dashboard layout
         {
           path: "/dashboard/student-account",
-          Component: StudentAccount,
+          Component: StudentAccountRoute,
           ErrorBoundary: ErrorBoundary,
         },
         // Registrar routes (formerly Admin)
         {
           path: "/registrar",
-          Component: AdminLayout,
+          Component: RegistrarRoute,
           ErrorBoundary: ErrorBoundary,
           children: [
             { index: true, element: <Navigate to="/registrar/pending" replace /> },
@@ -158,7 +210,7 @@ export default function App() {
         // Branch Coordinator routes (formerly Super Admin)
         {
           path: "/branchcoordinator",
-          Component: SuperAdminLayout,
+          Component: BranchCoordinatorRoute,
           ErrorBoundary: ErrorBoundary,
           children: [
             { index: true, Component: SuperAdminDashboard },
@@ -185,7 +237,7 @@ export default function App() {
         // Cashier routes (new)
         {
           path: "/cashier",
-          Component: CashierLayout,
+          Component: CashierRoute,
           ErrorBoundary: ErrorBoundary,
           children: [
             { index: true, Component: CashierDashboard },

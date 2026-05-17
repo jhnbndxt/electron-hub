@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
 import bcrypt from 'bcryptjs';
 
-// Test users to seed into Supabase
+// Test users to seed into Supabase for local/demo use.
 const testUsers = [
   {
     email: "electronbranchcoor@gmail.com",
@@ -38,81 +38,81 @@ const testUsers = [
 ];
 
 export async function seedTestUsers() {
-  console.log("🌱 Starting to seed test users...");
-  
+  console.log("Starting to seed test users...");
+
   for (const user of testUsers) {
     try {
-      console.log(`📝 Processing user: ${user.email}`);
-      
-      // Check if user already exists
+      console.log(`Processing user: ${user.email}`);
+
       const { data: existingUser, error: checkError } = await supabase
         .from("users")
         .select("email")
         .eq("email", user.email)
         .single();
-      
-      if (existingUser) {
-        console.log(`✓ User ${user.email} already exists, skipping`);
+
+      if (checkError && checkError.code !== "PGRST116") {
+        console.error(`Error checking user ${user.email}:`, checkError.message);
         continue;
       }
-      
-      // Hash the password
-      const saltRounds = 10;
-      const password_hash = await bcrypt.hash(user.password, saltRounds);
-      console.log(`🔐 Password hashed for ${user.email}`);
-      
-      // Insert user into database
-      const { data: newUser, error: dbError } = await supabase
+
+      if (existingUser) {
+        console.log(`User ${user.email} already exists, skipping`);
+        continue;
+      }
+
+      const password_hash = await bcrypt.hash(user.password, 10);
+      console.log(`Password hashed for ${user.email}`);
+
+      const { error: dbError } = await supabase
         .from("users")
         .insert([{
           email: user.email,
-          password_hash: password_hash,
+          password_hash,
           full_name: user.full_name,
           role: user.role,
           admin_type: user.admin_type,
           status: user.status
         }])
         .select();
-      
+
       if (dbError) {
-        console.error(`❌ Error creating user ${user.email}:`, dbError.message, dbError.details);
+        console.error(`Error creating user ${user.email}:`, dbError.message, dbError.details);
         continue;
       }
-      
-      console.log(`✅ Test user created: ${user.email} (${user.full_name})`);
+
+      console.log(`Test user created: ${user.email} (${user.full_name})`);
     } catch (error) {
-      console.error(`❌ Unexpected error for user ${user.email}:`, error.message);
+      console.error(`Unexpected error for user ${user.email}:`, error.message);
     }
   }
-  
-  console.log("✨ Test user seeding complete!");
+
+  console.log("Test user seeding complete!");
 }
 
-// Run seeding (can be called from App.tsx on first load)
+// Called from App.tsx on first load for local/demo environments.
 export async function initializeTestUsers() {
   try {
-    console.log("🚀 Initializing test users...");
-    
-    // Check if seeding has already been done
+    console.log("Initializing test users...");
+
     const { data: users, error: queryError } = await supabase
       .from("users")
       .select("email")
-      .in("email", testUsers.map(u => u.email));
-    
+      .in("email", testUsers.map((user) => user.email));
+
     if (queryError) {
-      console.error("❌ Error querying users:", queryError.message);
+      console.error("Error querying users:", queryError.message);
       return;
     }
-    
+
     console.log(`Found ${users?.length || 0} existing test users out of ${testUsers.length}`);
-    
+
     if (!users || users.length < testUsers.length) {
-      console.log("⏳ Some users missing, starting seeding...");
+      console.log("Some users missing, starting seeding...");
       await seedTestUsers();
     } else {
-      console.log("✅ All test users already exist in database");
+      console.log("All test users already exist in database");
     }
   } catch (error) {
-    console.error("❌ Error initializing test users:", error.message);
+    console.error("Error initializing test users:", error.message);
   }
 }
