@@ -1680,8 +1680,8 @@ export function PublicAssessment() {
                           <span className="text-xs font-medium text-blue-700">Higher ratings mean stronger agreement.</span>
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-                          {question.options.map((option, optIndex) => {
-                            const ratingValue = 5 - optIndex;
+                          {[...question.options].reverse().map((option, optIndex) => {
+                            const ratingValue = optIndex + 1;
                             const isSelected = answers[question.id] === ratingValue;
 
                             return (

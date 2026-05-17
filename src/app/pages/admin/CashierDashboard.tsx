@@ -99,6 +99,20 @@ interface CashPayment {
   paidDate?: string;
 }
 
+interface PaymentQueueStats {
+  onlinePending: number;
+  onlineApproved: number;
+  cashPending: number;
+  cashPaid: number;
+}
+
+const defaultPaymentQueueStats: PaymentQueueStats = {
+  onlinePending: 0,
+  onlineApproved: 0,
+  cashPending: 0,
+  cashPaid: 0,
+};
+
 const getPaymentSubmissionTime = (payment: any) => {
   const timestamp = payment?.submitted_at || payment?.created_at || "";
   const time = new Date(timestamp).getTime();
@@ -106,6 +120,12 @@ const getPaymentSubmissionTime = (payment: any) => {
 };
 
 const OPEN_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
+const APPROVED_ONLINE_PAYMENT_STATUSES = new Set(["approved", "verified", "completed", "complete", "success", "successful"]);
+const CONFIRMED_CASH_PAYMENT_STATUSES = new Set(["paid", "approved", "verified", "completed", "complete", "success", "successful"]);
+
+const normalizePaymentStatus = (status?: string | null) => String(status || "").trim().toLowerCase();
+const isOnlinePaymentMethod = (method?: string | null) => ["bank", "gcash"].includes(String(method || "").toLowerCase());
+const isCashPaymentMethod = (method?: string | null) => String(method || "").toLowerCase() === "cash";
 
 const normalizeText = (value?: string | null) => String(value || "").trim();
 
@@ -148,6 +168,7 @@ export function CashierDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [onlinePayments, setOnlinePayments] = useState<OnlinePayment[]>([]);
   const [cashPayments, setCashPayments] = useState<CashPayment[]>([]);
+  const [queueStats, setQueueStats] = useState<PaymentQueueStats>(defaultPaymentQueueStats);
   const [selectedPayment, setSelectedPayment] = useState<OnlinePayment | null>(null);
   const [selectedCashPayment, setSelectedCashPayment] = useState<CashPayment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -170,26 +191,21 @@ export function CashierDashboard() {
   const actorName = userData?.name || "Cashier";
 
   useEffect(() => {
-    loadPayments();
+    void loadPayments({ showPageLoading: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     const handleWindowFocus = () => {
-      loadPayments();
+      if (!showReviewModal && !showCashModal && !isProcessing) {
+        void loadPayments();
+      }
     };
 
     window.addEventListener("focus", handleWindowFocus);
     return () => window.removeEventListener("focus", handleWindowFocus);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (showReviewModal || showCashModal) {
-      loadPayments();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showReviewModal, showCashModal]);
+  }, [showReviewModal, showCashModal, isProcessing]);
 
   useEffect(() => {
     if (selectedPayment) {
@@ -214,25 +230,60 @@ export function CashierDashboard() {
     }
   }, [onlinePayments, cashPayments, selectedPayment, selectedCashPayment]);
 
-  async function loadPayments() {
-    setIsLoading(true);
-    // Load all payments from Supabase
-    const { data: allPayments, error } = await getAllPayments();
+  async function loadPayments(options: { showPageLoading?: boolean } = {}) {
+    const showPageLoading = options.showPageLoading ?? false;
 
-    if (error) {
-      console.error('Error loading payments:', error);
-      setOnlinePayments([]);
-      setCashPayments([]);
-      setIsLoading(false);
-      return;
+    if (showPageLoading) {
+      setIsLoading(true);
     }
 
-    if (!allPayments) {
-      setOnlinePayments([]);
-      setCashPayments([]);
-      setIsLoading(false);
-      return;
-    }
+    try {
+      // Load all payments from Supabase
+      const { data: allPayments, error } = await getAllPayments();
+
+      if (error) {
+        console.error('Error loading payments:', error);
+        setOnlinePayments([]);
+        setCashPayments([]);
+        setQueueStats(defaultPaymentQueueStats);
+        return;
+      }
+
+      if (!allPayments) {
+        setOnlinePayments([]);
+        setCashPayments([]);
+        setQueueStats(defaultPaymentQueueStats);
+        return;
+      }
+
+      setQueueStats(
+        allPayments.reduce(
+          (stats: PaymentQueueStats, payment: any) => {
+            const status = normalizePaymentStatus(payment.status);
+
+            if (isOnlinePaymentMethod(payment.payment_method)) {
+              if (OPEN_PAYMENT_STATUSES.has(status)) {
+                stats.onlinePending += 1;
+              }
+              if (APPROVED_ONLINE_PAYMENT_STATUSES.has(status)) {
+                stats.onlineApproved += 1;
+              }
+            }
+
+            if (isCashPaymentMethod(payment.payment_method)) {
+              if (OPEN_PAYMENT_STATUSES.has(status)) {
+                stats.cashPending += 1;
+              }
+              if (CONFIRMED_CASH_PAYMENT_STATUSES.has(status)) {
+                stats.cashPaid += 1;
+              }
+            }
+
+            return stats;
+          },
+          { ...defaultPaymentQueueStats }
+        )
+      );
 
     // Fetch user details for student names and profile photos.
     const studentIds = [...new Set(allPayments.map((p: any) => p.student_id).filter(Boolean))];
@@ -398,9 +449,13 @@ export function CashierDashboard() {
         };
       });
 
-    setOnlinePayments(onlinePending);
-    setCashPayments(cashPending);
-    setIsLoading(false);
+      setOnlinePayments(onlinePending);
+      setCashPayments(cashPending);
+    } finally {
+      if (showPageLoading) {
+        setIsLoading(false);
+      }
+    }
   };
 
   const openConfirmModal = (
@@ -652,10 +707,7 @@ export function CashierDashboard() {
   );
 
   // Stats
-  const onlinePending = onlinePayments.filter((p) => p.status === "pending").length;
-  const onlineApproved = onlinePayments.filter((p) => p.status === "approved").length;
-  const cashPending = cashPayments.filter((p) => p.status === "pending").length;
-  const cashPaid = cashPayments.filter((p) => p.status === "paid").length;
+  const { onlinePending, onlineApproved, cashPending, cashPaid } = queueStats;
 
   const selectedReceiptUrls = selectedPayment?.receiptFiles?.length ? selectedPayment.receiptFiles : [];
   const isPaymentReferenceDuplicate = selectedPayment
