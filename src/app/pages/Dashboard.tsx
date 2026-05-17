@@ -24,6 +24,7 @@ import { useAuth } from "../context/AuthContext";
 import { useChat } from "../context/ChatContext";
 import { useState, useEffect } from "react";
 import { supabase } from "../../supabase";
+import { expireOverdueCashPayments } from "../../services/adminService";
 
 type EnrollmentSnapshot = {
   status: string;
@@ -47,6 +48,7 @@ export function Dashboard() {
   const { openChat } = useChat();
   const [rejectedDocuments, setRejectedDocuments] = useState<Array<{ name: string; comment: string }>>([]);
   const [enrollmentSnapshot, setEnrollmentSnapshot] = useState<EnrollmentSnapshot | null>(null);
+  const [expiredCashPaymentNotice, setExpiredCashPaymentNotice] = useState("");
   const [isFirstLogin, setIsFirstLogin] = useState(false);
   const [systemSettings, setSystemSettings] = useState<any>(null);
   
@@ -70,6 +72,27 @@ export function Dashboard() {
   useEffect(() => {
     const loadEnrollmentReadiness = async () => {
       if (!userData?.email) return;
+
+      if (userData?.id) {
+        await expireOverdueCashPayments(userData.id);
+        const { data: latestPayment } = await supabase
+          .from("payments")
+          .select("payment_method, status, notes, rejection_comment")
+          .eq("student_id", userData.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        const expirationText = `${latestPayment?.notes || ""} ${latestPayment?.rejection_comment || ""}`;
+        setExpiredCashPaymentNotice(
+          latestPayment?.payment_method === "cash" &&
+            latestPayment?.status === "rejected" &&
+            /expired|schedule expired/i.test(expirationText)
+            ? latestPayment.rejection_comment ||
+                "Your over-the-counter payment schedule has expired because the payment was not completed on the assigned date. To continue your enrollment process, please generate a new payment schedule or contact the school administration for assistance."
+            : ""
+        );
+      }
 
       // Get the user's enrollment and documents
       const { data: enrollments } = await supabase
@@ -457,6 +480,26 @@ export function Dashboard() {
           </div>
         </div>
       </div>
+
+      {expiredCashPaymentNotice && (
+        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-5 text-orange-900 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-orange-600" />
+              <div>
+                <p className="font-bold">Payment Schedule Expired</p>
+                <p className="mt-1 text-sm leading-6">{expiredCashPaymentNotice}</p>
+              </div>
+            </div>
+            <Link
+              to="/dashboard/payment"
+              className="inline-flex justify-center rounded-xl bg-orange-600 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-700"
+            >
+              Generate New Schedule
+            </Link>
+          </div>
+        </div>
+      )}
 
       {/* Enrolled Student Banner */}
       {isFullyEnrolled && (

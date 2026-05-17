@@ -30,6 +30,7 @@ import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
+import { expireOverdueCashPayments } from "../../../services/adminService";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
 
 interface PaymentRecord {
@@ -64,6 +65,10 @@ const normalizePaymentStatus = (status?: string) => {
 
   return "pending";
 };
+
+const isExpiredPayment = (payment: Pick<PaymentRecord, "status" | "rejectionComment">) =>
+  normalizePaymentStatus(payment.status) === "rejected" &&
+  /expired|schedule expired/i.test(payment.rejectionComment || "");
 
 const normalizePaymentMode = (mode?: string) => {
   const normalized = String(mode || "cash").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -207,6 +212,7 @@ export function BranchCoordinatorPayments() {
   const loadPayments = async () => {
     try {
       setIsLoading(true);
+      await expireOverdueCashPayments();
       // Load all payments from Supabase
       const { data: allPayments, error } = await supabase
         .from("payments")
@@ -293,7 +299,7 @@ export function BranchCoordinatorPayments() {
           undefined,
         receiptUrl: getReceiptUrl(p) || undefined,
         receiptFileName: getReceiptFileName(p),
-        rejectionComment: p.notes || undefined,
+        rejectionComment: p.rejection_comment || p.notes || undefined,
       }));
 
       setPayments(paymentsList);
@@ -787,7 +793,7 @@ export function BranchCoordinatorPayments() {
                       )}
                       {normalizePaymentStatus(payment.status) === "rejected" && (
                         <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                          Rejected
+                          {isExpiredPayment(payment) ? "Expired" : "Rejected"}
                         </span>
                       )}
                     </td>
@@ -851,10 +857,14 @@ export function BranchCoordinatorPayments() {
                           ? "border-amber-200 bg-amber-50 text-amber-700"
                           : normalizePaymentStatus(selectedPayment.status) === "approved"
                           ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : isExpiredPayment(selectedPayment)
+                          ? "border-orange-200 bg-orange-50 text-orange-700"
                           : "border-red-200 bg-red-50 text-red-700"
                       }`}
                     >
-                      {String(selectedPayment.status || "pending").replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase())}
+                      {isExpiredPayment(selectedPayment)
+                        ? "Payment Schedule Expired"
+                        : String(selectedPayment.status || "pending").replace(/_/g, " ").replace(/^\w/, (letter) => letter.toUpperCase())}
                     </span>
                     <button
                       onClick={closeDetailsModal}
@@ -893,8 +903,8 @@ export function BranchCoordinatorPayments() {
                   </div>
 
                   {selectedPayment.rejectionComment && (
-                    <div className="mt-4 rounded-2xl border border-red-100 bg-red-50/80 p-4 text-sm text-red-700">
-                      <p className="font-bold">Rejection Reason</p>
+                    <div className={`mt-4 rounded-2xl border p-4 text-sm ${isExpiredPayment(selectedPayment) ? "border-orange-100 bg-orange-50/80 text-orange-700" : "border-red-100 bg-red-50/80 text-red-700"}`}>
+                      <p className="font-bold">{isExpiredPayment(selectedPayment) ? "Expiration Notice" : "Rejection Reason"}</p>
                       <p className="mt-1 leading-6">{selectedPayment.rejectionComment}</p>
                     </div>
                   )}

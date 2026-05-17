@@ -59,6 +59,11 @@ const NOTIFICATION_MAP = {
     title: 'Payment Rejected',
     message: 'Your payment was rejected. Please try again.',
   },
+  PAYMENT_SCHEDULE_EXPIRED: {
+    title: 'Payment Schedule Expired',
+    message:
+      'Your over-the-counter payment schedule has expired because the payment was not completed on the assigned date. To continue your enrollment process, please generate a new payment schedule or contact the school administration for assistance.',
+  },
   PAYMENT_UPDATED: {
     title: 'Payment Status Updated',
     message: additionalData =>

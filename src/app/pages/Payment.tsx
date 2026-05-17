@@ -5,6 +5,7 @@ import { LoadingState } from "../components/LoadingState";
 import { useNavigate } from "react-router";
 import { supabase } from "../../supabase";
 import { getSystemSettings } from "../../services/systemSettingsService";
+import { expireOverdueCashPayments } from "../../services/adminService";
 
 type PaymentMode = "bank" | "gcash" | "cash" | null;
 
@@ -12,6 +13,8 @@ const CASH_QUEUE_TIME_VALUE = "09:00:00";
 const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
 const RECEIPT_FILE_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
 const MAX_RECEIPT_SIZE = 5 * 1024 * 1024;
+const CASH_PAYMENT_EXPIRATION_MESSAGE =
+  "Your over-the-counter payment schedule has expired because the payment was not completed on the assigned date. To continue your enrollment process, please generate a new payment schedule or contact the school administration for assistance.";
 
 type PaymentSettings = {
   payment_bank_enabled: boolean;
@@ -72,6 +75,11 @@ function formatCashQueueTime(timeValue?: string | null) {
   })} - 4:00 PM`;
 }
 
+function isExpiredCashPayment(payment: any) {
+  const reason = `${payment?.notes || ""} ${payment?.rejection_comment || ""}`;
+  return payment?.payment_method === "cash" && payment?.status === "rejected" && /expired|schedule expired/i.test(reason);
+}
+
 export function Payment() {
   const { updateEnrollmentProgress, isDocumentsVerified, markPaymentVisited, userData, logout } = useAuth();
   const navigate = useNavigate();
@@ -85,6 +93,7 @@ export function Payment() {
   const [copied, setCopied] = useState(false);
   const [paymentApproved, setPaymentApproved] = useState(false);
   const [approvedPaymentData, setApprovedPaymentData] = useState<any>(null);
+  const [expiredPaymentData, setExpiredPaymentData] = useState<any>(null);
   const [voucherCoverage, setVoucherCoverage] = useState<any>(null);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
   const [methodMessage, setMethodMessage] = useState("");
@@ -133,6 +142,8 @@ export function Payment() {
       }
 
       try {
+        await expireOverdueCashPayments(userData.id);
+
         if (userData?.email) {
           const { data: enrollment } = await supabase
             .from("enrollments")
@@ -191,6 +202,7 @@ export function Payment() {
                 : new Date().toLocaleDateString(),
             });
           } else if (mode === "cash" && payment.status === "pending") {
+            setExpiredPaymentData(null);
             setQueueNumber(payment.queue_number);
             if (payment.queue_schedule_date) {
               const schedDate = new Date(payment.queue_schedule_date);
@@ -200,7 +212,24 @@ export function Payment() {
               });
             }
             setShowQueueTicket(true);
+          } else if (isExpiredCashPayment(payment)) {
+            setExpiredPaymentData({
+              queueNumber: payment.queue_number,
+              amount: Number(payment.amount) || paymentSettings.payment_tuition_amount,
+              message: payment.rejection_comment || CASH_PAYMENT_EXPIRATION_MESSAGE,
+              scheduleDate: payment.queue_schedule_date
+                ? new Date(payment.queue_schedule_date).toLocaleDateString("en-US", {
+                    month: "long",
+                    day: "numeric",
+                    year: "numeric",
+                  })
+                : "the assigned date",
+            });
+            setShowQueueTicket(false);
+            setQueueNumber(null);
+            setQueueSchedule(null);
           } else if (payment.status === "pending" || payment.status === "submitted") {
+            setExpiredPaymentData(null);
             setIsSubmitted(true);
           }
         }
@@ -382,6 +411,65 @@ export function Payment() {
     );
   }
 
+  if (expiredPaymentData) {
+    return (
+      <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="portal-glass-panel-strong w-full max-w-4xl rounded-2xl border border-orange-200 p-6 text-center shadow-xl sm:p-10 lg:p-12">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-orange-100 text-orange-700">
+            <Clock className="h-11 w-11" />
+          </div>
+          <h1 className="mb-4 text-3xl font-bold text-orange-700 sm:text-4xl">
+            Payment Schedule Expired
+          </h1>
+          <p className="mx-auto mb-3 max-w-2xl text-lg leading-7 text-gray-700">
+            Your over-the-counter payment schedule has expired because the payment was not completed on the assigned date.
+          </p>
+          <p className="mx-auto mb-8 max-w-2xl text-base leading-7 text-gray-600">
+            To continue your enrollment process, please generate a new payment schedule or contact the school administration for assistance.
+          </p>
+
+          <div className="portal-glass-panel mx-auto mb-8 max-w-lg rounded-xl border border-orange-100 p-6 text-left">
+            <h3 className="mb-4 text-center text-lg font-semibold text-gray-900">Expired Schedule</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Queue Number:</span>
+                <span className="font-mono font-semibold text-gray-900">{expiredPaymentData.queueNumber || "N/A"}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Scheduled Date:</span>
+                <span className="font-semibold text-gray-900">{expiredPaymentData.scheduleDate}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-gray-600">Status:</span>
+                <span className="font-semibold text-orange-700">Payment Request Expired</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
+            <button
+              onClick={() => {
+                setExpiredPaymentData(null);
+                setSelectedMode("cash");
+                void handleGenerateQueue();
+              }}
+              className="rounded-lg px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:opacity-90"
+              style={{ backgroundColor: "var(--electron-blue)" }}
+            >
+              Generate New Schedule
+            </button>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="rounded-lg border border-gray-300 bg-white px-8 py-4 text-base font-semibold text-gray-700 transition-all hover:bg-gray-50"
+            >
+              Back to Dashboard
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const paymentModes = [
     {
       id: "bank" as PaymentMode,
@@ -515,7 +603,7 @@ export function Payment() {
     }
   };
 
-  const handleGenerateQueue = async () => {
+  async function handleGenerateQueue() {
     if (voucherCoverage) return;
     if (!userData?.id || !userData?.email) return;
     if (!paymentSettings.payment_cash_enabled) {
@@ -529,6 +617,7 @@ export function Payment() {
       .select("*")
       .eq("student_id", userData.id)
       .eq("payment_method", "cash")
+      .in("status", ["pending", "submitted"])
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -593,11 +682,12 @@ export function Payment() {
 
     setQueueNumber(qNum);
     setQueueSchedule({ date: formattedDate, time: CASH_QUEUE_TIME_LABEL });
+    setExpiredPaymentData(null);
     setShowQueueTicket(true);
 
     // Update enrollment progress
     updateEnrollmentProgress("Payment Submitted", "current");
-  };
+  }
 
   const handleCancelCashPayment = async () => {
     if (!userData?.id) return;

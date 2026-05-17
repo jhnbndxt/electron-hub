@@ -155,7 +155,7 @@ export function CashierDashboard() {
   const [showCashModal, setShowCashModal] = useState(false);
   const [showRejectReasonModal, setShowRejectReasonModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<"approveOnline" | "rejectOnline" | "confirmCash" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"approveOnline" | "rejectOnline" | "confirmCash" | "extendCash" | null>(null);
   const [confirmTitle, setConfirmTitle] = useState("");
   const [confirmMessage, setConfirmMessage] = useState("");
   const [confirmText, setConfirmText] = useState("Confirm");
@@ -404,7 +404,7 @@ export function CashierDashboard() {
   };
 
   const openConfirmModal = (
-    action: "approveOnline" | "rejectOnline" | "confirmCash",
+    action: "approveOnline" | "rejectOnline" | "confirmCash" | "extendCash",
     title: string,
     message: string,
     confirmLabel: string,
@@ -557,13 +557,70 @@ export function CashierDashboard() {
     }
   };
 
+  const handleExtendCashSchedule = async () => {
+    if (!selectedCashPayment) return;
+
+    setIsProcessing(true);
+    setProcessingTitle("Extending Payment Schedule...");
+    setProcessingMessage("Generating a new over-the-counter payment date. Please wait.");
+
+    try {
+      const nextScheduleDate = new Date();
+      nextScheduleDate.setDate(nextScheduleDate.getDate() + 3);
+      const nextScheduleDateValue = nextScheduleDate.toISOString().split("T")[0];
+
+      const { error } = await supabase
+        .from("payments")
+        .update({
+          queue_schedule_date: nextScheduleDateValue,
+          queue_schedule_time: "09:00:00",
+          status: "pending",
+          notes: null,
+          rejection_comment: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedCashPayment.id);
+
+      if (error) {
+        toast.error("Failed to extend the payment schedule. Please try again.");
+        return;
+      }
+
+      await createAuditLog(
+        actorReference,
+        'PAYMENT_SCHEDULE_EXTENDED',
+        `Cash payment schedule extended by ${actorName}: Queue #${selectedCashPayment.queueNumber}`,
+        'success'
+      );
+
+      try {
+        await triggerNotification(selectedCashPayment.studentEmail, 'PAYMENT_UPDATED', {
+          message: `Your over-the-counter payment schedule has been extended to ${nextScheduleDate.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.`,
+        });
+      } catch (notificationError) {
+        console.error('Error creating notification:', notificationError);
+      }
+
+      await loadPayments();
+      toast.success("Payment schedule extended.");
+    } catch (error) {
+      console.error('Cash schedule extension error:', error);
+      toast.error('Something went wrong while extending the schedule.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleConfirmAction = async () => {
     if (!confirmAction) {
       setShowConfirmModal(false);
       return;
     }
 
-    switch (confirmAction) {
+    const actionToRun = confirmAction;
+    setShowConfirmModal(false);
+
+    switch (actionToRun) {
       case 'approveOnline':
         await handleApproveOnlinePayment();
         break;
@@ -573,9 +630,10 @@ export function CashierDashboard() {
       case 'confirmCash':
         await handleConfirmCashPayment();
         break;
+      case 'extendCash':
+        await handleExtendCashSchedule();
+        break;
     }
-
-    setShowConfirmModal(false);
   };
 
   // Filter payments
@@ -1353,23 +1411,44 @@ export function CashierDashboard() {
                 {/* Footer Actions */}
                 {selectedCashPayment.status === "pending" && (
                   <div className="border-t border-white/20 bg-white/45 p-6">
-                    <button
-                      onClick={() =>
-                        openConfirmModal(
-                          'confirmCash',
-                          'Confirm student enrollment?',
-                          'Are you sure you want to verify this cash payment?',
-                          'Verify Payment',
-                          'success'
-                        )
-                      }
-                      disabled={isProcessing}
-                      className={`w-full rounded-2xl px-4 py-3 font-bold text-white transition-all ${isProcessing ? 'cursor-not-allowed bg-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-700/15 hover:shadow-xl'}`}
-                    >
-                      Confirm Payment Received & Enroll
-                    </button>
+                    <div className="grid gap-3 sm:grid-cols-[0.8fr_1.2fr]">
+                      <button
+                        onClick={() =>
+                          openConfirmModal(
+                            'extendCash',
+                            'Extend payment schedule?',
+                            'This will generate a new over-the-counter payment date for this student.',
+                            'Extend Schedule',
+                            'warning'
+                          )
+                        }
+                        disabled={isProcessing}
+                        className={`rounded-2xl border px-4 py-3 font-bold transition-all ${
+                          isProcessing
+                            ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400'
+                            : 'border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100'
+                        }`}
+                      >
+                        Extend Schedule
+                      </button>
+                      <button
+                        onClick={() =>
+                          openConfirmModal(
+                            'confirmCash',
+                            'Confirm student enrollment?',
+                            'Are you sure you want to verify this cash payment?',
+                            'Verify Payment',
+                            'success'
+                          )
+                        }
+                        disabled={isProcessing}
+                        className={`rounded-2xl px-4 py-3 font-bold text-white transition-all ${isProcessing ? 'cursor-not-allowed bg-emerald-300' : 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-700/15 hover:shadow-xl'}`}
+                      >
+                        Confirm Payment Received & Enroll
+                      </button>
+                    </div>
                     <p className="mt-3 text-center text-xs font-medium text-slate-600">
-                      Only click this button after receiving the payment in person.
+                      Only confirm after receiving the payment in person. Use extend only for approved schedule adjustments.
                     </p>
                   </div>
                 )}

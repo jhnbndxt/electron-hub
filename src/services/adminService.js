@@ -10,6 +10,9 @@ const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const FINALIZED_PAYMENT_STATUSES = new Set(['completed', 'verified', 'approved', 'paid']);
 const INACTIVE_ENROLLMENT_STATUSES = new Set(['rejected', 'dropped', 'unenrolled', 'removed']);
+const OPEN_PAYMENT_STATUSES = ['pending', 'submitted'];
+const CASH_PAYMENT_EXPIRATION_MESSAGE =
+  'Your over-the-counter payment schedule has expired because the payment was not completed on the assigned date. To continue your enrollment process, please generate a new payment schedule or contact the school administration for assistance.';
 
 const normalizeAuditSeverity = (status = 'success') => {
   const normalizedStatus = String(status || 'success').trim().toLowerCase();
@@ -1002,6 +1005,8 @@ export const getStudentPaymentStatus = async (userId) => {
       return { error: null, data: null, isVerified: false, isPending: false };
     }
 
+    await expireOverdueCashPayments(studentId);
+
     const { data, error } = await supabase
       .from('payments')
       .select('*')
@@ -1030,9 +1035,116 @@ export const getStudentPaymentStatus = async (userId) => {
   }
 };
 
+const buildCashScheduleEnd = (scheduleDate, scheduleTime) => {
+  if (!scheduleDate) return null;
+
+  const [year, month, day] = String(scheduleDate).split('-').map(Number);
+  if (!year || !month || !day) return null;
+
+  const scheduleEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+  const normalizedTime = String(scheduleTime || '').trim();
+  const [hourPart, minutePart] = normalizedTime.split(':');
+  const startHour = Number(hourPart);
+  const startMinute = Number(minutePart || 0);
+
+  if (Number.isFinite(startHour) && Number.isFinite(startMinute)) {
+    scheduleEnd.setHours(Math.max(startHour, 16), startMinute, 59, 999);
+  }
+
+  return Number.isNaN(scheduleEnd.getTime()) ? null : scheduleEnd;
+};
+
+export const isCashPaymentScheduleExpired = (payment, now = new Date()) => {
+  if (!payment || payment.payment_method !== 'cash') return false;
+  if (!OPEN_PAYMENT_STATUSES.includes(String(payment.status || '').toLowerCase())) return false;
+
+  const scheduleEnd = buildCashScheduleEnd(payment.queue_schedule_date, payment.queue_schedule_time);
+  return Boolean(scheduleEnd && now.getTime() > scheduleEnd.getTime());
+};
+
+export const expireOverdueCashPayments = async (studentReference = null) => {
+  try {
+    const resolvedStudentId = studentReference ? await resolveUserId(studentReference) : null;
+    let query = supabase
+      .from('payments')
+      .select('id, student_id, payment_method, status, queue_number, queue_schedule_date, queue_schedule_time')
+      .eq('payment_method', 'cash')
+      .in('status', OPEN_PAYMENT_STATUSES)
+      .not('queue_schedule_date', 'is', null);
+
+    if (resolvedStudentId) {
+      query = query.eq('student_id', resolvedStudentId);
+    }
+
+    const { data: openCashPayments, error } = await query;
+
+    if (error) {
+      console.error('Expire cash payment schedules error:', error);
+      return { error: error.message, expiredCount: 0, data: [] };
+    }
+
+    const expiredPayments = (openCashPayments || []).filter((payment) =>
+      isCashPaymentScheduleExpired(payment)
+    );
+
+    if (expiredPayments.length === 0) {
+      return { error: null, expiredCount: 0, data: [] };
+    }
+
+    const expiredIds = expiredPayments.map((payment) => payment.id);
+    const timestamp = new Date().toISOString();
+    const { data, error: updateError } = await supabase
+      .from('payments')
+      .update({
+        status: 'rejected',
+        notes: 'Payment Schedule Expired',
+        rejection_comment: CASH_PAYMENT_EXPIRATION_MESSAGE,
+        updated_at: timestamp,
+      })
+      .in('id', expiredIds)
+      .select();
+
+    if (updateError) {
+      console.error('Expire cash payment schedules error:', updateError);
+      return { error: updateError.message, expiredCount: 0, data: [] };
+    }
+
+    await Promise.allSettled(
+      expiredPayments.map((payment) =>
+        notifyStudent(payment.student_id, 'PAYMENT_SCHEDULE_EXPIRED', {
+          paymentId: payment.id,
+          queueNumber: payment.queue_number,
+          message: CASH_PAYMENT_EXPIRATION_MESSAGE,
+        })
+      )
+    );
+
+    await createAuditLog(
+      'system',
+      'PAYMENT_SCHEDULE_EXPIRED',
+      `Expired ${expiredPayments.length} overdue over-the-counter payment schedule(s).`,
+      'warning',
+      {
+        resourceType: 'payment',
+        changes: {
+          expired_payment_ids: expiredIds,
+          expired_count: expiredPayments.length,
+        },
+      }
+    );
+
+    return { error: null, expiredCount: expiredPayments.length, data: data || [] };
+  } catch (error) {
+    console.error('Expire cash payment schedules error:', error);
+    return { error: error.message, expiredCount: 0, data: [] };
+  }
+};
+
 // Get all payments for review
 export const getAllPayments = async (status = null) => {
   try {
+    await expireOverdueCashPayments();
+
     let query = supabase
       .from('payments')
       .select(
