@@ -8,7 +8,7 @@ import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
-import { triggerNotification } from "../../../services/notificationService";
+import { addNotification } from "../../../services/notificationService";
 
 interface EnrolledStudent {
   id: string;
@@ -270,13 +270,18 @@ async function notifyStudentsAboutSectionAssignments(
 ) {
   const notificationTasks = finalSections.flatMap((section) =>
     section.students.map((student) =>
-      triggerNotification(student.email, "STUDENT_SECTION_ASSIGNED", {
-        sectionId: section.id,
-        sectionName: section.name,
-        actionUrl: "/dashboard/profile",
-        message:
-          "Hi! Welcome to the Electron Community.\nOur registrar office has assigned you a temporary section.\n\nYou may also view your section on your profile.\n\nNote: This section is temporary and may still change until further notice.",
-      }).catch((error) => {
+      addNotification(
+        student.email,
+        "ENROLLMENT_STATUS_CHANGED",
+        "Temporary Section Assigned",
+        "Hi! Welcome to the Electron Community.\nOur registrar office has assigned you a temporary section.\n\nYou may also view your section on your profile.\n\nNote: This section is temporary and may still change until further notice.",
+        {
+          trigger: "STUDENT_SECTION_ASSIGNED",
+          sectionId: section.id,
+          sectionName: section.name,
+          actionUrl: "/dashboard/profile",
+        }
+      ).catch((error) => {
         console.error("Error notifying student about section assignment:", {
           student: student.email,
           section: section.name,

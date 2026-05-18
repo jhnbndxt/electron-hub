@@ -56,7 +56,7 @@ function RequireRole({ roles, children }: { roles: AppRole[]; children: ReactNod
   const { userRole, userData } = useAuth();
 
   if (!userData || !userRole || !roles.includes(userRole)) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
