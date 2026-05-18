@@ -61,6 +61,30 @@ function calculateElectiveScore(elective, data) {
   );
 }
 
+function buildElectiveTieBreaker(elective, data) {
+  const seed = [
+    elective?.name,
+    data.track,
+    toScore(data.academicInterest),
+    toScore(data.communicationInterest),
+    toScore(data.creativeInterest),
+    toScore(data.leadershipInterest),
+    toScore(data.technicalInterest),
+    toScore(data.socialInterest),
+    toScore(data.VA),
+    toScore(data.MA),
+    toScore(data.SA),
+    toScore(data.LRA),
+  ].join("|");
+
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) % 1000003;
+  }
+
+  return hash / 1000003;
+}
+
 function rankElectivesForAssessment(data) {
   const trackElectives = electives.filter((elective) => elective.track === data.track);
   const sourceElectives = trackElectives.length ? trackElectives : electives;
@@ -69,9 +93,18 @@ function rankElectivesForAssessment(data) {
     .map((elective) => ({
       ...elective,
       compatibilityScore: Number(calculateElectiveScore(elective, data).toFixed(2)),
+      tieBreaker: buildElectiveTieBreaker(elective, data),
     }))
-    .sort((first, second) => second.compatibilityScore - first.compatibilityScore)
-    .slice(0, 10);
+    .sort((first, second) => {
+      const scoreDifference = second.compatibilityScore - first.compatibilityScore;
+
+      if (Math.abs(scoreDifference) > 0.0001) {
+        return scoreDifference;
+      }
+
+      return second.tieBreaker - first.tieBreaker;
+    })
+    .slice(0, 20);
 }
 
 function findElectiveByName(name, rankedElectives) {
@@ -93,6 +126,49 @@ function getStrongestDomain(data) {
   ];
 
   return domains.sort((first, second) => second.score - first.score)[0];
+}
+
+function getStrongestInterests(data) {
+  return [
+    { label: "academic interests", score: toScore(data.academicInterest) },
+    { label: "communication and people-oriented interests", score: toScore(data.communicationInterest) },
+    { label: "creative interests", score: toScore(data.creativeInterest) },
+    { label: "leadership and business interests", score: toScore(data.leadershipInterest) },
+    { label: "technical interests", score: toScore(data.technicalInterest) },
+    { label: "social and helping interests", score: toScore(data.socialInterest) },
+  ]
+    .filter((interest) => interest.score > 0)
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 2);
+}
+
+function formatList(items = [], fallback = "related fields") {
+  const values = Array.from(new Set(items.filter(Boolean)));
+
+  if (!values.length) {
+    return fallback;
+  }
+
+  if (values.length === 1) {
+    return values[0];
+  }
+
+  return `${values.slice(0, -1).join(", ")} and ${values[values.length - 1]}`;
+}
+
+function buildElectiveExplanation(elective, data, positionLabel) {
+  const strongestDomain = getStrongestDomain(data);
+  const strongestInterests = getStrongestInterests(data);
+  const interestSummary = formatList(
+    strongestInterests.map((interest) => `${interest.label} (${interest.score}%)`),
+    "your interest profile"
+  );
+  const strengths = formatList(elective?.strengths || [], "the skills used in this subject");
+  const idealFor = formatList(elective?.idealFor || [], "your assessment profile");
+  const courses = formatList(elective?.relatedCourses || [], "related college programs");
+  const careers = formatList(elective?.careerPathways || [], "future career opportunities");
+
+  return `${positionLabel} is recommended because your ${strongestDomain.label} score (${strongestDomain.score}%) and ${interestSummary} connect well with ${idealFor}. This elective is about ${elective?.group || elective?.category || "a specialized learning area"} and builds strengths such as ${strengths}. You can expect learning activities that develop subject knowledge, applied skills, problem solving, and career awareness connected to this field. Possible future pathways include college courses such as ${courses}, as well as opportunities like ${careers}.`;
 }
 
 function buildFallbackRecommendation(data, rankedElectives) {
@@ -126,9 +202,9 @@ function buildFallbackRecommendation(data, rankedElectives) {
     recommendedTrack: data.track,
     trackExplanation: `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`,
     elective1: firstElective?.name || "",
-    elective1Explanation: `${firstElective?.name || "This elective"} matches your profile because it connects with your strongest assessment areas and supports the direction of the ${data.track} Track.`,
+    elective1Explanation: buildElectiveExplanation(firstElective, data, firstElective?.name || "Elective 1"),
     elective2: secondElective?.name || "",
-    elective2Explanation: `${secondElective?.name || "This elective"} is a good second option because it adds another specialization that works with your interests, aptitude scores, and future study goals.`,
+    elective2Explanation: buildElectiveExplanation(secondElective, data, secondElective?.name || "Elective 2"),
     overallAnalysis: `Your result points toward the ${data.track} Track with electives that can help you turn your strengths into clearer college and career options.`,
     suggestedCollegeCourses: courses,
     careerPathways,
@@ -176,8 +252,8 @@ You are an AI assessment recommendation system.
 The student's track is already determined.
 
 Your tasks:
-1. Recommend ONLY the BEST 2 electives.
-2. Explain why those electives fit the student.
+1. Recommend ONLY the BEST 2 electives, unless saved electives are provided.
+2. Explain why those electives fit the student in detail.
 3. Suggest possible college courses.
 4. Match recommendations using:
    - aptitude scores
@@ -221,7 +297,7 @@ Choose electives based on:
 IMPORTANT:
 Electives must strongly align with the student's dominant interests and aptitude scores.
 Do not recommend broad or unrelated electives.
-Prioritize electives with the highest compatibility scores.
+Prioritize electives with the highest compatibility scores, but treat all valid electives as eligible and do not favor any elective because of list order, popularity, or familiarity.
 Use ONLY electives from TOP MATCHING ELECTIVES.
 Ensure the chosen electives match the student's determined track.
 If saved electives are provided and they are valid for the determined track, explain those saved electives instead of replacing them.
@@ -267,11 +343,11 @@ Requirements:
 - Use ONLY electives from TOP MATCHING ELECTIVES.
 - Match electives based on strongest aptitude and interest scores.
 - Prioritize electives with highest compatibility scores.
+- Do not bias recommendations toward specific elective names, groups, or earlier list positions.
 - Avoid unrelated or weak recommendations.
-- Keep explanations concise and personalized.
 - trackExplanation must explain WHY the track fits the student based on aptitude and interests.
-- elective1Explanation must explain WHY elective 1 matches the student's strengths and interests.
-- elective2Explanation must explain WHY elective 2 matches the student's strengths and interests.
+- elective1Explanation must be detailed and include: why elective 1 was recommended from the assessment results, what the elective is about, what students can expect to learn or do, and possible career pathways, college courses, or future opportunities related to that elective.
+- elective2Explanation must be detailed and include: why elective 2 was recommended from the assessment results, what the elective is about, what students can expect to learn or do, and possible career pathways, college courses, or future opportunities related to that elective.
 - overallAnalysis must provide a career/academic assessment summary.
 - suggestedCollegeCourses must list college programs aligned with the track and electives.
 - careerPathways must be grouped by specialization/category.

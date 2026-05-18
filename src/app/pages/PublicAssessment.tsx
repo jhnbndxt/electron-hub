@@ -5,6 +5,7 @@ import { formatAssessmentResult } from "../../services/assessmentScoringService"
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
 import { LoadingState } from "../components/LoadingState";
+import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
 
@@ -504,6 +505,8 @@ export function PublicAssessment() {
   const [saveErrors, setSaveErrors] = useState({ fullName: "", email: "" });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveMessage, setSaveMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState(0);
   const hasRestoredProgress = useRef(false);
   const publicAssessmentShellStyle = {
     background:
@@ -1225,6 +1228,13 @@ export function PublicAssessment() {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitProgress(8);
+
     try {
       const questionsByCategory: Record<string, Question[]> = {
       Verbal: [],
@@ -1241,8 +1251,11 @@ export function PublicAssessment() {
     });
 
     const formattedResult = await formatAssessmentResult(answers, questionsByCategory as any);
+    setSubmitProgress(32);
     if (!formattedResult) {
       console.error("❌ Error formatting public assessment result");
+      setIsSubmitting(false);
+      setSubmitProgress(0);
       return;
     }
 
@@ -1273,20 +1286,20 @@ export function PublicAssessment() {
         leadershipInterest,
         technicalInterest,
         socialInterest,
+        electives: formattedResult.electives,
       });
+      setSubmitProgress(68);
     } catch (error) {
       console.error("Public assessment AI recommendation failed; using scoring fallback:", error);
+      setSubmitProgress(68);
     }
 
     if (aiRecommendation && !aiRecommendation.raw) {
-      const aiElectives = normalizeResultArray([aiRecommendation.elective1, aiRecommendation.elective2]);
-
       const aiTrack = normalizeResultText(aiRecommendation.recommendedTrack);
       formattedResult.track = aiTrack || formattedResult.track;
       formattedResult.recommended_track = aiTrack || formattedResult.recommended_track;
-      formattedResult.electives = aiElectives.length > 0 ? aiElectives : formattedResult.electives;
-      formattedResult.elective_1 = aiElectives[0] || formattedResult.elective_1;
-      formattedResult.elective_2 = aiElectives[1] || formattedResult.elective_2;
+      formattedResult.elective_1 = formattedResult.electives[0] || formattedResult.elective_1;
+      formattedResult.elective_2 = formattedResult.electives[1] || formattedResult.elective_2;
     }
 
     const assessmentResult: AssessmentResult = {
@@ -1307,18 +1320,23 @@ export function PublicAssessment() {
     const normalizedResult = normalizeAssessmentResult(assessmentResult);
     if (!normalizedResult) {
       console.error("Public assessment result normalization failed");
+      setIsSubmitting(false);
+      setSubmitProgress(0);
       return;
     }
 
     localStorage.setItem("publicAssessmentResults", JSON.stringify(normalizedResult));
     localStorage.removeItem(assessmentProgressKey);
     localStorage.removeItem("publicAssessmentProgress_guest");
+    setSubmitProgress(100);
 
     setResults(normalizedResult);
     setAssessmentCompleted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Public assessment submission failed:", error);
+      setIsSubmitting(false);
+      setSubmitProgress(0);
     }
   };
 
@@ -1528,6 +1546,12 @@ export function PublicAssessment() {
   // Main Assessment UI
   return (
     <div>
+      <ProcessingModal
+        isOpen={isSubmitting}
+        title="Processing Assessment"
+        message="Scoring your answers and preparing your AI elective explanations..."
+        progress={submitProgress}
+      />
       <section
         className="relative overflow-hidden py-20 text-white"
         style={{
@@ -1778,7 +1802,7 @@ export function PublicAssessment() {
               <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <button
                   onClick={handlePrevious}
-                  disabled={currentSection === 0}
+                  disabled={currentSection === 0 || isSubmitting}
                   className="inline-flex items-center justify-center gap-2 rounded-lg border-2 px-6 py-3 font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
                   style={{
                     borderColor: "var(--electron-blue)",
@@ -1800,19 +1824,19 @@ export function PublicAssessment() {
                 {isLastSection ? (
                   <button
                     onClick={handleSubmit}
-                    disabled={!allCurrentQuestionsAnswered}
+                    disabled={!allCurrentQuestionsAnswered || isSubmitting}
                     className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
                     style={{
                       backgroundColor: "var(--electron-blue)",
                     }}
                   >
-                    Submit Assessment
+                    {isSubmitting ? `Processing ${submitProgress}%` : "Submit Assessment"}
                     <CheckCircle className="w-5 h-5" />
                   </button>
                 ) : (
                   <button
                     onClick={handleNext}
-                    disabled={!allCurrentQuestionsAnswered}
+                    disabled={!allCurrentQuestionsAnswered || isSubmitting}
                     className="inline-flex items-center justify-center gap-2 rounded-lg px-6 py-3 text-white font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50"
                     style={{
                       backgroundColor: "var(--electron-blue)",

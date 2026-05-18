@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '../supabase';
+import electivesCatalog from '../data/electives.js';
 
 const EMPTY_GROUPED_QUESTIONS = {
   Verbal: [],
@@ -413,6 +414,79 @@ function rankElectiveGroups(track, scores, interestClusters = {}) {
     .sort((first, second) => second.score - first.score);
 }
 
+function toScore(value) {
+  const score = Number(value);
+  return Number.isFinite(score) ? score : 0;
+}
+
+function buildElectiveScoringProfile(scores, interestClusters = {}) {
+  return {
+    academic: toScore(interestClusters.academic),
+    communication: Math.round((toScore(interestClusters.creative) + toScore(interestClusters.helping)) / 2),
+    creative: toScore(interestClusters.creative),
+    leadership: toScore(interestClusters.business),
+    technical: toScore(interestClusters.tech),
+    social: toScore(interestClusters.helping),
+    verbal: toScore(scores?.verbal_ability_score),
+    math: toScore(scores?.mathematical_ability_score),
+    science: toScore(scores?.spatial_ability_score),
+    logical: toScore(scores?.logical_reasoning_score),
+  };
+}
+
+function calculateCatalogElectiveScore(elective, profile) {
+  const weights = elective?.weights || {};
+
+  return Object.entries(weights).reduce((score, [dimension, weight]) => {
+    return score + toScore(profile[dimension]) * toScore(weight);
+  }, 0);
+}
+
+function buildResponseTieBreaker(elective, profile) {
+  const seed = [
+    elective?.name,
+    profile.academic,
+    profile.communication,
+    profile.creative,
+    profile.leadership,
+    profile.technical,
+    profile.social,
+    profile.verbal,
+    profile.math,
+    profile.science,
+    profile.logical,
+  ].join('|');
+
+  let hash = 0;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash = (hash * 31 + seed.charCodeAt(index)) % 1000003;
+  }
+
+  return hash / 1000003;
+}
+
+function rankCatalogElectives(track, scores, interestClusters = {}) {
+  const profile = buildElectiveScoringProfile(scores, interestClusters);
+  const trackElectives = electivesCatalog.filter((elective) => elective.track === track);
+  const sourceElectives = trackElectives.length ? trackElectives : electivesCatalog;
+
+  return sourceElectives
+    .map((elective) => ({
+      ...elective,
+      score: calculateCatalogElectiveScore(elective, profile),
+      tieBreaker: buildResponseTieBreaker(elective, profile),
+    }))
+    .sort((first, second) => {
+      const scoreDifference = second.score - first.score;
+
+      if (Math.abs(scoreDifference) > 0.0001) {
+        return scoreDifference;
+      }
+
+      return second.tieBreaker - first.tieBreaker;
+    });
+}
+
 export function calculateInterestClusterScores(answers, questionsByCategory) {
   const grouped = normalizeGroupedQuestions(questionsByCategory);
   const interestQuestions = grouped.Interests;
@@ -542,7 +616,11 @@ export function determineTrack(scores, interestClusters = {}) {
 }
 
 /**
- * Recommend the elective pair for the highest-ranked elective family.
+ * Recommend the top two individual electives.
+ *
+ * Each elective competes independently using its own configured weights. This
+ * avoids the old family-level behavior where the same first two options in a
+ * group were always selected, even when other electives were equally strong.
  */
 export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}) {
   let track = trackOrScores;
@@ -559,8 +637,14 @@ export function recommendElectives(trackOrScores, scoresOrInterestClusters = {},
     return [];
   }
 
+  const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters);
+
+  if (rankedCatalogElectives.length > 0) {
+    return rankedCatalogElectives.slice(0, 2).map((elective) => elective.name);
+  }
+
   const rankedGroups = rankElectiveGroups(track, scores, interestClusters);
-  return rankedGroups[0]?.electives || [];
+  return rankedGroups.flatMap((group) => group.electives).slice(0, 2);
 }
 
 /**

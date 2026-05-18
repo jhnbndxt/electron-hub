@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { LoadingState } from "../components/LoadingState";
+import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/assessmentResultService";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
@@ -35,6 +36,8 @@ export function Assessment() {
   const [sections, setSections] = useState<Section[]>([]);
   const [loading, setLoading] = useState(true);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitProgress, setSubmitProgress] = useState(0);
   const hasRestoredProgress = useRef(false);
 
   const isInterestQuestion = (question: Question) => question.category === "Interests";
@@ -413,6 +416,12 @@ export function Assessment() {
   };
 
   const handleSubmit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitProgress(8);
     console.log("🚀 Submitting assessment with dynamic scoring...");
 
     const questionsByCategory: Record<string, Question[]> = {
@@ -430,9 +439,9 @@ export function Assessment() {
     });
 
     const assessmentResult = await formatAssessmentResult(answers, questionsByCategory);
+    setSubmitProgress(32);
     if (!assessmentResult) {
       console.error("❌ Error formatting assessment result");
-      return;
     }
 
     console.log("📊 Assessment Result:", assessmentResult);
@@ -463,16 +472,15 @@ export function Assessment() {
       leadershipInterest,
       technicalInterest,
       socialInterest,
+      electives: assessmentResult.electives,
     });
+    setSubmitProgress(68);
 
     if (aiRecommendation && !aiRecommendation.raw) {
-      const aiElectives = [aiRecommendation.elective1, aiRecommendation.elective2].filter(Boolean);
-
       assessmentResult.track = aiRecommendation.recommendedTrack || assessmentResult.track;
       assessmentResult.recommended_track = aiRecommendation.recommendedTrack || assessmentResult.recommended_track;
-      assessmentResult.electives = aiElectives.length > 0 ? aiElectives : assessmentResult.electives;
-      assessmentResult.elective_1 = aiElectives[0] || assessmentResult.elective_1;
-      assessmentResult.elective_2 = aiElectives[1] || assessmentResult.elective_2;
+      assessmentResult.elective_1 = assessmentResult.electives[0] || assessmentResult.elective_1;
+      assessmentResult.elective_2 = assessmentResult.electives[1] || assessmentResult.elective_2;
     }
 
     const userEmail = userData?.email || "student@gmail.com";
@@ -494,17 +502,23 @@ export function Assessment() {
         aiRecommendation,
       })
     );
+    setSubmitProgress(82);
 
     try {
       await saveAssessmentResult(userEmail, assessmentResult);
       console.log("✅ Assessment result saved to Supabase");
       localStorage.removeItem(assessmentProgressKey);
+      setSubmitProgress(94);
     } catch (error) {
       console.error("❌ Error saving assessment result:", error);
+      setIsSubmitting(false);
+      setSubmitProgress(0);
+      return;
     }
 
     updateEnrollmentProgress("AI Assessment Completed", "completed");
     updateEnrollmentProgress("Documents Submitted", "current");
+    setSubmitProgress(100);
 
     navigate("/dashboard/results");
     setTimeout(() => {
@@ -520,6 +534,12 @@ export function Assessment() {
 
   return (
     <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <ProcessingModal
+        isOpen={isSubmitting}
+        title="Processing Assessment"
+        message="Scoring your answers and preparing your AI elective explanations..."
+        progress={submitProgress}
+      />
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1
@@ -687,7 +707,7 @@ export function Assessment() {
         <div className="flex justify-between items-center">
           <button
             onClick={handlePrevious}
-            disabled={currentSection === 0}
+            disabled={currentSection === 0 || isSubmitting}
             className="px-6 py-3 rounded-lg border-2 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             style={{
               borderColor: "var(--electron-blue)",
@@ -701,16 +721,16 @@ export function Assessment() {
           {isLastSection ? (
             <button
               onClick={handleSubmit}
-              disabled={!allCurrentQuestionsAnswered}
+              disabled={!allCurrentQuestionsAnswered || isSubmitting}
               className="px-8 py-3 rounded-lg text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:opacity-90"
               style={{ backgroundColor: "var(--electron-red)" }}
             >
-              Submit Assessment
+              {isSubmitting ? `Processing ${submitProgress}%` : "Submit Assessment"}
             </button>
           ) : (
             <button
               onClick={handleNext}
-              disabled={!allCurrentQuestionsAnswered}
+              disabled={!allCurrentQuestionsAnswered || isSubmitting}
               className="px-6 py-3 rounded-lg text-white font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-md"
               style={{ backgroundColor: "var(--electron-blue)" }}
             >

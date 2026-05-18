@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ProcessingModalProps {
@@ -6,6 +6,7 @@ interface ProcessingModalProps {
   title?: string;
   message?: string;
   description?: string;
+  progress?: number;
 }
 
 export function ProcessingModal({
@@ -13,9 +14,13 @@ export function ProcessingModal({
   title = "Processing Request",
   message = "Please wait while we process your request...",
   description,
+  progress,
 }: ProcessingModalProps) {
+  const [internalProgress, setInternalProgress] = useState(0);
+
   useEffect(() => {
     if (!isOpen) {
+      setInternalProgress(0);
       return;
     }
 
@@ -26,6 +31,33 @@ export function ProcessingModal({
       document.body.style.overflow = originalOverflow;
     };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || typeof progress === "number") {
+      return;
+    }
+
+    setInternalProgress(5);
+    const interval = window.setInterval(() => {
+      setInternalProgress((currentProgress) => {
+        if (currentProgress >= 95) {
+          return currentProgress;
+        }
+
+        const increment = currentProgress < 60 ? 7 : currentProgress < 85 ? 4 : 1;
+        return Math.min(95, currentProgress + increment);
+      });
+    }, 450);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [isOpen, progress]);
+
+  const displayProgress = Math.max(
+    0,
+    Math.min(100, Math.round(typeof progress === "number" ? progress : internalProgress))
+  );
 
   return (
     <AnimatePresence>
@@ -86,9 +118,30 @@ export function ProcessingModal({
                   </p>
                 )}
 
+                <div className="mt-6 w-full" aria-label={`Processing progress ${displayProgress}%`}>
+                  <div className="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
+                    <span>Progress</span>
+                    <span>{displayProgress}%</span>
+                  </div>
+                  <div
+                    className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200"
+                    role="progressbar"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={displayProgress}
+                  >
+                    <motion.div
+                      className="h-full rounded-full bg-blue-600"
+                      initial={false}
+                      animate={{ width: `${displayProgress}%` }}
+                      transition={{ duration: 0.25, ease: "easeOut" }}
+                    />
+                  </div>
+                </div>
+
                 {/* Status indicator */}
                 <motion.div
-                  className="mt-6 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100"
+                  className="mt-5 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-100"
                   animate={{ opacity: [1, 0.6, 1] }}
                   transition={{ duration: 2, repeat: Infinity }}
                 >
