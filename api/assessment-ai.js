@@ -412,6 +412,45 @@ Requirements:
 - Keep explanations natural and conversational.
 - Avoid overly technical or AI-sounding phrases.
 
+Example output for tone and structure only:
+Do not copy these elective names unless they are valid TOP MATCHING ELECTIVES for the actual student.
+
+{
+  "recommendedTrack": "Academic",
+  "trackExplanation": "The Academic Track is recommended because your assessment shows strong science, mathematics, and logical reasoning results, with interests that connect well to structured academic and laboratory-based learning.",
+  "elective1": "Chemistry 1",
+  "elective1Explanation": "Chemistry 1 is recommended because your science, math, and logical reasoning results show that you may do well in a subject that uses analysis, precision, and laboratory thinking. This elective introduces important chemistry concepts such as matter, chemical reactions, measurement, laboratory safety, and scientific problem solving. You can expect to work with experiments, interpret data, practice careful observation, and build a foundation for science-related study. This elective can support college courses such as BS Chemistry, BS Chemical Engineering, BS Pharmacy, BS Medical Technology, and BS Nursing, with future pathways such as chemist, pharmacist, laboratory analyst, medical technologist, chemical engineer, or science researcher.",
+  "elective2": "Chemistry 2",
+  "elective2Explanation": "Chemistry 2 is recommended as the next step after Chemistry 1 because your results suggest readiness for deeper scientific analysis and more advanced laboratory work. This elective builds on foundational chemistry by exploring more complex chemical concepts, laboratory procedures, and applied problem-solving tasks. You can expect to strengthen your analytical thinking, handle more detailed experiments, and connect chemistry learning to health, engineering, and research fields. Related college courses include BS Chemistry, BS Chemical Engineering, BS Medical Technology, BS Pharmacy, and other science or health programs, with career pathways such as laboratory analyst, chemist, chemical engineer, pharmacist, medical technologist, researcher, or science educator.",
+  "overallAnalysis": "Your results suggest that science-focused electives can help you build a strong pathway toward college programs and careers that use analysis, precision, laboratory skills, and problem solving.",
+  "suggestedCollegeCourses": [
+    "BS Chemistry",
+    "BS Chemical Engineering",
+    "BS Pharmacy",
+    "BS Medical Technology",
+    "BS Nursing"
+  ],
+  "careerPathways": [
+    {
+      "category": "Chemistry and Laboratory Science",
+      "careers": [
+        "Chemist",
+        "Laboratory Analyst",
+        "Research Assistant",
+        "Science Educator"
+      ]
+    },
+    {
+      "category": "Health and Applied Science",
+      "careers": [
+        "Pharmacist",
+        "Medical Technologist",
+        "Healthcare Professional"
+      ]
+    }
+  ]
+}
+
 `;
     const input = prompt.trim();
 
