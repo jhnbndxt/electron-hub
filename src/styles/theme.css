@@ -1064,6 +1064,21 @@
     font-size: 0.875rem;
   }
 
+  .portal-dashboard-page [role="progressbar"],
+  .public-page-shell [role="progressbar"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .portal-dashboard-page .h-1,
+  .portal-dashboard-page .h-2,
+  .portal-dashboard-page .h-3,
+  .public-page-shell .h-1,
+  .public-page-shell .h-2,
+  .public-page-shell .h-3 {
+    max-width: 100%;
+  }
+
   .portal-dashboard-page input,
   .portal-dashboard-page select,
   .portal-dashboard-page textarea,

@@ -625,8 +625,48 @@ export function Dashboard() {
           </h2>
         </div>
 
+        {/* Mobile/Tablet Progress List */}
+        <div className="mb-8 space-y-3 md:hidden">
+          {enrollmentSteps.map((step, index) => {
+            const StepIcon = step.icon;
+            const isCompleted = step.status === "completed";
+            const isCurrent = step.status === "current";
+
+            return (
+              <div
+                key={step.name}
+                className={`flex items-center gap-3 rounded-2xl border p-4 ${
+                  isCompleted
+                    ? "border-blue-100 bg-blue-50/80"
+                    : isCurrent
+                    ? "border-red-100 bg-red-50/70"
+                    : "border-slate-200 bg-white/70"
+                }`}
+              >
+                <div
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                    isCompleted
+                      ? "bg-[var(--electron-blue)] text-white"
+                      : isCurrent
+                      ? "bg-white text-[var(--electron-blue)] ring-2 ring-blue-200"
+                      : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  {isCompleted ? <CheckCircle2 className="h-5 w-5" /> : isCurrent ? <CircleDot className="h-5 w-5" /> : <StepIcon className="h-5 w-5" />}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-slate-900">{step.name}</p>
+                  <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                    Step {index + 1} of {enrollmentSteps.length} • {isCompleted ? "Completed" : isCurrent ? "In progress" : "Pending"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         {/* 7-Step Linear Progress Stepper */}
-        <div className="relative mb-8 overflow-x-auto pb-2">
+        <div className="relative mb-8 hidden overflow-x-auto pb-2 md:block">
           <div className="relative min-w-[820px]">
           {/* Connector Line Background */}
           <div 

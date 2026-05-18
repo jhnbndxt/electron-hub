@@ -1589,7 +1589,46 @@ export function PublicAssessment() {
                 </div>
               </div>
 
-              <div className="relative overflow-x-auto pb-2">
+              <div className="grid gap-3 md:hidden">
+                {sections.map((section, index) => {
+                  const Icon = section.icon;
+                  const isActive = index === currentSection;
+                  const isCompleted = index < currentSection;
+
+                  return (
+                    <div
+                      key={section.name}
+                      className={`flex items-center gap-3 rounded-2xl border p-4 ${
+                        isActive
+                          ? "border-blue-100 bg-blue-50"
+                          : isCompleted
+                          ? "border-green-100 bg-green-50"
+                          : "border-slate-200 bg-slate-50"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                          isActive
+                            ? "bg-[var(--electron-blue)] text-white"
+                            : isCompleted
+                            ? "bg-green-500 text-white"
+                            : "bg-white text-slate-400"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-slate-900">{section.name}</p>
+                        <p className="mt-0.5 text-xs font-semibold text-slate-500">
+                          Section {index + 1} of {sections.length} • {isActive ? "In progress" : isCompleted ? "Completed" : "Pending"}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="relative hidden overflow-x-auto pb-2 md:block">
                 <div className="relative flex min-w-[720px] justify-between gap-4">
             {sections.map((section, index) => {
               const Icon = section.icon;
