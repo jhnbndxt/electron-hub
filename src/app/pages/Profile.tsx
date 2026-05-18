@@ -826,9 +826,6 @@ export function Profile() {
 
               <div className="min-w-0 flex-1">
                 <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                  Review your assigned section and keep your profile details ready for enrollment updates.
-                </p>
                 <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full border border-white/60 bg-white/45 px-4 py-2 text-sm font-bold text-blue-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_36px_-28px_rgba(30,58,138,0.95)] backdrop-blur-xl ring-1 ring-blue-100/70">
                   <BookOpen className="h-4 w-4 shrink-0 text-yellow-300" />
                   <span className="truncate">Section: {sectionDisplayName}</span>
