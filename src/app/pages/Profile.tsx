@@ -826,26 +826,9 @@ export function Profile() {
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                   Review your assigned section and keep your profile details ready for enrollment updates.
                 </p>
-
-                <div className="mt-5 rounded-2xl border border-blue-100 bg-white/80 p-4 shadow-sm">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
-                        <BookOpen className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Section Assignment</p>
-                        <p className="mt-1 text-lg font-bold text-slate-950">{sectionDisplayName}</p>
-                      </div>
-                    </div>
-                    <span className={`inline-flex w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
-                      studentSection.status === "assigned"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-50 text-red-700"
-                    }`}>
-                      {studentSection.status === "assigned" ? "Assigned" : "Pending"}
-                    </span>
-                  </div>
+                <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-[var(--electron-blue)]/90 px-4 py-2 text-sm font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_12px_28px_-22px_rgba(30,58,138,0.9)]">
+                  <BookOpen className="h-4 w-4 shrink-0 text-yellow-300" />
+                  <span className="truncate">Section: {sectionDisplayName}</span>
                 </div>
               </div>
 
