@@ -766,7 +766,7 @@ export function ChatAssistantShell({
   return createPortal(
     <>
       <motion.div
-        className="fixed bottom-4 right-4 z-[80] sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8"
+        className="fixed bottom-3 right-3 z-[80] sm:bottom-6 sm:right-6 lg:bottom-8 lg:right-8"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
       >
@@ -774,7 +774,7 @@ export function ChatAssistantShell({
           type="button"
           onClick={() => openStateChange(!isOpen)}
           aria-label={isOpen ? "Close chat assistant" : "Open chat assistant"}
-          className="relative flex h-[4.75rem] w-[4.75rem] items-center justify-center rounded-full border border-white/30 text-white shadow-[0_28px_58px_-24px_rgba(15,23,42,0.72)] sm:h-20 sm:w-20"
+          className="relative flex h-14 w-14 items-center justify-center rounded-full border border-white/30 text-white shadow-[0_22px_42px_-24px_rgba(15,23,42,0.72)] sm:h-16 sm:w-16 lg:h-20 lg:w-20"
           style={{
             background:
               "linear-gradient(135deg, var(--electron-blue) 0%, #2d5cc9 55%, var(--electron-red) 100%)",
@@ -788,19 +788,19 @@ export function ChatAssistantShell({
             animate={{ scale: [1, 1.16, 1], opacity: [0.35, 0.08, 0.35] }}
             transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
           />
-          <span className="absolute inset-[6px] rounded-full bg-white/12 backdrop-blur" />
-          <span className="absolute inset-[0.6rem] rounded-full bg-white/12 shadow-inner shadow-white/20" />
+          <span className="absolute inset-[5px] rounded-full bg-white/12 backdrop-blur sm:inset-[6px]" />
+          <span className="absolute inset-2 rounded-full bg-white/12 shadow-inner shadow-white/20 sm:inset-[0.55rem] lg:inset-[0.6rem]" />
           <img
             src={chatbotLogo}
             alt=""
-            className="relative h-12 w-12 object-contain drop-shadow-[0_8px_14px_rgba(15,23,42,0.22)] sm:h-14 sm:w-14"
+            className="relative h-9 w-9 object-contain drop-shadow-[0_8px_14px_rgba(15,23,42,0.22)] sm:h-11 sm:w-11 lg:h-14 lg:w-14"
             aria-hidden="true"
           />
-          <span className="absolute right-2.5 top-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/40 sm:right-3 sm:top-3">
+          <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/40 sm:right-2 sm:top-2 sm:h-5 sm:w-5 lg:right-3 lg:top-3">
             {isOpen ? (
-              <X className="h-3 w-3 text-white" />
+              <X className="h-2.5 w-2.5 text-white sm:h-3 sm:w-3" />
             ) : (
-              <Sparkles className="h-3 w-3 text-amber-200" />
+              <Sparkles className="h-2.5 w-2.5 text-amber-200 sm:h-3 sm:w-3" />
             )}
           </span>
         </motion.button>
@@ -822,8 +822,8 @@ export function ChatAssistantShell({
             <motion.section
               role="dialog"
               aria-label="EHub AI Assistant"
-              className={`fixed inset-x-3 bottom-3 z-[80] flex min-h-0 flex-col overflow-hidden rounded-[2rem] border border-white/55 bg-white/80 shadow-[0_42px_120px_-50px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[430px] sm:max-w-[calc(100vw-3rem)] lg:bottom-8 lg:right-8 ${
-                isConversationEmpty ? "h-auto max-h-[calc(100vh-1.5rem)]" : "h-[min(82vh,760px)]"
+              className={`fixed inset-x-3 bottom-3 z-[80] flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/55 bg-white/80 shadow-[0_32px_90px_-48px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[390px] sm:max-w-[calc(100vw-3rem)] sm:rounded-[1.75rem] lg:bottom-8 lg:right-8 lg:w-[430px] lg:rounded-[2rem] ${
+                isConversationEmpty ? "h-auto max-h-[calc(100dvh-1rem)]" : "h-[min(74dvh,620px)] sm:h-[min(78vh,680px)] lg:h-[min(82vh,760px)]"
               }`}
               initial={{ opacity: 0, y: 24, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
