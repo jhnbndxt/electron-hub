@@ -564,7 +564,7 @@ export function Dashboard() {
                     <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-white" />
                     <div>
                       <p className="font-semibold text-white">Section release</p>
-                      <p className="mt-1 text-sm text-emerald-50/85">Your section assignment will appear on the dashboard after the enrollment period ends. Stay updated through notifications.</p>
+                      <p className="mt-1 text-sm text-emerald-50/85">Your section assignment will appear on your profile page once sections are released. Watch your notifications for updates.</p>
                     </div>
                   </div>
                 </div>
