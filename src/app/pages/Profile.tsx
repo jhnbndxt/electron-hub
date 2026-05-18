@@ -21,6 +21,12 @@ interface AssessmentResult {
   overallScore: number;
 }
 
+interface StudentSectionAssignment {
+  status: "loading" | "assigned" | "pending" | "unavailable";
+  sectionId?: string;
+  sectionName?: string;
+}
+
 // Helper to format assessment date
 function formatAssessmentDate(isoDate: string): string {
   const date = new Date(isoDate);
@@ -52,6 +58,90 @@ export function Profile() {
   const [profileImageUrl, setProfileImageUrl] = useState(userData?.profilePictureUrl || "");
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [studentSection, setStudentSection] = useState<StudentSectionAssignment>({ status: "loading" });
+
+  const getSectionStorageKey = () => {
+    const reference = userData?.id || userData?.email || "";
+    return reference ? `student_section_assignment_${reference}` : "";
+  };
+
+  const readStoredSectionAssignment = () => {
+    const storageKey = getSectionStorageKey();
+    if (!storageKey) return null;
+
+    try {
+      const storedAssignment = localStorage.getItem(storageKey);
+      return storedAssignment ? JSON.parse(storedAssignment) : null;
+    } catch (_error) {
+      return null;
+    }
+  };
+
+  const persistSectionAssignment = (assignment: StudentSectionAssignment) => {
+    const storageKey = getSectionStorageKey();
+    if (!storageKey || assignment.status !== "assigned") return;
+
+    localStorage.setItem(
+      storageKey,
+      JSON.stringify({
+        sectionId: assignment.sectionId,
+        sectionName: assignment.sectionName,
+      })
+    );
+  };
+
+  async function loadStudentSectionAssignment(enrollmentId?: string) {
+    if (!enrollmentId) {
+      setStudentSection(readStoredSectionAssignment() ? { status: "unavailable" } : { status: "pending" });
+      return;
+    }
+
+    const { data: assignment, error: assignmentError } = await supabase
+      .from("section_assignments")
+      .select("id, section_id, status, updated_at, created_at")
+      .eq("enrollment_id", enrollmentId)
+      .eq("status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (assignmentError) {
+      console.error("Error loading student section assignment:", assignmentError);
+      setStudentSection(readStoredSectionAssignment() ? { status: "unavailable" } : { status: "pending" });
+      return;
+    }
+
+    if (!assignment?.section_id) {
+      setStudentSection(readStoredSectionAssignment() ? { status: "unavailable" } : { status: "pending" });
+      return;
+    }
+
+    const { data: section, error: sectionError } = await supabase
+      .from("sections")
+      .select("id, section_code")
+      .eq("id", assignment.section_id)
+      .maybeSingle();
+
+    if (sectionError || !section) {
+      if (sectionError) {
+        console.error("Error loading assigned section:", sectionError);
+      }
+      setStudentSection({
+        status: "unavailable",
+        sectionId: assignment.section_id,
+      });
+      return;
+    }
+
+    const nextAssignment = {
+      status: "assigned" as const,
+      sectionId: section.id,
+      sectionName: section.section_code || "Assigned Section",
+    };
+
+    persistSectionAssignment(nextAssignment);
+    setStudentSection(nextAssignment);
+  }
 
   useEffect(() => {
     if (userData) {
@@ -109,6 +199,9 @@ export function Profile() {
             }
           : null
       );
+      await loadStudentSectionAssignment(latestEnrollmentId);
+    } else {
+      await loadStudentSectionAssignment("");
     }
 
     // Check assessment history from Supabase
@@ -267,6 +360,49 @@ export function Profile() {
     };
   }, [userData, location]); // Re-run when location changes (navigation)
 
+  useEffect(() => {
+    const enrollmentId = enrollmentData?.id;
+    if (!enrollmentId || (!userData?.id && !userData?.email)) {
+      return;
+    }
+
+    const refreshSectionAssignment = () => {
+      void loadStudentSectionAssignment(enrollmentId);
+    };
+
+    const assignmentChannel = supabase
+      .channel(`student-section-assignment-${enrollmentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "section_assignments",
+          filter: `enrollment_id=eq.${enrollmentId}`,
+        },
+        refreshSectionAssignment
+      )
+      .subscribe();
+
+    const sectionChannel = supabase
+      .channel(`student-section-records-${enrollmentId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "sections",
+        },
+        refreshSectionAssignment
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(assignmentChannel);
+      supabase.removeChannel(sectionChannel);
+    };
+  }, [enrollmentData?.id, userData?.id, userData?.email]);
+
   // Format date of birth for display
   const formatDate = (dateString: string) => {
     if (!dateString) return "Not specified";
@@ -288,7 +424,6 @@ export function Profile() {
     address: formatAddress(enrollmentData),
     birthDate: formatDate(profileData.dateOfBirth),
     sex: formatSex(profileData.gender),
-    studentId: "2026-00001",
   };
 
   // Calculate actual progress stats
@@ -369,7 +504,6 @@ export function Profile() {
   // CSV Export for Student Record
   const handleExportStudentRecordCSV = () => {
     const headers = [
-      "Student ID",
       "Full Name",
       "Email",
       "Phone",
@@ -384,7 +518,6 @@ export function Profile() {
     ];
     const assessmentStatus = assessmentHistory.length > 0 ? "Completed" : "Not Started";
     const rows = [[
-      studentInfo.studentId,
       studentInfo.name,
       studentInfo.email,
       studentInfo.phone,
@@ -398,7 +531,7 @@ export function Profile() {
       new Date().toLocaleDateString('en-US')
     ]];
     exportToCSV({
-      filename: `student-record-${studentInfo.studentId}-${new Date().toISOString().split('T')[0]}`,
+      filename: `student-record-${(studentInfo.email || "student").replace(/[^a-z0-9]+/gi, "-")}-${new Date().toISOString().split('T')[0]}`,
       title: "Student Record Export",
       subtitle: `Electron Hub - Student Management System`,
       headers,
@@ -456,9 +589,6 @@ export function Profile() {
               </div>
 
               <div className="min-w-0 flex-1">
-                <div className="mb-3 inline-flex rounded-full border border-blue-100 bg-white/70 px-3 py-1 text-xs font-semibold text-blue-900 shadow-sm">
-                  Student ID: {studentInfo.studentId}
-                </div>
                 <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                   Keep your contact details current and review your assessment, payment, and enrollment progress in one place.
@@ -482,6 +612,65 @@ export function Profile() {
                   Edit Profile
                 </Link>
               </div>
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-[1.75rem] border-2 border-blue-200 bg-gradient-to-br from-blue-950 via-blue-900 to-slate-950 p-6 text-white shadow-2xl shadow-blue-950/25 sm:p-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-100">
+                  <Users2 className="h-4 w-4" />
+                  Student Section
+                </div>
+                {studentSection.status === "assigned" ? (
+                  <>
+                    <p className="text-sm font-semibold text-blue-100">
+                      Hi! Welcome to the Electron Community.
+                    </p>
+                    <p className="mt-1 text-sm text-blue-100/90">
+                      Our registrar office has assigned you a temporary section.
+                    </p>
+                  </>
+                ) : studentSection.status === "unavailable" ? (
+                  <>
+                    <p className="text-sm font-semibold text-amber-100">
+                      Your section assignment is currently unavailable.
+                    </p>
+                    <p className="mt-1 text-sm text-blue-100/90">
+                      It is pending update from the registrar.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-blue-100">
+                      Your section assignment is still pending.
+                    </p>
+                    <p className="mt-1 text-sm text-blue-100/90">
+                      Please wait while the registrar finalizes sectioning.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-white/20 bg-white px-5 py-4 text-center text-blue-950 shadow-xl lg:min-w-80">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
+                  Assigned Section
+                </p>
+                <p className="mt-2 break-words text-3xl font-black leading-tight sm:text-4xl">
+                  {studentSection.status === "assigned"
+                    ? studentSection.sectionName
+                    : studentSection.status === "unavailable"
+                    ? "Pending Update"
+                    : "Pending"}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-white/15 bg-white/10 p-4 text-sm leading-6 text-blue-50">
+              <p>You may also view your section on your profile.</p>
+              <p className="mt-1 font-semibold">
+                Note: This section is temporary and may still change until further notice.
+              </p>
             </div>
           </section>
 

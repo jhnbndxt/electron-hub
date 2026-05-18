@@ -144,6 +144,12 @@ const NOTIFICATION_MAP = {
     title: 'Enrollment Reopened',
     message: 'Enrollment is now open again. Please complete your application while the window is available.',
   },
+  STUDENT_SECTION_ASSIGNED: {
+    title: 'Temporary Section Assigned',
+    message: additionalData =>
+      additionalData.message ||
+      'Hi! Welcome to the Electron Community. Our registrar office has assigned you a temporary section. You may also view your section on your profile. Note: This section is temporary and may still change until further notice.',
+  },
 };
 
 /**

@@ -25,7 +25,7 @@ export function PublicLayout() {
 
   const handleLogout = () => {
     logout();
-    navigate("/");
+    navigate("/", { replace: true });
   };
 
   useEffect(() => {

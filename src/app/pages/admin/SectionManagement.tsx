@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, Grid3x3, BookOpen, X, Edit2, Trash2, Save, Download } from "lucide-react";
+import { Users, Grid3x3, BookOpen, X, Edit2, Trash2, Save, Download, Loader2 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { getEnrolledStudents } from "../../../services/adminService";
@@ -8,6 +8,7 @@ import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
+import { triggerNotification } from "../../../services/notificationService";
 
 interface EnrolledStudent {
   id: string;
@@ -262,6 +263,31 @@ function sanitizeFileName(value: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
+}
+
+async function notifyStudentsAboutSectionAssignments(
+  finalSections: Array<{ id: string; name: string; students: EnrolledStudent[] }>
+) {
+  const notificationTasks = finalSections.flatMap((section) =>
+    section.students.map((student) =>
+      triggerNotification(student.email, "STUDENT_SECTION_ASSIGNED", {
+        sectionId: section.id,
+        sectionName: section.name,
+        actionUrl: "/dashboard/profile",
+        message:
+          "Hi! Welcome to the Electron Community.\nOur registrar office has assigned you a temporary section.\n\nYou may also view your section on your profile.\n\nNote: This section is temporary and may still change until further notice.",
+      }).catch((error) => {
+        console.error("Error notifying student about section assignment:", {
+          student: student.email,
+          section: section.name,
+          error,
+        });
+        return null;
+      })
+    )
+  );
+
+  await Promise.allSettled(notificationTasks);
 }
 
 export function SectionManagement() {
@@ -619,6 +645,7 @@ export function SectionManagement() {
         const timestamp = new Date().toISOString();
         const finalSections = activeExistingSections.map((section) => ({
           id: section.id,
+          name: section.name,
           students: section.plannedStudents,
         }));
 
@@ -695,6 +722,7 @@ export function SectionManagement() {
 
           finalSections.push({
             id: insertedSection.id,
+            name: sectionCode,
             students: section.plannedStudents,
           });
         }
@@ -732,6 +760,8 @@ export function SectionManagement() {
             alert(`Failed to save section assignments: ${assignmentInsertError.message}`);
             return;
           }
+
+          await notifyStudentsAboutSectionAssignments(finalSections);
         }
 
         if (sectionsToDelete.length > 0) {
@@ -1200,8 +1230,14 @@ export function SectionManagement() {
   return (
     <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
       {isAssignmentSyncing && (
-        <div className="mb-4 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-900">
-          Section details are loading — showing available sections while student assignment data updates.
+        <div className="mb-5 flex items-start gap-3 rounded-xl border-2 border-amber-400 bg-amber-100 px-4 py-3 text-sm font-semibold text-amber-950 shadow-lg shadow-amber-200/70 ring-2 ring-amber-200">
+          <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-amber-700" />
+          <div>
+            <p>Section details are loading</p>
+            <p className="mt-0.5 font-medium text-amber-900">
+              Showing available sections while student assignment data updates.
+            </p>
+          </div>
         </div>
       )}
       <DashboardPageHeader
