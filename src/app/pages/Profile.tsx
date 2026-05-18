@@ -1,6 +1,6 @@
 import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3, Check, X, RotateCcw, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { Link, useLocation, useNavigate } from "react-router";
+import { Link, useLocation } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
@@ -40,7 +40,6 @@ export function Profile() {
   const { userData, enrollmentProgress, updateUserData, logout } = useAuth();
   const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const navigate = useNavigate();
   
   const [profileData, setProfileData] = useState({
     fullName: userData?.name || "Student",
@@ -790,7 +789,7 @@ export function Profile() {
             </p>
           </div>
 
-          <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-0">
+          <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8">
             <input
               ref={fileInputRef}
               type="file"
@@ -799,35 +798,31 @@ export function Profile() {
               onChange={handleProfileImageUpload}
             />
 
-            <div className="relative z-10 grid overflow-hidden lg:grid-cols-[18rem_minmax(0,1fr)]">
-              <div className="relative flex min-h-64 flex-col items-center justify-center bg-[var(--electron-blue)] p-8 text-center text-white">
-                <div className="absolute inset-x-0 top-0 h-1.5 bg-[var(--electron-red)]" />
-                <div className="relative">
-                  <Avatar className="h-36 w-36 shadow-[0_26px_50px_-24px_rgba(15,23,42,0.95)] ring-4 ring-white/90">
-                    {profileImageUrl ? (
-                      <AvatarImage src={profileImageUrl} alt={`${studentInfo.name} profile photo`} className="object-cover" />
-                    ) : null}
-                    <AvatarFallback className="bg-white text-4xl font-bold text-blue-900">
-                      {userInitial}
-                    </AvatarFallback>
-                  </Avatar>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingProfileImage}
-                    className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--electron-red)] text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-                    aria-label="Change profile photo"
-                  >
-                    {isUploadingProfileImage ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                  </button>
-                </div>
-                <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-blue-100">Student Profile</p>
-              </div>
+            <div className="relative z-10 space-y-6">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:text-left">
+                  <div className="relative shrink-0">
+                    <Avatar className="h-32 w-32 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.8)] ring-4 ring-white/90 sm:h-36 sm:w-36">
+                      {profileImageUrl ? (
+                        <AvatarImage src={profileImageUrl} alt={`${studentInfo.name} profile photo`} className="object-cover" />
+                      ) : null}
+                      <AvatarFallback className="text-4xl font-bold text-white" style={{ backgroundColor: "var(--electron-blue)" }}>
+                        {userInitial}
+                      </AvatarFallback>
+                    </Avatar>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={isUploadingProfileImage}
+                      className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--electron-red)] text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                      aria-label="Change profile photo"
+                    >
+                      {isUploadingProfileImage ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                    </button>
+                  </div>
 
-              <div className="flex flex-col justify-between gap-8 p-6 sm:p-8 lg:p-10">
-                <div className="space-y-5">
-                  <div>
-                    <div className="mb-3 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+                  <div className="min-w-0">
+                    <div className="mb-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                       <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-900">
                         <ShieldCheck className="h-3.5 w-3.5" />
                         Student Portal
@@ -837,11 +832,11 @@ export function Profile() {
                         {sectionDisplayName}
                       </span>
                     </div>
-                    <h2 className="text-center text-3xl font-bold leading-tight text-slate-950 sm:text-4xl lg:text-left">{studentInfo.name}</h2>
+                    <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-44">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -860,60 +855,43 @@ export function Profile() {
                   </Link>
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  { icon: Mail, label: "Email Address", value: studentInfo.email },
+                  { icon: Phone, label: "Phone Number", value: studentInfo.phone },
+                  { icon: Calendar, label: "Birth Date", value: studentInfo.birthDate },
+                  { icon: Users2, label: "Sex", value: studentInfo.sex },
+                ].map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <div key={item.label} className="flex items-start gap-3 border-b border-slate-200/80 p-4 sm:[&:nth-child(odd)]:border-r xl:border-b-0 xl:border-r xl:last:border-r-0">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                        <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{item.value}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white/75 p-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
+                  <MapPin className="h-5 w-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Address</p>
+                  <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{studentInfo.address}</p>
+                </div>
+              </div>
             </div>
           </section>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
             <div className="space-y-6">
-              <section className="portal-glass-panel rounded-[1.75rem] p-6">
-                <div className="mb-6 flex items-center justify-between gap-4">
-                  <div>
-                    <h3 className="text-xl font-bold text-slate-950">Personal Information</h3>
-                    <p className="mt-1 text-sm text-slate-500">Registration and contact details</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/dashboard/edit-profile")}
-                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
-                    aria-label="Edit profile"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 divide-y divide-slate-200/80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/70 md:grid-cols-2 md:divide-x md:divide-y-0">
-                  {[
-                    { icon: Mail, label: "Email Address", value: studentInfo.email },
-                    { icon: Phone, label: "Phone Number", value: studentInfo.phone },
-                    { icon: Calendar, label: "Birth Date", value: studentInfo.birthDate },
-                    { icon: Users2, label: "Sex", value: studentInfo.sex },
-                  ].map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <div key={item.label} className="flex items-start gap-3 p-4">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
-                          <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{item.value}</p>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
-                    <MapPin className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Address</p>
-                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">{studentInfo.address}</p>
-                  </div>
-                </div>
-              </section>
-
               <section className="portal-glass-panel rounded-[1.75rem] p-6">
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-slate-950">Quick Stats</h3>
