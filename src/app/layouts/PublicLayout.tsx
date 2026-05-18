@@ -235,48 +235,55 @@ export function PublicLayout() {
           </div>
         </div>
 
-        <AnimatePresence>
-          {isMobileMenuOpen ? (
-            <div className="fixed inset-0 z-50 lg:hidden">
-              <motion.div
-                className="absolute inset-0 bg-slate-950/50"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
-                onClick={() => setIsMobileMenuOpen(false)}
-              />
-              <motion.div
-                className="absolute right-0 top-0 h-full w-80 max-w-[88vw] overflow-y-auto p-5 shadow-2xl"
-                style={{ backgroundColor: isAnyAdmin ? "#7F1D1D" : "#102A6B" }}
-                initial={{ x: "100%", opacity: 0.98 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: "100%", opacity: 0.98 }}
-                transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.9 }}
-              >
-                <motion.div
-                  initial={{ opacity: 0, y: -12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -12 }}
-                  transition={{ duration: 0.24 }}
-                  className="mb-6 flex items-start justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-semibold">Electron College</p>
-                    <p className="text-xs opacity-80">
-                      {isAnyAdmin ? getAdminLabel() : "Online Enrollment Portal"}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="rounded-lg border border-white/20 p-2 transition-colors hover:bg-white/10"
-                    aria-label="Close navigation menu"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </motion.div>
+      </nav>
 
+      <AnimatePresence>
+        {isMobileMenuOpen ? (
+          <div className="fixed inset-0 z-[100] lg:hidden">
+            <motion.div
+              className="absolute inset-0 bg-slate-950/50"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.22, ease: [0.32, 0.72, 0, 1] }}
+              onClick={() => setIsMobileMenuOpen(false)}
+            />
+            <motion.div
+              className="absolute bottom-0 right-0 top-0 flex h-[100dvh] w-80 max-w-[88vw] flex-col overflow-hidden p-5 text-white shadow-2xl"
+              style={{
+                background: isAnyAdmin
+                  ? "linear-gradient(180deg, #7F1D1D 0%, #991B1B 100%)"
+                  : "linear-gradient(180deg, #102A6B 0%, #1E3A8A 100%)",
+              }}
+              initial={{ x: "100%", opacity: 0.98 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: "100%", opacity: 0.98 }}
+              transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.9 }}
+            >
+              <motion.div
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.24 }}
+                className="mb-6 flex shrink-0 items-start justify-between gap-4"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-base font-semibold">Electron College</p>
+                  <p className="text-xs opacity-80">
+                    {isAnyAdmin ? getAdminLabel() : "Online Enrollment Portal"}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="rounded-lg border border-white/20 p-2 transition-colors hover:bg-white/10"
+                  aria-label="Close navigation menu"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </motion.div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto pb-6">
                 <div className="space-y-2">
                   {studentNavLinks.map((link, index) => (
                     <motion.div
@@ -345,11 +352,11 @@ export function PublicLayout() {
                     </button>
                   ) : null}
                 </motion.div>
-              </motion.div>
-            </div>
-          ) : null}
-        </AnimatePresence>
-      </nav>
+              </div>
+            </motion.div>
+          </div>
+        ) : null}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main className="flex-1">
