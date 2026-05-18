@@ -45,42 +45,10 @@ import {
   getRegions,
 } from "../../services/addressService";
 
-// Academic electives
-const academicElectives = [
-  "Biology",
-  "Physics",
-  "Psychology",
-  "Creative Writing",
-  "Entrepreneurship",
-  "Marketing",
-  "Media Arts",
-  "Visual Arts",
-  "Coaching",
-  "Fitness",
-  "Sports"
-];
-
-// Technical-Professional electives
-const technicalElectives = [
-  "ICT",
-  "Programming",
-  "Cookery",
-  "Bread & Pastry",
-  "Automotive",
-  "Electrical",
-  "Agriculture",
-  "Fishery",
-  "Fitness Training",
-  "Coaching"
-];
-
 const allElectives = Array.from(
   new Set(
-    [
-      ...academicElectives,
-      ...technicalElectives,
-      ...((electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[]),
-    ].sort((first, second) => first.localeCompare(second))
+    ((electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[])
+      .sort((first, second) => first.localeCompare(second))
   )
 );
 const electiveCatalogNames = (electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[];
