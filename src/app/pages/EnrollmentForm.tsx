@@ -52,6 +52,7 @@ const allElectives = Array.from(
   )
 );
 const electiveCatalogNames = (electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[];
+const electiveCatalogNameSet = new Set(electiveCatalogNames.map((elective) => elective.toLowerCase()));
 
 const guardianFields = [
   "guardianLastName",
@@ -1077,6 +1078,12 @@ export function EnrollmentForm() {
       if (!formData.preferredTrack) newErrors.preferredTrack = "This field is required";
       if (!formData.elective1) newErrors.elective1 = "This field is required";
       if (!formData.elective2) newErrors.elective2 = "This field is required";
+      if (formData.elective1 && !isAvailableElective(formData.elective1)) {
+        newErrors.elective1 = getElectiveAvailabilityMessage("Elective 1");
+      }
+      if (formData.elective2 && !isAvailableElective(formData.elective2)) {
+        newErrors.elective2 = getElectiveAvailabilityMessage("Elective 2");
+      }
       if (formData.elective1 && formData.elective2 && formData.elective1 === formData.elective2) {
         newErrors.elective2 = "Elective 1 and Elective 2 must be different";
       }
@@ -1237,6 +1244,14 @@ export function EnrollmentForm() {
       .slice(0, 12);
   };
 
+  const isAvailableElective = (elective: string) => {
+    return electiveCatalogNameSet.has(String(elective || "").trim().toLowerCase());
+  };
+
+  const getElectiveAvailabilityMessage = (label: string) => {
+    return `${label} must be selected from the available elective list. Please choose one of the matching dropdown options.`;
+  };
+
   const renderPageIndicator = () => {
     const pages = [
       { num: 1, label: "Basic Info", icon: User },
@@ -1386,6 +1401,13 @@ export function EnrollmentForm() {
           }}
           onBlur={() => {
             window.setTimeout(() => {
+              const typedValue = electiveSearch[field].trim();
+              if (typedValue && typedValue !== formData[field]) {
+                setErrors((prev) => ({
+                  ...prev,
+                  [field]: getElectiveAvailabilityMessage(label),
+                }));
+              }
               setActiveElectiveField((currentField) => (currentField === field ? null : currentField));
               setElectiveSearch((prev) => ({ ...prev, [field]: formData[field] || "" }));
             }, 150);
