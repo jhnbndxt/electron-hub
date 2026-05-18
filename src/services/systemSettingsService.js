@@ -175,7 +175,8 @@ const SETTINGS_BY_KEY = SYSTEM_SETTINGS_DEFINITIONS.reduce((definitionMap, defin
   return definitionMap;
 }, {});
 
-const ENCRYPTED_VALUE_PREFIX = 'enc:v1:';
+const LEGACY_ENCODED_VALUE_PREFIX = 'enc:v1:';
+const ENCRYPTED_VALUE_PREFIX = 'enc:aes-gcm:v1:';
 const SENSITIVE_PAYMENT_SETTING_KEYS = new Set([
   'payment_bank_account_name',
   'payment_bank_account_number',
@@ -185,13 +186,64 @@ const SENSITIVE_PAYMENT_SETTING_KEYS = new Set([
   'payment_gcash_details',
 ]);
 
-function encodeSensitiveValue(value) {
+function getEncryptionSecret() {
+  return (
+    import.meta.env.VITE_PAYMENT_SETTINGS_ENCRYPTION_KEY ||
+    import.meta.env.VITE_SUPABASE_ANON_KEY ||
+    'electron-hub-development-payment-settings-key'
+  );
+}
+
+function bufferToBase64(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let binary = '';
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+async function getPaymentSettingsEncryptionKey() {
+  if (
+    typeof crypto === 'undefined' ||
+    !crypto.subtle ||
+    typeof TextEncoder === 'undefined'
+  ) {
+    return null;
+  }
+
+  const encodedSecret = new TextEncoder().encode(getEncryptionSecret());
+  const keyMaterial = await crypto.subtle.digest('SHA-256', encodedSecret);
+
+  return crypto.subtle.importKey(
+    'raw',
+    keyMaterial,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+function legacyEncodeSensitiveValue(value) {
   const normalizedValue = String(value ?? '').trim();
   if (!normalizedValue) return '';
 
   try {
     if (typeof window !== 'undefined' && typeof window.btoa === 'function') {
-      return `${ENCRYPTED_VALUE_PREFIX}${window.btoa(unescape(encodeURIComponent(normalizedValue)))}`;
+      return `${LEGACY_ENCODED_VALUE_PREFIX}${window.btoa(unescape(encodeURIComponent(normalizedValue)))}`;
     }
   } catch (_error) {
     return normalizedValue;
@@ -200,14 +252,14 @@ function encodeSensitiveValue(value) {
   return normalizedValue;
 }
 
-function decodeSensitiveValue(value) {
+function legacyDecodeSensitiveValue(value) {
   const normalizedValue = String(value ?? '');
-  if (!normalizedValue.startsWith(ENCRYPTED_VALUE_PREFIX)) {
+  if (!normalizedValue.startsWith(LEGACY_ENCODED_VALUE_PREFIX)) {
     return normalizedValue;
   }
 
   try {
-    const encodedValue = normalizedValue.slice(ENCRYPTED_VALUE_PREFIX.length);
+    const encodedValue = normalizedValue.slice(LEGACY_ENCODED_VALUE_PREFIX.length);
     if (typeof window !== 'undefined' && typeof window.atob === 'function') {
       return decodeURIComponent(escape(window.atob(encodedValue)));
     }
@@ -216,6 +268,74 @@ function decodeSensitiveValue(value) {
   }
 
   return '';
+}
+
+async function encodeSensitiveValue(value) {
+  const normalizedValue = String(value ?? '').trim();
+  if (!normalizedValue) return '';
+
+  if (
+    normalizedValue.startsWith(ENCRYPTED_VALUE_PREFIX) ||
+    normalizedValue.startsWith(LEGACY_ENCODED_VALUE_PREFIX)
+  ) {
+    return normalizedValue;
+  }
+
+  try {
+    const key = await getPaymentSettingsEncryptionKey();
+    if (!key || typeof crypto === 'undefined' || !crypto.getRandomValues) {
+      return legacyEncodeSensitiveValue(normalizedValue);
+    }
+
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encryptedBuffer = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      new TextEncoder().encode(normalizedValue)
+    );
+
+    return `${ENCRYPTED_VALUE_PREFIX}${bufferToBase64(iv)}.${bufferToBase64(encryptedBuffer)}`;
+  } catch (error) {
+    console.error('Payment settings encryption failed:', error);
+    return legacyEncodeSensitiveValue(normalizedValue);
+  }
+}
+
+async function decodeSensitiveValue(value) {
+  const normalizedValue = String(value ?? '');
+
+  if (normalizedValue.startsWith(LEGACY_ENCODED_VALUE_PREFIX)) {
+    return legacyDecodeSensitiveValue(normalizedValue);
+  }
+
+  if (!normalizedValue.startsWith(ENCRYPTED_VALUE_PREFIX)) {
+    return normalizedValue;
+  }
+
+  try {
+    const key = await getPaymentSettingsEncryptionKey();
+    if (!key) {
+      return '';
+    }
+
+    const encryptedPayload = normalizedValue.slice(ENCRYPTED_VALUE_PREFIX.length);
+    const [ivValue, encryptedValue] = encryptedPayload.split('.');
+
+    if (!ivValue || !encryptedValue) {
+      return '';
+    }
+
+    const decryptedBuffer = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: base64ToBytes(ivValue) },
+      key,
+      base64ToBytes(encryptedValue)
+    );
+
+    return new TextDecoder().decode(decryptedBuffer);
+  } catch (error) {
+    console.error('Payment settings decryption failed:', error);
+    return '';
+  }
 }
 
 function parseBoolean(value, fallbackValue) {
@@ -251,8 +371,8 @@ function parseNumber(value, fallbackValue) {
   return Number.isFinite(parsedValue) ? parsedValue : Number(fallbackValue || 0);
 }
 
-function parseStoredValue(value, type, fallbackValue) {
-  const rawValue = decodeSensitiveValue(value);
+async function parseStoredValue(value, type, fallbackValue) {
+  const rawValue = await decodeSensitiveValue(value);
 
   if (type === 'boolean') {
     return parseBoolean(rawValue, fallbackValue);
@@ -278,7 +398,7 @@ function parseStoredValue(value, type, fallbackValue) {
   return normalizedValue || String(fallbackValue ?? '');
 }
 
-function serializeStoredValue(value, type, key = '') {
+async function serializeStoredValue(value, type, key = '') {
   if (type === 'json') {
     return JSON.stringify(value ?? null);
   }
@@ -303,21 +423,42 @@ function buildDefaultSettings() {
   }, {});
 }
 
-function normalizeSettings(input = {}) {
+async function normalizeSettings(input = {}) {
   const defaultSettings = buildDefaultSettings();
+  const settingEntries = await Promise.all(
+    SYSTEM_SETTINGS_DEFINITIONS.map(async (definition) => {
+      const rawValue = input[definition.key];
+      const parsedValue = await parseStoredValue(
+        rawValue === undefined ? defaultSettings[definition.key] : rawValue,
+        definition.type,
+        definition.defaultValue
+      );
 
-  return SYSTEM_SETTINGS_DEFINITIONS.reduce((settings, definition) => {
-    const rawValue = input[definition.key];
-    settings[definition.key] = parseStoredValue(
-      rawValue === undefined ? defaultSettings[definition.key] : rawValue,
-      definition.type,
-      definition.defaultValue
-    );
+      return [definition.key, parsedValue];
+    })
+  );
+
+  return settingEntries.reduce((settings, [key, value]) => {
+    settings[key] = value;
     return settings;
   }, {});
 }
 
-function getLocalPayload() {
+async function serializeSettingsForStorage(settings) {
+  const serializedEntries = await Promise.all(
+    SYSTEM_SETTINGS_DEFINITIONS.map(async (definition) => [
+      definition.key,
+      await serializeStoredValue(settings[definition.key], definition.type, definition.key),
+    ])
+  );
+
+  return serializedEntries.reduce((serializedSettings, [key, value]) => {
+    serializedSettings[key] = value;
+    return serializedSettings;
+  }, {});
+}
+
+async function getLocalPayload() {
   if (typeof window === 'undefined') {
     return {
       settings: buildDefaultSettings(),
@@ -338,13 +479,13 @@ function getLocalPayload() {
 
     if (parsedPayload && typeof parsedPayload === 'object' && parsedPayload.settings) {
       return {
-        settings: normalizeSettings(parsedPayload.settings),
+        settings: await normalizeSettings(parsedPayload.settings),
         lastUpdatedAt: parsedPayload.lastUpdatedAt || null,
       };
     }
 
     return {
-      settings: normalizeSettings(parsedPayload),
+      settings: await normalizeSettings(parsedPayload),
       lastUpdatedAt: null,
     };
   } catch (_error) {
@@ -355,14 +496,15 @@ function getLocalPayload() {
   }
 }
 
-function writeLocalPayload(settings, lastUpdatedAt = new Date().toISOString()) {
-  const normalizedSettings = normalizeSettings(settings);
+async function writeLocalPayload(settings, lastUpdatedAt = new Date().toISOString()) {
+  const normalizedSettings = await normalizeSettings(settings);
+  const serializedSettings = await serializeSettingsForStorage(normalizedSettings);
 
   if (typeof window !== 'undefined') {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
-        settings: normalizedSettings,
+        settings: serializedSettings,
         lastUpdatedAt,
       })
     );
@@ -393,20 +535,20 @@ async function ensureRemoteDefaults(existingKeys, resolvedUserId) {
   }
 
   const timestamp = new Date().toISOString();
-  const payload = missingDefinitions.map((definition) => ({
+  const payload = await Promise.all(missingDefinitions.map(async (definition) => ({
     setting_key: definition.key,
-    setting_value: serializeStoredValue(definition.defaultValue, definition.type, definition.key),
+    setting_value: await serializeStoredValue(definition.defaultValue, definition.type, definition.key),
     description: definition.description,
     setting_type: definition.type,
     updated_at: timestamp,
     updated_by: resolvedUserId || null,
-  }));
+  })));
 
   await supabase.from('system_settings').upsert(payload, { onConflict: 'setting_key' });
 }
 
 export async function getSystemSettings() {
-  const localPayload = getLocalPayload();
+  const localPayload = await getLocalPayload();
 
   try {
     const { data, error } = await supabase
@@ -420,29 +562,29 @@ export async function getSystemSettings() {
     const remoteSettings = buildDefaultSettings();
     const existingKeys = new Set();
 
-    (data || []).forEach((record) => {
+    for (const record of data || []) {
       const definition = SETTINGS_BY_KEY[record.setting_key];
       if (!definition) {
-        return;
+        continue;
       }
 
       existingKeys.add(record.setting_key);
-      remoteSettings[record.setting_key] = parseStoredValue(
+      remoteSettings[record.setting_key] = await parseStoredValue(
         record.setting_value,
         record.setting_type || definition.type,
         definition.defaultValue
       );
-    });
+    }
 
     await ensureRemoteDefaults(existingKeys, null);
 
-    const mergedSettings = normalizeSettings({
+    const mergedSettings = await normalizeSettings({
       ...localPayload.settings,
       ...remoteSettings,
     });
     const lastUpdatedAt = getLatestTimestamp(data || []) || localPayload.lastUpdatedAt;
 
-    writeLocalPayload(mergedSettings, lastUpdatedAt || undefined);
+    await writeLocalPayload(mergedSettings, lastUpdatedAt || undefined);
 
     return {
       error: null,
@@ -452,7 +594,7 @@ export async function getSystemSettings() {
       warning: null,
     };
   } catch (error) {
-    const fallbackPayload = writeLocalPayload(localPayload.settings, localPayload.lastUpdatedAt || undefined);
+    const fallbackPayload = await writeLocalPayload(localPayload.settings, localPayload.lastUpdatedAt || undefined);
 
     return {
       error: null,
@@ -466,7 +608,7 @@ export async function getSystemSettings() {
 
 export async function saveSystemSettings(nextSettings, actorReference) {
   const timestamp = new Date().toISOString();
-  const localPayload = writeLocalPayload(nextSettings, timestamp);
+  const localPayload = await writeLocalPayload(nextSettings, timestamp);
 
   const previousSettingsResult = await getSystemSettings();
   const previousSettings = previousSettingsResult?.data || buildDefaultSettings();
@@ -476,14 +618,14 @@ export async function saveSystemSettings(nextSettings, actorReference) {
 
   try {
     const resolvedUserId = actorReference ? await resolveUserId(actorReference) : null;
-    const payload = SYSTEM_SETTINGS_DEFINITIONS.map((definition) => ({
+    const payload = await Promise.all(SYSTEM_SETTINGS_DEFINITIONS.map(async (definition) => ({
       setting_key: definition.key,
-      setting_value: serializeStoredValue(localPayload.settings[definition.key], definition.type, definition.key),
+      setting_value: await serializeStoredValue(localPayload.settings[definition.key], definition.type, definition.key),
       description: definition.description,
       setting_type: definition.type,
       updated_at: timestamp,
       updated_by: resolvedUserId || null,
-    }));
+    })));
 
     const { error } = await supabase
       .from('system_settings')
@@ -503,7 +645,7 @@ export async function saveSystemSettings(nextSettings, actorReference) {
           resourceType: 'system_setting',
           changes: {
             updated_keys: SYSTEM_SETTINGS_DEFINITIONS.map((definition) => definition.key),
-            settings: localPayload.settings,
+            sensitive_payment_settings_encrypted: true,
           },
         }
       );

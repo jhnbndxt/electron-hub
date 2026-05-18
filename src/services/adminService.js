@@ -14,6 +14,16 @@ const OPEN_PAYMENT_STATUSES = ['pending', 'submitted'];
 const CASH_PAYMENT_EXPIRATION_MESSAGE =
   'Your over-the-counter payment schedule has expired because the payment was not completed on the assigned date. To continue your enrollment process, please generate a new payment schedule or contact the school administration for assistance.';
 
+const normalizeProfileText = (value) => String(value || '').trim();
+
+const buildProfileFullName = (...parts) =>
+  parts
+    .map(normalizeProfileText)
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const normalizeAuditSeverity = (status = 'success') => {
   const normalizedStatus = String(status || 'success').trim().toLowerCase();
 
@@ -380,7 +390,84 @@ export const getEnrolledStudents = async () => {
       return { error: error.message, data: null };
     }
 
-    return { error: null, data };
+    const userReferences = [
+      ...new Set(
+        (data || [])
+          .flatMap((enrollment) => [
+            enrollment.user_id,
+            enrollment.form_data?.email,
+            enrollment.form_data?.emailAddress,
+            enrollment.form_data?.email_address,
+          ])
+          .map((reference) => String(reference || '').trim())
+          .filter(Boolean)
+      ),
+    ];
+
+    let userProfiles = [];
+    if (userReferences.length > 0) {
+      const emailReferences = userReferences.filter((reference) => reference.includes('@'));
+      const idReferences = userReferences.filter((reference) => UUID_PATTERN.test(reference));
+      const userQueries = [];
+
+      if (emailReferences.length > 0) {
+        userQueries.push(
+          supabase
+            .from('users')
+            .select('id, email, full_name, first_name, middle_name, last_name')
+            .in('email', emailReferences)
+        );
+      }
+
+      if (idReferences.length > 0) {
+        userQueries.push(
+          supabase
+            .from('users')
+            .select('id, email, full_name, first_name, middle_name, last_name')
+            .in('id', idReferences)
+        );
+      }
+
+      const userResults = await Promise.all(userQueries);
+      const userErrors = userResults.map((result) => result.error).filter(Boolean);
+      if (userErrors.length > 0) {
+        console.error('Get enrolled student profiles error:', userErrors[0]);
+      }
+
+      userProfiles = userResults.flatMap((result) => result.data || []);
+    }
+
+    const usersByEmail = new Map();
+    const usersById = new Map();
+    userProfiles.forEach((user) => {
+      if (user.email) usersByEmail.set(String(user.email).toLowerCase(), user);
+      if (user.id) usersById.set(user.id, user);
+    });
+
+    const enrichedData = (data || []).map((enrollment) => {
+      const formData = enrollment.form_data || {};
+      const userReference = String(enrollment.user_id || '').trim();
+      const formEmail = String(formData.email || formData.emailAddress || formData.email_address || '').trim();
+      const userProfile =
+        usersById.get(userReference) ||
+        usersByEmail.get(userReference.toLowerCase()) ||
+        usersByEmail.get(formEmail.toLowerCase()) ||
+        null;
+
+      return {
+        ...enrollment,
+        user_profile: userProfile
+          ? {
+              ...userProfile,
+              display_name:
+                normalizeProfileText(userProfile.full_name) ||
+                buildProfileFullName(userProfile.first_name, userProfile.middle_name, userProfile.last_name),
+            }
+          : null,
+      };
+    });
+
+    return { error: null, data: enrichedData };
   } catch (error) {
     console.error('Get enrolled students error:', error);
     return { error: error.message, data: null };

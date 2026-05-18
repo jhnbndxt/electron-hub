@@ -39,6 +39,35 @@ const normalizeTrack = (value: unknown): string => {
   return "";
 };
 
+const normalizeNamePart = (value: unknown) => String(value || "").trim();
+
+const buildStudentName = (enrollment: any) => {
+  const formData = enrollment.form_data || {};
+  const userProfile = enrollment.user_profile || {};
+  const profileName =
+    normalizeNamePart(userProfile.display_name) ||
+    normalizeNamePart(userProfile.full_name) ||
+    [userProfile.first_name, userProfile.middle_name, userProfile.last_name]
+      .map(normalizeNamePart)
+      .filter(Boolean)
+      .join(" ");
+
+  const formName =
+    normalizeNamePart(formData.studentName) ||
+    normalizeNamePart(formData.fullName) ||
+    normalizeNamePart(formData.full_name) ||
+    [formData.firstName, formData.middleName, formData.lastName]
+      .map(normalizeNamePart)
+      .filter(Boolean)
+      .join(" ") ||
+    [formData.first_name, formData.middle_name, formData.last_name]
+      .map(normalizeNamePart)
+      .filter(Boolean)
+      .join(" ");
+
+  return profileName || formName || normalizeNamePart(enrollment.user_id) || "Unknown";
+};
+
 export function StudentRecords() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -77,8 +106,8 @@ export function StudentRecords() {
       return {
         id: enrollment.id,
         studentId: formData.studentId || enrollment.id.slice(0, 8),
-        name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`.trim() || studentEmail || 'Unknown',
-        email: studentEmail,
+        name: buildStudentName(enrollment),
+        email: enrollment.user_profile?.email || studentEmail,
         enrollmentDate: enrollment.enrollment_date || enrollment.created_at || '',
         track: normalizeTrack(
           formData.preferred_track ||

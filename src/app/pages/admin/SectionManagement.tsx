@@ -81,6 +81,48 @@ function normalizeSectionField(value?: string | null, fallback = "Not Set") {
   return normalizedValue || fallback;
 }
 
+function normalizeNamePart(value: unknown) {
+  return String(value || "").trim();
+}
+
+function buildEnrollmentStudentName(enrollment: any) {
+  const formData = enrollment.form_data || {};
+  const userProfile = enrollment.user_profile || {};
+  const profileName =
+    normalizeNamePart(userProfile.display_name) ||
+    normalizeNamePart(userProfile.full_name) ||
+    [userProfile.first_name, userProfile.middle_name, userProfile.last_name]
+      .map(normalizeNamePart)
+      .filter(Boolean)
+      .join(" ");
+
+  const formName =
+    normalizeNamePart(formData.studentName) ||
+    normalizeNamePart(formData.fullName) ||
+    normalizeNamePart(formData.full_name) ||
+    [formData.firstName, formData.middleName, formData.lastName]
+      .map(normalizeNamePart)
+      .filter(Boolean)
+      .join(" ") ||
+    [formData.first_name, formData.middle_name, formData.last_name]
+      .map(normalizeNamePart)
+      .filter(Boolean)
+      .join(" ");
+
+  return profileName || formName || normalizeNamePart(enrollment.user_id) || "Unknown Student";
+}
+
+function getEnrollmentStudentEmail(enrollment: any) {
+  const formData = enrollment.form_data || {};
+  return (
+    normalizeNamePart(enrollment.user_profile?.email) ||
+    normalizeNamePart(enrollment.user_id) ||
+    normalizeNamePart(formData.email) ||
+    normalizeNamePart(formData.emailAddress) ||
+    normalizeNamePart(formData.email_address)
+  );
+}
+
 function getStudentCombinationKey(student: Pick<EnrolledStudent, "track" | "elective1" | "elective2">) {
   return JSON.stringify([
     normalizeSectionField(student.track),
@@ -302,7 +344,7 @@ export function SectionManagement() {
     const baseEnrolled = enrollments
       .map((enrollment: any) => {
         const formData = enrollment.form_data || {};
-        const email = enrollment.user_id || formData.email || "";
+        const email = getEnrollmentStudentEmail(enrollment);
 
         if (!email) {
           return null;
@@ -310,10 +352,7 @@ export function SectionManagement() {
 
         return {
           id: enrollment.id,
-          name:
-            formData.studentName ||
-            `${formData.firstName || ""} ${formData.lastName || ""}`.trim() ||
-            email,
+          name: buildEnrollmentStudentName(enrollment),
           email,
           track: normalizeSectionField(
             formData.preferredTrack ||
@@ -366,7 +405,7 @@ export function SectionManagement() {
     const enrolled = enrollments
       .map((enrollment: any) => {
         const formData = enrollment.form_data || {};
-        const email = enrollment.user_id || formData.email || "";
+        const email = getEnrollmentStudentEmail(enrollment);
 
         if (!email) {
           return null;
@@ -374,10 +413,7 @@ export function SectionManagement() {
 
         const student = {
           id: enrollment.id,
-          name:
-            formData.studentName ||
-            `${formData.firstName || ""} ${formData.lastName || ""}`.trim() ||
-            email,
+          name: buildEnrollmentStudentName(enrollment),
           email,
           track: normalizeSectionField(
             formData.preferredTrack ||
