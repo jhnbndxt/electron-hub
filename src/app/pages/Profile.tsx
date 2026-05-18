@@ -576,6 +576,7 @@ export function Profile() {
   };
   
   const enrollmentStatus = getEnrollmentStatus();
+  const isStudentEnrolled = enrollmentStatus.label === "Enrolled";
   const paymentMethod = paymentData?.payment_method || paymentData?.paymentMode || paymentData?.payment_mode || "";
   const paymentReferenceNumber = paymentData?.reference_number || paymentData?.referenceNumber || "";
   const paymentQueueNumber = paymentData?.queue_number || paymentData?.queueNumber || "";
@@ -589,7 +590,9 @@ export function Profile() {
   const sectionDisplayName =
     studentSection.status === "assigned" && studentSection.sectionName
       ? studentSection.sectionName
-      : "Pending Section";
+      : isStudentEnrolled
+        ? "Pending Section"
+        : "Available after enrollment";
   const formatPaymentDate = (dateValue: string) => {
     if (!dateValue) return "Not specified";
     const date = new Date(dateValue);
@@ -826,7 +829,7 @@ export function Profile() {
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                   Review your assigned section and keep your profile details ready for enrollment updates.
                 </p>
-                <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full border border-white/20 bg-[var(--electron-blue)]/90 px-4 py-2 text-sm font-bold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_12px_28px_-22px_rgba(30,58,138,0.9)]">
+                <div className="mt-4 inline-flex max-w-full items-center gap-2 rounded-full border border-white/60 bg-white/45 px-4 py-2 text-sm font-bold text-blue-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_36px_-28px_rgba(30,58,138,0.95)] backdrop-blur-xl ring-1 ring-blue-100/70">
                   <BookOpen className="h-4 w-4 shrink-0 text-yellow-300" />
                   <span className="truncate">Section: {sectionDisplayName}</span>
                 </div>
