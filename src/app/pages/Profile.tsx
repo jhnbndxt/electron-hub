@@ -1,6 +1,6 @@
-import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3, Check, X, RotateCcw, ShieldCheck } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3, Check, X, RotateCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
 import toast, { Toaster } from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
@@ -40,6 +40,7 @@ export function Profile() {
   const { userData, enrollmentProgress, updateUserData, logout } = useAuth();
   const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const navigate = useNavigate();
   
   const [profileData, setProfileData] = useState({
     fullName: userData?.name || "Student",
@@ -789,7 +790,7 @@ export function Profile() {
             </p>
           </div>
 
-          <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8">
+          <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
             <input
               ref={fileInputRef}
               type="file"
@@ -798,100 +799,127 @@ export function Profile() {
               onChange={handleProfileImageUpload}
             />
 
-            <div className="relative z-10 space-y-6">
-              <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-                <div className="flex flex-col items-center gap-5 text-center sm:flex-row sm:text-left">
-                  <div className="relative shrink-0">
-                    <Avatar className="h-32 w-32 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.8)] ring-4 ring-white/90 sm:h-36 sm:w-36">
-                      {profileImageUrl ? (
-                        <AvatarImage src={profileImageUrl} alt={`${studentInfo.name} profile photo`} className="object-cover" />
-                      ) : null}
-                      <AvatarFallback className="text-4xl font-bold text-white" style={{ backgroundColor: "var(--electron-blue)" }}>
-                        {userInitial}
-                      </AvatarFallback>
-                    </Avatar>
-                    <button
-                      type="button"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingProfileImage}
-                      className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--electron-red)] text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-                      aria-label="Change profile photo"
-                    >
-                      {isUploadingProfileImage ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                    </button>
-                  </div>
+            <div className="relative z-10 flex flex-col items-center gap-6 text-center lg:flex-row lg:text-left">
+              <div className="relative shrink-0">
+                <Avatar className="h-32 w-32 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.8)] ring-4 ring-white/80 sm:h-36 sm:w-36">
+                  {profileImageUrl ? (
+                    <AvatarImage src={profileImageUrl} alt={`${studentInfo.name} profile photo`} className="object-cover" />
+                  ) : null}
+                  <AvatarFallback className="text-4xl font-bold text-white" style={{ backgroundColor: "var(--electron-blue)" }}>
+                    {userInitial}
+                  </AvatarFallback>
+                </Avatar>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingProfileImage}
+                  className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                  style={{ backgroundColor: "var(--electron-red)" }}
+                  aria-label="Change profile photo"
+                >
+                  {isUploadingProfileImage ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                </button>
+              </div>
 
-                  <div className="min-w-0">
-                    <div className="mb-3 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-                      <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-900">
-                        <ShieldCheck className="h-3.5 w-3.5" />
-                        Student Portal
-                      </span>
-                      <span className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
-                        <BookOpen className="h-3.5 w-3.5" />
-                        {sectionDisplayName}
-                      </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+                  Review your assigned section and keep your profile details ready for enrollment updates.
+                </p>
+
+                <div className="mt-5 rounded-2xl border border-blue-100 bg-white/80 p-4 shadow-sm">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
+                        <BookOpen className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Section Assignment</p>
+                        <p className="mt-1 text-lg font-bold text-slate-950">{sectionDisplayName}</p>
+                      </div>
                     </div>
-                    <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
+                    <span className={`inline-flex w-fit rounded-full px-3 py-1.5 text-xs font-bold ${
+                      studentSection.status === "assigned"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-red-50 text-red-700"
+                    }`}>
+                      {studentSection.status === "assigned" ? "Assigned" : "Pending"}
+                    </span>
                   </div>
-                </div>
-
-                <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-44">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploadingProfileImage}
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
-                  >
-                    {isUploadingProfileImage ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                    {isUploadingProfileImage ? "Preparing..." : "Change Photo"}
-                  </button>
-                  <Link
-                    to="/dashboard/edit-profile"
-                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--electron-blue)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-22px_rgba(30,58,138,0.85)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-800"
-                  >
-                    <Edit3 className="h-4 w-4" />
-                    Edit Details
-                  </Link>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  { icon: Mail, label: "Email Address", value: studentInfo.email },
-                  { icon: Phone, label: "Phone Number", value: studentInfo.phone },
-                  { icon: Calendar, label: "Birth Date", value: studentInfo.birthDate },
-                  { icon: Users2, label: "Sex", value: studentInfo.sex },
-                ].map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <div key={item.label} className="flex items-start gap-3 border-b border-slate-200/80 p-4 sm:[&:nth-child(odd)]:border-r xl:border-b-0 xl:border-r xl:last:border-r-0">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
-                        <Icon className="h-5 w-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
-                        <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{item.value}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white/75 p-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
-                  <MapPin className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Address</p>
-                  <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{studentInfo.address}</p>
-                </div>
+              <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-48">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploadingProfileImage}
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isUploadingProfileImage ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                  {isUploadingProfileImage ? "Preparing..." : "Change Photo"}
+                </button>
+                <Link
+                  to="/dashboard/edit-profile"
+                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--electron-blue)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-22px_rgba(30,58,138,0.85)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-800"
+                >
+                  Edit Profile
+                </Link>
               </div>
             </div>
           </section>
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.25fr)]">
             <div className="space-y-6">
+              <section className="portal-glass-panel rounded-[1.75rem] p-6">
+                <div className="mb-6 flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold text-slate-950">Personal Information</h3>
+                    <p className="mt-1 text-sm text-slate-500">Registration and contact details</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/dashboard/edit-profile")}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+                    aria-label="Edit profile"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 divide-y divide-slate-200/80 overflow-hidden rounded-2xl border border-slate-200/80 bg-white/70 md:grid-cols-2 md:divide-x md:divide-y-0">
+                  {[
+                    { icon: Mail, label: "Email Address", value: studentInfo.email },
+                    { icon: Phone, label: "Phone Number", value: studentInfo.phone },
+                    { icon: Calendar, label: "Birth Date", value: studentInfo.birthDate },
+                    { icon: Users2, label: "Sex", value: studentInfo.sex },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <div key={item.label} className="flex items-start gap-3 p-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p>
+                          <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{item.value}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-slate-200/80 bg-white/70 p-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-900">
+                    <MapPin className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Address</p>
+                    <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">{studentInfo.address}</p>
+                  </div>
+                </div>
+              </section>
+
               <section className="portal-glass-panel rounded-[1.75rem] p-6">
                 <div className="mb-6">
                   <h3 className="text-xl font-bold text-slate-950">Quick Stats</h3>
