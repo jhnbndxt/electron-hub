@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3, Check, X, RotateCcw } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3, Check, X, RotateCcw, ShieldCheck } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -790,7 +790,7 @@ export function Profile() {
             </p>
           </div>
 
-          <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
+          <section className="portal-glass-panel-strong relative overflow-hidden rounded-[2rem] p-0">
             <input
               ref={fileInputRef}
               type="file"
@@ -799,51 +799,66 @@ export function Profile() {
               onChange={handleProfileImageUpload}
             />
 
-            <div className="relative z-10 flex flex-col items-center gap-6 text-center lg:flex-row lg:text-left">
-              <div className="relative shrink-0">
-                <Avatar className="h-32 w-32 shadow-[0_24px_50px_-30px_rgba(15,23,42,0.8)] ring-4 ring-white/80 sm:h-36 sm:w-36">
-                  {profileImageUrl ? (
-                    <AvatarImage src={profileImageUrl} alt={`${studentInfo.name} profile photo`} className="object-cover" />
-                  ) : null}
-                  <AvatarFallback className="text-4xl font-bold text-white" style={{ backgroundColor: "var(--electron-blue)" }}>
-                    {userInitial}
-                  </AvatarFallback>
-                </Avatar>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingProfileImage}
-                  className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
-                  style={{ backgroundColor: "var(--electron-red)" }}
-                  aria-label="Upload profile photo"
-                >
-                  {isUploadingProfileImage ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-                </button>
+            <div className="relative z-10 grid overflow-hidden lg:grid-cols-[18rem_minmax(0,1fr)]">
+              <div className="relative flex min-h-64 flex-col items-center justify-center bg-[var(--electron-blue)] p-8 text-center text-white">
+                <div className="absolute inset-x-0 top-0 h-1.5 bg-[var(--electron-red)]" />
+                <div className="relative">
+                  <Avatar className="h-36 w-36 shadow-[0_26px_50px_-24px_rgba(15,23,42,0.95)] ring-4 ring-white/90">
+                    {profileImageUrl ? (
+                      <AvatarImage src={profileImageUrl} alt={`${studentInfo.name} profile photo`} className="object-cover" />
+                    ) : null}
+                    <AvatarFallback className="bg-white text-4xl font-bold text-blue-900">
+                      {userInitial}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingProfileImage}
+                    className="absolute -bottom-2 -right-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--electron-red)] text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70"
+                    aria-label="Change profile photo"
+                  >
+                    {isUploadingProfileImage ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+                  </button>
+                </div>
+                <p className="mt-5 text-xs font-bold uppercase tracking-[0.22em] text-blue-100">Student Profile</p>
               </div>
 
-              <div className="min-w-0 flex-1">
-                <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
-                <p className="mt-3 text-lg font-bold text-blue-900">
-                  Section: <span className="text-red-700">{sectionDisplayName}</span>
-                </p>
-              </div>
+              <div className="flex flex-col justify-between gap-8 p-6 sm:p-8 lg:p-10">
+                <div className="space-y-5">
+                  <div>
+                    <div className="mb-3 flex flex-wrap items-center justify-center gap-2 lg:justify-start">
+                      <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-900">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Student Portal
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700">
+                        <BookOpen className="h-3.5 w-3.5" />
+                        {sectionDisplayName}
+                      </span>
+                    </div>
+                    <h2 className="text-center text-3xl font-bold leading-tight text-slate-950 sm:text-4xl lg:text-left">{studentInfo.name}</h2>
+                  </div>
+                </div>
 
-              <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-48">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploadingProfileImage}
-                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isUploadingProfileImage ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
-                  {isUploadingProfileImage ? "Uploading..." : "Upload Photo"}
-                </button>
-                <Link
-                  to="/dashboard/edit-profile"
-                  className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--electron-blue)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-22px_rgba(30,58,138,0.85)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-800"
-                >
-                  Edit Profile
-                </Link>
+                <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingProfileImage}
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/85 px-5 py-3 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {isUploadingProfileImage ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                    {isUploadingProfileImage ? "Preparing..." : "Change Photo"}
+                  </button>
+                  <Link
+                    to="/dashboard/edit-profile"
+                    className="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[var(--electron-blue)] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_34px_-22px_rgba(30,58,138,0.85)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-blue-800"
+                  >
+                    <Edit3 className="h-4 w-4" />
+                    Edit Details
+                  </Link>
+                </div>
               </div>
             </div>
           </section>
