@@ -142,7 +142,21 @@ export function Dashboard() {
         diploma: "Grade 10 Diploma",
       };
 
-      const rejected = documents
+      const latestDocumentsByType = new Map<string, any>();
+      documents.forEach((doc: any) => {
+        const documentType = doc.document_type || doc.type || doc.id;
+        const currentDocument = latestDocumentsByType.get(documentType);
+        const currentTimestamp = new Date(
+          currentDocument?.updated_at || currentDocument?.uploaded_at || currentDocument?.created_at || 0
+        ).getTime();
+        const nextTimestamp = new Date(doc.updated_at || doc.uploaded_at || doc.created_at || 0).getTime();
+
+        if (!currentDocument || nextTimestamp >= currentTimestamp) {
+          latestDocumentsByType.set(documentType, doc);
+        }
+      });
+
+      const rejected = Array.from(latestDocumentsByType.values())
         .filter((doc: any) => doc.status === 'rejected')
         .map((doc: any) => ({
           name: documentNames[doc.document_type] || doc.document_type,

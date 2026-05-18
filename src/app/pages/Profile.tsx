@@ -485,6 +485,10 @@ export function Profile() {
     paymentData?.generatedDate ||
     paymentData?.created_at ||
     "";
+  const sectionDisplayName =
+    studentSection.status === "assigned" && studentSection.sectionName
+      ? studentSection.sectionName
+      : "Pending Section";
   const formatPaymentDate = (dateValue: string) => {
     if (!dateValue) return "Not specified";
     const date = new Date(dateValue);
@@ -593,6 +597,9 @@ export function Profile() {
                 <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
                   Keep your contact details current and review your assessment, payment, and enrollment progress in one place.
                 </p>
+                <p className="mt-3 text-lg font-bold text-blue-900">
+                  Section: <span className="text-red-700">{sectionDisplayName}</span>
+                </p>
               </div>
 
               <div className="flex w-full flex-col gap-3 sm:w-auto sm:min-w-48">
@@ -612,65 +619,6 @@ export function Profile() {
                   Edit Profile
                 </Link>
               </div>
-            </div>
-          </section>
-
-          <section className="overflow-hidden rounded-[1.75rem] border-2 border-blue-200 bg-gradient-to-br from-blue-950 via-blue-900 to-slate-950 p-6 text-white shadow-2xl shadow-blue-950/25 sm:p-8">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-wide text-blue-100">
-                  <Users2 className="h-4 w-4" />
-                  Student Section
-                </div>
-                {studentSection.status === "assigned" ? (
-                  <>
-                    <p className="text-sm font-semibold text-blue-100">
-                      Hi! Welcome to the Electron Community.
-                    </p>
-                    <p className="mt-1 text-sm text-blue-100/90">
-                      Our registrar office has assigned you a temporary section.
-                    </p>
-                  </>
-                ) : studentSection.status === "unavailable" ? (
-                  <>
-                    <p className="text-sm font-semibold text-amber-100">
-                      Your section assignment is currently unavailable.
-                    </p>
-                    <p className="mt-1 text-sm text-blue-100/90">
-                      It is pending update from the registrar.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold text-blue-100">
-                      Your section assignment is still pending.
-                    </p>
-                    <p className="mt-1 text-sm text-blue-100/90">
-                      Please wait while the registrar finalizes sectioning.
-                    </p>
-                  </>
-                )}
-              </div>
-
-              <div className="rounded-2xl border border-white/20 bg-white px-5 py-4 text-center text-blue-950 shadow-xl lg:min-w-80">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">
-                  Assigned Section
-                </p>
-                <p className="mt-2 break-words text-3xl font-black leading-tight sm:text-4xl">
-                  {studentSection.status === "assigned"
-                    ? studentSection.sectionName
-                    : studentSection.status === "unavailable"
-                    ? "Pending Update"
-                    : "Pending"}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 rounded-2xl border border-white/15 bg-white/10 p-4 text-sm leading-6 text-blue-50">
-              <p>You may also view your section on your profile.</p>
-              <p className="mt-1 font-semibold">
-                Note: This section is temporary and may still change until further notice.
-              </p>
             </div>
           </section>
 
