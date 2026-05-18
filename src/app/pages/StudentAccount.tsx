@@ -122,10 +122,10 @@ export function StudentAccount() {
               </h1>
               <div className="space-y-0.5">
                 <p className="text-sm text-gray-500">
-                  Student ID: <span className="font-medium text-gray-700">2026-0001</span>
+                  Email: <span className="font-medium text-gray-700">{userData?.email || "Not specified"}</span>
                 </p>
                 <p className="text-sm text-gray-500">
-                  Course: <span className="font-medium text-gray-700">BS Information Technology</span>
+                  Account Type: <span className="font-medium text-gray-700">Student Portal</span>
                 </p>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3 } from "lucide-react";
+import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, AlertCircle, CreditCard, Camera, LoaderCircle, Edit3, Check, X, RotateCcw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
@@ -6,7 +6,7 @@ import toast, { Toaster } from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
 import { supabase } from "../../supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { loadProfileImageUrl, uploadProfileImage } from "../utils/profileImage";
+import { loadProfileImageUrl, uploadProfileImage, validateProfileImageFile } from "../utils/profileImage";
 import { exportToCSV, formatDateForCSV } from "../../utils/csvExport";
 import { LoadingState } from "../components/LoadingState";
 
@@ -26,6 +26,9 @@ interface StudentSectionAssignment {
   sectionId?: string;
   sectionName?: string;
 }
+
+const PROFILE_CROP_PREVIEW_SIZE = 288;
+const PROFILE_CROP_OUTPUT_SIZE = 512;
 
 // Helper to format assessment date
 function formatAssessmentDate(isoDate: string): string {
@@ -59,6 +62,11 @@ export function Profile() {
   const [isUploadingProfileImage, setIsUploadingProfileImage] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [studentSection, setStudentSection] = useState<StudentSectionAssignment>({ status: "loading" });
+  const [pendingProfileFile, setPendingProfileFile] = useState<File | null>(null);
+  const [pendingProfilePreviewUrl, setPendingProfilePreviewUrl] = useState("");
+  const [pendingImageDimensions, setPendingImageDimensions] = useState({ width: 0, height: 0 });
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropOffset, setCropOffset] = useState({ x: 0, y: 0 });
 
   const getSectionStorageKey = () => {
     const reference = userData?.id || userData?.email || "";
@@ -287,6 +295,61 @@ export function Profile() {
     }
   };
 
+  const resetProfileCrop = () => {
+    if (pendingProfilePreviewUrl) {
+      URL.revokeObjectURL(pendingProfilePreviewUrl);
+    }
+
+    setPendingProfileFile(null);
+    setPendingProfilePreviewUrl("");
+    setPendingImageDimensions({ width: 0, height: 0 });
+    setCropZoom(1);
+    setCropOffset({ x: 0, y: 0 });
+  };
+
+  const createCroppedProfileImage = async () => {
+    if (!pendingProfileFile || !pendingProfilePreviewUrl || !pendingImageDimensions.width || !pendingImageDimensions.height) {
+      throw new Error("Please wait for the selected photo to load before saving.");
+    }
+
+    const image = new Image();
+    image.src = pendingProfilePreviewUrl;
+    await image.decode();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = PROFILE_CROP_OUTPUT_SIZE;
+    canvas.height = PROFILE_CROP_OUTPUT_SIZE;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      throw new Error("Your browser could not prepare the cropped profile photo.");
+    }
+
+    const outputScale = PROFILE_CROP_OUTPUT_SIZE / PROFILE_CROP_PREVIEW_SIZE;
+    const baseScale = Math.max(
+      PROFILE_CROP_OUTPUT_SIZE / pendingImageDimensions.width,
+      PROFILE_CROP_OUTPUT_SIZE / pendingImageDimensions.height
+    );
+    const drawWidth = pendingImageDimensions.width * baseScale * cropZoom;
+    const drawHeight = pendingImageDimensions.height * baseScale * cropZoom;
+    const drawX = (PROFILE_CROP_OUTPUT_SIZE - drawWidth) / 2 + cropOffset.x * outputScale;
+    const drawY = (PROFILE_CROP_OUTPUT_SIZE - drawHeight) / 2 + cropOffset.y * outputScale;
+
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, PROFILE_CROP_OUTPUT_SIZE, PROFILE_CROP_OUTPUT_SIZE);
+    context.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, "image/jpeg", 0.92);
+    });
+
+    if (!blob) {
+      throw new Error("Failed to crop the selected profile photo.");
+    }
+
+    return new File([blob], "profile-photo.jpg", { type: "image/jpeg" });
+  };
+
   const handleProfileImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     event.target.value = "";
@@ -300,17 +363,47 @@ export function Profile() {
       return;
     }
 
+    const validationError = validateProfileImageFile(selectedFile);
+    if (validationError) {
+      toast.error(validationError);
+      return;
+    }
+
+    if (pendingProfilePreviewUrl) {
+      URL.revokeObjectURL(pendingProfilePreviewUrl);
+    }
+
+    setPendingProfileFile(selectedFile);
+    setPendingProfilePreviewUrl(URL.createObjectURL(selectedFile));
+    setPendingImageDimensions({ width: 0, height: 0 });
+    setCropZoom(1);
+    setCropOffset({ x: 0, y: 0 });
+  };
+
+  const handleSaveCroppedProfileImage = async () => {
+    if (!pendingProfileFile) {
+      return;
+    }
+
+    if (!userData?.id) {
+      toast.error("Please sign in again before updating your profile photo.");
+      resetProfileCrop();
+      return;
+    }
+
     try {
       setIsUploadingProfileImage(true);
+      const croppedFile = await createCroppedProfileImage();
 
       const { imageUrl, usedStorageFallback } = await uploadProfileImage({
         userId: userData.id,
         email: userData.email,
-        file: selectedFile,
+        file: croppedFile,
       });
 
       setProfileImageUrl(imageUrl);
       updateUserData({ profilePictureUrl: imageUrl });
+      resetProfileCrop();
 
       if (usedStorageFallback) {
         toast.success("Profile photo uploaded to Supabase Storage. Cross-device loading now uses the storage fallback until the users.profile_picture_url column is added.");
@@ -324,6 +417,14 @@ export function Profile() {
       setIsUploadingProfileImage(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (pendingProfilePreviewUrl) {
+        URL.revokeObjectURL(pendingProfilePreviewUrl);
+      }
+    };
+  }, [pendingProfilePreviewUrl]);
 
   // Reload profile data when component mounts or when returning from edit
   useEffect(() => {
@@ -543,9 +644,137 @@ export function Profile() {
     });
   };
 
+  const cropPreviewBaseScale =
+    pendingImageDimensions.width && pendingImageDimensions.height
+      ? Math.max(
+          PROFILE_CROP_PREVIEW_SIZE / pendingImageDimensions.width,
+          PROFILE_CROP_PREVIEW_SIZE / pendingImageDimensions.height
+        )
+      : 1;
+  const cropPreviewImageStyle =
+    pendingImageDimensions.width && pendingImageDimensions.height
+      ? {
+          width: `${pendingImageDimensions.width * cropPreviewBaseScale}px`,
+          height: `${pendingImageDimensions.height * cropPreviewBaseScale}px`,
+          transform: `translate(-50%, -50%) translate(${cropOffset.x}px, ${cropOffset.y}px) scale(${cropZoom})`,
+        }
+      : undefined;
+
   return (
     <div className="portal-dashboard-page flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8">
       <Toaster position="top-center" />
+
+      {pendingProfilePreviewUrl && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-white/70 bg-white shadow-2xl"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="profile-crop-title"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h2 id="profile-crop-title" className="text-lg font-bold text-slate-950">Crop Profile Photo</h2>
+                <p className="text-sm text-slate-500">Adjust the photo before saving it to your profile.</p>
+              </div>
+              <button
+                type="button"
+                onClick={resetProfileCrop}
+                disabled={isUploadingProfileImage}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                aria-label="Cancel photo crop"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-5 p-5">
+              <div className="mx-auto h-72 w-72 overflow-hidden rounded-full bg-slate-100 ring-4 ring-slate-200">
+                <div className="relative h-full w-full">
+                  <img
+                    src={pendingProfilePreviewUrl}
+                    alt="Selected profile photo preview"
+                    className="absolute left-1/2 top-1/2 max-w-none select-none"
+                    draggable={false}
+                    style={cropPreviewImageStyle}
+                    onLoad={(event) => {
+                      setPendingImageDimensions({
+                        width: event.currentTarget.naturalWidth,
+                        height: event.currentTarget.naturalHeight,
+                      });
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Zoom</span>
+                  <input
+                    type="range"
+                    min="1"
+                    max="3"
+                    step="0.01"
+                    value={cropZoom}
+                    onChange={(event) => setCropZoom(Number(event.target.value))}
+                    className="w-full accent-blue-900"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Horizontal Position</span>
+                  <input
+                    type="range"
+                    min="-90"
+                    max="90"
+                    step="1"
+                    value={cropOffset.x}
+                    onChange={(event) => setCropOffset((current) => ({ ...current, x: Number(event.target.value) }))}
+                    className="w-full accent-blue-900"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-slate-700">Vertical Position</span>
+                  <input
+                    type="range"
+                    min="-90"
+                    max="90"
+                    step="1"
+                    value={cropOffset.y}
+                    onChange={(event) => setCropOffset((current) => ({ ...current, y: Number(event.target.value) }))}
+                    className="w-full accent-blue-900"
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => {
+                  setCropZoom(1);
+                  setCropOffset({ x: 0, y: 0 });
+                }}
+                disabled={isUploadingProfileImage}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Reset
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCroppedProfileImage}
+                disabled={isUploadingProfileImage || !pendingImageDimensions.width}
+                className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[var(--electron-blue)] px-5 py-2 text-sm font-semibold text-white shadow-[0_18px_34px_-22px_rgba(30,58,138,0.85)] transition-all hover:-translate-y-0.5 hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {isUploadingProfileImage ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {isUploadingProfileImage ? "Saving..." : "Save Photo"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {isInitializing ? (
         <LoadingState
@@ -594,9 +823,6 @@ export function Profile() {
 
               <div className="min-w-0 flex-1">
                 <h2 className="text-3xl font-bold leading-tight text-slate-950 sm:text-4xl">{studentInfo.name}</h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-                  Keep your contact details current and review your assessment, payment, and enrollment progress in one place.
-                </p>
                 <p className="mt-3 text-lg font-bold text-blue-900">
                   Section: <span className="text-red-700">{sectionDisplayName}</span>
                 </p>
