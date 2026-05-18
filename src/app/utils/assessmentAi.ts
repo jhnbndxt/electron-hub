@@ -10,6 +10,11 @@ export interface AssessmentAiPayload {
   leadershipInterest: number;
   technicalInterest: number;
   socialInterest: number;
+  practicalInterest?: number;
+  homeInterest?: number;
+  outdoorInterest?: number;
+  physicalInterest?: number;
+  riasecScores?: Record<string, number>;
   electives?: string[];
 }
 

@@ -457,6 +457,10 @@ export function Assessment() {
     const leadershipInterest = assessmentResult.interestClusters?.business || 0;
     const technicalInterest = assessmentResult.interestClusters?.tech || 0;
     const socialInterest = assessmentResult.interestClusters?.helping || 0;
+    const practicalInterest = assessmentResult.interestClusters?.practical || 0;
+    const homeInterest = assessmentResult.interestClusters?.home || 0;
+    const outdoorInterest = assessmentResult.interestClusters?.outdoor || 0;
+    const physicalInterest = assessmentResult.interestClusters?.physical || 0;
     const recommendedTrack = assessmentResult.track;
     let aiRecommendation: any = null;
 
@@ -472,6 +476,11 @@ export function Assessment() {
       leadershipInterest,
       technicalInterest,
       socialInterest,
+      practicalInterest,
+      homeInterest,
+      outdoorInterest,
+      physicalInterest,
+      riasecScores: assessmentResult.riasecScores,
       electives: assessmentResult.electives,
     });
     setSubmitProgress(68);

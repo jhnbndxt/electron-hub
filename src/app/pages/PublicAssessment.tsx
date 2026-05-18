@@ -1270,6 +1270,10 @@ export function PublicAssessment() {
     const leadershipInterest = formattedResult.interestClusters?.business || 0;
     const technicalInterest = formattedResult.interestClusters?.tech || 0;
     const socialInterest = formattedResult.interestClusters?.helping || 0;
+    const practicalInterest = formattedResult.interestClusters?.practical || 0;
+    const homeInterest = formattedResult.interestClusters?.home || 0;
+    const outdoorInterest = formattedResult.interestClusters?.outdoor || 0;
+    const physicalInterest = formattedResult.interestClusters?.physical || 0;
     const recommendedTrack = formattedResult.track;
     let aiRecommendation: any = null;
 
@@ -1286,6 +1290,11 @@ export function PublicAssessment() {
         leadershipInterest,
         technicalInterest,
         socialInterest,
+        practicalInterest,
+        homeInterest,
+        outdoorInterest,
+        physicalInterest,
+        riasecScores: formattedResult.riasecScores,
         electives: formattedResult.electives,
       });
       setSubmitProgress(68);

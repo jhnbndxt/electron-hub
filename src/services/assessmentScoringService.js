@@ -9,6 +9,7 @@
 import { supabase } from '../supabase';
 import electivesCatalog from '../data/electives.js';
 import { selectElectivesWithPrerequisites } from '../utils/electivePrerequisites.js';
+import { RIASEC_TYPES, scoreElectiveRecommendation } from '../utils/electiveRecommendationScoring.js';
 
 const EMPTY_GROUPED_QUESTIONS = {
   Verbal: [],
@@ -40,6 +41,13 @@ const RIASEC_CLUSTER_WEIGHTS = {
   Enterprising: { business: 0.75, helping: 0.15, creative: 0.1 },
   Conventional: { home: 0.45, practical: 0.35, business: 0.2 },
 };
+
+function buildEmptyRiasecScores() {
+  return RIASEC_TYPES.reduce((scores, type) => {
+    scores[type] = 0;
+    return scores;
+  }, {});
+}
 
 const LEGACY_INTEREST_TYPE_BY_SLOT = {
   1: 'Investigative',
@@ -355,6 +363,35 @@ function calculateRiasecInterestClusterScores(answers, interestQuestions) {
   return clusterTotals;
 }
 
+export function calculateRiasecInterestScores(answers, questionsByCategory) {
+  const grouped = normalizeGroupedQuestions(questionsByCategory);
+  const interestQuestions = grouped.Interests;
+  const typeTotals = buildEmptyRiasecScores();
+  const typeMaxTotals = buildEmptyRiasecScores();
+
+  interestQuestions.forEach((question, index) => {
+    const interestType = question?.interest_type || question?.interestType || LEGACY_INTEREST_TYPE_BY_SLOT[index + 1];
+
+    if (!RIASEC_TYPES.includes(interestType)) {
+      return;
+    }
+
+    const response = Number(answers?.[question.id]);
+    const rating = Number.isFinite(response) && response >= 1 && response <= 5 ? response : 0;
+
+    typeTotals[interestType] += rating;
+    typeMaxTotals[interestType] += 5;
+  });
+
+  RIASEC_TYPES.forEach((type) => {
+    typeTotals[type] = typeMaxTotals[type] > 0
+      ? Math.round((typeTotals[type] / typeMaxTotals[type]) * 100)
+      : 0;
+  });
+
+  return typeTotals;
+}
+
 function calculateOptionBasedInterestClusterScores(answers, interestQuestions) {
   const clusterTotals = buildEmptyInterestClusters();
   const selectedOptions = interestQuestions.flatMap((question) => getSelectedInterestOptions(question, answers));
@@ -420,7 +457,7 @@ function toScore(value) {
   return Number.isFinite(score) ? score : 0;
 }
 
-function buildElectiveScoringProfile(scores, interestClusters = {}) {
+function buildElectiveScoringProfile(scores, interestClusters = {}, riasecScores = {}) {
   return {
     academic: toScore(interestClusters.academic),
     communication: Math.round((toScore(interestClusters.creative) + toScore(interestClusters.helping)) / 2),
@@ -432,15 +469,16 @@ function buildElectiveScoringProfile(scores, interestClusters = {}) {
     math: toScore(scores?.mathematical_ability_score),
     science: toScore(scores?.spatial_ability_score),
     logical: toScore(scores?.logical_reasoning_score),
+    ...riasecScores,
   };
 }
 
-function calculateCatalogElectiveScore(elective, profile) {
-  const weights = elective?.weights || {};
-
-  return Object.entries(weights).reduce((score, [dimension, weight]) => {
-    return score + toScore(profile[dimension]) * toScore(weight);
-  }, 0);
+function calculateCatalogElectiveScore(elective, scores, interestClusters, riasecScores) {
+  return scoreElectiveRecommendation(elective, {
+    scores,
+    interestClusters,
+    riasecScores,
+  }).finalScore;
 }
 
 function buildResponseTieBreaker(elective, profile) {
@@ -466,15 +504,15 @@ function buildResponseTieBreaker(elective, profile) {
   return hash / 1000003;
 }
 
-function rankCatalogElectives(track, scores, interestClusters = {}) {
-  const profile = buildElectiveScoringProfile(scores, interestClusters);
+function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores = {}) {
+  const profile = buildElectiveScoringProfile(scores, interestClusters, riasecScores);
   const trackElectives = electivesCatalog.filter((elective) => elective.track === track);
   const sourceElectives = trackElectives.length ? trackElectives : electivesCatalog;
 
   return sourceElectives
     .map((elective) => ({
       ...elective,
-      score: calculateCatalogElectiveScore(elective, profile),
+      score: calculateCatalogElectiveScore(elective, scores, interestClusters, riasecScores),
       tieBreaker: buildResponseTieBreaker(elective, profile),
     }))
     .sort((first, second) => {
@@ -623,14 +661,16 @@ export function determineTrack(scores, interestClusters = {}) {
  * avoids the old family-level behavior where the same first two options in a
  * group were always selected, even when other electives were equally strong.
  */
-export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}) {
+export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}, maybeRiasecScores = {}) {
   let track = trackOrScores;
   let scores = scoresOrInterestClusters;
   let interestClusters = maybeInterestClusters;
+  let riasecScores = maybeRiasecScores;
 
   if (typeof trackOrScores !== 'string') {
     scores = trackOrScores;
     interestClusters = scoresOrInterestClusters || {};
+    riasecScores = maybeInterestClusters || {};
     track = determineTrack(scores, interestClusters);
   }
 
@@ -638,7 +678,7 @@ export function recommendElectives(trackOrScores, scoresOrInterestClusters = {},
     return [];
   }
 
-  const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters);
+  const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters, riasecScores);
 
   if (rankedCatalogElectives.length > 0) {
     return selectElectivesWithPrerequisites(rankedCatalogElectives, 2).map((elective) => elective.name);
@@ -701,14 +741,16 @@ export async function formatAssessmentResult(answers, questionsByCategory = null
     if (!scores) return null;
 
     const interestClusters = calculateInterestClusterScores(answers, groupedQuestions);
+    const riasecScores = calculateRiasecInterestScores(answers, groupedQuestions);
     const track = determineTrack(scores, interestClusters);
-    const electives = recommendElectives(track, scores, interestClusters);
+    const electives = recommendElectives(track, scores, interestClusters, riasecScores);
     const topDomains = getTopDomains(scores);
     const topInterests = getTopInterests(answers, groupedQuestions);
 
     return {
       scores,
       interestClusters,
+      riasecScores,
       recommended_track: track,
       elective_1: electives[0] || null,
       elective_2: electives[1] || null,

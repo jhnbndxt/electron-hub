@@ -3,6 +3,7 @@ import {
   selectElectivesWithPrerequisites,
   validateElectiveSequence,
 } from "../src/utils/electivePrerequisites.js";
+import { scoreElectiveRecommendation } from "../src/utils/electiveRecommendationScoring.js";
 
 console.log(
   "ENV:",
@@ -49,20 +50,30 @@ function toScore(value) {
 }
 
 function calculateElectiveScore(elective, data) {
-  const weights = elective.weights || {};
+  return calculateElectiveScoring(elective, data).finalScore;
+}
 
-  return (
-    toScore(data.academicInterest) * (weights.academic || 0) +
-    toScore(data.communicationInterest) * (weights.communication || 0) +
-    toScore(data.creativeInterest) * (weights.creative || 0) +
-    toScore(data.leadershipInterest) * (weights.leadership || 0) +
-    toScore(data.technicalInterest) * (weights.technical || 0) +
-    toScore(data.socialInterest) * (weights.social || 0) +
-    toScore(data.VA) * (weights.verbal || 0) +
-    toScore(data.MA) * (weights.math || 0) +
-    toScore(data.SA) * (weights.science || 0) +
-    toScore(data.LRA) * (weights.logical || 0)
-  );
+function calculateElectiveScoring(elective, data) {
+  return scoreElectiveRecommendation(elective, {
+    scores: {
+      VA: data.VA,
+      MA: data.MA,
+      SA: data.SA,
+      LRA: data.LRA,
+    },
+    interestClusters: {
+      academic: data.academicInterest,
+      creative: data.creativeInterest,
+      helping: data.socialInterest,
+      business: data.leadershipInterest,
+      tech: data.technicalInterest,
+      practical: data.practicalInterest,
+      home: data.homeInterest,
+      outdoor: data.outdoorInterest,
+      physical: data.physicalInterest,
+    },
+    riasecScores: data.riasecScores,
+  });
 }
 
 function buildElectiveTieBreaker(elective, data) {
@@ -94,11 +105,17 @@ function rankElectivesForAssessment(data) {
   const sourceElectives = trackElectives.length ? trackElectives : electives;
 
   return sourceElectives
-    .map((elective) => ({
-      ...elective,
-      compatibilityScore: Number(calculateElectiveScore(elective, data).toFixed(2)),
-      tieBreaker: buildElectiveTieBreaker(elective, data),
-    }))
+    .map((elective) => {
+      const scoring = calculateElectiveScoring(elective, data);
+
+      return {
+        ...elective,
+        compatibilityScore: scoring.finalScore,
+        aptitudeFit: scoring.aptitudeFit,
+        riasecFit: scoring.riasecFit,
+        tieBreaker: buildElectiveTieBreaker(elective, data),
+      };
+    })
     .sort((first, second) => {
       const scoreDifference = second.compatibilityScore - first.compatibilityScore;
 
@@ -296,7 +313,7 @@ You are an AI assessment recommendation system.
 The student's track is already determined.
 
 Your tasks:
-1. Recommend ONLY the BEST 2 electives, unless saved electives are provided.
+1. Recommend ONLY the BEST 2 electives, unless local scoring electives are provided for explanation.
 2. Explain why those electives fit the student in detail.
 3. Suggest possible college courses.
 4. Match recommendations using:
@@ -325,6 +342,16 @@ Creative: ${data.creativeInterest}
 Leadership: ${data.leadershipInterest}
 Technical: ${data.technicalInterest}
 Social: ${data.socialInterest}
+
+RIASEC SCORES:
+${data.riasecScores ? JSON.stringify(data.riasecScores) : "Not available"}
+
+RECOMMENDATION FORMULA:
+Each elective is scored independently using the student's actual assessment results.
+Final elective score = aptitude fit * 0.55 + RIASEC interest fit * 0.45 when both signals are available.
+Aptitude fit uses the elective's own verbal, math, science, and logical weights.
+RIASEC interest fit uses the student's Realistic, Investigative, Artistic, Social, Enterprising, and Conventional scores mapped to the elective's learning/work profile.
+Use compatibilityScore from TOP MATCHING ELECTIVES as the computed final elective score.
 
 TOP MATCHING ELECTIVES:
 ${JSON.stringify(rankedElectives)}
