@@ -140,7 +140,7 @@ export function PublicLayout() {
             </Link>
 
             {/* Navigation Links */}
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
               {isAnyAdmin ? (
                 // Admin Authenticated State - Show on public pages
                 <>
@@ -227,7 +227,7 @@ export function PublicLayout() {
             <button
               type="button"
               onClick={() => setIsMobileMenuOpen(true)}
-              className="md:hidden rounded-lg border border-white/20 p-2 text-white transition-colors hover:bg-white/10"
+              className="lg:hidden rounded-lg border border-white/20 p-2 text-white transition-colors hover:bg-white/10"
               aria-label="Open navigation menu"
             >
               <Menu className="h-6 w-6" />
@@ -237,7 +237,7 @@ export function PublicLayout() {
 
         <AnimatePresence>
           {isMobileMenuOpen ? (
-            <div className="fixed inset-0 z-50 md:hidden">
+            <div className="fixed inset-0 z-50 lg:hidden">
               <motion.div
                 className="absolute inset-0 bg-slate-950/50"
                 initial={{ opacity: 0 }}

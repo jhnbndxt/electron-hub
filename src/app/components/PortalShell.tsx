@@ -117,7 +117,7 @@ export function PortalShell({
         </div>
       </div>
 
-      <nav className="flex-1 overflow-hidden p-4">
+      <nav className="min-h-0 flex-1 overflow-y-auto p-4">
         <ul className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;

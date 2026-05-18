@@ -1001,3 +1001,134 @@
     max-height: calc(100dvh - 1rem);
   }
 }
+
+@media (max-width: 1023px) {
+  .portal-glass-content,
+  .portal-glass-main,
+  .portal-dashboard-page,
+  .public-page-shell main {
+    min-width: 0;
+    max-width: 100vw;
+  }
+
+  .portal-glass-sidebar {
+    max-height: 100dvh;
+  }
+
+  .portal-glass-sidebar nav {
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .public-page-shell nav {
+    min-height: 4rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .portal-dashboard-page {
+    padding-inline: clamp(1rem, 4vw, 1.25rem) !important;
+  }
+
+  .portal-glass-panel,
+  .portal-glass-panel-strong,
+  .portal-glass-modal {
+    border-radius: 1.25rem !important;
+  }
+
+  .portal-dashboard-page .portal-glass-panel,
+  .portal-dashboard-page .portal-glass-panel-strong {
+    padding: 1.25rem !important;
+  }
+
+  .portal-dashboard-page h1,
+  .portal-dashboard-page .text-4xl,
+  .portal-dashboard-page .sm\:text-4xl {
+    font-size: clamp(1.85rem, 8vw, 2.35rem) !important;
+    line-height: 1.08 !important;
+  }
+
+  .portal-dashboard-page h2,
+  .portal-dashboard-page .text-3xl {
+    font-size: clamp(1.5rem, 6.4vw, 1.9rem) !important;
+    line-height: 1.16 !important;
+  }
+
+  .portal-dashboard-page table {
+    min-width: max-content;
+  }
+
+  .portal-dashboard-page table,
+  .portal-dashboard-page thead,
+  .portal-dashboard-page tbody {
+    font-size: 0.875rem;
+  }
+
+  .portal-dashboard-page input,
+  .portal-dashboard-page select,
+  .portal-dashboard-page textarea,
+  .auth-shell-bg input,
+  .auth-shell-bg select,
+  .auth-shell-bg textarea,
+  .public-page-shell input,
+  .public-page-shell select,
+  .public-page-shell textarea {
+    font-size: 16px;
+  }
+
+  .portal-dashboard-page button,
+  .portal-dashboard-page a,
+  .public-page-shell button,
+  .public-page-shell a {
+    touch-action: manipulation;
+  }
+
+  .public-page-shell main section {
+    padding-block: clamp(3rem, 10vw, 4rem) !important;
+  }
+
+  .public-page-shell main h1,
+  .public-page-shell main .text-5xl,
+  .public-page-shell main .md\:text-7xl {
+    font-size: clamp(2.35rem, 11vw, 3.25rem) !important;
+    line-height: 0.98 !important;
+  }
+
+  .public-page-shell main h2,
+  .public-page-shell main .text-4xl,
+  .public-page-shell main .md\:text-5xl {
+    font-size: clamp(1.9rem, 8vw, 2.55rem) !important;
+    line-height: 1.08 !important;
+  }
+
+  .public-page-shell main .p-8 {
+    padding: 1.25rem !important;
+  }
+
+  .public-page-shell main .px-8 {
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+  }
+
+  .public-page-shell footer {
+    padding-bottom: calc(2rem + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 420px) {
+  .portal-dashboard-page {
+    padding-inline: 0.875rem !important;
+  }
+
+  .portal-dashboard-page .portal-glass-panel,
+  .portal-dashboard-page .portal-glass-panel-strong,
+  .public-page-shell main .rounded-2xl,
+  .public-page-shell main .rounded-3xl {
+    border-radius: 1rem !important;
+  }
+
+  .portal-dashboard-page .grid,
+  .public-page-shell main .grid {
+    gap: 1rem;
+  }
+}
