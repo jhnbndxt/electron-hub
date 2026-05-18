@@ -181,6 +181,8 @@ export function EnrollmentForm() {
     barangays: false,
   });
   const [addressError, setAddressError] = useState("");
+  const [electiveSearch, setElectiveSearch] = useState({ elective1: "", elective2: "" });
+  const [activeElectiveField, setActiveElectiveField] = useState<"elective1" | "elective2" | null>(null);
   const hasRestoredDraft = useRef(false);
 
   const [formData, setFormData] = useState<FormData>({
@@ -868,6 +870,7 @@ export function EnrollmentForm() {
             ...prev,
             [field]: sequenceValidation.message,
           }));
+          setElectiveSearch((prev) => ({ ...prev, [field]: formData[field] || "" }));
           return;
         }
       }
@@ -1222,8 +1225,16 @@ export function EnrollmentForm() {
     }
   };
 
-  const getAvailableElectives = () => {
-    return allElectives;
+  const getFilteredElectives = (query: string) => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    if (!normalizedQuery) {
+      return allElectives.slice(0, 12);
+    }
+
+    return allElectives
+      .filter((elective) => elective.toLowerCase().includes(normalizedQuery))
+      .slice(0, 12);
   };
 
   const renderPageIndicator = () => {
@@ -1348,6 +1359,81 @@ export function EnrollmentForm() {
       )}
     </div>
   );
+
+  const renderElectiveCombobox = (
+    label: string,
+    field: "elective1" | "elective2"
+  ) => {
+    const searchValue = electiveSearch[field] || formData[field] || "";
+    const filteredElectives = getFilteredElectives(searchValue);
+    const showOptions = activeElectiveField === field && !isSubmittedEnrollment;
+
+    return (
+      <div className="relative">
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label} <span className="text-red-500">*</span>
+        </label>
+        <input
+          type="text"
+          value={searchValue}
+          onFocus={() => {
+            setActiveElectiveField(field);
+            setElectiveSearch((prev) => ({ ...prev, [field]: prev[field] || formData[field] || "" }));
+          }}
+          onChange={(event) => {
+            setActiveElectiveField(field);
+            setElectiveSearch((prev) => ({ ...prev, [field]: event.target.value }));
+          }}
+          onBlur={() => {
+            window.setTimeout(() => {
+              setActiveElectiveField((currentField) => (currentField === field ? null : currentField));
+              setElectiveSearch((prev) => ({ ...prev, [field]: formData[field] || "" }));
+            }, 150);
+          }}
+          disabled={isSubmittedEnrollment}
+          placeholder={`Search ${label.toLowerCase()}`}
+          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+            errors[field] ? "border-red-500" : "border-gray-300"
+          } ${isSubmittedEnrollment ? "bg-gray-50 cursor-not-allowed opacity-60" : ""}`}
+          role="combobox"
+          aria-expanded={showOptions}
+          aria-controls={`${field}-elective-options`}
+          autoComplete="off"
+        />
+        {showOptions && (
+          <div
+            id={`${field}-elective-options`}
+            className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
+          >
+            {filteredElectives.length > 0 ? (
+              filteredElectives.map((elective) => (
+                <button
+                  key={elective}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => {
+                    handleInputChange(field, elective);
+                    setElectiveSearch((prev) => ({ ...prev, [field]: elective }));
+                    setActiveElectiveField(null);
+                  }}
+                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
+                    formData[field] === elective ? "bg-blue-50 font-semibold text-blue-900" : "text-slate-700"
+                  }`}
+                >
+                  {elective}
+                </button>
+              ))
+            ) : (
+              <p className="px-3 py-2 text-sm text-slate-500">No matching elective found.</p>
+            )}
+          </div>
+        )}
+        {errors[field] && (
+          <p className="text-red-500 text-xs mt-1">{errors[field]}</p>
+        )}
+      </div>
+    );
+  };
 
   const renderFileUpload = (
     label: string,
@@ -1774,8 +1860,8 @@ export function EnrollmentForm() {
         {renderSelect("Preferred Track", "preferredTrack", ["Academic", "Technical-Professional"])}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {renderSelect("Elective 1", "elective1", getAvailableElectives())}
-          {renderSelect("Elective 2", "elective2", getAvailableElectives())}
+          {renderElectiveCombobox("Elective 1", "elective1")}
+          {renderElectiveCombobox("Elective 2", "elective2")}
         </div>
       </div>
 
