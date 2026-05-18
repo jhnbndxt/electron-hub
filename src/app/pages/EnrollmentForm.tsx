@@ -35,6 +35,9 @@ import { triggerNotification } from "../../services/notificationService";
 import { supabase } from "../../supabase";
 import electivesDataset from "../../data/electives";
 import {
+  validateElectiveSequence,
+} from "../../utils/electivePrerequisites";
+import {
   getBarangays,
   getCities,
   getCitiesByProvince,
@@ -80,6 +83,7 @@ const allElectives = Array.from(
     ].sort((first, second) => first.localeCompare(second))
   )
 );
+const electiveCatalogNames = (electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[];
 
 const guardianFields = [
   "guardianLastName",
@@ -882,6 +886,24 @@ export function EnrollmentForm() {
   const handleInputChange = (field: keyof FormData, value: string | boolean | File | null) => {
     // Don't allow changes if this is a submitted enrollment
     if (isSubmittedEnrollment) return;
+
+    if ((field === "elective1" || field === "elective2") && typeof value === "string") {
+      const nextElective1 = field === "elective1" ? value : formData.elective1;
+      const nextElective2 = field === "elective2" ? value : formData.elective2;
+      const isGrade11Selection = formData.yearLevel === "Grade 11" || formData.admissionType === "New Regular";
+
+      if (isGrade11Selection) {
+        const sequenceValidation = validateElectiveSequence(nextElective1, nextElective2, electiveCatalogNames);
+
+        if (!sequenceValidation.valid) {
+          setErrors((prev) => ({
+            ...prev,
+            [field]: sequenceValidation.message,
+          }));
+          return;
+        }
+      }
+    }
     
     setFormData(prev => {
       const nextValue = field === "sex" && typeof value === "string" ? normalizeSexForEnrollment(value) : value;
@@ -902,6 +924,17 @@ export function EnrollmentForm() {
       // Handle admission type year level auto-set
       if (field === "admissionType" && value === "New Regular") {
         newData.yearLevel = "Grade 11";
+      }
+
+      if (field === "yearLevel" && value === "Grade 11") {
+        const sequenceValidation = validateElectiveSequence(newData.elective1, newData.elective2, electiveCatalogNames);
+
+        if (!sequenceValidation.valid) {
+          newData = {
+            ...newData,
+            [sequenceValidation.field]: "",
+          };
+        }
       }
 
       if (field === "admissionType" && value !== "Transferee") {
@@ -939,6 +972,10 @@ export function EnrollmentForm() {
       setErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[field];
+        if (field === "elective1" || field === "elective2") {
+          delete newErrors.elective1;
+          delete newErrors.elective2;
+        }
         if (field === "guardianSource") {
           guardianFields.forEach((guardianField) => {
             delete newErrors[guardianField];
@@ -1071,6 +1108,13 @@ export function EnrollmentForm() {
       if (!formData.elective2) newErrors.elective2 = "This field is required";
       if (formData.elective1 && formData.elective2 && formData.elective1 === formData.elective2) {
         newErrors.elective2 = "Elective 1 and Elective 2 must be different";
+      }
+      if (formData.yearLevel === "Grade 11" || formData.admissionType === "New Regular") {
+        const sequenceValidation = validateElectiveSequence(formData.elective1, formData.elective2, electiveCatalogNames);
+
+        if (!sequenceValidation.valid && sequenceValidation.field) {
+          newErrors[sequenceValidation.field] = sequenceValidation.message || "Please follow the required elective prerequisite sequence.";
+        }
       }
       if (!formData.yearLevel) newErrors.yearLevel = "This field is required";
     }

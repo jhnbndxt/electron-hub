@@ -8,6 +8,7 @@
 
 import { supabase } from '../supabase';
 import electivesCatalog from '../data/electives.js';
+import { selectElectivesWithPrerequisites } from '../utils/electivePrerequisites.js';
 
 const EMPTY_GROUPED_QUESTIONS = {
   Verbal: [],
@@ -640,7 +641,7 @@ export function recommendElectives(trackOrScores, scoresOrInterestClusters = {},
   const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters);
 
   if (rankedCatalogElectives.length > 0) {
-    return rankedCatalogElectives.slice(0, 2).map((elective) => elective.name);
+    return selectElectivesWithPrerequisites(rankedCatalogElectives, 2).map((elective) => elective.name);
   }
 
   const rankedGroups = rankElectiveGroups(track, scores, interestClusters);

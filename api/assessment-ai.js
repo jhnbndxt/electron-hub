@@ -1,4 +1,8 @@
 import electives from "../src/data/electives.js";
+import {
+  selectElectivesWithPrerequisites,
+  validateElectiveSequence,
+} from "../src/utils/electivePrerequisites.js";
 
 console.log(
   "ENV:",
@@ -175,12 +179,15 @@ function buildFallbackRecommendation(data, rankedElectives) {
   const savedElectives = Array.isArray(data.electives)
     ? data.electives.map((elective) => String(elective || "").trim()).filter(Boolean)
     : [];
-  const selectedElectives = savedElectives.length
+  const validSavedSequence =
+    savedElectives.length === 2 &&
+    validateElectiveSequence(savedElectives[0], savedElectives[1], electives.map((elective) => elective.name)).valid;
+  const selectedElectives = validSavedSequence
     ? savedElectives.map((name) => ({
         ...(findElectiveByName(name, rankedElectives) || {}),
         name,
       }))
-    : rankedElectives.slice(0, 2);
+    : selectElectivesWithPrerequisites(rankedElectives, 2);
   const [firstElective = rankedElectives[0], secondElective = rankedElectives[1]] = selectedElectives;
   const strongestDomain = getStrongestDomain(data);
   const courses = Array.from(
@@ -208,6 +215,43 @@ function buildFallbackRecommendation(data, rankedElectives) {
     overallAnalysis: `Your result points toward the ${data.track} Track with electives that can help you turn your strengths into clearer college and career options.`,
     suggestedCollegeCourses: courses,
     careerPathways,
+  };
+}
+
+function removeFinalizedWording(text = "") {
+  return String(text)
+    .replace(/you have already saved/gi, "this recommendation includes")
+    .replace(/you already saved/gi, "this recommendation includes")
+    .replace(/saved as one of your electives/gi, "recommended as one of your electives")
+    .replace(/saved elective/gi, "recommended elective")
+    .trim();
+}
+
+function normalizeRecommendationResult(result, fallbackRecommendation, rankedElectives) {
+  if (!result || result.raw) {
+    return result;
+  }
+
+  const availableElectives = electives.map((elective) => elective.name);
+  const elective1 = String(result.elective1 || "").trim();
+  const elective2 = String(result.elective2 || "").trim();
+  const sequenceValidation = validateElectiveSequence(elective1, elective2, availableElectives);
+  const firstElective = findElectiveByName(elective1, rankedElectives);
+  const secondElective = findElectiveByName(elective2, rankedElectives);
+  const useFallbackElectives = !sequenceValidation.valid || !firstElective || !secondElective;
+
+  return {
+    ...result,
+    elective1: useFallbackElectives ? fallbackRecommendation.elective1 : elective1,
+    elective2: useFallbackElectives ? fallbackRecommendation.elective2 : elective2,
+    elective1Explanation: removeFinalizedWording(
+      useFallbackElectives ? fallbackRecommendation.elective1Explanation : result.elective1Explanation
+    ),
+    elective2Explanation: removeFinalizedWording(
+      useFallbackElectives ? fallbackRecommendation.elective2Explanation : result.elective2Explanation
+    ),
+    trackExplanation: removeFinalizedWording(result.trackExplanation || fallbackRecommendation.trackExplanation),
+    overallAnalysis: removeFinalizedWording(result.overallAnalysis || fallbackRecommendation.overallAnalysis),
   };
 }
 
@@ -265,7 +309,7 @@ Your tasks:
 Track:
 ${data.track}
 
-SAVED ELECTIVES TO EXPLAIN, IF PROVIDED:
+LOCAL SCORING ELECTIVES TO EXPLAIN, IF PROVIDED:
 ${Array.isArray(data.electives) && data.electives.length ? JSON.stringify(data.electives) : "None"}
 
 APTITUDE SCORES:
@@ -300,7 +344,9 @@ Do not recommend broad or unrelated electives.
 Prioritize electives with the highest compatibility scores, but treat all valid electives as eligible and do not favor any elective because of list order, popularity, or familiarity.
 Use ONLY electives from TOP MATCHING ELECTIVES.
 Ensure the chosen electives match the student's determined track.
-If saved electives are provided and they are valid for the determined track, explain those saved electives instead of replacing them.
+If local scoring electives are provided and they are valid for the determined track and prerequisite sequence, explain those recommendations instead of replacing them.
+Never say the student has already saved, finalized, chosen, or enrolled in an elective. Use recommendation-based wording such as "This elective is recommended..." or "This option fits your results...".
+Prerequisite rule: any Level 2 elective, including names ending in " 2" or using a pattern like "Subject 2: Topic", must only appear as elective2 when the matching Level 1 elective is elective1. Examples: Chemistry 2 requires Chemistry 1 first; Biology 2 requires Biology 1 first; Human Movement 2: Motor Skills Development requires Human Movement 1: Basic Anatomy in Sports and Exercise first. Do not return Programming + Chemistry 2 or any unrelated Level 1 + Level 2 pair.
 
 Return ONLY VALID JSON using this exact format:
 
@@ -344,6 +390,8 @@ Requirements:
 - Match electives based on strongest aptitude and interest scores.
 - Prioritize electives with highest compatibility scores.
 - Do not bias recommendations toward specific elective names, groups, or earlier list positions.
+- Follow prerequisite order: elective1 must be the Level 1 prerequisite if elective2 is the matching Level 2 subject.
+- Do not recommend any Level 2 elective unless its matching Level 1 elective is also recommended first.
 - Avoid unrelated or weak recommendations.
 - trackExplanation must explain WHY the track fits the student based on aptitude and interests.
 - elective1Explanation must be detailed and include: why elective 1 was recommended from the assessment results, what the elective is about, what students can expect to learn or do, and possible career pathways, college courses, or future opportunities related to that elective.
@@ -413,7 +461,11 @@ Requirements:
       .replace(/```json/g, "")
       .replace(/```/g, "");
 
-    const parsedResult = parseAiJson(reply);
+    const parsedResult = normalizeRecommendationResult(
+      parseAiJson(reply),
+      fallbackRecommendation,
+      rankedElectives
+    );
 
     return sendJson(response, 200, {
       success: true,
