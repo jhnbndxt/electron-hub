@@ -11,7 +11,7 @@ Redesign ONLY the Assessment Page and Result Page based on:
 🔹 ASSESSMENT PAGE (FULL CONTENT)
 
 HEADER:
-Title: Track Recommendation Assessment Powered by AI
+Title: Track Recommendation Assessment
 Subtitle: Answer the following to determine your recommended track and electives  
 
 Progress Bar Steps:

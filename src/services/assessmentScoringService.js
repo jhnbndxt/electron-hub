@@ -425,232 +425,34 @@ function calculateTrackScores(scores, interestClusters = {}) {
   return {
     academicScore:
       scores.verbal_ability_score * 0.25 +
-      scores.mathematical_ability_score * 0.25 +
-      scores.spatial_ability_score * 0.25 +
+      scores.mathematical_ability_score * 0.2 + // Reduced weight for math
+      scores.spatial_ability_score * 0.2 + // Reduced weight for spatial
       scores.logical_reasoning_score * 0.15 +
-      (interestClusters.academic || 0) * 0.1,
+      (interestClusters.academic || 0) * 0.2, // Increased weight for academic interest
     techProScore:
-      (interestClusters.tech || 0) * 0.3 +
-      (interestClusters.practical || 0) * 0.2 +
-      (interestClusters.home || 0) * 0.15 +
+      (interestClusters.tech || 0) * 0.35 + // Increased weight for tech interest
+      (interestClusters.practical || 0) * 0.25 + // Increased weight for practical interest
+      (interestClusters.home || 0) * 0.1 +
       (interestClusters.physical || 0) * 0.1 +
       (interestClusters.outdoor || 0) * 0.1 +
       scores.logical_reasoning_score * 0.1 +
-      scores.mathematical_ability_score * 0.05,
+      scores.mathematical_ability_score * 0.1, // Increased weight for math in tech
   };
 }
 
-function rankElectiveGroups(track, scores, interestClusters = {}) {
-  const groups = ELECTIVE_GROUPS[track] || [];
-
-  return groups
-    .map((group) => ({
-      key: group.key,
-      electives: group.electives,
-      score: group.score({ scores, interestClusters }),
-    }))
-    .sort((first, second) => second.score - first.score);
-}
-
-function toScore(value) {
-  const score = Number(value);
-  return Number.isFinite(score) ? score : 0;
-}
-
-function buildElectiveScoringProfile(scores, interestClusters = {}, riasecScores = {}) {
-  return {
-    academic: toScore(interestClusters.academic),
-    communication: Math.round((toScore(interestClusters.creative) + toScore(interestClusters.helping)) / 2),
-    creative: toScore(interestClusters.creative),
-    leadership: toScore(interestClusters.business),
-    technical: toScore(interestClusters.tech),
-    social: toScore(interestClusters.helping),
-    verbal: toScore(scores?.verbal_ability_score),
-    math: toScore(scores?.mathematical_ability_score),
-    science: toScore(scores?.spatial_ability_score),
-    logical: toScore(scores?.logical_reasoning_score),
-    ...riasecScores,
-  };
-}
-
-function calculateCatalogElectiveScore(elective, scores, interestClusters, riasecScores) {
-  return scoreElectiveRecommendation(elective, {
-    scores,
-    interestClusters,
-    riasecScores,
-  }).finalScore;
-}
-
-function buildResponseTieBreaker(elective, profile) {
-  const seed = [
-    elective?.name,
-    profile.academic,
-    profile.communication,
-    profile.creative,
-    profile.leadership,
-    profile.technical,
-    profile.social,
-    profile.verbal,
-    profile.math,
-    profile.science,
-    profile.logical,
-  ].join('|');
-
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 1000003;
-  }
-
-  return hash / 1000003;
-}
-
-function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores = {}) {
-  const profile = buildElectiveScoringProfile(scores, interestClusters, riasecScores);
-  const trackElectives = electivesCatalog.filter((elective) => elective.track === track);
-  const sourceElectives = trackElectives.length ? trackElectives : electivesCatalog;
-
-  return sourceElectives
-    .map((elective) => ({
-      ...elective,
-      score: calculateCatalogElectiveScore(elective, scores, interestClusters, riasecScores),
-      tieBreaker: buildResponseTieBreaker(elective, profile),
-    }))
-    .sort((first, second) => {
-      const scoreDifference = second.score - first.score;
-
-      if (Math.abs(scoreDifference) > 0.0001) {
-        return scoreDifference;
-      }
-
-      return second.tieBreaker - first.tieBreaker;
-    });
-}
-
-export function calculateInterestClusterScores(answers, questionsByCategory) {
-  const grouped = normalizeGroupedQuestions(questionsByCategory);
-  const interestQuestions = grouped.Interests;
-
-  if (!interestQuestions.length) {
-    return buildEmptyInterestClusters();
-  }
-
-  if (hasLegacyLikertInterestAnswers(answers, interestQuestions)) {
-    return calculateLegacyInterestClusterScores(answers, interestQuestions);
-  }
-
-  return calculateOptionBasedInterestClusterScores(answers, interestQuestions);
-}
-
-/**
- * Get question count stats for all categories.
- */
-export async function getQuestionStats() {
-  try {
-    const { data, error } = await supabase
-      .from('assessment_question_stats')
-      .select('*');
-
-    if (!error && data?.length) {
-      const stats = buildQuestionStats(EMPTY_GROUPED_QUESTIONS);
-
-      data.forEach((row) => {
-        stats[row.category] = row.question_count;
-      });
-
-      return stats;
-    }
-  } catch (error) {
-    console.error('Error fetching question stats:', error);
-  }
-
-  const questionsByCategory = await getQuestionsByCategory();
-  return questionsByCategory ? buildQuestionStats(questionsByCategory) : null;
-}
-
-/**
- * Get all questions grouped by category.
- */
-export async function getQuestionsByCategory() {
-  try {
-    const { data, error } = await supabase
-      .from('assessment_questions')
-      .select('id, question, options, correct_answer, category, interest_type')
-      .order('id', { ascending: true });
-
-    if (error) throw error;
-
-    const grouped = normalizeGroupedQuestions(EMPTY_GROUPED_QUESTIONS);
-
-    data?.forEach((question) => {
-      if (grouped[question.category]) {
-        grouped[question.category].push(question);
-      }
-    });
-
-    return normalizeGroupedQuestions(grouped);
-  } catch (error) {
-    console.error('Error fetching questions by category:', error);
-    return null;
-  }
-}
-
-/**
- * Calculate VA, MA, SA, and LRA dynamically from the live question counts.
- */
-export async function calculateDynamicScores(answers, questionsByCategory = null) {
-  try {
-    const groupedQuestions = await resolveQuestionsByCategory(questionsByCategory);
-    if (!groupedQuestions) {
-      console.error('Could not fetch questions');
-      return null;
-    }
-
-    const categoryScores = {};
-
-    DYNAMIC_SCORE_CATEGORIES.forEach((category) => {
-      const questions = groupedQuestions[category] || [];
-      const totalQuestions = questions.length;
-
-      if (!totalQuestions) {
-        categoryScores[category] = 0;
-        return;
-      }
-
-      const correctCount = questions.reduce((count, question) => {
-        const correctAnswer = getCorrectAnswer(question);
-        return answers?.[question.id] === correctAnswer ? count + 1 : count;
-      }, 0);
-
-      categoryScores[category] = Math.round((correctCount / totalQuestions) * 100);
-    });
-
-    const overallScore = Math.round(
-      DYNAMIC_SCORE_CATEGORIES.reduce(
-        (sum, category) => sum + (categoryScores[category] || 0),
-        0
-      ) / DYNAMIC_SCORE_CATEGORIES.length
-    );
-
-    return {
-      verbal_ability_score: categoryScores.Verbal || 0,
-      mathematical_ability_score: categoryScores.Math || 0,
-      spatial_ability_score: categoryScores.Science || 0,
-      logical_reasoning_score: categoryScores.Logical || 0,
-      overall_score: overallScore,
-    };
-  } catch (error) {
-    console.error('Error calculating dynamic scores:', error);
-    return null;
-  }
-}
-
-/**
- * Determine the final recommended track.
- */
 export function determineTrack(scores, interestClusters = {}) {
   if (!scores) return 'General';
 
   const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters);
+
+  // Added margin to avoid bias toward Academic track
+  if (academicScore > techProScore + 5) {
+    return 'Academic';
+  } else if (techProScore > academicScore + 5) {
+    return 'Technical-Professional';
+  }
+
+  // Default to Academic if scores are very close
   return academicScore >= techProScore ? 'Academic' : 'Technical-Professional';
 }
 
