@@ -523,19 +523,44 @@ function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores
 }
 
 function calculateTrackScores(scores, interestClusters = {}) {
+  let academicScore = 0;
+  let techProScore = 0;
+
+  if (scores.verbal_ability_score) {
+    academicScore += scores.verbal_ability_score * 0.35;
+  }
+  if (scores.spatial_ability_score) {
+    academicScore += scores.spatial_ability_score * 0.35;
+  }
+  if (scores.logical_reasoning_score) {
+    academicScore += scores.logical_reasoning_score * 0.1;
+  }
+  if (scores.mathematical_ability_score) {
+    academicScore += scores.mathematical_ability_score * 0.05;
+  }
+  if (interestClusters.academic) {
+    academicScore += interestClusters.academic * 0.15;
+  }
+
+  if (scores.mathematical_ability_score) {
+    techProScore += scores.mathematical_ability_score * 0.3;
+  }
+  if (scores.logical_reasoning_score) {
+    techProScore += scores.logical_reasoning_score * 0.25;
+  }
+  if (interestClusters.creative) {
+    techProScore += interestClusters.creative * 0.2;
+  }
+  if (interestClusters.tech) {
+    techProScore += interestClusters.tech * 0.15;
+  }
+  if (interestClusters.practical) {
+    techProScore += interestClusters.practical * 0.1;
+  }
+
   return {
-    academicScore:
-      scores.verbal_ability_score * 0.35 +
-      scores.spatial_ability_score * 0.35 +
-      scores.logical_reasoning_score * 0.1 +
-      scores.mathematical_ability_score * 0.05 +
-      (interestClusters.academic || 0) * 0.15,
-    techProScore:
-      scores.mathematical_ability_score * 0.3 +
-      scores.logical_reasoning_score * 0.25 +
-      (interestClusters.creative || 0) * 0.2 +
-      (interestClusters.tech || 0) * 0.15 +
-      (interestClusters.practical || 0) * 0.1,
+    academicScore,
+    techProScore,
   };
 }
 
@@ -544,16 +569,14 @@ export function determineTrack(scores, interestClusters = {}) {
 
   const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters);
 
-  return academicScore >= techProScore ? 'Academic' : 'Technical-Professional';
+  if (academicScore >= techProScore) {
+    return 'Academic';
+  } else {
+    return 'Technical-Professional';
+  }
 }
 
-/**
- * Recommend the top two individual electives.
- *
- * Each elective competes independently using its own configured weights. This
- * avoids the old family-level behavior where the same first two options in a
- * group were always selected, even when other electives were equally strong.
- */
+
 export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}, maybeRiasecScores = {}) {
   let track = trackOrScores;
   let scores = scoresOrInterestClusters;
