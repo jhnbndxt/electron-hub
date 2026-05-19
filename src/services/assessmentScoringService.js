@@ -525,19 +525,17 @@ function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores
 function calculateTrackScores(scores, interestClusters = {}) {
   return {
     academicScore:
-      scores.verbal_ability_score * 0.25 +
-      scores.mathematical_ability_score * 0.2 + // Reduced weight for math
-      scores.spatial_ability_score * 0.2 + // Reduced weight for spatial
-      scores.logical_reasoning_score * 0.15 +
-      (interestClusters.academic || 0) * 0.2, // Increased weight for academic interest
-    techProScore:
-      (interestClusters.tech || 0) * 0.35 + // Increased weight for tech interest
-      (interestClusters.practical || 0) * 0.25 + // Increased weight for practical interest
-      (interestClusters.home || 0) * 0.1 +
-      (interestClusters.physical || 0) * 0.1 +
-      (interestClusters.outdoor || 0) * 0.1 +
+      scores.verbal_ability_score * 0.35 +
+      scores.spatial_ability_score * 0.35 +
       scores.logical_reasoning_score * 0.1 +
-      scores.mathematical_ability_score * 0.1, // Increased weight for math in tech
+      scores.mathematical_ability_score * 0.05 +
+      (interestClusters.academic || 0) * 0.15,
+    techProScore:
+      scores.mathematical_ability_score * 0.3 +
+      scores.logical_reasoning_score * 0.25 +
+      (interestClusters.creative || 0) * 0.2 +
+      (interestClusters.tech || 0) * 0.15 +
+      (interestClusters.practical || 0) * 0.1,
   };
 }
 
@@ -546,14 +544,6 @@ export function determineTrack(scores, interestClusters = {}) {
 
   const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters);
 
-  // Added margin to avoid bias toward Academic track
-  if (academicScore > techProScore + 5) {
-    return 'Academic';
-  } else if (techProScore > academicScore + 5) {
-    return 'Technical-Professional';
-  }
-
-  // Default to Academic if scores are very close
   return academicScore >= techProScore ? 'Academic' : 'Technical-Professional';
 }
 
