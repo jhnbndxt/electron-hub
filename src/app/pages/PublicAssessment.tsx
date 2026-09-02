@@ -152,43 +152,60 @@ function getSuggestedCoursesForPublicResult(track: string, elective: string): st
 
   if (track === "Academic") {
     if (normalizedElective.includes("biology")) {
-      return ["Medicine", "Nursing", "Biology"];
+      return ["Medicine", "Nursing", "Pharmacy", "Biological Sciences"];
     } else if (normalizedElective.includes("physics")) {
-      return ["Engineering (Civil, Electrical, Mechanical)", "Applied Physics"];
+      return ["Engineering", "Physics", "Materials Science", "Astronomy"];
     } else if (normalizedElective.includes("psychology")) {
-      return ["Psychology", "Education", "Social Work"];
-    } else if (normalizedElective.includes("creative writing")) {
-      return ["Communication", "Journalism", "Literature"];
+      return ["Psychology", "Counseling", "Education", "Social Work"];
+    } else if (normalizedElective.includes("creative writing") || normalizedElective.includes("literature")) {
+      return ["Communications", "Journalism", "English Literature", "Creative Writing"];
     } else if (normalizedElective.includes("entrepreneurship") || normalizedElective.includes("marketing")) {
-      return ["Business Administration", "Marketing", "Management"];
+      return ["Business Administration", "Marketing", "Entrepreneurship", "Finance"];
     } else if (normalizedElective.includes("media arts") || normalizedElective.includes("visual arts")) {
-      return ["Multimedia Arts", "Film", "Graphic Design"];
+      return ["Fine Arts", "Graphic Design", "Digital Media", "Animation"];
     } else if (normalizedElective.includes("coaching") || normalizedElective.includes("fitness")) {
-      return ["Physical Education", "Sports Science", "Sports Management"];
+      return ["Physical Education", "Sports Science", "Kinesiology", "Sports Management"];
     }
   } else if (track === "Technical-Professional") {
-    if (normalizedElective.includes("ict")) {
-      return ["Information Technology", "Computer Science", "Software Engineering"];
+    if (normalizedElective.includes("ict") || normalizedElective.includes("information") || normalizedElective.includes("technology")) {
+      return ["Information Technology", "Computer Science", "Systems Administration", "Cybersecurity"];
     } else if (normalizedElective.includes("programming")) {
-      return ["Software Engineering", "Computer Engineering"];
-    } else if (normalizedElective.includes("cookery")) {
-      return ["Culinary Arts", "Hospitality Management", "Tourism"];
-    } else if (normalizedElective.includes("bread") || normalizedElective.includes("pastry")) {
-      return ["Culinary Arts", "Baking & Pastry"];
+      return ["Software Development", "App Development", "Web Development", "Game Development"];
+    } else if (normalizedElective.includes("cookery") || normalizedElective.includes("culinary")) {
+      return ["Culinary Arts", "Hospitality Management", "Food Service", "Nutrition"];
+    } else if (normalizedElective.includes("bread") || normalizedElective.includes("pastry") || normalizedElective.includes("baking")) {
+      return ["Bakery Management", "Culinary Arts", "Pastry Arts", "Food Production"];
     } else if (normalizedElective.includes("automotive")) {
-      return ["Mechanical Engineering", "Automotive Technology"];
+      return ["Automotive Technology", "Mechanical Engineering", "Vehicle Maintenance", "Automotive Engineering"];
     } else if (normalizedElective.includes("electrical")) {
-      return ["Electrical Engineering", "Electronics Engineering"];
-    } else if (normalizedElective.includes("agriculture")) {
-      return ["Agriculture", "Agribusiness"];
-    } else if (normalizedElective.includes("fishery")) {
-      return ["Fisheries", "Marine Biology"];
+      return ["Electrical Technology", "Electrical Engineering", "Power Systems", "Electronics Repair"];
+    } else if (normalizedElective.includes("agriculture") || normalizedElective.includes("farming")) {
+      return ["Agriculture", "Agribusiness", "Agricultural Engineering", "Sustainable Farming"];
+    } else if (normalizedElective.includes("fishery") || normalizedElective.includes("fishing")) {
+      return ["Fisheries", "Marine Biology", "Aquaculture", "Ocean Resources Management"];
     } else if (normalizedElective.includes("fitness") || normalizedElective.includes("coaching")) {
-      return ["Physical Education", "Sports Management"];
+      return ["Physical Education", "Sports Management", "Fitness Training", "Athletic Coaching"];
     }
   }
 
   return [];
+}
+
+function getPathwayExplanation(track: string, elective: string): string {
+  const normalizedElective = normalizeResultText(elective).toLowerCase();
+  const courses = getSuggestedCoursesForPublicResult(track, elective);
+
+  if (courses.length === 0) {
+    return `${elective} prepares you with foundational knowledge and skills applicable across various fields in the ${track} pathway.`;
+  }
+
+  if (track === "Academic") {
+    return `Based on your ${elective} elective and Academic Track, college programs in ${courses.slice(0, 2).join(" or ")} build on these foundations with advanced theory and research.`;
+  } else if (track === "Technical-Professional") {
+    return `Your ${elective} elective within the Technical-Professional Track leads directly to careers and training in ${courses.slice(0, 2).join(", ")}, combining practical skills with industry credentials.`;
+  }
+
+  return `Your selection of ${elective} opens pathways to programs and careers in ${courses.slice(0, 2).join(" and ")}.`;
 }
 
 interface PublicAssessmentResultsViewProps {
@@ -411,16 +428,24 @@ function PublicAssessmentResultsView({
 
           <div className="rounded-2xl bg-white p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-950">Possible Pathways</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Your {track} Track and suggested electives create these college and career pathways:
+            </p>
             <div className="mt-4 space-y-3">
               {pathwayRows.filter((pathway) => pathway.careers.length > 0).slice(0, 4).map((pathway, index) => (
                 <div key={`${pathway.category}-${index}`} className="rounded-xl bg-slate-50 p-4">
                   <p className="text-sm font-bold text-slate-900">{pathway.category}</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{pathway.careers.join(", ")}</p>
+                  <p className="mt-2 text-xs leading-6 text-slate-600">{getPathwayExplanation(track, pathway.category)}</p>
+                  {pathway.careers.length > 0 && (
+                    <p className="mt-2 text-sm font-medium text-slate-700">
+                      Programs: {pathway.careers.join(", ")}
+                    </p>
+                  )}
                 </div>
               ))}
               {pathwayRows.every((pathway) => pathway.careers.length === 0) && (
                 <p className="text-sm leading-6 text-slate-600">
-                  Your track and electives can support college and career options connected to your strengths.
+                  Your {track} Track and electives support college and career options connected to your strengths and interests.
                 </p>
               )}
             </div>

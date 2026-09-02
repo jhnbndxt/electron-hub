@@ -189,9 +189,13 @@ function buildElectiveExplanation(elective, data, positionLabel) {
   const idealFor = formatList(elective?.idealFor || [], "your assessment profile");
   const courses = formatList(elective?.relatedCourses || [], "related college programs");
   const careers = formatList(elective?.careerPathways || [], "future career opportunities");
+  const trackContext = data.track === 'Academic' 
+    ? 'within the Academic Track, where theoretical knowledge and research are emphasized'
+    : 'within the Technical-Professional Track, where practical skills and career-ready training are emphasized';
 
-  return `${positionLabel} is recommended because your ${strongestDomain.label} score (${strongestDomain.score}%) and ${interestSummary} connect well with ${idealFor}. This elective is about ${elective?.group || elective?.category || "a specialized learning area"} and builds strengths such as ${strengths}. You can expect learning activities that develop subject knowledge, applied skills, problem solving, and career awareness connected to this field. Possible future pathways include college courses such as ${courses}, as well as opportunities like ${careers}.`;
+  return `${positionLabel} is recommended for ${trackContext}. Your ${strongestDomain.label} score (${strongestDomain.score}%) and ${interestSummary} align well with ${idealFor}. This elective develops strengths such as ${strengths} through subject knowledge, applied skills, problem-solving, and career awareness. Foundation-level understanding here prepares you for related college programs in ${courses} and career opportunities in ${careers}.`;
 }
+
 
 function buildFallbackRecommendation(data, rankedElectives) {
   const savedElectives = Array.isArray(data.electives)
@@ -208,6 +212,19 @@ function buildFallbackRecommendation(data, rankedElectives) {
     : selectElectivesWithPrerequisites(rankedElectives, 2);
   const [firstElective = rankedElectives[0], secondElective = rankedElectives[1]] = selectedElectives;
   const strongestDomain = getStrongestDomain(data);
+
+  // Build track explanation with more context
+  let trackExplanation = "";
+  if (data.track === "Academic") {
+    trackExplanation = `The Academic Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), which is essential for college-preparatory learning. This track emphasizes theoretical knowledge, research skills, and academic specialization—preparing you for university-level study and careers requiring advanced education.`;
+  } else if (data.track === "Technical-Professional") {
+    trackExplanation = `The Technical-Professional Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), combined with practical and technical interests. This track emphasizes hands-on skills, career readiness, and industry-relevant training—preparing you for immediate career entry or further technical education.`;
+  } else if (data.track === "Further Assessment") {
+    trackExplanation = `Your assessment results suggest a need for further career guidance. Your strengths and interests span multiple directions, which means you have flexibility in choosing a track. We recommend discussing your options with a school counselor to explore which pathway aligns best with your goals.`;
+  } else {
+    trackExplanation = `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`;
+  }
+
   const courses = Array.from(
     new Set(
       [firstElective, secondElective]
@@ -225,12 +242,12 @@ function buildFallbackRecommendation(data, rankedElectives) {
 
   return {
     recommendedTrack: data.track,
-    trackExplanation: `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`,
+    trackExplanation,
     elective1: firstElective?.name || "",
-    elective1Explanation: buildElectiveExplanation(firstElective, data, firstElective?.name || "Elective 1"),
+    elective1Explanation: buildElectiveExplanation(firstElective, data, "Elective 1"),
     elective2: secondElective?.name || "",
-    elective2Explanation: buildElectiveExplanation(secondElective, data, secondElective?.name || "Elective 2"),
-    overallAnalysis: `Your result points toward the ${data.track} Track with electives that can help you turn your strengths into clearer college and career options.`,
+    elective2Explanation: buildElectiveExplanation(secondElective, data, "Elective 2"),
+    overallAnalysis: `Your ${data.track} Track recommendation is based on your strongest aptitudes and interests. The suggested electives—${firstElective?.name || "Elective 1"} and ${secondElective?.name || "Elective 2"}—are foundational subjects that will strengthen your skills and open pathways to related college programs and careers.`,
     suggestedCollegeCourses: courses,
     careerPathways,
   };
