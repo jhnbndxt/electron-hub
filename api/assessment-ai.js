@@ -4,6 +4,7 @@ import {
   validateElectiveSequence,
 } from "../src/utils/electivePrerequisites.js";
 import { scoreElectiveRecommendation } from "../src/utils/electiveRecommendationScoring.js";
+import { DEFAULT_GROQ_MODEL, DEFAULT_OPENROUTER_MODEL } from "./ai-models.js";
 
 console.log(
   "ENV:",
@@ -294,8 +295,8 @@ export default async function handler(request, response) {
       : "https://openrouter.ai/api/v1/chat/completions";
   const model =
     provider === "groq"
-      ? process.env.GROQ_MODEL || "llama-3.3-70b-versatile"
-      : process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat-v3-0324:free";
+      ? process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL
+      : process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
 
   if (!apiKey) {
     return sendJson(response, 200, {

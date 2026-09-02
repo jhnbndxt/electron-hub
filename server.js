@@ -8,6 +8,7 @@ import OpenAI from "openai";
 
 import chatbotRouter from "./server/routes/chatbot.js";
 import assessmentAiHandler from "./api/assessment-ai.js";
+import { DEFAULT_OPENROUTER_MODEL } from "./api/ai-models.js";
 
 dotenv.config({ path: "./.env" });
 
@@ -44,7 +45,7 @@ app.post(
         await openai.chat.completions.create({
 
           model:
-            "deepseek/deepseek-chat-v3-0324:free",
+            process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL,
 
           messages: [
 
