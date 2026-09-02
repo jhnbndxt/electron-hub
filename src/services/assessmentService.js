@@ -18,11 +18,11 @@ export const RIASEC_TYPES = [
 ];
 
 const LIKERT_OPTIONS = [
-  '5 - Strongly Agree',
-  '4 - Agree',
-  '3 - Neutral',
-  '2 - Disagree',
   '1 - Strongly Disagree',
+  '2 - Disagree',
+  '3 - Neutral',
+  '4 - Agree',
+  '5 - Strongly Agree',
 ];
 
 export const INTEREST_LIKERT_QUESTIONS = [
