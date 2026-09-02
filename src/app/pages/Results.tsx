@@ -23,6 +23,15 @@ import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 interface AssessmentResults {
   track: string;
   electives: string[];
+  electiveRecommendations?: Array<{
+    name: string;
+    track: string;
+    category?: string;
+    compatibilityScore: number;
+    aptitudeScore: number;
+    riasecScore: number;
+    reason: string;
+  }>;
   scores: {
     VA: number;
     MA: number;
@@ -113,6 +122,7 @@ export function Results() {
             scores: latestResult.scores,
             topDomains: latestResult.topDomains,
             topInterests: latestResult.topInterests,
+            electiveRecommendations: storedResults?.electiveRecommendations,
             overallScore: latestResult.overallScore,
             aiRecommendation: storedResults?.aiRecommendation,
           });
@@ -466,6 +476,7 @@ export function Results() {
     : [];
   const electiveExplanations = electives.map((elective, index) => ({
     elective,
+    scoring: results.electiveRecommendations?.find((recommendation) => recommendation.name === elective),
     explanation:
       index === 0
         ? aiRecommendation?.elective1Explanation
@@ -954,7 +965,7 @@ export function Results() {
                 </span>
               </div>
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
-                {electiveExplanations.map(({ elective, explanation }, index) => (
+                {electiveExplanations.map(({ elective, scoring, explanation }, index) => (
                   <div
                     key={index}
                     className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-5 shadow-sm"
@@ -968,6 +979,22 @@ export function Results() {
                         <h4 className="mt-2 text-lg font-semibold text-slate-950">{elective}</h4>
                       </div>
                     </div>
+                    {scoring ? (
+                      <div className="mt-4 grid gap-2 rounded-2xl bg-white p-4 text-sm text-slate-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">Compatibility Score</span>
+                          <span className="font-bold text-blue-700">{scoring.compatibilityScore.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Aptitude Score</span>
+                          <span>{scoring.aptitudeScore.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>RIASEC Score</span>
+                          <span>{scoring.riasecScore.toFixed(2)}%</span>
+                        </div>
+                      </div>
+                    ) : null}
                     {explanation ? (
                       <p className="mt-4 text-sm leading-6 text-slate-600">
                         {explanation}

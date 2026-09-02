@@ -8,6 +8,7 @@
 
 import { supabase } from '../supabase';
 import electivesCatalog from '../data/electives.js';
+import { validateElectiveWeightProfiles } from '../data/electiveWeightProfiles.js';
 import { selectElectivesWithPrerequisites } from '../utils/electivePrerequisites.js';
 import { RIASEC_TYPES, scoreElectiveRecommendation } from '../utils/electiveRecommendationScoring.js';
 
@@ -469,12 +470,16 @@ function buildElectiveScoringProfile(scores, interestClusters = {}, riasecScores
   };
 }
 
-function calculateCatalogElectiveScore(elective, scores, interestClusters, riasecScores) {
-  return scoreElectiveRecommendation(elective, {
-    scores,
-    interestClusters,
-    riasecScores,
-  }).finalScore;
+function buildElectiveRecommendationReason(elective, scoring) {
+  const strongestSignals = [
+    { label: 'aptitude fit', score: scoring.aptitudeFit },
+    { label: 'RIASEC interest fit', score: scoring.riasecFit },
+  ]
+    .sort((first, second) => second.score - first.score)
+    .map((signal) => `${signal.label} (${signal.score}%)`)
+    .join(' and ');
+
+  return `${elective.name} is recommended based on assessment compatibility. Its competency profile matches your ${strongestSignals}.`;
 }
 
 function buildResponseTieBreaker(elective, profile) {
@@ -502,15 +507,23 @@ function buildResponseTieBreaker(elective, profile) {
 
 function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores = {}) {
   const profile = buildElectiveScoringProfile(scores, interestClusters, riasecScores);
-  const trackElectives = electivesCatalog.filter((elective) => elective.track === track);
-  const sourceElectives = trackElectives.length ? trackElectives : electivesCatalog;
 
-  return sourceElectives
-    .map((elective) => ({
-      ...elective,
-      score: calculateCatalogElectiveScore(elective, scores, interestClusters, riasecScores),
-      tieBreaker: buildResponseTieBreaker(elective, profile),
-    }))
+  return electivesCatalog
+    .map((elective) => {
+      const scoring = scoreElectiveRecommendation(elective, {
+        scores,
+        interestClusters,
+        riasecScores,
+      });
+
+      return {
+        ...elective,
+        score: scoring.finalScore,
+        aptitudeFit: scoring.aptitudeFit,
+        riasecFit: scoring.riasecFit,
+        tieBreaker: buildResponseTieBreaker(elective, profile),
+      };
+    })
     .sort((first, second) => {
       const scoreDifference = second.score - first.score;
 
@@ -522,27 +535,97 @@ function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores
     });
 }
 
-function calculateTrackScores(scores, interestClusters = {}) {
+function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) {
+  const THRESHOLD = 70;
+
+  // Get all aptitude scores
+  const verbal = scores.verbal_ability_score ?? 0;
+  const math = scores.mathematical_ability_score ?? 0;
+  const spatial = scores.spatial_ability_score ?? 0;
+  const logical = scores.logical_reasoning_score ?? 0;
+
+  // Get all RIASEC scores
+  const realistic = riasecScores.Realistic ?? 0;
+  const investigative = riasecScores.Investigative ?? 0;
+  const artistic = riasecScores.Artistic ?? 0;
+  const social = riasecScores.Social ?? 0;
+  const enterprising = riasecScores.Enterprising ?? 0;
+  const conventional = riasecScores.Conventional ?? 0;
+
+  // PRIORITY: If ALL aptitudes are high (>= 70), recommend Academic Track
+  if (verbal >= THRESHOLD && math >= THRESHOLD && spatial >= THRESHOLD && logical >= THRESHOLD) {
+    return {
+      academicScore: 100,
+      techProScore: 0,
+    };
+  }
+
+  // CHECK ACADEMIC TRACK CONDITIONS
+  // Verbal >= 70 AND Spatial (Science) >= 70 AND Logical >= 70
+  const academicAptitudesOk = (verbal >= THRESHOLD) && (spatial >= THRESHOLD) && (logical >= THRESHOLD);
+
+  // AND (Investigative OR Artistic OR Social OR Enterprising) >= 70
+  const academicInterestsOk = (investigative >= THRESHOLD) || (artistic >= THRESHOLD) || (social >= THRESHOLD) || (enterprising >= THRESHOLD);
+
+  if (academicAptitudesOk && academicInterestsOk) {
+    return {
+      academicScore: 100,
+      techProScore: 0,
+    };
+  }
+
+  // CHECK TECHNICAL-PROFESSIONAL TRACK CONDITIONS
+  // Mathematical >= 70 AND Spatial >= 70 AND Logical >= 70
+  const techAptitudesOk = (math >= THRESHOLD) && (spatial >= THRESHOLD) && (logical >= THRESHOLD);
+
+  // AND (Realistic OR Investigative OR Conventional) >= 70
+  const techInterestsOk = (realistic >= THRESHOLD) || (investigative >= THRESHOLD) || (conventional >= THRESHOLD);
+
+  if (techAptitudesOk && techInterestsOk) {
+    return {
+      academicScore: 0,
+      techProScore: 100,
+    };
+  }
+
+  // FALLBACK: Use weighted scoring if no clear match
   return {
     academicScore:
-      scores.verbal_ability_score * 0.35 +
-      scores.spatial_ability_score * 0.35 +
-      scores.logical_reasoning_score * 0.1 +
-      scores.mathematical_ability_score * 0.05 +
-      (interestClusters.academic || 0) * 0.15,
+      verbal * 0.25 +
+      math * 0.25 +
+      spatial * 0.25 +
+      logical * 0.15 +
+      (interestClusters.academic || 0) * 0.1,
     techProScore:
-      scores.mathematical_ability_score * 0.3 +
-      scores.logical_reasoning_score * 0.25 +
-      (interestClusters.creative || 0) * 0.2 +
-      (interestClusters.tech || 0) * 0.15 +
-      (interestClusters.practical || 0) * 0.1,
+      (interestClusters.tech || 0) * 0.3 +
+      (interestClusters.practical || 0) * 0.2 +
+      (interestClusters.home || 0) * 0.15 +
+      (interestClusters.physical || 0) * 0.1 +
+      (interestClusters.outdoor || 0) * 0.1 +
+      logical * 0.1 +
+      math * 0.05,
   };
 }
 
-export function determineTrack(scores, interestClusters = {}) {
+function buildElectiveRecommendationDetails(selectedElectives = []) {
+  return selectedElectives.map((elective) => ({
+    name: elective.name,
+    track: elective.track,
+    category: elective.category || elective.group,
+    compatibilityScore: elective.score,
+    aptitudeScore: elective.aptitudeFit,
+    riasecScore: elective.riasecFit,
+    reason: buildElectiveRecommendationReason(elective, {
+      aptitudeFit: elective.aptitudeFit,
+      riasecFit: elective.riasecFit,
+    }),
+  }));
+}
+
+export function determineTrack(scores, interestClusters = {}, riasecScores = {}) {
   if (!scores) return 'General';
 
-  const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters);
+  const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters, riasecScores);
 
   return academicScore >= techProScore ? 'Academic' : 'Technical-Professional';
 }
@@ -564,7 +647,7 @@ export function recommendElectives(trackOrScores, scoresOrInterestClusters = {},
     scores = trackOrScores;
     interestClusters = scoresOrInterestClusters || {};
     riasecScores = maybeInterestClusters || {};
-    track = determineTrack(scores, interestClusters);
+    track = determineTrack(scores, interestClusters, riasecScores);
   }
 
   if (!scores || typeof track !== 'string') {
@@ -579,6 +662,17 @@ export function recommendElectives(trackOrScores, scoresOrInterestClusters = {},
 
   const rankedGroups = rankElectiveGroups(track, scores, interestClusters);
   return rankedGroups.flatMap((group) => group.electives).slice(0, 2);
+}
+
+export function recommendElectiveDetails(track, scores, interestClusters = {}, riasecScores = {}) {
+  if (!scores || typeof track !== 'string') {
+    return [];
+  }
+
+  const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters, riasecScores);
+  const selectedElectives = selectElectivesWithPrerequisites(rankedCatalogElectives, 2);
+
+  return buildElectiveRecommendationDetails(selectedElectives);
 }
 
 /**
@@ -738,8 +832,15 @@ export async function formatAssessmentResult(answers, questionsByCategory = null
 
     const interestClusters = calculateInterestClusterScores(answers, groupedQuestions);
     const riasecScores = calculateRiasecInterestScores(answers, groupedQuestions);
-    const track = determineTrack(scores, interestClusters);
-    const electives = recommendElectives(track, scores, interestClusters, riasecScores);
+    const electiveWeightErrors = validateElectiveWeightProfiles(electivesCatalog.map((elective) => elective.name));
+
+    if (electiveWeightErrors.length > 0) {
+      console.error('Elective weight validation errors:', electiveWeightErrors);
+    }
+
+    const track = determineTrack(scores, interestClusters, riasecScores);
+    const electiveRecommendations = recommendElectiveDetails(track, scores, interestClusters, riasecScores);
+    const electives = electiveRecommendations.map((elective) => elective.name);
     const topDomains = getTopDomains(scores);
     const topInterests = getTopInterests(answers, groupedQuestions);
 
@@ -754,6 +855,7 @@ export async function formatAssessmentResult(answers, questionsByCategory = null
       top_interests: topInterests,
       track,
       electives,
+      electiveRecommendations,
       topDomains,
       topInterests,
       overallScore: scores.overall_score,

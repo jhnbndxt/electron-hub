@@ -29,6 +29,15 @@ interface Section {
 interface AssessmentResult {
   track: string;
   electives: string[];
+  electiveRecommendations?: Array<{
+    name: string;
+    track: string;
+    category?: string;
+    compatibilityScore: number;
+    aptitudeScore: number;
+    riasecScore: number;
+    reason: string;
+  }>;
   scores: {
     VA: number;
     MA: number;
@@ -130,6 +139,9 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
     },
     topDomains: normalizeResultArray(result.topDomains ?? result.top_domains),
     topInterests: normalizeResultArray(result.topInterests ?? result.top_interests),
+    electiveRecommendations: Array.isArray(result.electiveRecommendations)
+      ? result.electiveRecommendations
+      : [],
     overallScore: normalizeResultScore(result.overallScore ?? result.overall_score ?? rawScores.overall_score),
     aiRecommendation: result.aiRecommendation || {},
   };
@@ -331,10 +343,31 @@ function PublicAssessmentResultsView({
                 </div>
               </div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                {electives.map((elective, index) => (
+                {electives.map((elective, index) => {
+                  const scoring = normalizedResult.electiveRecommendations?.find(
+                    (recommendation) => recommendation.name === elective
+                  );
+
+                  return (
                   <div key={`${elective}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50 p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Elective {index + 1}</p>
                     <p className="mt-2 text-xl font-bold text-slate-950">{normalizeResultText(elective, "Elective")}</p>
+                    {scoring ? (
+                      <div className="mt-4 grid gap-2 rounded-xl bg-white p-4 text-sm text-slate-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">Compatibility Score</span>
+                          <span className="font-bold text-blue-700">{scoring.compatibilityScore.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Aptitude Score</span>
+                          <span>{scoring.aptitudeScore.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>RIASEC Score</span>
+                          <span>{scoring.riasecScore.toFixed(2)}%</span>
+                        </div>
+                      </div>
+                    ) : null}
                     <p className="mt-2 text-sm leading-6 text-slate-700">
                       {getElectiveExplanation(elective, index)}
                     </p>
@@ -344,7 +377,8 @@ function PublicAssessmentResultsView({
                       </p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -1322,6 +1356,7 @@ export function PublicAssessment() {
       },
       topDomains: formattedResult.topDomains,
       topInterests: formattedResult.topInterests,
+      electiveRecommendations: formattedResult.electiveRecommendations,
       overallScore: formattedResult.scores.overall_score,
       aiRecommendation,
     };

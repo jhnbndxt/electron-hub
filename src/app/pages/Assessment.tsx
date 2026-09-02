@@ -507,6 +507,7 @@ export function Assessment() {
         },
         topDomains: assessmentResult.topDomains,
         topInterests: assessmentResult.topInterests,
+        electiveRecommendations: assessmentResult.electiveRecommendations,
         overallScore: assessmentResult.scores.overall_score,
         aiRecommendation,
       })

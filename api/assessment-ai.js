@@ -322,7 +322,7 @@ Your tasks:
    - interest scores
    - strengths
    - compatibility
-5. Ensure recommendations align with the student's determined track.
+5. Explain the system-selected electives, even when an elective belongs to a different curriculum grouping than the recommended track.
 
 Track:
 ${data.track}
@@ -349,7 +349,7 @@ ${data.riasecScores ? JSON.stringify(data.riasecScores) : "Not available"}
 
 RECOMMENDATION FORMULA:
 Each elective is scored independently using the student's actual assessment results.
-Final elective score = aptitude fit * 0.55 + RIASEC interest fit * 0.45 when both signals are available.
+Final elective score = aptitude fit * 0.50 + RIASEC interest fit * 0.50 when both signals are available.
 Aptitude fit uses the elective's own verbal, math, science, and logical weights.
 RIASEC interest fit uses the student's Realistic, Investigative, Artistic, Social, Enterprising, and Conventional scores mapped to the elective's learning/work profile.
 Use compatibilityScore from TOP MATCHING ELECTIVES as the computed final elective score.
@@ -371,8 +371,8 @@ Electives must strongly align with the student's dominant interests and aptitude
 Do not recommend broad or unrelated electives.
 Prioritize electives with the highest compatibility scores, but treat all valid electives as eligible and do not favor any elective because of list order, popularity, or familiarity.
 Use ONLY electives from TOP MATCHING ELECTIVES.
-Ensure the chosen electives match the student's determined track.
-If local scoring electives are provided and they are valid for the determined track and prerequisite sequence, explain those recommendations instead of replacing them.
+Electives may come from any available curriculum grouping when their compatibility scores are highest.
+If local scoring electives are provided and they are valid for the prerequisite sequence, explain those recommendations instead of replacing them.
 Never say the student has already saved, finalized, chosen, or enrolled in an elective. Use recommendation-based wording such as "This elective is recommended..." or "This option fits your results...".
 Prerequisite rule: any Level 2 elective, including names ending in " 2" or using a pattern like "Subject 2: Topic", must only appear as elective2 when the matching Level 1 elective is elective1. Examples: Chemistry 2 requires Chemistry 1 first; Biology 2 requires Biology 1 first; Human Movement 2: Motor Skills Development requires Human Movement 1: Basic Anatomy in Sports and Exercise first. Do not return Programming + Chemistry 2 or any unrelated Level 1 + Level 2 pair.
 
@@ -418,6 +418,7 @@ Requirements:
 - Match electives based on strongest aptitude and interest scores.
 - Prioritize electives with highest compatibility scores.
 - Do not bias recommendations toward specific elective names, groups, or earlier list positions.
+- Electives may come from any available curriculum grouping; do not reject an elective only because its catalog track differs from the recommended track.
 - Follow prerequisite order: elective1 must be the Level 1 prerequisite if elective2 is the matching Level 2 subject.
 - Do not recommend any Level 2 elective unless its matching Level 1 elective is also recommended first.
 - Avoid unrelated or weak recommendations.
