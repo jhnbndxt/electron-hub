@@ -383,8 +383,9 @@ export function calculateRiasecInterestScores(answers, questionsByCategory) {
   const grouped = normalizeGroupedQuestions(questionsByCategory);
   const interestQuestions = grouped.Interests;
   const typeTotals = buildEmptyRiasecScores();
-  const typeMaxTotals = buildEmptyRiasecScores();
+  const typeQuestionCounts = buildEmptyRiasecScores();
 
+  // Sum up ratings for each RIASEC type
   interestQuestions.forEach((question, index) => {
     const interestType = question?.interest_type || question?.interestType || LEGACY_INTEREST_TYPE_BY_SLOT[index + 1];
 
@@ -396,12 +397,13 @@ export function calculateRiasecInterestScores(answers, questionsByCategory) {
     const rating = Number.isFinite(response) && response >= 1 && response <= 5 ? response : 0;
 
     typeTotals[interestType] += rating;
-    typeMaxTotals[interestType] += 5;
+    typeQuestionCounts[interestType] += 1;
   });
 
+  // Calculate average for each RIASEC type (returns 1-5 scale)
   RIASEC_TYPES.forEach((type) => {
-    typeTotals[type] = typeMaxTotals[type] > 0
-      ? Math.round((typeTotals[type] / typeMaxTotals[type]) * 100)
+    typeTotals[type] = typeQuestionCounts[type] > 0
+      ? Number((typeTotals[type] / typeQuestionCounts[type]).toFixed(2))
       : 0;
   });
 
@@ -536,15 +538,16 @@ function rankCatalogElectives(track, scores, interestClusters = {}, riasecScores
 }
 
 function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) {
-  const THRESHOLD = 70;
+  const APTITUDE_THRESHOLD = 70;
+  const INTEREST_THRESHOLD = 3.5;
 
   // Get all aptitude scores
   const verbal = scores.verbal_ability_score ?? 0;
   const math = scores.mathematical_ability_score ?? 0;
-  const spatial = scores.spatial_ability_score ?? 0;
+  const spatial = scores.spatial_ability_score ?? 0; // Science
   const logical = scores.logical_reasoning_score ?? 0;
 
-  // Get all RIASEC scores
+  // Get all RIASEC scores (1-5 scale)
   const realistic = riasecScores.Realistic ?? 0;
   const investigative = riasecScores.Investigative ?? 0;
   const artistic = riasecScores.Artistic ?? 0;
@@ -552,58 +555,46 @@ function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) 
   const enterprising = riasecScores.Enterprising ?? 0;
   const conventional = riasecScores.Conventional ?? 0;
 
-  // PRIORITY: If ALL aptitudes are high (>= 70), recommend Academic Track
-  if (verbal >= THRESHOLD && math >= THRESHOLD && spatial >= THRESHOLD && logical >= THRESHOLD) {
+  // CONDITION 1: If ALL four aptitudes are >= 70%, recommend Academic Track
+  if (verbal >= APTITUDE_THRESHOLD && math >= APTITUDE_THRESHOLD && spatial >= APTITUDE_THRESHOLD && logical >= APTITUDE_THRESHOLD) {
     return {
       academicScore: 100,
       techProScore: 0,
+      recommendedTrack: 'Academic',
     };
   }
 
-  // CHECK ACADEMIC TRACK CONDITIONS
-  // Verbal >= 70 AND Spatial (Science) >= 70 AND Logical >= 70
-  const academicAptitudesOk = (verbal >= THRESHOLD) && (spatial >= THRESHOLD) && (logical >= THRESHOLD);
-
-  // AND (Investigative OR Artistic OR Social OR Enterprising) >= 70
-  const academicInterestsOk = (investigative >= THRESHOLD) || (artistic >= THRESHOLD) || (social >= THRESHOLD) || (enterprising >= THRESHOLD);
+  // CONDITION 2: Verbal >= 70% AND Science >= 70% AND Logical >= 70%
+  // AND (I >= 3.5 OR A >= 3.5 OR E >= 3.5)
+  const academicAptitudesOk = (verbal >= APTITUDE_THRESHOLD) && (spatial >= APTITUDE_THRESHOLD) && (logical >= APTITUDE_THRESHOLD);
+  const academicInterestsOk = (investigative >= INTEREST_THRESHOLD) || (artistic >= INTEREST_THRESHOLD) || (enterprising >= INTEREST_THRESHOLD);
 
   if (academicAptitudesOk && academicInterestsOk) {
     return {
       academicScore: 100,
       techProScore: 0,
+      recommendedTrack: 'Academic',
     };
   }
 
-  // CHECK TECHNICAL-PROFESSIONAL TRACK CONDITIONS
-  // Mathematical >= 70 AND Spatial >= 70 AND Logical >= 70
-  const techAptitudesOk = (math >= THRESHOLD) && (spatial >= THRESHOLD) && (logical >= THRESHOLD);
-
-  // AND (Realistic OR Investigative OR Conventional) >= 70
-  const techInterestsOk = (realistic >= THRESHOLD) || (investigative >= THRESHOLD) || (conventional >= THRESHOLD);
+  // CONDITION 3: Mathematical >= 70% AND Logical >= 70%
+  // AND (R >= 3.5 OR S >= 3.5 OR C >= 3.5)
+  const techAptitudesOk = (math >= APTITUDE_THRESHOLD) && (logical >= APTITUDE_THRESHOLD);
+  const techInterestsOk = (realistic >= INTEREST_THRESHOLD) || (social >= INTEREST_THRESHOLD) || (conventional >= INTEREST_THRESHOLD);
 
   if (techAptitudesOk && techInterestsOk) {
     return {
       academicScore: 0,
       techProScore: 100,
+      recommendedTrack: 'Technical-Professional',
     };
   }
 
-  // FALLBACK: Use weighted scoring if no clear match
+  // FALLBACK: No clear match - Further Assessment
   return {
-    academicScore:
-      verbal * 0.25 +
-      math * 0.25 +
-      spatial * 0.25 +
-      logical * 0.15 +
-      (interestClusters.academic || 0) * 0.1,
-    techProScore:
-      (interestClusters.tech || 0) * 0.3 +
-      (interestClusters.practical || 0) * 0.2 +
-      (interestClusters.home || 0) * 0.15 +
-      (interestClusters.physical || 0) * 0.1 +
-      (interestClusters.outdoor || 0) * 0.1 +
-      logical * 0.1 +
-      math * 0.05,
+    academicScore: 50,
+    techProScore: 50,
+    recommendedTrack: 'Further Assessment',
   };
 }
 
@@ -625,9 +616,9 @@ function buildElectiveRecommendationDetails(selectedElectives = []) {
 export function determineTrack(scores, interestClusters = {}, riasecScores = {}) {
   if (!scores) return 'General';
 
-  const { academicScore, techProScore } = calculateTrackScores(scores, interestClusters, riasecScores);
+  const { recommendedTrack } = calculateTrackScores(scores, interestClusters, riasecScores);
 
-  return academicScore >= techProScore ? 'Academic' : 'Technical-Professional';
+  return recommendedTrack;
 }
 
 /**
