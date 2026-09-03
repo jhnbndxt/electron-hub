@@ -8,6 +8,7 @@ import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
+import electivesCatalog from "../../data/electives.js";
 
 interface Question {
   id: number;
@@ -287,8 +288,15 @@ function PublicAssessmentResultsView({
           careers: getSuggestedCoursesForPublicResult(track, elective),
         }));
   const electiveExplanations = [
-    normalizeResultText(aiRecommendation.elective1Explanation),
-    normalizeResultText(aiRecommendation.elective2Explanation),
+    ...electives.slice(0, 2).map((elective) => {
+      const catalogElective = electivesCatalog.find(
+        (candidate) => candidate.name.toLowerCase() === elective.toLowerCase()
+      );
+
+      return catalogElective
+        ? `${catalogElective.name} is recommended based on your assessment compatibility. It develops ${catalogElective.strengths.join(", ")} and can support related college programs such as ${catalogElective.relatedCourses.join(", ")}, leading to careers including ${catalogElective.careerPathways.join(", ")}.`
+        : "";
+    }),
   ];
   const getElectiveExplanation = (elective: string, index: number) =>
     electiveExplanations[index] ||

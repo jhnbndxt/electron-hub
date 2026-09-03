@@ -488,21 +488,13 @@ export function Results() {
     elective,
     scoring: results.electiveRecommendations?.find((recommendation) => recommendation.name === elective),
     explanation: (() => {
-      const aiExplanation = index === 0
-        ? aiRecommendation?.elective1Explanation
-        : aiRecommendation?.elective2Explanation;
       const catalogElective = findCatalogElective(elective);
-      const normalizedExplanation = String(aiExplanation || "").toLowerCase();
-
-      if (aiExplanation && normalizedExplanation.includes(elective.toLowerCase())) {
-        return aiExplanation;
-      }
 
       if (catalogElective) {
         return `${catalogElective.name} is recommended based on your assessment compatibility. It develops ${catalogElective.strengths.join(", ")} and can support related college programs such as ${catalogElective.relatedCourses.join(", ")}, leading to careers including ${catalogElective.careerPathways.join(", ")}.`;
       }
 
-      return aiExplanation;
+      return "";
     })(),
   }));
 
