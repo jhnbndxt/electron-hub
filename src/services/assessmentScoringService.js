@@ -590,11 +590,18 @@ function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) 
     };
   }
 
-  // FALLBACK: No clear match - Further Assessment
+  // FALLBACK: Always recommend one of the supported tracks.
+  const academicFit = (verbal + math + spatial + logical) / 4;
+  const technicalFit = (math + logical) / 2;
+  const academicInterestFit = investigative + artistic + enterprising;
+  const technicalInterestFit = realistic + social + conventional;
+  const academicScore = academicFit + academicInterestFit * 5;
+  const technicalScore = technicalFit + technicalInterestFit * 5;
+
   return {
-    academicScore: 50,
-    techProScore: 50,
-    recommendedTrack: 'Further Assessment',
+    academicScore,
+    techProScore: technicalScore,
+    recommendedTrack: academicScore >= technicalScore ? 'Academic' : 'Technical-Professional',
   };
 }
 

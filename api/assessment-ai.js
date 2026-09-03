@@ -220,8 +220,6 @@ function buildFallbackRecommendation(data, rankedElectives) {
     trackExplanation = `The Academic Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), which is essential for college-preparatory learning. This track emphasizes theoretical knowledge, research skills, and academic specialization—preparing you for university-level study and careers requiring advanced education.`;
   } else if (data.track === "Technical-Professional") {
     trackExplanation = `The Technical-Professional Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), combined with practical and technical interests. This track emphasizes hands-on skills, career readiness, and industry-relevant training—preparing you for immediate career entry or further technical education.`;
-  } else if (data.track === "Further Assessment") {
-    trackExplanation = `Your assessment results suggest a need for further career guidance. Your strengths and interests span multiple directions, which means you have flexibility in choosing a track. We recommend discussing your options with a school counselor to explore which pathway aligns best with your goals.`;
   } else {
     trackExplanation = `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`;
   }
