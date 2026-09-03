@@ -263,9 +263,14 @@ function PublicAssessmentResultsView({
   const scores = normalizedResult.scores;
   const overallScore = Math.round(normalizeResultScore(normalizedResult.overallScore));
   const aiRecommendation = normalizedResult.aiRecommendation || {};
-  const aiExplanation =
-    normalizeResultText(aiRecommendation.overallAnalysis) ||
-    `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`;
+  const selectedElectiveDetails = electives
+    .map((elective) => electivesCatalog.find(
+      (candidate) => candidate.name.toLowerCase() === elective.toLowerCase()
+    ))
+    .filter(Boolean);
+  const aiExplanation = selectedElectiveDetails.length > 0
+    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives match your strengths in ${topDomains.join(" and ")} and interests connected to ${topInterests.join(" and ")}. Together, they develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")} and connect to related study and career pathways.`
+    : `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`;
   const trackExplanation =
     normalizeResultText(aiRecommendation.trackExplanation) ||
     (track === "Academic"

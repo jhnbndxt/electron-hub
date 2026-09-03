@@ -249,8 +249,12 @@ export function Results() {
   const trackNarrative = aiRecommendation?.trackExplanation ||
     `The ${track} Track is recommended because your aptitude and interests align strongly with its learning profile.`;
 
-  const analysisSummary = aiRecommendation?.overallAnalysis ||
-    `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}. This recommendation is designed to align your strengths with future study and career opportunities.`;
+  const selectedElectiveDetails = electives
+    .map((elective) => findCatalogElective(elective))
+    .filter(Boolean);
+  const analysisSummary = selectedElectiveDetails.length > 0
+    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives match your strengths in ${topDomainSummary} and interests in ${topInterestSummary}. Together, they develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")} and connect to related study and career pathways.`
+    : `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}.`;
 
   const trackColor = "var(--electron-blue)";
   const secondaryColor = "var(--electron-red)";
