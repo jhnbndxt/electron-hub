@@ -1,5 +1,6 @@
 import electives from "../src/data/electives.js";
 import {
+  isAdvancedElective,
   selectElectivesWithPrerequisites,
   validateElectiveSequence,
 } from "../src/utils/electivePrerequisites.js";
@@ -262,7 +263,7 @@ function removeFinalizedWording(text = "") {
     .trim();
 }
 
-function normalizeRecommendationResult(result, fallbackRecommendation, rankedElectives) {
+function normalizeRecommendationResult(result, fallbackRecommendation, rankedElectives, data) {
   if (!result || result.raw) {
     return result;
   }
@@ -273,18 +274,41 @@ function normalizeRecommendationResult(result, fallbackRecommendation, rankedEle
   const sequenceValidation = validateElectiveSequence(elective1, elective2, availableElectives);
   const firstElective = findElectiveByName(elective1, rankedElectives);
   const secondElective = findElectiveByName(elective2, rankedElectives);
-  const useFallbackElectives = !sequenceValidation.valid || !firstElective || !secondElective;
+  const useFallbackElectives =
+    !sequenceValidation.valid ||
+    !firstElective ||
+    !secondElective ||
+    isAdvancedElective(elective1) ||
+    isAdvancedElective(elective2);
+  const resolvedFirstElective = useFallbackElectives
+    ? findElectiveByName(fallbackRecommendation.elective1, rankedElectives)
+    : firstElective;
+  const resolvedSecondElective = useFallbackElectives
+    ? findElectiveByName(fallbackRecommendation.elective2, rankedElectives)
+    : secondElective;
+  const resolvedElectives = [resolvedFirstElective, resolvedSecondElective].filter(Boolean);
+  const careerPathways = resolvedElectives
+    .map((elective) => ({
+      category: elective.group || elective.category || elective.name,
+      careers: (elective.careerPathways || []).slice(0, 4),
+    }))
+    .filter((pathway) => pathway.careers.length > 0);
 
   return {
     ...result,
-    elective1: useFallbackElectives ? fallbackRecommendation.elective1 : elective1,
-    elective2: useFallbackElectives ? fallbackRecommendation.elective2 : elective2,
-    elective1Explanation: removeFinalizedWording(
-      useFallbackElectives ? fallbackRecommendation.elective1Explanation : result.elective1Explanation
+    elective1: resolvedFirstElective?.name || fallbackRecommendation.elective1,
+    elective2: resolvedSecondElective?.name || fallbackRecommendation.elective2,
+    elective1Explanation: buildElectiveExplanation(
+      resolvedFirstElective,
+      data,
+      "Elective 1"
     ),
-    elective2Explanation: removeFinalizedWording(
-      useFallbackElectives ? fallbackRecommendation.elective2Explanation : result.elective2Explanation
+    elective2Explanation: buildElectiveExplanation(
+      resolvedSecondElective,
+      data,
+      "Elective 2"
     ),
+    careerPathways,
     trackExplanation: removeFinalizedWording(result.trackExplanation || fallbackRecommendation.trackExplanation),
     overallAnalysis: removeFinalizedWording(result.overallAnalysis || fallbackRecommendation.overallAnalysis),
   };
@@ -549,7 +573,8 @@ Do not copy these elective names unless they are valid TOP MATCHING ELECTIVES fo
     const parsedResult = normalizeRecommendationResult(
       parseAiJson(reply),
       fallbackRecommendation,
-      rankedElectives
+      rankedElectives,
+      data
     );
 
     return sendJson(response, 200, {
