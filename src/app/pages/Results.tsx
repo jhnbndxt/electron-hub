@@ -19,6 +19,7 @@ import { getLatestAssessmentResult } from "../../services/assessmentResultServic
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
+import electivesCatalog from "../../data/electives.js";
 
 interface AssessmentResults {
   track: string;
@@ -81,6 +82,11 @@ const buildAssessmentAiPayload = (result: AssessmentResults) => {
     technicalInterest: toInterestScore(topInterests, ["technology", "practical"], techFallback),
     socialInterest: toInterestScore(topInterests, ["helping"], 35),
     electives,
+  };
+
+  const findCatalogElective = (name: string) => {
+    const normalizedName = String(name || "").trim().toLowerCase();
+    return electivesCatalog.find((elective) => elective.name.toLowerCase() === normalizedName);
   };
 };
 
@@ -352,6 +358,14 @@ export function Results() {
 
   // Helper function to get career pathways based on track and elective
   const getCareerPathways = (track: string, elective: string): Array<{ course: string; careers: string[] }> => {
+    const catalogElective = findCatalogElective(elective);
+    if (catalogElective) {
+      return (catalogElective.careerPathways || []).map((career) => ({
+        course: catalogElective.name,
+        careers: [career],
+      }));
+    }
+
     const normalizedElective = elective.toLowerCase();
 
     if (track === "Academic") {
@@ -459,35 +473,44 @@ export function Results() {
   // Get all suggested courses from AI output and elective mappings.
   const allSuggestedCourses = [
     ...aiSuggestedCourses,
-    ...electives.flatMap(elective => getSuggestedCourses(track, elective)),
+    ...electives.flatMap(elective => {
+      const catalogElective = findCatalogElective(elective);
+      return catalogElective?.relatedCourses || getSuggestedCourses(track, elective);
+    }),
   ];
 
   // Remove duplicates
   const uniqueCourses = Array.from(new Set(allSuggestedCourses));
 
   // Get career pathways from all electives
-  const allCareerPathways = electives.flatMap(elective =>
-    getCareerPathways(track, elective)
-  );
-  const aiCareerPathways = Array.isArray(aiRecommendation?.careerPathways)
-    ? aiRecommendation.careerPathways.filter(
-        (pathway) => pathway?.category && Array.isArray(pathway.careers) && pathway.careers.length > 0
-      )
-    : [];
+  const allCareerPathways = electives.flatMap(elective => getCareerPathways(track, elective));
   const electiveExplanations = electives.map((elective, index) => ({
     elective,
     scoring: results.electiveRecommendations?.find((recommendation) => recommendation.name === elective),
-    explanation:
-      index === 0
+    explanation: (() => {
+      const aiExplanation = index === 0
         ? aiRecommendation?.elective1Explanation
-        : aiRecommendation?.elective2Explanation,
+        : aiRecommendation?.elective2Explanation;
+      const catalogElective = findCatalogElective(elective);
+      const normalizedExplanation = String(aiExplanation || "").toLowerCase();
+
+      if (aiExplanation && normalizedExplanation.includes(elective.toLowerCase())) {
+        return aiExplanation;
+      }
+
+      if (catalogElective) {
+        return `${catalogElective.name} is recommended based on your assessment compatibility. It develops ${catalogElective.strengths.join(", ")} and can support related college programs such as ${catalogElective.relatedCourses.join(", ")}, leading to careers including ${catalogElective.careerPathways.join(", ")}.`;
+      }
+
+      return aiExplanation;
+    })(),
   }));
 
   const recommendedBranches = getRecommendedElectronBranches({
     track,
     electives,
     suggestedCourses: uniqueCourses,
-    careerPathways: aiCareerPathways.length > 0 ? aiCareerPathways : allCareerPathways,
+    careerPathways: allCareerPathways,
     topDomains,
     topInterests,
   });
@@ -1322,7 +1345,7 @@ export function Results() {
         )}
 
         {/* NEW SECTION: Career Pathways */}
-        {(aiCareerPathways.length > 0 || allCareerPathways.length > 0) && (
+        {allCareerPathways.length > 0 && (
           <div className="mb-8 rounded-xl bg-white p-5 shadow-lg sm:p-8">
             <div className="flex items-center gap-2 mb-2">
               <Briefcase className="w-6 h-6" style={{ color: "var(--electron-blue)" }} />
@@ -1331,41 +1354,13 @@ export function Results() {
               </h3>
             </div>
             <p className="text-gray-600 mb-3">
-              {aiCareerPathways.length > 0
-                ? "The AI recommendation identifies career categories that match your strengths, track, and elective choices."
-                : "Explore potential career paths based on your recommended track and electives:"}
+              Explore potential career paths based on your recommended electives:
             </p>
             <p className="text-gray-600 mb-6">
-              {aiCareerPathways.length > 0
-                ? "These career paths are tailored to your aptitude, interests, and recommended track."
-                : "These careers reflect your elective choices and cognitive strengths, making them well-suited pathways to build a meaningful and sustainable future."}
+              These careers come directly from the selected electives and their related catalog pathways.
             </p>
             <div className="grid grid-cols-1 gap-6">
-              {aiCareerPathways.length > 0 ? (
-                aiCareerPathways.map((pathway, categoryIndex) => (
-                  <div
-                    key={categoryIndex}
-                    className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
-                    style={{ borderColor: "var(--electron-blue)" }}
-                  >
-                    <div className="mb-4">
-                      <p className="text-sm uppercase tracking-[0.24em] text-slate-400">{pathway.category}</p>
-                      <h4 className="mt-2 text-xl font-bold text-slate-900">Career opportunities</h4>
-                    </div>
-                    <div className="flex flex-wrap gap-3">
-                      {pathway.careers.map((career, careerIndex) => (
-                        <span
-                          key={careerIndex}
-                          className="rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700"
-                        >
-                          {career}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))
-              ) : (
-                allCareerPathways.map((pathway, index) => (
+              {allCareerPathways.map((pathway, index) => (
                   <div
                     key={index}
                     className="portal-glass-panel rounded-xl border-2 p-6 transition-all hover:shadow-lg"
@@ -1398,8 +1393,7 @@ export function Results() {
                       ))}
                     </div>
                   </div>
-                ))
-              )}
+              ))}
             </div>
           </div>
         )}
