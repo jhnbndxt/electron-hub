@@ -23,6 +23,8 @@ import { supabase } from "../../../supabase";
 import {
   getSystemSettings,
   saveSystemSettings,
+  updateSystemSetting,
+  parseBooleanStrict,
 } from "../../../services/systemSettingsService";
 
 function getCurrentSchoolYear(date = new Date()) {
@@ -33,8 +35,8 @@ function getCurrentSchoolYear(date = new Date()) {
 }
 
 function normalizeAcademicYear(rawValue) {
-  const normalizedValue = String(rawValue || "").trim();
-  return /^\d{4}-\d{4}$/.test(normalizedValue) ? normalizedValue : getCurrentSchoolYear();
+  const normalized = String(rawValue || "").trim();
+  return /^\d{4}-\d{4}$/.test(normalized) ? normalized : getCurrentSchoolYear();
 }
 
 function formatDateLabel(dateValue) {
@@ -64,6 +66,7 @@ const CONFIGURATION_FIELD_LABELS = {
   default_section_capacity: "Default Section Capacity",
   enrollment_open: "Enrollment Status",
   maintenance_mode: "Maintenance Mode",
+  assessment_answers_visible: "Student Assessment Answers",
 };
 
 function formatConfigurationValue(fieldKey, value) {
@@ -72,11 +75,15 @@ function formatConfigurationValue(fieldKey, value) {
   }
 
   if (fieldKey === "enrollment_open") {
-    return value ? "Open" : "Closed";
+    return parseBooleanStrict(value, true) ? "Open" : "Closed";
   }
 
   if (fieldKey === "maintenance_mode") {
-    return value ? "Enabled" : "Disabled";
+    return parseBooleanStrict(value, false) ? "Enabled" : "Disabled";
+  }
+
+  if (fieldKey === "assessment_answers_visible") {
+    return parseBooleanStrict(value, true) ? "Visible" : "Hidden";
   }
 
   if (fieldKey === "enrollment_start_date" || fieldKey === "enrollment_end_date") {
@@ -193,6 +200,7 @@ export function SystemConfiguration() {
   const [showConfirmSaveModal, setShowConfirmSaveModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [lastSavedBy, setLastSavedBy] = useState(null);
+  const [updatingToggles, setUpdatingToggles] = useState({});
 
   const loadRuntimeSummary = async (academicYear) => {
     const currentSchoolYear = normalizeAcademicYear(academicYear);
@@ -270,6 +278,42 @@ export function SystemConfiguration() {
 
   useEffect(() => {
     void loadConfiguration();
+
+    const channel = supabase
+      .channel("admin-system-configuration-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "system_settings" },
+        (payload: any) => {
+          if (payload?.new?.setting_key && payload.new.setting_value !== undefined) {
+            const key = payload.new.setting_key;
+            if (CONFIGURATION_FIELD_LABELS[key]) {
+              setSettings((prev: any) => {
+                if (!prev) return prev;
+                const val = typeof prev[key] === "boolean"
+                  ? parseBooleanStrict(payload.new.setting_value, prev[key])
+                  : payload.new.setting_value;
+                return { ...prev, [key]: val };
+              });
+              setInitialSettings((prev: any) => {
+                if (!prev) return prev;
+                const val = typeof prev[key] === "boolean"
+                  ? parseBooleanStrict(payload.new.setting_value, prev[key])
+                  : payload.new.setting_value;
+                return { ...prev, [key]: val };
+              });
+              if (payload.new.updated_at) {
+                setLastUpdatedAt(payload.new.updated_at);
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const hasChanges = useMemo(() => {
@@ -401,6 +445,11 @@ export function SystemConfiguration() {
             label: "Maintenance Mode",
             description: "Restrict normal user access while maintenance or data fixes are being performed.",
           },
+          {
+            key: "assessment_answers_visible",
+            label: "Student Assessment Answers",
+            description: "Allow students to view their assessment score breakdown, elective compatibility, and performance analysis on their Results page.",
+          },
         ],
       },
     ];
@@ -421,6 +470,72 @@ export function SystemConfiguration() {
       delete nextErrors[fieldKey];
       return nextErrors;
     });
+  };
+
+  const handleToggleChange = async (toggleKey, nextValue) => {
+    if (updatingToggles[toggleKey]) {
+      return;
+    }
+
+    const previousValue = parseBooleanStrict(settings?.[toggleKey], false);
+    const toggleLabel = CONFIGURATION_FIELD_LABELS[toggleKey] || toggleKey;
+
+    // Optimistically update React state and initialSettings so no false unsaved badge appears
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      [toggleKey]: nextValue,
+    }));
+    setInitialSettings((currentInitial) => ({
+      ...currentInitial,
+      [toggleKey]: nextValue,
+    }));
+
+    setUpdatingToggles((prev) => ({ ...prev, [toggleKey]: true }));
+
+    try {
+      const result = await updateSystemSetting(
+        toggleKey,
+        nextValue,
+        userData?.id || userData?.email || null
+      );
+
+      if (result.error) {
+        setSettings((currentSettings) => ({
+          ...currentSettings,
+          [toggleKey]: previousValue,
+        }));
+        setInitialSettings((currentInitial) => ({
+          ...currentInitial,
+          [toggleKey]: previousValue,
+        }));
+        setNotice({
+          type: "error",
+          message: `Failed to save ${toggleLabel} to database: ${result.error}`,
+        });
+      } else {
+        setLastUpdatedAt(result.lastUpdatedAt);
+        setSource(result.source);
+        setNotice({
+          type: "success",
+          message: `${toggleLabel} is now ${nextValue ? "enabled" : "disabled"}. Saved to database.`,
+        });
+      }
+    } catch (err) {
+      setSettings((currentSettings) => ({
+        ...currentSettings,
+        [toggleKey]: previousValue,
+      }));
+      setInitialSettings((currentInitial) => ({
+        ...currentInitial,
+        [toggleKey]: previousValue,
+      }));
+      setNotice({
+        type: "error",
+        message: `Error updating ${toggleLabel}: ${err?.message || "Unknown error"}`,
+      });
+    } finally {
+      setUpdatingToggles((prev) => ({ ...prev, [toggleKey]: false }));
+    }
   };
 
   const handleSaveClick = () => {
@@ -625,31 +740,42 @@ export function SystemConfiguration() {
 
                 {section.toggles && section.toggles.length > 0 && (
                   <div className="grid grid-cols-1 gap-4">
-                    {section.toggles.map((toggle) => (
-                      <div
-                        key={toggle.key}
-                        className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 p-4"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-900">{toggle.label}</p>
-                          <p className="text-sm text-gray-500 mt-1">{toggle.description}</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleFieldChange(toggle.key, !settings[toggle.key])}
-                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                            settings[toggle.key] ? "bg-blue-600" : "bg-gray-300"
-                          }`}
-                          aria-label={toggle.label}
+                    {section.toggles.map((toggle) => {
+                      const isToggleActive = parseBooleanStrict(settings[toggle.key], false);
+                      const isUpdating = Boolean(updatingToggles[toggle.key]);
+
+                      return (
+                        <div
+                          key={toggle.key}
+                          className="flex items-center justify-between gap-4 rounded-lg border border-gray-200 p-4"
                         >
-                          <span
-                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                              settings[toggle.key] ? "translate-x-6" : "translate-x-1"
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-gray-900">{toggle.label}</p>
+                              {isUpdating && (
+                                <LoaderCircle className="h-3.5 w-3.5 animate-spin text-blue-600" />
+                              )}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-1">{toggle.description}</p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={isUpdating}
+                            onClick={() => void handleToggleChange(toggle.key, !isToggleActive)}
+                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                              isToggleActive ? "bg-blue-600" : "bg-gray-300"
                             }`}
-                          />
-                        </button>
-                      </div>
-                    ))}
+                            aria-label={toggle.label}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                isToggleActive ? "translate-x-6" : "translate-x-1"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -657,6 +783,7 @@ export function SystemConfiguration() {
           );
         })}
       </div>
+
 
       <div className="mt-6 bg-white rounded-lg border border-gray-200 shadow-sm p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Configuration Summary</h2>
@@ -670,6 +797,12 @@ export function SystemConfiguration() {
           <div className="rounded-lg border border-gray-200 p-4">
             <p className="text-sm text-gray-500">Default Section Capacity</p>
             <p className="mt-1 font-medium text-gray-900">{settings.default_section_capacity} students</p>
+          </div>
+          <div className="rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-500">Assessment Answers Visibility</p>
+            <p className="mt-1 font-medium text-gray-900">
+              {parseBooleanStrict(settings.assessment_answers_visible, true) ? "Visible to Students" : "Hidden from Students"}
+            </p>
           </div>
         </div>
 
