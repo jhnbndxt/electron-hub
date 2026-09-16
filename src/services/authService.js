@@ -1,4 +1,4 @@
-import { supabase } from '../supabase';
+import { supabase, supabaseConfigError } from '../supabase';
 import bcrypt from 'bcryptjs';
 
 function normalizeEmailAddress(email) {
@@ -155,6 +155,10 @@ export async function loginUser(email, password) {
  */
 export async function registerUser(email, password, profile = {}) {
   try {
+    if (supabaseConfigError) {
+      return { error: supabaseConfigError, user: null };
+    }
+
     const normalizedEmail = normalizeEmailAddress(email);
 
     if (!normalizedEmail) {

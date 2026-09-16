@@ -114,6 +114,7 @@ function mapAssessmentResult(result) {
     recommended_track: result.recommended_track || result.track || 'General',
     elective_1: electives[0] || null,
     elective_2: electives[1] || null,
+    answers: result.answers || result.top_interests?.answers || null,
   };
 }
 

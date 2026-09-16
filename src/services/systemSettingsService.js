@@ -168,6 +168,12 @@ export const SYSTEM_SETTINGS_DEFINITIONS = [
     defaultValue: 15000,
     description: 'Default tuition/payment amount used in student payment flows.',
   },
+  {
+    key: 'assessment_answers_visible',
+    type: 'boolean',
+    defaultValue: true,
+    description: 'Allow students to view their assessment score details, elective breakdowns, and performance analysis on the Results page.',
+  },
 ];
 
 const SETTINGS_BY_KEY = SYSTEM_SETTINGS_DEFINITIONS.reduce((definitionMap, definition) => {
@@ -338,7 +344,7 @@ async function decodeSensitiveValue(value) {
   }
 }
 
-function parseBoolean(value, fallbackValue) {
+export function parseBooleanStrict(value, fallbackValue = false) {
   if (typeof value === 'boolean') {
     return value;
   }
@@ -362,6 +368,8 @@ function parseBoolean(value, fallbackValue) {
   return Boolean(fallbackValue);
 }
 
+export const parseBoolean = parseBooleanStrict;
+
 function parseNumber(value, fallbackValue) {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
@@ -375,7 +383,7 @@ async function parseStoredValue(value, type, fallbackValue) {
   const rawValue = await decodeSensitiveValue(value);
 
   if (type === 'boolean') {
-    return parseBoolean(rawValue, fallbackValue);
+    return parseBooleanStrict(rawValue, fallbackValue);
   }
 
   if (type === 'number') {
@@ -404,7 +412,7 @@ async function serializeStoredValue(value, type, key = '') {
   }
 
   if (type === 'boolean') {
-    return String(Boolean(value));
+    return String(parseBooleanStrict(value, false));
   }
 
   if (type === 'number') {
@@ -559,7 +567,7 @@ export async function getSystemSettings() {
       throw error;
     }
 
-    const remoteSettings = buildDefaultSettings();
+    const remoteSettings = {};
     const existingKeys = new Set();
 
     for (const record of data || []) {
@@ -579,6 +587,7 @@ export async function getSystemSettings() {
     await ensureRemoteDefaults(existingKeys, null);
 
     const mergedSettings = await normalizeSettings({
+      ...buildDefaultSettings(),
       ...localPayload.settings,
       ...remoteSettings,
     });
@@ -606,13 +615,107 @@ export async function getSystemSettings() {
   }
 }
 
+export async function updateSystemSetting(settingKey, nextValue, actorReference) {
+  const definition = SETTINGS_BY_KEY[settingKey];
+  if (!definition) {
+    return {
+      error: `Unknown setting key: ${settingKey}`,
+      data: null,
+      source: 'unknown',
+      lastUpdatedAt: null,
+    };
+  }
+
+  const timestamp = new Date().toISOString();
+  const parsedValue = await parseStoredValue(nextValue, definition.type, definition.defaultValue);
+  const serializedValue = await serializeStoredValue(parsedValue, definition.type, definition.key);
+
+  const localPayload = await getLocalPayload();
+  const previousSettings = localPayload?.settings || buildDefaultSettings();
+  const previousEnrollmentOpen = previousSettings.enrollment_open !== false;
+
+  const nextSettings = {
+    ...previousSettings,
+    [settingKey]: parsedValue,
+  };
+  await writeLocalPayload(nextSettings, timestamp);
+
+  try {
+    const resolvedUserId = actorReference ? await resolveUserId(actorReference) : null;
+
+    const { error } = await supabase
+      .from('system_settings')
+      .upsert(
+        {
+          setting_key: definition.key,
+          setting_value: serializedValue,
+          description: definition.description,
+          setting_type: definition.type,
+          updated_at: timestamp,
+          updated_by: resolvedUserId || null,
+        },
+        { onConflict: 'setting_key' }
+      );
+
+    if (error) {
+      throw error;
+    }
+
+    try {
+      await createAuditLog(
+        actorReference || 'system',
+        'SYSTEM_SETTING_UPDATED',
+        `Updated system setting ${definition.key}.`,
+        'success',
+        {
+          resourceType: 'system_setting',
+          setting_key: definition.key,
+          new_value: serializedValue,
+        }
+      );
+    } catch (auditError) {
+      console.error('System setting audit log error:', auditError);
+    }
+
+    if (settingKey === 'enrollment_open') {
+      const studentNotificationsEnabled = parseBooleanStrict(nextSettings.student_notifications_enabled, true);
+      const nextEnrollmentOpen = parseBooleanStrict(parsedValue, true);
+      if (studentNotificationsEnabled && previousEnrollmentOpen !== nextEnrollmentOpen) {
+        try {
+          const enrollmentTrigger = nextEnrollmentOpen ? 'ENROLLMENT_OPENED' : 'ENROLLMENT_CLOSED';
+          await broadcastNotificationToStudents(enrollmentTrigger);
+        } catch (broadcastError) {
+          console.error('Error broadcasting enrollment status notifications:', broadcastError);
+        }
+      }
+    }
+
+    return {
+      error: null,
+      data: nextSettings,
+      source: 'supabase',
+      lastUpdatedAt: timestamp,
+      warning: null,
+    };
+  } catch (error) {
+    console.error(`Failed to persist system setting ${settingKey} to Supabase:`, error);
+    return {
+      error: error?.message || 'Database update failed',
+      data: nextSettings,
+      source: 'local',
+      lastUpdatedAt: timestamp,
+      warning: error?.message || 'Unable to save setting to Supabase. Setting stored locally only.',
+    };
+  }
+}
+
 export async function saveSystemSettings(nextSettings, actorReference) {
   const timestamp = new Date().toISOString();
-  const localPayload = await writeLocalPayload(nextSettings, timestamp);
-
-  const previousSettingsResult = await getSystemSettings();
-  const previousSettings = previousSettingsResult?.data || buildDefaultSettings();
+  const previousLocalPayload = await getLocalPayload();
+  const previousSettings = previousLocalPayload?.settings || buildDefaultSettings();
   const previousEnrollmentOpen = previousSettings.enrollment_open !== false;
+
+  const localPayload = await writeLocalPayload(nextSettings, timestamp);
   const nextEnrollmentOpen = localPayload.settings.enrollment_open !== false;
   const studentNotificationsEnabled = localPayload.settings.student_notifications_enabled !== false;
 
