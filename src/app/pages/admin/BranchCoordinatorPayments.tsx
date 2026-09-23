@@ -32,6 +32,7 @@ import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
 import { expireOverdueCashPayments } from "../../../services/adminService";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
+import { exportToCSV, formatCurrencyForCSV } from "../../../utils/csvExport";
 
 interface PaymentRecord {
   id: string;
@@ -522,17 +523,17 @@ export function BranchCoordinatorPayments() {
       p.studentEmail,
       getPaymentModeLabel(p.paymentMode),
       p.referenceNumber || p.queueNumber || "N/A",
-      formatCurrency(p.amount),
+      formatCurrencyForCSV(p.amount),
       p.status.toUpperCase(),
     ]);
 
-    const csvContent = [csvHeaders, ...csvRows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `payment-management-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
+    exportToCSV({
+      filename: `payment-management-${new Date().toISOString().split("T")[0]}`,
+      title: "Payment Collection Report",
+      subtitle: "Electron Hub Payment Management",
+      headers: csvHeaders,
+      rows: csvRows,
+    });
   };
 
   if (isLoading) {

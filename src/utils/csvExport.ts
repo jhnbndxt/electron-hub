@@ -20,6 +20,9 @@ export const ELECTRON_BRANDING = {
   success: '#10B981',      // Success Green
 };
 
+const escapeCSVCell = (cell: string | number | boolean): string =>
+  `"${String(cell).replace(/"/g, '""')}"`;
+
 /**
  * Export data as a CSV file with Electron Hub branding
  */
@@ -52,11 +55,11 @@ export const exportToCSV = (options: ExportOptions): void => {
   csvContent.push(''); // Empty line for spacing
 
   // Add headers
-  csvContent.push(headers.map((h) => `"${h}"`).join(','));
+  csvContent.push(headers.map(escapeCSVCell).join(','));
 
   // Add data rows
   rows.forEach((row) => {
-    csvContent.push(row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','));
+    csvContent.push(row.map(escapeCSVCell).join(','));
   });
 
   // Add branding footer
@@ -65,7 +68,8 @@ export const exportToCSV = (options: ExportOptions): void => {
   csvContent.push(`"${generatedDate}"`);
 
   // Create blob and download
-  const csvString = csvContent.join('\n');
+  // The BOM makes UTF-8 currency symbols display correctly in Excel.
+  const csvString = `\uFEFF${csvContent.join('\r\n')}`;
   const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement('a');
   const url = URL.createObjectURL(blob);
