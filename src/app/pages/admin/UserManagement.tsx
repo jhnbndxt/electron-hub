@@ -12,6 +12,7 @@ import { createAuditLog } from "../../../services/adminService";
 interface UserAccount {
   id: string;
   name: string;
+  contactNumber: string;
   email: string;
   role: string;
   status?: string;
@@ -155,6 +156,8 @@ export function UserManagement() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [selectedRole, setSelectedRole] = useState<EditableRole>("student");
+  const [editDisplayName, setEditDisplayName] = useState("");
+  const [editContactInformation, setEditContactInformation] = useState("");
   const [branchCoordinatorPassword, setBranchCoordinatorPassword] = useState("");
   const [showEditPassword, setShowEditPassword] = useState(false);
   const [editRoleError, setEditRoleError] = useState("");
@@ -189,7 +192,7 @@ export function UserManagement() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, role, status, created_at')
+      .select('id, email, full_name, contact_number, role, status, created_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -208,6 +211,7 @@ export function UserManagement() {
     const formattedUsers = (data || []).map((user: any) => ({
       id: user.id,
       name: user.full_name || user.email,
+      contactNumber: user.contact_number || "",
       email: user.email,
       role: user.role || 'student',
       status: user.status || 'active',
@@ -280,6 +284,8 @@ export function UserManagement() {
   const handleEditClick = (user: UserAccount) => {
     setEditingUser(user);
     setSelectedRole(EDITABLE_ROLE_VALUES.includes(user.role as EditableRole) ? (user.role as EditableRole) : "student");
+    setEditDisplayName(user.name);
+    setEditContactInformation(user.contactNumber);
     setBranchCoordinatorPassword("");
     setShowEditPassword(false);
     setEditRoleError("");
@@ -288,6 +294,8 @@ export function UserManagement() {
   const closeEditModal = () => {
     if (isSavingEdit) return;
     setEditingUser(null);
+    setEditDisplayName("");
+    setEditContactInformation("");
     setBranchCoordinatorPassword("");
     setShowEditPassword(false);
     setEditRoleError("");
@@ -303,8 +311,25 @@ export function UserManagement() {
         return;
       }
 
+      const displayName = editDisplayName.trim();
+      const contactInformation = editContactInformation.trim();
+      if (!displayName) {
+        setEditRoleError("Display name is required.");
+        return;
+      }
+
+      if (displayName.length < 2 || !NAME_PATTERN.test(displayName)) {
+        setEditRoleError("Display name can only include letters, spaces, apostrophes, periods, and hyphens.");
+        return;
+      }
+
+      if (contactInformation && !CONTACT_NUMBER_PATTERN.test(contactInformation)) {
+        setEditRoleError("Use 09XXXXXXXXX or +639XXXXXXXXX for contact information.");
+        return;
+      }
+
       if (!password) {
-        setEditRoleError("Branch Coordinator password is required before saving role changes.");
+        setEditRoleError("Branch Coordinator password is required before saving account changes.");
         return;
       }
 
@@ -341,15 +366,19 @@ export function UserManagement() {
         return;
       }
 
-      // Update role in Supabase
       const { error } = await supabase
         .from('users')
-        .update({ role: selectedRole, updated_at: new Date().toISOString() })
+        .update({
+          full_name: displayName,
+          contact_number: contactInformation || null,
+          role: selectedRole,
+          updated_at: new Date().toISOString(),
+        })
         .eq('id', editingUser.id);
 
       if (error) {
-        console.error('Error updating user role:', error);
-        setEditRoleError(error.message || "Failed to update user role.");
+        console.error('Error updating user account:', error);
+        setEditRoleError(error.message || "Failed to update user account.");
         setIsSavingEdit(false);
         return;
       }
@@ -357,12 +386,16 @@ export function UserManagement() {
       await createAuditLog(
         userData?.id || userData?.email || "system",
         "USER_ROLE_UPDATED",
-        `Updated ${editingUser.email} role to ${getRoleLabel(selectedRole)}.`,
+        `Updated ${editingUser.email} account details and role to ${getRoleLabel(selectedRole)}.`,
         "success",
         {
           resourceType: "user",
           resourceId: editingUser.id,
           changes: {
+            previous_display_name: editingUser.name,
+            new_display_name: displayName,
+            previous_contact_information: editingUser.contactNumber,
+            new_contact_information: contactInformation,
             previous_role: editingUser.role,
             new_role: selectedRole,
             authorized_by: currentAccount.email,
@@ -373,15 +406,19 @@ export function UserManagement() {
 
       // Update UI
       const updatedUsers = users.map((user) =>
-        user.id === editingUser.id ? { ...user, role: selectedRole } : user
+        user.id === editingUser.id
+          ? { ...user, name: displayName, contactNumber: contactInformation, role: selectedRole }
+          : user
       );
       setUsers(updatedUsers);
       setIsSavingEdit(false);
       setEditingUser(null);
+      setEditDisplayName("");
+      setEditContactInformation("");
       setBranchCoordinatorPassword("");
       setShowEditPassword(false);
       setEditRoleError("");
-      showSuccess("User role updated successfully!");
+      showSuccess("User account updated successfully!");
     }
   };
 
@@ -725,6 +762,7 @@ export function UserManagement() {
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Name</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Email</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Contact</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Role</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Created</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Actions</th>
@@ -733,7 +771,7 @@ export function UserManagement() {
             <tbody className="divide-y divide-gray-100">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
                     No users match the current search and role filters.
                   </td>
                 </tr>
@@ -753,6 +791,9 @@ export function UserManagement() {
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-gray-600">{user.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-gray-600">{user.contactNumber || "Not provided"}</p>
                       </td>
                       <td className="px-6 py-4">
                         <span
@@ -875,6 +916,40 @@ export function UserManagement() {
                     {getRoleLabel(editingUser.role)}
                   </span>
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-800">
+                  Display Name <span className="text-red-600">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editDisplayName}
+                  onChange={(event) => {
+                    setEditDisplayName(event.target.value);
+                    setEditRoleError("");
+                  }}
+                  className="w-full rounded-2xl border border-blue-100 bg-white/85 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                  placeholder="Enter display name"
+                  autoComplete="name"
+                />
+              </div>
+
+              <div>
+                <label className="mb-2 block text-sm font-bold text-slate-800">
+                  Contact Information
+                </label>
+                <input
+                  type="tel"
+                  value={editContactInformation}
+                  onChange={(event) => {
+                    setEditContactInformation(event.target.value);
+                    setEditRoleError("");
+                  }}
+                  className="w-full rounded-2xl border border-blue-100 bg-white/85 px-4 py-3 text-sm text-slate-800 outline-none transition-all focus:border-blue-300 focus:ring-4 focus:ring-blue-100"
+                  placeholder="09XXXXXXXXX or +639XXXXXXXXX"
+                  autoComplete="tel"
+                />
               </div>
 
               <div>
