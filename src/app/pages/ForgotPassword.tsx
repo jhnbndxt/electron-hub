@@ -3,8 +3,6 @@ import { Link } from "react-router";
 import { AlertCircle, ArrowLeft, CheckCircle, LoaderCircle, Mail } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
 import logo from "../../assets/electronLogo";
-import { supabase } from "../../supabase";
-
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ForgotPassword() {
@@ -34,9 +32,15 @@ export function ForgotPassword() {
     setErrorMessage("");
 
     try {
-      const redirectTo = `${window.location.origin}/reset-password`;
-      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
-      if (error) throw error;
+      const response = await fetch("/api/password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request", email: normalizedEmail }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to send a password reset email. Please try again.");
+      }
 
       setEmail(normalizedEmail);
       setIsSubmitted(true);
