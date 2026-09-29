@@ -27,6 +27,27 @@ interface Section {
   questions: Question[];
 }
 
+function organizeAssessmentSections(questions: Question[]): Section[] {
+  return [
+    { name: "Verbal", icon: Brain, questions: questions.filter((question) => question.category === "Verbal") },
+    { name: "Math", icon: Calculator, questions: questions.filter((question) => question.category === "Math") },
+    { name: "Science", icon: Beaker, questions: questions.filter((question) => question.category === "Science") },
+    { name: "Logical", icon: Lightbulb, questions: questions.filter((question) => question.category === "Logical") },
+    { name: "Interests", icon: Heart, questions: questions.filter((question) => question.category === "Interests") },
+  ];
+}
+
+function getBundledAssessmentQuestions(): Question[] {
+  return getDefaultAssessmentQuestions().map((question, index) => ({
+    id: index + 1,
+    question: question.question,
+    options: question.options,
+    correctAnswer: question.correctAnswer,
+    category: question.category,
+    interestType: question.interestType || null,
+  }));
+}
+
 interface AssessmentResult {
   track: string;
   electives: string[];
@@ -567,8 +588,10 @@ export function PublicAssessment() {
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState(0);
   const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sections, setSections] = useState<Section[]>(() =>
+    organizeAssessmentSections(getBundledAssessmentQuestions())
+  );
+  const [loading, setLoading] = useState(false);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const [results, setResults] = useState<AssessmentResult | null>(null);
   const [assessmentStarted, setAssessmentStarted] = useState(false);
@@ -580,6 +603,7 @@ export function PublicAssessment() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
   const hasRestoredProgress = useRef(false);
+  const assessmentStartedRef = useRef(false);
   const publicAssessmentShellStyle = {
     background:
       "radial-gradient(circle at top left, rgba(37, 99, 235, 0.16) 0%, transparent 26%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.1) 0%, transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f8fafc 100%)",
@@ -595,8 +619,6 @@ export function PublicAssessment() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    localStorage.removeItem("assessment_questions");
-
     const initializeAssessment = async () => {
       const existingResults = localStorage.getItem("publicAssessmentResults");
 
@@ -619,8 +641,8 @@ export function PublicAssessment() {
         localStorage.removeItem("publicAssessmentResults");
       }
 
-      await loadQuestionsFromSupabase();
       setLoading(false);
+      void loadQuestionsFromSupabase();
     };
 
     initializeAssessment();
@@ -647,6 +669,7 @@ export function PublicAssessment() {
 
       if (typeof parsedProgress?.assessmentStarted === "boolean") {
         setAssessmentStarted(parsedProgress.assessmentStarted);
+        assessmentStartedRef.current = parsedProgress.assessmentStarted;
       }
     } catch (error) {
       console.error("Failed to restore public assessment progress:", error);
@@ -731,7 +754,9 @@ export function PublicAssessment() {
         },
       ];
 
-      setSections(organizedSections);
+      if (!assessmentStartedRef.current) {
+        setSections(organizedSections);
+      }
     } catch (error) {
       console.error("❌ Error loading questions from Supabase:", error);
       loadQuestionsFromStorage();
@@ -749,49 +774,13 @@ export function PublicAssessment() {
       localStorage.setItem("assessment_questions", JSON.stringify(questions));
     }
 
-    const organizedSections: Section[] = [
-      {
-        name: "Verbal",
-        icon: Brain,
-        questions: questions.filter((question) => question.category === "Verbal"),
-      },
-      {
-        name: "Math",
-        icon: Calculator,
-        questions: questions.filter((question) => question.category === "Math"),
-      },
-      {
-        name: "Science",
-        icon: Beaker,
-        questions: questions.filter((question) => question.category === "Science"),
-      },
-      {
-        name: "Logical",
-        icon: Lightbulb,
-        questions: questions.filter((question) => question.category === "Logical"),
-      },
-      {
-        name: "Interests",
-        icon: Heart,
-        questions: questions.filter((question) => question.category === "Interests"),
-      },
-    ];
-
-    setSections(organizedSections);
+    if (!assessmentStartedRef.current) {
+      setSections(organizeAssessmentSections(questions));
+    }
   };
 
   const getDefaultQuestions = (): Question[] => {
-    // Load 75 comprehensive questions from service
-    const defaultQuestions = getDefaultAssessmentQuestions();
-    
-    return defaultQuestions.map((q, index) => ({
-      id: index + 1,
-      question: q.question,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
-      category: q.category,
-      interestType: q.interestType || null,
-    }));
+    return getBundledAssessmentQuestions();
   };
 
   if (loading) {
@@ -823,6 +812,7 @@ export function PublicAssessment() {
           localStorage.removeItem("publicAssessmentProgress_guest");
           setAssessmentCompleted(false);
           setResults(null);
+          assessmentStartedRef.current = false;
           setAssessmentStarted(false);
           setCurrentSection(0);
           setAnswers({});
@@ -849,6 +839,7 @@ export function PublicAssessment() {
                 localStorage.removeItem("publicAssessmentResults");
                 setAssessmentCompleted(false);
                 setResults(null);
+                assessmentStartedRef.current = false;
                 setAssessmentStarted(false);
               }}
               className="mt-6 rounded-xl bg-[var(--electron-blue)] px-5 py-3 font-semibold text-white"
@@ -1423,6 +1414,7 @@ export function PublicAssessment() {
   };
 
   const handleStartAssessment = () => {
+    assessmentStartedRef.current = true;
     setAssessmentStarted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
