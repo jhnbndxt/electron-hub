@@ -1,16 +1,52 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
-import { ArrowLeft, CheckCircle, Mail } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle, LoaderCircle, Mail } from "lucide-react";
 import { ChatAssistant } from "../components/ChatAssistant";
 import logo from "../../assets/electronLogo";
+import { supabase } from "../../supabase";
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const submissionInProgress = useRef(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setIsSubmitted(true);
+
+    if (submissionInProgress.current) return;
+
+    const normalizedEmail = email.trim();
+    if (!normalizedEmail) {
+      setErrorMessage("Enter your email address.");
+      return;
+    }
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setErrorMessage("Enter a valid email address.");
+      return;
+    }
+
+    submissionInProgress.current = true;
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, { redirectTo });
+      if (error) throw error;
+
+      setEmail(normalizedEmail);
+      setIsSubmitted(true);
+    } catch (error) {
+      console.error("Error requesting password reset:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Unable to send a password reset email. Please try again.");
+    } finally {
+      submissionInProgress.current = false;
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -42,7 +78,7 @@ export function ForgotPassword() {
               </div>
 
               <p className="mt-4 text-center text-sm leading-6 text-slate-500">
-                Click the link in the email to reset your password. If you don&apos;t see it, check your spam folder.
+                Click the link in the email to reset your password. Check your inbox and spam folder if you don&apos;t see it.
               </p>
 
               <Link
@@ -54,7 +90,10 @@ export function ForgotPassword() {
               </Link>
 
               <button
-                onClick={() => setIsSubmitted(false)}
+                onClick={() => {
+                  setIsSubmitted(false);
+                  setErrorMessage("");
+                }}
                 className="mt-4 text-sm font-semibold text-[#1E3A8A] hover:underline"
               >
                 Didn&apos;t receive the email? Send another link
@@ -80,13 +119,24 @@ export function ForgotPassword() {
                       type="email"
                       id="email"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        setErrorMessage("");
+                      }}
                       placeholder="Email"
                       required
+                      autoComplete="email"
                       className="min-w-0 text-sm placeholder:text-slate-400"
                     />
                   </div>
                 </div>
+
+                {errorMessage && (
+                  <div role="alert" className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
 
                 <p className="text-sm text-slate-500">
                   Use the same email address you registered with so the reset link reaches the correct account.
@@ -94,9 +144,15 @@ export function ForgotPassword() {
 
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   className="auth-primary-button w-full rounded-2xl px-6 py-4 text-base font-semibold text-white"
                 >
-                  Get Reset Link
+                  {isSubmitting ? (
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <LoaderCircle className="h-5 w-5 animate-spin" />
+                      Sending...
+                    </span>
+                  ) : "Get Reset Link"}
                 </button>
               </form>
 

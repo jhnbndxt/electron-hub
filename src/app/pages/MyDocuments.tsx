@@ -112,7 +112,7 @@ export function MyDocuments() {
     // Find the student's enrollment by email
     const { data: enrollment, error: enrollError } = await supabase
       .from("enrollments")
-      .select("id")
+      .select("id, status")
       .eq("user_id", userData.email)
       .neq("status", "rejected")
       .order("created_at", { ascending: false })
@@ -334,6 +334,7 @@ export function MyDocuments() {
         .maybeSingle();
 
       const isRejectedCorrection = existingDoc?.status === "rejected";
+      const isAlreadyEnrolled = String(enrollment?.status || "").toLowerCase() === "enrolled";
       const nextStatus = isRejectedCorrection ? "reuploaded" : "pending_review";
 
       if (existingDoc) {
@@ -364,17 +365,17 @@ export function MyDocuments() {
         });
       }
 
-      await supabase
-        .from("enrollments")
-        .update({
-          status: "pending_review",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", currentEnrollmentId);
-
-      if (isRejectedCorrection) {
-        await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });
+      if (!isAlreadyEnrolled) {
+        await supabase
+          .from("enrollments")
+          .update({
+            status: "pending_review",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", currentEnrollmentId);
       }
+
+      await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });
 
       await loadDocuments();
     } catch (err) {

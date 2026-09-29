@@ -15,6 +15,7 @@ import { EnrollmentInfo } from "./pages/EnrollmentInfo";
 import { Login } from "./pages/Login";
 import { Register } from "./pages/Register";
 import { ForgotPassword } from "./pages/ForgotPassword";
+import { ResetPassword } from "./pages/ResetPassword";
 import { Dashboard } from "./pages/Dashboard";
 import { Assessment } from "./pages/Assessment";
 import { Results } from "./pages/Results";
@@ -156,6 +157,11 @@ export default function App() {
         {
           path: "/forgot-password",
           Component: ForgotPassword,
+          ErrorBoundary: ErrorBoundary,
+        },
+        {
+          path: "/reset-password",
+          Component: ResetPassword,
           ErrorBoundary: ErrorBoundary,
         },
         {

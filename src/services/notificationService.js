@@ -121,10 +121,10 @@ const NOTIFICATION_MAP = {
       `Your uploaded document '${additionalData.documentName || 'Document'}' was rejected${additionalData.reason ? ` due to ${additionalData.reason}` : ''}. Open My Documents, click Re-upload Document for this item, select the corrected file, and wait for registrar review.`,
   },
   DOCUMENT_REUPLOADED: {
-    title: 'Document Re-uploaded',
+    title: 'Document Awaiting Review',
     message: (additionalData) =>
       additionalData.message ||
-      `${additionalData.studentName || 'A student'} re-uploaded ${additionalData.documentName || 'a document'} and is ready for priority review.`,
+      `${additionalData.studentName || 'A student'} submitted ${additionalData.documentName || 'a document'} and it is ready for review.`,
   },
   DOCUMENT_STATUS_UPDATED: {
     title: 'Document Status Updated',
