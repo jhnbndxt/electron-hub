@@ -166,6 +166,7 @@ export function UserManagement() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
   const [reactivatingUser, setReactivatingUser] = useState<UserAccount | null>(null);
+  const [permanentlyDeletingUser, setPermanentlyDeletingUser] = useState<UserAccount | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -482,6 +483,39 @@ export function UserManagement() {
     );
     setReactivatingUser(null);
     showSuccess("User reactivated successfully!");
+  };
+
+  const handleConfirmPermanentDelete = async () => {
+    if (!permanentlyDeletingUser) return;
+
+    if (permanentlyDeletingUser.id === userData?.id) {
+      showError("You cannot permanently delete your own account while logged in.");
+      return;
+    }
+
+    const { data: deletedUser, error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", permanentlyDeletingUser.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error permanently deleting user:", error);
+      showError(error.message || "Failed to permanently delete user.");
+      return;
+    }
+
+    if (!deletedUser) {
+      showError("The user could not be deleted. Check database permissions and try again.");
+      return;
+    }
+
+    setUsers((currentUsers) =>
+      currentUsers.filter((user) => user.id !== permanentlyDeletingUser.id)
+    );
+    setPermanentlyDeletingUser(null);
+    showSuccess("User permanently deleted from the database.");
   };
 
   const handleAddUser = () => {
@@ -896,14 +930,24 @@ export function UserManagement() {
                               </button>
                             </>
                           ) : (
-                            <button
-                              onClick={() => setReactivatingUser(user)}
-                              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
-                              title="Reactivate user"
-                            >
-                              <RefreshCw className="h-4 w-4" />
-                              Reactivate
-                            </button>
+                            <>
+                              <button
+                                onClick={() => setReactivatingUser(user)}
+                                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                title="Reactivate user"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                Reactivate
+                              </button>
+                              <button
+                                onClick={() => setPermanentlyDeletingUser(user)}
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100"
+                                title="Permanently delete user"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete permanently
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -1457,6 +1501,21 @@ export function UserManagement() {
         type="success"
         onConfirm={handleConfirmReactivate}
         onClose={() => setReactivatingUser(null)}
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(permanentlyDeletingUser)}
+        title="Permanently Delete User"
+        message={
+          permanentlyDeletingUser
+            ? `Permanently delete ${permanentlyDeletingUser.name}? This removes the account from the database and cannot be undone.`
+            : ""
+        }
+        confirmText="Delete Permanently"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={handleConfirmPermanentDelete}
+        onClose={() => setPermanentlyDeletingUser(null)}
       />
 
       <style>{`
