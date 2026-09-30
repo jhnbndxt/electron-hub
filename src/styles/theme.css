@@ -851,6 +851,7 @@
 
 .auth-shell-bg {
   position: relative;
+  box-sizing: border-box;
   overflow: hidden;
   min-height: 100vh;
   min-height: 100dvh;
@@ -999,6 +1000,12 @@
 
   .auth-panel-compact {
     max-height: calc(100dvh - 1rem);
+  }
+}
+
+@media (max-width: 640px) and (max-height: 500px) {
+  .auth-shell-bg {
+    padding-block: 0.5rem;
   }
 }
 

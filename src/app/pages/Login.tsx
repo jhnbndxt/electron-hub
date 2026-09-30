@@ -138,7 +138,7 @@ export function Login() {
   }
 
   return (
-    <div className={`auth-shell-bg flex min-h-screen items-center justify-center px-4 py-4 sm:px-6 lg:px-8 ${shouldAnimateEntry ? "auth-shell-enter" : ""}`}>
+    <div className={`auth-shell-bg flex min-h-screen min-h-[100dvh] items-center justify-center px-3 py-2 sm:px-6 sm:py-4 lg:px-8 ${shouldAnimateEntry ? "auth-shell-enter" : ""}`}>
       <div className="relative z-10 flex w-full max-w-6xl items-center justify-center">
         {/* Assessment Banner */}
         <div className="w-full max-w-[27rem]">

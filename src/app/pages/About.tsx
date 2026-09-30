@@ -167,9 +167,9 @@ export function About() {
             />
             
             {/* Badge Overlay */}
-            <div className="absolute bottom-8 right-8 z-20 bg-white rounded-xl shadow-lg p-4 border-l-4" style={{ borderColor: "#B91C1C" }}>
+            <div className="absolute bottom-4 right-4 z-20 max-w-[calc(100%-2rem)] rounded-xl border-l-4 bg-white p-3 shadow-lg sm:bottom-8 sm:right-8 sm:p-4" style={{ borderColor: "#B91C1C" }}>
               <p className="text-sm font-semibold text-gray-600 mb-1">Since</p>
-              <p className="text-3xl font-bold" style={{ color: "#1E3A8A" }}>2002</p>
+              <p className="text-[clamp(1.5rem,8vw,1.875rem)] font-bold leading-none" style={{ color: "#1E3A8A" }}>2002</p>
             </div>
           </div>
 
