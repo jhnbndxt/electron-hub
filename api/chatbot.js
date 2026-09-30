@@ -3,6 +3,7 @@ import {
   isEnrollmentRelated,
   retrieveChatbotKnowledge,
 } from "../src/data/chatbotKnowledge.js";
+import { DEFAULT_GROQ_MODEL } from "./ai-models.js";
 
 const jsonHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -56,7 +57,7 @@ async function generateGroqReply({ message, knowledge, context, recentMessages }
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+      model: process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL,
       messages: [
         {
           role: "system",

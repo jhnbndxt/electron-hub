@@ -23,6 +23,11 @@ export function getElectivePrerequisite(electiveName = "", availableElectives = 
   return matchedPrerequisite || prerequisiteName;
 }
 
+export function isAdvancedElective(electiveName = "") {
+  const normalizedName = normalizeElectiveName(electiveName);
+  return /^(.+?)\s+2(?:\s*:|$)/i.test(normalizedName);
+}
+
 export function getPrerequisiteValidationMessage(electiveName, prerequisiteName) {
   return `${electiveName} requires ${prerequisiteName} first. Please select ${prerequisiteName} as Elective 1 before choosing ${electiveName}.`;
 }
@@ -57,15 +62,13 @@ export function validateElectiveSequence(elective1, elective2, availableElective
 }
 
 export function selectElectivesWithPrerequisites(rankedElectives = [], limit = 2) {
-  const catalogNames = rankedElectives.map((elective) => elective?.name).filter(Boolean);
+  const foundationElectives = rankedElectives.filter(
+    (elective) => elective?.name && !isAdvancedElective(elective.name)
+  );
   const selected = [];
   const selectedNames = new Set();
-  const findByName = (name) =>
-    rankedElectives.find(
-      (elective) => normalizeElectiveName(elective?.name).toLowerCase() === normalizeElectiveName(name).toLowerCase()
-    );
 
-  for (const elective of rankedElectives) {
+  for (const elective of foundationElectives) {
     if (!elective?.name || selected.length >= limit) {
       break;
     }
@@ -77,29 +80,8 @@ export function selectElectivesWithPrerequisites(rankedElectives = [], limit = 2
       continue;
     }
 
-    const prerequisiteName = getElectivePrerequisite(normalizedName, catalogNames);
-
-    if (!prerequisiteName) {
-      selected.push(elective);
-      selectedNames.add(normalizedKey);
-      continue;
-    }
-
-    const prerequisiteKey = normalizeElectiveName(prerequisiteName).toLowerCase();
-
-    if (selectedNames.has(prerequisiteKey)) {
-      selected.push(elective);
-      selectedNames.add(normalizedKey);
-      continue;
-    }
-
-    const prerequisiteElective = findByName(prerequisiteName);
-
-    if (prerequisiteElective && selected.length === 0 && limit >= 2) {
-      selected.push(prerequisiteElective, elective);
-      selectedNames.add(prerequisiteKey);
-      selectedNames.add(normalizedKey);
-    }
+    selected.push(elective);
+    selectedNames.add(normalizedKey);
   }
 
   return selected.slice(0, limit);

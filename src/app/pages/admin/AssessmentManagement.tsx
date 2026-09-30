@@ -28,8 +28,6 @@ import {
   questionsExistInDatabase,
   initializeQuestions,
   getDefaultAssessmentQuestions,
-  syncInterestChecklistQuestions,
-  syncDefaultAssessmentQuestions,
   RIASEC_TYPES,
 } from "../../../services/assessmentService";
 
@@ -220,18 +218,6 @@ export function AssessmentManagement() {
       }
       setIsLoading(false);
     } else {
-      const { error: bankSyncError } = await syncDefaultAssessmentQuestions();
-
-      if (bankSyncError) {
-        console.error('Error syncing assessment question bank:', bankSyncError);
-      }
-
-      const { error: syncError } = await syncInterestChecklistQuestions();
-
-      if (syncError) {
-        console.error('Error syncing interest Likert questions:', syncError);
-      }
-
       // Load from database
       const { data, error } = await getAssessmentQuestions();
       

@@ -1,3 +1,5 @@
+import { getElectiveWeightProfile } from '../data/electiveWeightProfiles.js';
+
 export const RIASEC_TYPES = [
   'Realistic',
   'Investigative',
@@ -113,18 +115,21 @@ function buildElectiveRiasecTarget(elective = {}) {
 }
 
 export function scoreElectiveRecommendation(elective, { scores = {}, interestClusters = {}, riasecScores = {} } = {}) {
+  const electiveProfile = getElectiveWeightProfile(elective?.name);
   const electiveWeights = elective?.weights || {};
-  const aptitudeWeights = Object.keys(APTITUDE_DIMENSIONS).reduce((weights, dimension) => {
-    if (Number(electiveWeights[dimension]) > 0) {
-      weights[dimension] = Number(electiveWeights[dimension]);
-    }
+  const aptitudeWeights =
+    electiveProfile?.aptitude ||
+    Object.keys(APTITUDE_DIMENSIONS).reduce((weights, dimension) => {
+      if (Number(electiveWeights[dimension]) > 0) {
+        weights[dimension] = Number(electiveWeights[dimension]);
+      }
 
-    return weights;
-  }, {});
+      return weights;
+    }, {});
   const aptitudeScores = getAptitudeScores(scores);
   const interestScores = getInterestClusterScores(interestClusters);
   const studentRiasecScores = getRiasecScores(riasecScores, interestClusters);
-  const electiveRiasecTarget = buildElectiveRiasecTarget(elective);
+  const electiveRiasecTarget = electiveProfile?.riasec || buildElectiveRiasecTarget(elective);
 
   const aptitudeFit = weightedAverage(aptitudeScores, aptitudeWeights);
   const riasecFit = weightedAverage(studentRiasecScores, electiveRiasecTarget);
@@ -135,7 +140,7 @@ export function scoreElectiveRecommendation(elective, { scores = {}, interestClu
   let finalScore = 0;
 
   if (aptitudeFit !== null && riasecFit !== null) {
-    finalScore = aptitudeFit * 0.55 + riasecFit * 0.45;
+    finalScore = aptitudeFit * 0.5 + riasecFit * 0.5;
   } else if (aptitudeFit !== null) {
     finalScore = aptitudeFit * 0.75 + averageInterest * 0.25;
   } else if (riasecFit !== null) {

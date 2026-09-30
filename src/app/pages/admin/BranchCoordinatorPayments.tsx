@@ -32,6 +32,7 @@ import { supabase } from "../../../supabase";
 import { useAuth } from "../../context/AuthContext";
 import { expireOverdueCashPayments } from "../../../services/adminService";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
+import { exportToCSV, formatCurrencyForCSV } from "../../../utils/csvExport";
 
 interface PaymentRecord {
   id: string;
@@ -101,6 +102,9 @@ const formatCurrency = (amount: number) =>
     currency: "PHP",
     maximumFractionDigits: 2,
   });
+
+const PAYMENT_AMOUNT_PATTERN = /^\d*(\.\d{0,2})?$/;
+const INVALID_PAYMENT_AMOUNT_MESSAGE = "Invalid payment amount. Please enter an amount greater than zero.";
 
 type PaymentSettingsForm = {
   payment_bank_enabled: boolean;
@@ -191,6 +195,9 @@ export function BranchCoordinatorPayments() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettingsForm>(defaultPaymentSettingsForm);
   const [settingsDraft, setSettingsDraft] = useState<PaymentSettingsForm>(defaultPaymentSettingsForm);
+  const [paymentAmountInput, setPaymentAmountInput] = useState(
+    String(defaultPaymentSettingsForm.payment_tuition_amount)
+  );
   const [editingCategory, setEditingCategory] = useState<"bank" | "gcash" | "cash" | "tuition" | null>(null);
   const [confirmationPassword, setConfirmationPassword] = useState("");
   const [settingsError, setSettingsError] = useState("");
@@ -321,6 +328,7 @@ export function BranchCoordinatorPayments() {
 
     setPaymentSettings(normalizedSettings);
     setSettingsDraft(normalizedSettings);
+    setPaymentAmountInput(String(normalizedSettings.payment_tuition_amount));
   };
 
   const verifySettingsPassword = async () => {
@@ -345,6 +353,14 @@ export function BranchCoordinatorPayments() {
   };
 
   const handleSavePaymentSettings = async () => {
+    if (
+      !Number.isFinite(settingsDraft.payment_tuition_amount) ||
+      settingsDraft.payment_tuition_amount <= 0
+    ) {
+      setSettingsError(INVALID_PAYMENT_AMOUNT_MESSAGE);
+      return;
+    }
+
     if (!canManagePaymentSettings) {
       setSettingsError("Only branch coordinators and cashiers can update payment settings.");
       return;
@@ -378,7 +394,9 @@ export function BranchCoordinatorPayments() {
     try {
       const backup = JSON.parse(localStorage.getItem(latestBackupKey) || "{}");
       if (backup?.settings) {
-        setSettingsDraft({ ...defaultPaymentSettingsForm, ...backup.settings });
+        const restoredSettings = { ...defaultPaymentSettingsForm, ...backup.settings };
+        setSettingsDraft(restoredSettings);
+        setPaymentAmountInput(String(restoredSettings.payment_tuition_amount));
         setEditingCategory("tuition");
         setSettingsError("Latest backup loaded into the draft. Confirm your password and save to restore it.");
       }
@@ -505,17 +523,17 @@ export function BranchCoordinatorPayments() {
       p.studentEmail,
       getPaymentModeLabel(p.paymentMode),
       p.referenceNumber || p.queueNumber || "N/A",
-      formatCurrency(p.amount),
+      formatCurrencyForCSV(p.amount),
       p.status.toUpperCase(),
     ]);
 
-    const csvContent = [csvHeaders, ...csvRows].map((row) => row.join(",")).join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `payment-management-${new Date().toISOString().split("T")[0]}.csv`;
-    link.click();
+    exportToCSV({
+      filename: `payment-management-${new Date().toISOString().split("T")[0]}`,
+      title: "Payment Collection Report",
+      subtitle: "Electron Hub Payment Management",
+      headers: csvHeaders,
+      rows: csvRows,
+    });
   };
 
   if (isLoading) {
@@ -547,6 +565,7 @@ export function BranchCoordinatorPayments() {
             <button
               onClick={() => {
                 setSettingsDraft(paymentSettings);
+                setPaymentAmountInput(String(paymentSettings.payment_tuition_amount));
                 setSettingsError("");
                 setConfirmationPassword("");
                 setShowSettingsModal(true);
@@ -1087,10 +1106,35 @@ export function BranchCoordinatorPayments() {
                       <label className="text-sm font-semibold text-slate-700">
                         Tuition Fee Amount
                         <input
-                          type="number"
-                          min={0}
-                          value={settingsDraft.payment_tuition_amount}
-                          onChange={(e) => setSettingsDraft({ ...settingsDraft, payment_tuition_amount: Number(e.target.value) || 0 })}
+                          type="text"
+                          inputMode="decimal"
+                          value={paymentAmountInput}
+                          onKeyDown={(e) => {
+                            if (
+                              ["-", "+", "e", "E"].includes(e.key) ||
+                              (e.key === "." && e.currentTarget.value.includes("."))
+                            ) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onPaste={(e) => {
+                            const pastedValue = e.clipboardData.getData("text");
+                            if (!PAYMENT_AMOUNT_PATTERN.test(pastedValue)) {
+                              e.preventDefault();
+                            }
+                          }}
+                          onChange={(e) => {
+                            const nextValue = e.target.value;
+                            if (!PAYMENT_AMOUNT_PATTERN.test(nextValue)) {
+                              return;
+                            }
+
+                            setSettingsDraft({
+                              ...settingsDraft,
+                              payment_tuition_amount: nextValue === "" ? 0 : Number(nextValue),
+                            });
+                            setPaymentAmountInput(nextValue);
+                          }}
                           className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2"
                         />
                       </label>

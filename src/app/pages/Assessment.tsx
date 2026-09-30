@@ -507,14 +507,17 @@ export function Assessment() {
         },
         topDomains: assessmentResult.topDomains,
         topInterests: assessmentResult.topInterests,
+        electiveRecommendations: assessmentResult.electiveRecommendations,
         overallScore: assessmentResult.scores.overall_score,
         aiRecommendation,
+        answers,
       })
     );
+    localStorage.setItem(`assessmentAnswers_${userEmail}`, JSON.stringify(answers));
     setSubmitProgress(82);
 
     try {
-      await saveAssessmentResult(userEmail, assessmentResult);
+      await saveAssessmentResult(userEmail, { ...assessmentResult, answers });
       console.log("✅ Assessment result saved to Supabase");
       localStorage.removeItem(assessmentProgressKey);
       setSubmitProgress(94);

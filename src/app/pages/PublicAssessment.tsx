@@ -8,6 +8,7 @@ import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
+import electivesCatalog from "../../data/electives.js";
 
 interface Question {
   id: number;
@@ -26,9 +27,39 @@ interface Section {
   questions: Question[];
 }
 
+function organizeAssessmentSections(questions: Question[]): Section[] {
+  return [
+    { name: "Verbal", icon: Brain, questions: questions.filter((question) => question.category === "Verbal") },
+    { name: "Math", icon: Calculator, questions: questions.filter((question) => question.category === "Math") },
+    { name: "Science", icon: Beaker, questions: questions.filter((question) => question.category === "Science") },
+    { name: "Logical", icon: Lightbulb, questions: questions.filter((question) => question.category === "Logical") },
+    { name: "Interests", icon: Heart, questions: questions.filter((question) => question.category === "Interests") },
+  ];
+}
+
+function getBundledAssessmentQuestions(): Question[] {
+  return getDefaultAssessmentQuestions().map((question, index) => ({
+    id: index + 1,
+    question: question.question,
+    options: question.options,
+    correctAnswer: question.correctAnswer,
+    category: question.category,
+    interestType: question.interestType || null,
+  }));
+}
+
 interface AssessmentResult {
   track: string;
   electives: string[];
+  electiveRecommendations?: Array<{
+    name: string;
+    track: string;
+    category?: string;
+    compatibilityScore: number;
+    aptitudeScore: number;
+    riasecScore: number;
+    reason: string;
+  }>;
   scores: {
     VA: number;
     MA: number;
@@ -130,6 +161,9 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
     },
     topDomains: normalizeResultArray(result.topDomains ?? result.top_domains),
     topInterests: normalizeResultArray(result.topInterests ?? result.top_interests),
+    electiveRecommendations: Array.isArray(result.electiveRecommendations)
+      ? result.electiveRecommendations
+      : [],
     overallScore: normalizeResultScore(result.overallScore ?? result.overall_score ?? rawScores.overall_score),
     aiRecommendation: result.aiRecommendation || {},
   };
@@ -140,43 +174,60 @@ function getSuggestedCoursesForPublicResult(track: string, elective: string): st
 
   if (track === "Academic") {
     if (normalizedElective.includes("biology")) {
-      return ["Medicine", "Nursing", "Biology"];
+      return ["Medicine", "Nursing", "Pharmacy", "Biological Sciences"];
     } else if (normalizedElective.includes("physics")) {
-      return ["Engineering (Civil, Electrical, Mechanical)", "Applied Physics"];
+      return ["Engineering", "Physics", "Materials Science", "Astronomy"];
     } else if (normalizedElective.includes("psychology")) {
-      return ["Psychology", "Education", "Social Work"];
-    } else if (normalizedElective.includes("creative writing")) {
-      return ["Communication", "Journalism", "Literature"];
+      return ["Psychology", "Counseling", "Education", "Social Work"];
+    } else if (normalizedElective.includes("creative writing") || normalizedElective.includes("literature")) {
+      return ["Communications", "Journalism", "English Literature", "Creative Writing"];
     } else if (normalizedElective.includes("entrepreneurship") || normalizedElective.includes("marketing")) {
-      return ["Business Administration", "Marketing", "Management"];
+      return ["Business Administration", "Marketing", "Entrepreneurship", "Finance"];
     } else if (normalizedElective.includes("media arts") || normalizedElective.includes("visual arts")) {
-      return ["Multimedia Arts", "Film", "Graphic Design"];
+      return ["Fine Arts", "Graphic Design", "Digital Media", "Animation"];
     } else if (normalizedElective.includes("coaching") || normalizedElective.includes("fitness")) {
-      return ["Physical Education", "Sports Science", "Sports Management"];
+      return ["Physical Education", "Sports Science", "Kinesiology", "Sports Management"];
     }
   } else if (track === "Technical-Professional") {
-    if (normalizedElective.includes("ict")) {
-      return ["Information Technology", "Computer Science", "Software Engineering"];
+    if (normalizedElective.includes("ict") || normalizedElective.includes("information") || normalizedElective.includes("technology")) {
+      return ["Information Technology", "Computer Science", "Systems Administration", "Cybersecurity"];
     } else if (normalizedElective.includes("programming")) {
-      return ["Software Engineering", "Computer Engineering"];
-    } else if (normalizedElective.includes("cookery")) {
-      return ["Culinary Arts", "Hospitality Management", "Tourism"];
-    } else if (normalizedElective.includes("bread") || normalizedElective.includes("pastry")) {
-      return ["Culinary Arts", "Baking & Pastry"];
+      return ["Software Development", "App Development", "Web Development", "Game Development"];
+    } else if (normalizedElective.includes("cookery") || normalizedElective.includes("culinary")) {
+      return ["Culinary Arts", "Hospitality Management", "Food Service", "Nutrition"];
+    } else if (normalizedElective.includes("bread") || normalizedElective.includes("pastry") || normalizedElective.includes("baking")) {
+      return ["Bakery Management", "Culinary Arts", "Pastry Arts", "Food Production"];
     } else if (normalizedElective.includes("automotive")) {
-      return ["Mechanical Engineering", "Automotive Technology"];
+      return ["Automotive Technology", "Mechanical Engineering", "Vehicle Maintenance", "Automotive Engineering"];
     } else if (normalizedElective.includes("electrical")) {
-      return ["Electrical Engineering", "Electronics Engineering"];
-    } else if (normalizedElective.includes("agriculture")) {
-      return ["Agriculture", "Agribusiness"];
-    } else if (normalizedElective.includes("fishery")) {
-      return ["Fisheries", "Marine Biology"];
+      return ["Electrical Technology", "Electrical Engineering", "Power Systems", "Electronics Repair"];
+    } else if (normalizedElective.includes("agriculture") || normalizedElective.includes("farming")) {
+      return ["Agriculture", "Agribusiness", "Agricultural Engineering", "Sustainable Farming"];
+    } else if (normalizedElective.includes("fishery") || normalizedElective.includes("fishing")) {
+      return ["Fisheries", "Marine Biology", "Aquaculture", "Ocean Resources Management"];
     } else if (normalizedElective.includes("fitness") || normalizedElective.includes("coaching")) {
-      return ["Physical Education", "Sports Management"];
+      return ["Physical Education", "Sports Management", "Fitness Training", "Athletic Coaching"];
     }
   }
 
   return [];
+}
+
+function getPathwayExplanation(track: string, elective: string): string {
+  const normalizedElective = normalizeResultText(elective).toLowerCase();
+  const courses = getSuggestedCoursesForPublicResult(track, elective);
+
+  if (courses.length === 0) {
+    return `${elective} prepares you with foundational knowledge and skills applicable across various fields in the ${track} pathway.`;
+  }
+
+  if (track === "Academic") {
+    return `Based on your ${elective} elective and Academic Track, college programs in ${courses.slice(0, 2).join(" or ")} build on these foundations with advanced theory and research.`;
+  } else if (track === "Technical-Professional") {
+    return `Your ${elective} elective within the Technical-Professional Track leads directly to careers and training in ${courses.slice(0, 2).join(", ")}, combining practical skills with industry credentials.`;
+  }
+
+  return `Your selection of ${elective} opens pathways to programs and careers in ${courses.slice(0, 2).join(" and ")}.`;
 }
 
 interface PublicAssessmentResultsViewProps {
@@ -233,9 +284,14 @@ function PublicAssessmentResultsView({
   const scores = normalizedResult.scores;
   const overallScore = Math.round(normalizeResultScore(normalizedResult.overallScore));
   const aiRecommendation = normalizedResult.aiRecommendation || {};
-  const aiExplanation =
-    normalizeResultText(aiRecommendation.overallAnalysis) ||
-    `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`;
+  const selectedElectiveDetails = electives
+    .map((elective) => electivesCatalog.find(
+      (candidate) => candidate.name.toLowerCase() === elective.toLowerCase()
+    ))
+    .filter(Boolean);
+  const aiExplanation = selectedElectiveDetails.length > 0
+    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives match your strengths in ${topDomains.join(" and ")} and interests connected to ${topInterests.join(" and ")}. Together, they develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")} and connect to related study and career pathways.`
+    : `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`;
   const trackExplanation =
     normalizeResultText(aiRecommendation.trackExplanation) ||
     (track === "Academic"
@@ -258,8 +314,15 @@ function PublicAssessmentResultsView({
           careers: getSuggestedCoursesForPublicResult(track, elective),
         }));
   const electiveExplanations = [
-    normalizeResultText(aiRecommendation.elective1Explanation),
-    normalizeResultText(aiRecommendation.elective2Explanation),
+    ...electives.slice(0, 2).map((elective) => {
+      const catalogElective = electivesCatalog.find(
+        (candidate) => candidate.name.toLowerCase() === elective.toLowerCase()
+      );
+
+      return catalogElective
+        ? `${catalogElective.name} is recommended based on your assessment compatibility. It develops ${catalogElective.strengths.join(", ")} and can support related college programs such as ${catalogElective.relatedCourses.join(", ")}, leading to careers including ${catalogElective.careerPathways.join(", ")}.`
+        : "";
+    }),
   ];
   const getElectiveExplanation = (elective: string, index: number) =>
     electiveExplanations[index] ||
@@ -331,10 +394,31 @@ function PublicAssessmentResultsView({
                 </div>
               </div>
               <div className="mt-5 grid gap-4 sm:grid-cols-2">
-                {electives.map((elective, index) => (
+                {electives.map((elective, index) => {
+                  const scoring = normalizedResult.electiveRecommendations?.find(
+                    (recommendation) => recommendation.name === elective
+                  );
+
+                  return (
                   <div key={`${elective}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50 p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Elective {index + 1}</p>
                     <p className="mt-2 text-xl font-bold text-slate-950">{normalizeResultText(elective, "Elective")}</p>
+                    {scoring ? (
+                      <div className="mt-4 grid gap-2 rounded-xl bg-white p-4 text-sm text-slate-700">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">Compatibility Score</span>
+                          <span className="font-bold text-blue-700">{scoring.compatibilityScore.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>Aptitude Score</span>
+                          <span>{scoring.aptitudeScore.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span>RIASEC Score</span>
+                          <span>{scoring.riasecScore.toFixed(2)}%</span>
+                        </div>
+                      </div>
+                    ) : null}
                     <p className="mt-2 text-sm leading-6 text-slate-700">
                       {getElectiveExplanation(elective, index)}
                     </p>
@@ -344,7 +428,8 @@ function PublicAssessmentResultsView({
                       </p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -377,16 +462,24 @@ function PublicAssessmentResultsView({
 
           <div className="rounded-2xl bg-white p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-950">Possible Pathways</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Your {track} Track and suggested electives create these college and career pathways:
+            </p>
             <div className="mt-4 space-y-3">
               {pathwayRows.filter((pathway) => pathway.careers.length > 0).slice(0, 4).map((pathway, index) => (
                 <div key={`${pathway.category}-${index}`} className="rounded-xl bg-slate-50 p-4">
                   <p className="text-sm font-bold text-slate-900">{pathway.category}</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{pathway.careers.join(", ")}</p>
+                  <p className="mt-2 text-xs leading-6 text-slate-600">{getPathwayExplanation(track, pathway.category)}</p>
+                  {pathway.careers.length > 0 && (
+                    <p className="mt-2 text-sm font-medium text-slate-700">
+                      Programs: {pathway.careers.join(", ")}
+                    </p>
+                  )}
                 </div>
               ))}
               {pathwayRows.every((pathway) => pathway.careers.length === 0) && (
                 <p className="text-sm leading-6 text-slate-600">
-                  Your track and electives can support college and career options connected to your strengths.
+                  Your {track} Track and electives support college and career options connected to your strengths and interests.
                 </p>
               )}
             </div>
@@ -495,8 +588,10 @@ export function PublicAssessment() {
   const navigate = useNavigate();
   const [currentSection, setCurrentSection] = useState(0);
   const [answers, setAnswers] = useState<Record<number, AnswerValue>>({});
-  const [sections, setSections] = useState<Section[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sections, setSections] = useState<Section[]>(() =>
+    organizeAssessmentSections(getBundledAssessmentQuestions())
+  );
+  const [loading, setLoading] = useState(false);
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const [results, setResults] = useState<AssessmentResult | null>(null);
   const [assessmentStarted, setAssessmentStarted] = useState(false);
@@ -508,6 +603,7 @@ export function PublicAssessment() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
   const hasRestoredProgress = useRef(false);
+  const assessmentStartedRef = useRef(false);
   const publicAssessmentShellStyle = {
     background:
       "radial-gradient(circle at top left, rgba(37, 99, 235, 0.16) 0%, transparent 26%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.1) 0%, transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f8fafc 100%)",
@@ -523,8 +619,6 @@ export function PublicAssessment() {
 
   useEffect(() => {
     window.scrollTo(0, 0);
-    localStorage.removeItem("assessment_questions");
-
     const initializeAssessment = async () => {
       const existingResults = localStorage.getItem("publicAssessmentResults");
 
@@ -547,8 +641,8 @@ export function PublicAssessment() {
         localStorage.removeItem("publicAssessmentResults");
       }
 
-      await loadQuestionsFromSupabase();
       setLoading(false);
+      void loadQuestionsFromSupabase();
     };
 
     initializeAssessment();
@@ -575,6 +669,7 @@ export function PublicAssessment() {
 
       if (typeof parsedProgress?.assessmentStarted === "boolean") {
         setAssessmentStarted(parsedProgress.assessmentStarted);
+        assessmentStartedRef.current = parsedProgress.assessmentStarted;
       }
     } catch (error) {
       console.error("Failed to restore public assessment progress:", error);
@@ -659,7 +754,9 @@ export function PublicAssessment() {
         },
       ];
 
-      setSections(organizedSections);
+      if (!assessmentStartedRef.current) {
+        setSections(organizedSections);
+      }
     } catch (error) {
       console.error("❌ Error loading questions from Supabase:", error);
       loadQuestionsFromStorage();
@@ -677,49 +774,13 @@ export function PublicAssessment() {
       localStorage.setItem("assessment_questions", JSON.stringify(questions));
     }
 
-    const organizedSections: Section[] = [
-      {
-        name: "Verbal",
-        icon: Brain,
-        questions: questions.filter((question) => question.category === "Verbal"),
-      },
-      {
-        name: "Math",
-        icon: Calculator,
-        questions: questions.filter((question) => question.category === "Math"),
-      },
-      {
-        name: "Science",
-        icon: Beaker,
-        questions: questions.filter((question) => question.category === "Science"),
-      },
-      {
-        name: "Logical",
-        icon: Lightbulb,
-        questions: questions.filter((question) => question.category === "Logical"),
-      },
-      {
-        name: "Interests",
-        icon: Heart,
-        questions: questions.filter((question) => question.category === "Interests"),
-      },
-    ];
-
-    setSections(organizedSections);
+    if (!assessmentStartedRef.current) {
+      setSections(organizeAssessmentSections(questions));
+    }
   };
 
   const getDefaultQuestions = (): Question[] => {
-    // Load 75 comprehensive questions from service
-    const defaultQuestions = getDefaultAssessmentQuestions();
-    
-    return defaultQuestions.map((q, index) => ({
-      id: index + 1,
-      question: q.question,
-      options: q.options,
-      correctAnswer: q.correctAnswer,
-      category: q.category,
-      interestType: q.interestType || null,
-    }));
+    return getBundledAssessmentQuestions();
   };
 
   if (loading) {
@@ -751,6 +812,7 @@ export function PublicAssessment() {
           localStorage.removeItem("publicAssessmentProgress_guest");
           setAssessmentCompleted(false);
           setResults(null);
+          assessmentStartedRef.current = false;
           setAssessmentStarted(false);
           setCurrentSection(0);
           setAnswers({});
@@ -777,6 +839,7 @@ export function PublicAssessment() {
                 localStorage.removeItem("publicAssessmentResults");
                 setAssessmentCompleted(false);
                 setResults(null);
+                assessmentStartedRef.current = false;
                 setAssessmentStarted(false);
               }}
               className="mt-6 rounded-xl bg-[var(--electron-blue)] px-5 py-3 font-semibold text-white"
@@ -1322,6 +1385,7 @@ export function PublicAssessment() {
       },
       topDomains: formattedResult.topDomains,
       topInterests: formattedResult.topInterests,
+      electiveRecommendations: formattedResult.electiveRecommendations,
       overallScore: formattedResult.scores.overall_score,
       aiRecommendation,
     };
@@ -1350,6 +1414,7 @@ export function PublicAssessment() {
   };
 
   const handleStartAssessment = () => {
+    assessmentStartedRef.current = true;
     setAssessmentStarted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };

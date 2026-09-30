@@ -48,11 +48,11 @@ SET
     ELSE question.question
   END,
   options = '[
-    "5 - Strongly Agree",
-    "4 - Agree",
-    "3 - Neutral",
+    "1 - Strongly Disagree",
     "2 - Disagree",
-    "1 - Strongly Disagree"
+    "3 - Neutral",
+    "4 - Agree",
+    "5 - Strongly Agree"
   ]'::jsonb,
   correct_answer = NULL,
   interest_type = CASE ordered_interests.interest_position

@@ -1,9 +1,11 @@
 import electives from "../src/data/electives.js";
 import {
+  isAdvancedElective,
   selectElectivesWithPrerequisites,
   validateElectiveSequence,
 } from "../src/utils/electivePrerequisites.js";
 import { scoreElectiveRecommendation } from "../src/utils/electiveRecommendationScoring.js";
+import { DEFAULT_GROQ_MODEL, DEFAULT_OPENROUTER_MODEL } from "./ai-models.js";
 
 console.log(
   "ENV:",
@@ -188,9 +190,13 @@ function buildElectiveExplanation(elective, data, positionLabel) {
   const idealFor = formatList(elective?.idealFor || [], "your assessment profile");
   const courses = formatList(elective?.relatedCourses || [], "related college programs");
   const careers = formatList(elective?.careerPathways || [], "future career opportunities");
+  const trackContext = data.track === 'Academic' 
+    ? 'within the Academic Track, where theoretical knowledge and research are emphasized'
+    : 'within the Technical-Professional Track, where practical skills and career-ready training are emphasized';
 
-  return `${positionLabel} is recommended because your ${strongestDomain.label} score (${strongestDomain.score}%) and ${interestSummary} connect well with ${idealFor}. This elective is about ${elective?.group || elective?.category || "a specialized learning area"} and builds strengths such as ${strengths}. You can expect learning activities that develop subject knowledge, applied skills, problem solving, and career awareness connected to this field. Possible future pathways include college courses such as ${courses}, as well as opportunities like ${careers}.`;
+  return `${positionLabel} is recommended for ${trackContext}. Your ${strongestDomain.label} score (${strongestDomain.score}%) and ${interestSummary} align well with ${idealFor}. This elective develops strengths such as ${strengths} through subject knowledge, applied skills, problem-solving, and career awareness. Foundation-level understanding here prepares you for related college programs in ${courses} and career opportunities in ${careers}.`;
 }
+
 
 function buildFallbackRecommendation(data, rankedElectives) {
   const savedElectives = Array.isArray(data.electives)
@@ -207,6 +213,17 @@ function buildFallbackRecommendation(data, rankedElectives) {
     : selectElectivesWithPrerequisites(rankedElectives, 2);
   const [firstElective = rankedElectives[0], secondElective = rankedElectives[1]] = selectedElectives;
   const strongestDomain = getStrongestDomain(data);
+
+  // Build track explanation with more context
+  let trackExplanation = "";
+  if (data.track === "Academic") {
+    trackExplanation = `The Academic Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), which is essential for college-preparatory learning. This track emphasizes theoretical knowledge, research skills, and academic specialization—preparing you for university-level study and careers requiring advanced education.`;
+  } else if (data.track === "Technical-Professional") {
+    trackExplanation = `The Technical-Professional Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), combined with practical and technical interests. This track emphasizes hands-on skills, career readiness, and industry-relevant training—preparing you for immediate career entry or further technical education.`;
+  } else {
+    trackExplanation = `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`;
+  }
+
   const courses = Array.from(
     new Set(
       [firstElective, secondElective]
@@ -224,12 +241,12 @@ function buildFallbackRecommendation(data, rankedElectives) {
 
   return {
     recommendedTrack: data.track,
-    trackExplanation: `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`,
+    trackExplanation,
     elective1: firstElective?.name || "",
-    elective1Explanation: buildElectiveExplanation(firstElective, data, firstElective?.name || "Elective 1"),
+    elective1Explanation: buildElectiveExplanation(firstElective, data, "Elective 1"),
     elective2: secondElective?.name || "",
-    elective2Explanation: buildElectiveExplanation(secondElective, data, secondElective?.name || "Elective 2"),
-    overallAnalysis: `Your result points toward the ${data.track} Track with electives that can help you turn your strengths into clearer college and career options.`,
+    elective2Explanation: buildElectiveExplanation(secondElective, data, "Elective 2"),
+    overallAnalysis: `Your ${data.track} Track recommendation is based on your strongest aptitudes and interests. The suggested electives—${firstElective?.name || "Elective 1"} and ${secondElective?.name || "Elective 2"}—are foundational subjects that will strengthen your skills and open pathways to related college programs and careers.`,
     suggestedCollegeCourses: courses,
     careerPathways,
   };
@@ -244,7 +261,7 @@ function removeFinalizedWording(text = "") {
     .trim();
 }
 
-function normalizeRecommendationResult(result, fallbackRecommendation, rankedElectives) {
+function normalizeRecommendationResult(result, fallbackRecommendation, rankedElectives, data) {
   if (!result || result.raw) {
     return result;
   }
@@ -255,18 +272,41 @@ function normalizeRecommendationResult(result, fallbackRecommendation, rankedEle
   const sequenceValidation = validateElectiveSequence(elective1, elective2, availableElectives);
   const firstElective = findElectiveByName(elective1, rankedElectives);
   const secondElective = findElectiveByName(elective2, rankedElectives);
-  const useFallbackElectives = !sequenceValidation.valid || !firstElective || !secondElective;
+  const useFallbackElectives =
+    !sequenceValidation.valid ||
+    !firstElective ||
+    !secondElective ||
+    isAdvancedElective(elective1) ||
+    isAdvancedElective(elective2);
+  const resolvedFirstElective = useFallbackElectives
+    ? findElectiveByName(fallbackRecommendation.elective1, rankedElectives)
+    : firstElective;
+  const resolvedSecondElective = useFallbackElectives
+    ? findElectiveByName(fallbackRecommendation.elective2, rankedElectives)
+    : secondElective;
+  const resolvedElectives = [resolvedFirstElective, resolvedSecondElective].filter(Boolean);
+  const careerPathways = resolvedElectives
+    .map((elective) => ({
+      category: elective.group || elective.category || elective.name,
+      careers: (elective.careerPathways || []).slice(0, 4),
+    }))
+    .filter((pathway) => pathway.careers.length > 0);
 
   return {
     ...result,
-    elective1: useFallbackElectives ? fallbackRecommendation.elective1 : elective1,
-    elective2: useFallbackElectives ? fallbackRecommendation.elective2 : elective2,
-    elective1Explanation: removeFinalizedWording(
-      useFallbackElectives ? fallbackRecommendation.elective1Explanation : result.elective1Explanation
+    elective1: resolvedFirstElective?.name || fallbackRecommendation.elective1,
+    elective2: resolvedSecondElective?.name || fallbackRecommendation.elective2,
+    elective1Explanation: buildElectiveExplanation(
+      resolvedFirstElective,
+      data,
+      "Elective 1"
     ),
-    elective2Explanation: removeFinalizedWording(
-      useFallbackElectives ? fallbackRecommendation.elective2Explanation : result.elective2Explanation
+    elective2Explanation: buildElectiveExplanation(
+      resolvedSecondElective,
+      data,
+      "Elective 2"
     ),
+    careerPathways,
     trackExplanation: removeFinalizedWording(result.trackExplanation || fallbackRecommendation.trackExplanation),
     overallAnalysis: removeFinalizedWording(result.overallAnalysis || fallbackRecommendation.overallAnalysis),
   };
@@ -294,8 +334,8 @@ export default async function handler(request, response) {
       : "https://openrouter.ai/api/v1/chat/completions";
   const model =
     provider === "groq"
-      ? process.env.GROQ_MODEL || "llama-3.3-70b-versatile"
-      : process.env.OPENROUTER_MODEL || "deepseek/deepseek-chat-v3-0324:free";
+      ? process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL
+      : process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
 
   if (!apiKey) {
     return sendJson(response, 200, {
@@ -321,7 +361,7 @@ Your tasks:
    - interest scores
    - strengths
    - compatibility
-5. Ensure recommendations align with the student's determined track.
+5. Explain the system-selected electives, even when an elective belongs to a different curriculum grouping than the recommended track.
 
 Track:
 ${data.track}
@@ -348,7 +388,7 @@ ${data.riasecScores ? JSON.stringify(data.riasecScores) : "Not available"}
 
 RECOMMENDATION FORMULA:
 Each elective is scored independently using the student's actual assessment results.
-Final elective score = aptitude fit * 0.55 + RIASEC interest fit * 0.45 when both signals are available.
+Final elective score = aptitude fit * 0.50 + RIASEC interest fit * 0.50 when both signals are available.
 Aptitude fit uses the elective's own verbal, math, science, and logical weights.
 RIASEC interest fit uses the student's Realistic, Investigative, Artistic, Social, Enterprising, and Conventional scores mapped to the elective's learning/work profile.
 Use compatibilityScore from TOP MATCHING ELECTIVES as the computed final elective score.
@@ -370,8 +410,8 @@ Electives must strongly align with the student's dominant interests and aptitude
 Do not recommend broad or unrelated electives.
 Prioritize electives with the highest compatibility scores, but treat all valid electives as eligible and do not favor any elective because of list order, popularity, or familiarity.
 Use ONLY electives from TOP MATCHING ELECTIVES.
-Ensure the chosen electives match the student's determined track.
-If local scoring electives are provided and they are valid for the determined track and prerequisite sequence, explain those recommendations instead of replacing them.
+Electives may come from any available curriculum grouping when their compatibility scores are highest.
+If local scoring electives are provided and they are valid for the prerequisite sequence, explain those recommendations instead of replacing them.
 Never say the student has already saved, finalized, chosen, or enrolled in an elective. Use recommendation-based wording such as "This elective is recommended..." or "This option fits your results...".
 Prerequisite rule: any Level 2 elective, including names ending in " 2" or using a pattern like "Subject 2: Topic", must only appear as elective2 when the matching Level 1 elective is elective1. Examples: Chemistry 2 requires Chemistry 1 first; Biology 2 requires Biology 1 first; Human Movement 2: Motor Skills Development requires Human Movement 1: Basic Anatomy in Sports and Exercise first. Do not return Programming + Chemistry 2 or any unrelated Level 1 + Level 2 pair.
 
@@ -417,6 +457,7 @@ Requirements:
 - Match electives based on strongest aptitude and interest scores.
 - Prioritize electives with highest compatibility scores.
 - Do not bias recommendations toward specific elective names, groups, or earlier list positions.
+- Electives may come from any available curriculum grouping; do not reject an elective only because its catalog track differs from the recommended track.
 - Follow prerequisite order: elective1 must be the Level 1 prerequisite if elective2 is the matching Level 2 subject.
 - Do not recommend any Level 2 elective unless its matching Level 1 elective is also recommended first.
 - Avoid unrelated or weak recommendations.
@@ -530,7 +571,8 @@ Do not copy these elective names unless they are valid TOP MATCHING ELECTIVES fo
     const parsedResult = normalizeRecommendationResult(
       parseAiJson(reply),
       fallbackRecommendation,
-      rankedElectives
+      rankedElectives,
+      data
     );
 
     return sendJson(response, 200, {
