@@ -25,7 +25,6 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 import { getSystemSettings, parseBooleanStrict } from "../../services/systemSettingsService";
-import { getAssessmentQuestions, getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
@@ -54,6 +53,7 @@ interface AssessmentResults {
   topInterests: string[];
   overallScore?: number;
   answers?: Record<string | number, any>;
+  answerSnapshots?: any[];
   aiRecommendation?: {
     recommendedTrack?: string;
     trackExplanation?: string;
@@ -163,6 +163,7 @@ export function Results() {
   const [assessmentAnswersVisible, setAssessmentAnswersVisible] = useState(true);
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [studentAnswers, setStudentAnswers] = useState<Record<string | number, any>>({});
+  const [answerSnapshots, setAnswerSnapshots] = useState<any[]>([]);
   const [activeDomainTab, setActiveDomainTab] = useState<string>("Verbal");
   const [domainFilter, setDomainFilter] = useState<"all" | "correct" | "incorrect">("all");
 
@@ -187,10 +188,9 @@ export function Results() {
       }
 
       try {
-        const [latestResult, systemSettings, questionsResult] = await Promise.all([
+        const [latestResult, systemSettings] = await Promise.all([
           getLatestAssessmentResult(userEmail),
           getSystemSettings(),
-          getAssessmentQuestions(),
         ]);
 
         if (systemSettings?.data) {
@@ -199,20 +199,14 @@ export function Results() {
           );
         }
 
-        const rawQuestions = (
-          questionsResult?.data && questionsResult.data.length > 0
-            ? questionsResult.data
-            : getDefaultAssessmentQuestions()
-        ).map((q: any, idx: number) => ({
-          id: q.id ?? idx + 1,
-          question: q.question,
-          options: Array.isArray(q.options) ? q.options : [],
-          correctAnswer: q.correct_answer !== undefined ? q.correct_answer : (q.correctAnswer !== undefined ? q.correctAnswer : null),
-          category: q.category,
-          interestType: q.interest_type ?? q.interestType ?? null,
-        }));
-
-        setQuestions(rawQuestions);
+        const localAnswerSnapshotsRaw = localStorage.getItem(`assessmentAnswerSnapshots_${userEmail}`);
+        const localAnswerSnapshots = localAnswerSnapshotsRaw ? JSON.parse(localAnswerSnapshotsRaw) : [];
+        const storedAnswerSnapshots =
+          (latestResult?.answerSnapshots?.length ? latestResult.answerSnapshots : null) ||
+          (storedResults?.answerSnapshots?.length ? storedResults.answerSnapshots : null) ||
+          localAnswerSnapshots;
+        setAnswerSnapshots(storedAnswerSnapshots);
+        setQuestions([]);
 
         const rawAnswers =
           latestResult?.answers ||
@@ -243,6 +237,7 @@ export function Results() {
             overallScore: latestResult.overallScore,
             aiRecommendation: storedResults?.aiRecommendation,
             answers: rawAnswers || undefined,
+            answerSnapshots: storedAnswerSnapshots,
           });
           setLoading(false);
           return;
@@ -252,21 +247,14 @@ export function Results() {
           setResults({
             ...storedResults,
             answers: storedResults.answers || rawAnswers || undefined,
+            answerSnapshots: storedAnswerSnapshots,
           });
         } else {
           setResults(null);
         }
       } catch (error) {
         console.error("Error loading assessment results:", error);
-        const fallbackQuestions = getDefaultAssessmentQuestions().map((q: any, idx: number) => ({
-          id: q.id ?? idx + 1,
-          question: q.question,
-          options: Array.isArray(q.options) ? q.options : [],
-          correctAnswer: q.correctAnswer !== undefined ? q.correctAnswer : null,
-          category: q.category,
-          interestType: q.interestType ?? null,
-        }));
-        setQuestions(fallbackQuestions);
+        setQuestions([]);
         if (storedResults) {
           setResults(storedResults);
         } else {
@@ -380,6 +368,31 @@ export function Results() {
   const resolvedAptitudeQuestions = useMemo(() => {
     if (!results || activeDomainTab === "Interests") return [];
 
+    if (answerSnapshots.length > 0) {
+      return answerSnapshots
+        .filter((snapshot) => snapshot.category === activeTabConfig.category)
+        .map((snapshot, idx) => {
+          const selectedChoiceIndex = snapshot.selectedChoiceId
+            ? snapshot.choices.findIndex((choice: any) => choice.id === snapshot.selectedChoiceId)
+            : null;
+          const correctChoiceIndex = snapshot.correctChoiceId
+            ? snapshot.choices.findIndex((choice: any) => choice.id === snapshot.correctChoiceId)
+            : null;
+
+          return {
+            id: snapshot.questionId,
+            question: snapshot.questionText,
+            options: snapshot.choices.map((choice: any) => choice.text),
+            correctAnswer: correctChoiceIndex,
+            category: snapshot.category,
+            questionNumber: idx + 1,
+            studentChoice: selectedChoiceIndex,
+            isCorrect: snapshot.isCorrect === true,
+            points: snapshot.isCorrect === true ? 1 : 0,
+          };
+        });
+    }
+
     const categoryQuestions = questions.filter(
       (q) => q.category.toLowerCase() === activeTabConfig.category.toLowerCase()
     );
@@ -420,7 +433,7 @@ export function Results() {
         points,
       };
     });
-  }, [results, activeDomainTab, activeTabConfig, currentDomainScore, questions, studentAnswers]);
+  }, [answerSnapshots, results, activeDomainTab, activeTabConfig, currentDomainScore, questions, studentAnswers]);
 
   const displayedAptitudeQuestions = useMemo(() => {
     if (!results) return [];
@@ -439,6 +452,36 @@ export function Results() {
 
   const resolvedInterestQuestions = useMemo(() => {
     if (!results) return [];
+
+    if (answerSnapshots.length > 0) {
+      return answerSnapshots
+        .filter((snapshot) => snapshot.category === "Interests")
+        .map((snapshot, idx) => {
+          const rating = snapshot.selectedChoiceId
+            ? snapshot.choices.findIndex((choice: any) => choice.id === snapshot.selectedChoiceId) + 1
+            : null;
+          const likertTexts: Record<number, string> = {
+            1: "Strongly Disagree",
+            2: "Disagree",
+            3: "Neutral",
+            4: "Agree",
+            5: "Strongly Agree",
+          };
+
+          return {
+            id: snapshot.questionId,
+            question: snapshot.questionText,
+            options: snapshot.choices.map((choice: any) => choice.text),
+            correctAnswer: null,
+            category: snapshot.category,
+            interestType: snapshot.interestType,
+            questionNumber: idx + 1,
+            rating,
+            ratingLabel: rating ? likertTexts[rating] : "Not answered",
+          };
+        });
+    }
+
     const interestQuestions = questions.filter(
       (q) => q.category.toLowerCase() === "interests"
     );
@@ -492,7 +535,7 @@ export function Results() {
         ratingLabel: LIKERT_TEXTS[rating] || "Neutral",
       };
     });
-  }, [results, questions, safeTopInterests, studentAnswers]);
+  }, [answerSnapshots, results, questions, safeTopInterests, studentAnswers]);
 
   if (loading) {
     return (

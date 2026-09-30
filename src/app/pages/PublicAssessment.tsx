@@ -8,6 +8,7 @@ import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
+import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
 import electivesCatalog from "../../data/electives.js";
 
 interface Question {
@@ -69,6 +70,7 @@ interface AssessmentResult {
   topDomains: string[];
   topInterests: string[];
   overallScore: number;
+  answerSnapshots?: any[];
   aiRecommendation?: any;
 }
 
@@ -165,6 +167,9 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
       ? result.electiveRecommendations
       : [],
     overallScore: normalizeResultScore(result.overallScore ?? result.overall_score ?? rawScores.overall_score),
+    answerSnapshots: Array.isArray(result.answerSnapshots ?? result.answer_snapshots)
+      ? (result.answerSnapshots ?? result.answer_snapshots)
+      : [],
     aiRecommendation: result.aiRecommendation || {},
   };
 };
@@ -1388,6 +1393,7 @@ export function PublicAssessment() {
       electiveRecommendations: formattedResult.electiveRecommendations,
       overallScore: formattedResult.scores.overall_score,
       aiRecommendation,
+      answerSnapshots: buildAssessmentAnswerSnapshots(answers, questionsByCategory),
     };
 
     const normalizedResult = normalizeAssessmentResult(assessmentResult);

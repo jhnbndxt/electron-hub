@@ -10,6 +10,10 @@
 import { supabase } from '../supabase';
 import { triggerNotification } from './notificationService';
 
+function normalizeAnswerSnapshots(value) {
+  return Array.isArray(value) ? value : [];
+}
+
 function normalizeScores(assessmentData = {}) {
   const scoreSource = assessmentData.scores || {};
 
@@ -115,6 +119,7 @@ function mapAssessmentResult(result) {
     elective_1: electives[0] || null,
     elective_2: electives[1] || null,
     answers: result.answers || result.top_interests?.answers || null,
+    answerSnapshots: normalizeAnswerSnapshots(result.answer_snapshots),
   };
 }
 
@@ -140,6 +145,7 @@ function buildAssessmentInsertPayload(studentId, assessmentData = {}, publicProf
     overall_score: scores.overall_score,
     top_domains: topDomains,
     top_interests: topInterests,
+    answer_snapshots: normalizeAnswerSnapshots(assessmentData.answerSnapshots ?? assessmentData.answer_snapshots),
     ...(publicProfile
       ? {
           public_full_name: publicProfile.fullName,
@@ -303,6 +309,7 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
         overall_score: scores.overall_score,
         top_domains: topDomains,
         top_interests: topInterests,
+        answer_snapshots: normalizeAnswerSnapshots(assessmentData.answerSnapshots ?? assessmentData.answer_snapshots),
       })
       .select();
 
