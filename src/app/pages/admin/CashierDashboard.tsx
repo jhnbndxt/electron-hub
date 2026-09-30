@@ -869,7 +869,7 @@ export function CashierDashboard() {
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="sticky right-0 z-10 bg-gray-50 px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                     Actions
                   </th>
                 </tr>
@@ -930,14 +930,14 @@ export function CashierDashboard() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="sticky right-0 z-10 bg-white px-4 sm:px-6 py-4 whitespace-nowrap text-sm shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.45)]">
                       <button
                         onClick={() => {
                           setSelectedPayment(payment);
                           setShowReviewModal(true);
                         }}
                         disabled={isProcessing}
-                        className={`inline-flex items-center gap-2 px-3 py-1.5 font-medium transition-colors ${isProcessing ? 'cursor-not-allowed text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
+                        className={`inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 font-medium transition-colors ${isProcessing ? 'cursor-not-allowed text-gray-400' : 'text-blue-600 hover:text-blue-800'}`}
                       >
                         <Eye className="w-4 h-4" />
                         Review

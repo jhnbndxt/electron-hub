@@ -1,3 +1,5 @@
+import { escapeCSVCell, formatCurrencyForCSV as formatCurrencyValueForCSV } from './csvExportCore.js';
+
 /**
  * CSV Export Utility with Electron Hub Branding
  * Exports data to CSV format with consistent branding and styling
@@ -19,9 +21,6 @@ export const ELECTRON_BRANDING = {
   white: '#FFFFFF',
   success: '#10B981',      // Success Green
 };
-
-const escapeCSVCell = (cell: string | number | boolean): string =>
-  `"${String(cell).replace(/"/g, '""')}"`;
 
 /**
  * Export data as a CSV file with Electron Hub branding
@@ -85,13 +84,7 @@ export const exportToCSV = (options: ExportOptions): void => {
  * Format currency for CSV export
  */
 export const formatCurrencyForCSV = (amount: number | string): string => {
-  if (typeof amount === 'string') {
-    return amount;
-  }
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-  }).format(amount);
+  return formatCurrencyValueForCSV(amount);
 };
 
 /**
