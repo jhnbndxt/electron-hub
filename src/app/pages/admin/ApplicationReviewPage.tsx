@@ -1400,7 +1400,7 @@ export function ApplicationReviewPage() {
 
         {isAlreadyEnrolled ? (
           <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm font-semibold text-blue-800">
-            Pending Documents: review and approve or reject the newly uploaded document. The student will remain Enrolled.
+            Student already enrolled. This review concerns an uploaded document only.
           </div>
         ) : <footer className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
           <div className="grid gap-3 lg:grid-cols-2">
