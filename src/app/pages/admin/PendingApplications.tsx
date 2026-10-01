@@ -783,9 +783,6 @@ export function PendingApplications() {
               <h2 className="text-xl font-semibold text-gray-900">
                 Application Queue
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Re-uploaded submissions stay first, pending reviews stay next, and approved applications stay below for monitoring until enrollment.
-              </p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-[360px]">
               <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-amber-800">
