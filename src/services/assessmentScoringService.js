@@ -628,13 +628,7 @@ export function determineTrack(scores, interestClusters = {}, riasecScores = {})
   return recommendedTrack;
 }
 
-/**
- * Recommend the top two individual electives.
- *
- * Each elective competes independently using its own configured weights. This
- * avoids the old family-level behavior where the same first two options in a
- * group were always selected, even when other electives were equally strong.
- */
+
 export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}, maybeRiasecScores = {}) {
   let track = trackOrScores;
   let scores = scoresOrInterestClusters;

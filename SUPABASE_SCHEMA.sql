@@ -189,6 +189,7 @@ CREATE TABLE assessment_results (
   -- Analysis
   top_domains JSONB, -- Array of strings
   top_interests JSONB, -- Array of strings
+  answer_snapshots JSONB NOT NULL DEFAULT '[]', -- Immutable questions and responses captured at submission
   
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

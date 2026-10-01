@@ -154,6 +154,7 @@ const getAddUserFieldError = (field: AddUserField, form: AddUserForm) => {
 export function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
+  const [accountTab, setAccountTab] = useState<"active" | "deactivated">("active");
   const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
   const [selectedRole, setSelectedRole] = useState<EditableRole>("student");
   const [editDisplayName, setEditDisplayName] = useState("");
@@ -164,6 +165,8 @@ export function UserManagement() {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
+  const [reactivatingUser, setReactivatingUser] = useState<UserAccount | null>(null);
+  const [permanentlyDeletingUser, setPermanentlyDeletingUser] = useState<UserAccount | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -266,9 +269,11 @@ export function UserManagement() {
   };
 
   const visibleUsers = users.filter((user) => user.status !== "inactive");
+  const deactivatedUsers = users.filter((user) => user.status === "inactive");
+  const usersForCurrentTab = accountTab === "active" ? visibleUsers : deactivatedUsers;
 
   // Filter users
-  let filteredUsers = visibleUsers.filter(
+  let filteredUsers = usersForCurrentTab.filter(
     (user) =>
       user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase())
@@ -455,6 +460,62 @@ export function UserManagement() {
       setSuccessMessage("User deactivated successfully!");
       setTimeout(() => setShowSuccessToast(false), 3000);
     }
+  };
+
+  const handleConfirmReactivate = async () => {
+    if (!reactivatingUser) return;
+
+    const { error } = await supabase
+      .from("users")
+      .update({ status: "active", updated_at: new Date().toISOString() })
+      .eq("id", reactivatingUser.id);
+
+    if (error) {
+      console.error("Error reactivating user:", error);
+      showError(error.message || "Failed to reactivate user.");
+      return;
+    }
+
+    setUsers((currentUsers) =>
+      currentUsers.map((user) =>
+        user.id === reactivatingUser.id ? { ...user, status: "active" } : user
+      )
+    );
+    setReactivatingUser(null);
+    showSuccess("User reactivated successfully!");
+  };
+
+  const handleConfirmPermanentDelete = async () => {
+    if (!permanentlyDeletingUser) return;
+
+    if (permanentlyDeletingUser.id === userData?.id) {
+      showError("You cannot permanently delete your own account while logged in.");
+      return;
+    }
+
+    const { data: deletedUser, error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", permanentlyDeletingUser.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Error permanently deleting user:", error);
+      showError(error.message || "Failed to permanently delete user.");
+      return;
+    }
+
+    if (!deletedUser) {
+      showError("The user could not be deleted. Check database permissions and try again.");
+      return;
+    }
+
+    setUsers((currentUsers) =>
+      currentUsers.filter((user) => user.id !== permanentlyDeletingUser.id)
+    );
+    setPermanentlyDeletingUser(null);
+    showSuccess("User permanently deleted from the database.");
   };
 
   const handleAddUser = () => {
@@ -700,6 +761,11 @@ export function UserManagement() {
                 Staff: {visibleUsers.filter(u => u.role !== 'student').length}
               </span>
             </div>
+            <div className="px-3 py-1.5 rounded-md bg-amber-50 border border-amber-200">
+              <span className="text-xs font-medium text-amber-700">
+                Deactivated: {deactivatedUsers.length}
+              </span>
+            </div>
           </div>
           <button
             onClick={() => {
@@ -728,6 +794,33 @@ export function UserManagement() {
       />
 
       <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-6 pt-5">
+          <button
+            type="button"
+            onClick={() => setAccountTab("active")}
+            className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
+              accountTab === "active"
+                ? "border-blue-800 text-blue-900"
+                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+            }`}
+          >
+            Active Accounts
+            <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">{visibleUsers.length}</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setAccountTab("deactivated")}
+            className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
+              accountTab === "deactivated"
+                ? "border-amber-600 text-amber-800"
+                : "border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700"
+            }`}
+          >
+            Deactivated Accounts
+            <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">{deactivatedUsers.length}</span>
+          </button>
+        </div>
+
         <div className="flex flex-col gap-4 border-b border-gray-200 bg-gray-50/70 p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="relative flex-1 max-w-xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -819,26 +912,43 @@ export function UserManagement() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEditClick(user)}
-                            className="rounded-lg p-2 transition-colors hover:bg-blue-50"
-                            title="Edit user"
-                          >
-                            <Edit2
-                              className="w-4 h-4"
-                              style={{ color: "#1E3A8A" }}
-                            />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user)}
-                            className="rounded-lg p-2 transition-colors hover:bg-red-50"
-                            title="Delete user"
-                          >
-                            <Trash2
-                              className="w-4 h-4"
-                              style={{ color: "#B91C1C" }}
-                            />
-                          </button>
+                          {accountTab === "active" ? (
+                            <>
+                              <button
+                                onClick={() => handleEditClick(user)}
+                                className="rounded-lg p-2 transition-colors hover:bg-blue-50"
+                                title="Edit user"
+                              >
+                                <Edit2 className="w-4 h-4" style={{ color: "#1E3A8A" }} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteUser(user)}
+                                className="rounded-lg p-2 transition-colors hover:bg-red-50"
+                                title="Deactivate user"
+                              >
+                                <Trash2 className="w-4 h-4" style={{ color: "#B91C1C" }} />
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setReactivatingUser(user)}
+                                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-100"
+                                title="Reactivate user"
+                              >
+                                <RefreshCw className="h-4 w-4" />
+                                Reactivate
+                              </button>
+                              <button
+                                onClick={() => setPermanentlyDeletingUser(user)}
+                                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700 transition-colors hover:bg-red-100"
+                                title="Permanently delete user"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                                Delete permanently
+                              </button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -854,7 +964,8 @@ export function UserManagement() {
           <p className="text-sm text-gray-600">
             Showing{" "}
             <span className="font-medium">{filteredUsers.length}</span> of{" "}
-            <span className="font-medium">{visibleUsers.length}</span> users
+            <span className="font-medium">{usersForCurrentTab.length}</span>{" "}
+            {accountTab === "active" ? "active users" : "deactivated users"}
           </p>
         </div>
       </div>
@@ -1375,6 +1486,36 @@ export function UserManagement() {
         type="danger"
         onConfirm={handleConfirmDelete}
         onClose={() => setDeletingUser(null)}
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(reactivatingUser)}
+        title="Reactivate User"
+        message={
+          reactivatingUser
+            ? `Reactivate ${reactivatingUser.name}? They will be able to sign in again.`
+            : ""
+        }
+        confirmText="Reactivate User"
+        cancelText="Cancel"
+        type="success"
+        onConfirm={handleConfirmReactivate}
+        onClose={() => setReactivatingUser(null)}
+      />
+
+      <ConfirmationModal
+        isOpen={Boolean(permanentlyDeletingUser)}
+        title="Permanently Delete User"
+        message={
+          permanentlyDeletingUser
+            ? `Permanently delete ${permanentlyDeletingUser.name}? This removes the account from the database and cannot be undone.`
+            : ""
+        }
+        confirmText="Delete Permanently"
+        cancelText="Cancel"
+        type="danger"
+        onConfirm={handleConfirmPermanentDelete}
+        onClose={() => setPermanentlyDeletingUser(null)}
       />
 
       <style>{`

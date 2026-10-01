@@ -9,6 +9,7 @@ import { formatAssessmentResult } from "../../services/assessmentScoringService"
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { supabase } from "../../supabase";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
+import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
 
 interface Question {
   id: number;
@@ -493,6 +494,7 @@ export function Assessment() {
     }
 
     const userEmail = userData?.email || "student@gmail.com";
+    const answerSnapshots = buildAssessmentAnswerSnapshots(answers, questionsByCategory);
 
     localStorage.setItem(
       `assessmentResults_${userEmail}`,
@@ -511,13 +513,19 @@ export function Assessment() {
         overallScore: assessmentResult.scores.overall_score,
         aiRecommendation,
         answers,
+        answerSnapshots,
       })
     );
     localStorage.setItem(`assessmentAnswers_${userEmail}`, JSON.stringify(answers));
+    localStorage.setItem(`assessmentAnswerSnapshots_${userEmail}`, JSON.stringify(answerSnapshots));
     setSubmitProgress(82);
 
     try {
-      await saveAssessmentResult(userEmail, { ...assessmentResult, answers });
+      await saveAssessmentResult(userEmail, {
+        ...assessmentResult,
+        answers,
+        answerSnapshots,
+      });
       console.log("✅ Assessment result saved to Supabase");
       localStorage.removeItem(assessmentProgressKey);
       setSubmitProgress(94);
