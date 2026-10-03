@@ -17,6 +17,7 @@ interface UserAccount {
   role: string;
   status?: string;
   dateCreated: string;
+  deactivatedAt?: string | null;
 }
 
 type CreatableRole = "student" | "registrar" | "branchcoordinator" | "cashier";
@@ -61,6 +62,15 @@ const EDITABLE_ROLE_OPTIONS: Array<{ value: EditableRole; label: string; descrip
   { value: "branchcoordinator", label: "Branch Coordinator", description: "Branch administration and user management access" },
 ];
 const EDITABLE_ROLE_VALUES = EDITABLE_ROLE_OPTIONS.map((role) => role.value);
+const ACCOUNT_DELETION_RETENTION_DAYS = 30;
+
+const formatDeletionDate = (deactivatedAt?: string | null) => {
+  if (!deactivatedAt) return "30 days after deactivation";
+  const deactivationDate = new Date(deactivatedAt);
+  if (Number.isNaN(deactivationDate.getTime())) return "30 days after deactivation";
+  const deletionDate = new Date(deactivationDate.getTime() + ACCOUNT_DELETION_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+  return deletionDate.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+};
 
 const getPasswordRequirements = (password: string) => {
   const missingRequirements: string[] = [];
@@ -195,7 +205,7 @@ export function UserManagement() {
     setIsLoading(true);
     const { data, error } = await supabase
       .from('users')
-      .select('id, email, full_name, contact_number, role, status, created_at')
+      .select('id, email, full_name, contact_number, role, status, created_at, deactivated_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -219,6 +229,7 @@ export function UserManagement() {
       role: user.role || 'student',
       status: user.status || 'active',
       dateCreated: new Date(user.created_at).toLocaleDateString(),
+      deactivatedAt: user.deactivated_at || (user.status === "inactive" ? user.updated_at : null),
     }));
 
     setUsers(formattedUsers);
@@ -438,10 +449,15 @@ export function UserManagement() {
         return;
       }
 
+      const deactivatedAt = new Date().toISOString();
       // Deactivate in Supabase instead of deleting the record
       const { error } = await supabase
         .from('users')
-        .update({ status: 'inactive', updated_at: new Date().toISOString() })
+        .update({
+          status: 'inactive',
+          deactivated_at: deactivatedAt,
+          updated_at: deactivatedAt,
+        })
         .eq('id', deletingUser.id);
 
       if (error) {
@@ -466,18 +482,21 @@ export function UserManagement() {
             previous_status: deletingUser.status || "active",
             new_status: "inactive",
             deletion_type: "deactivated",
+            scheduled_deletion_at: formatDeletionDate(deactivatedAt),
           },
         }
       );
 
       const updatedUsers = users.map((user) =>
-        user.id === deletingUser.id ? { ...user, status: 'inactive' } : user
+        user.id === deletingUser.id
+          ? { ...user, status: 'inactive', deactivatedAt }
+          : user
       );
       setUsers(updatedUsers);
       
       setDeletingUser(null);
       setShowSuccessToast(true);
-      setSuccessMessage("User deactivated successfully!");
+      setSuccessMessage(`User deactivated. Permanent deletion is scheduled for ${formatDeletionDate(deactivatedAt)}.`);
       setTimeout(() => setShowSuccessToast(false), 3000);
     }
   };
@@ -487,7 +506,7 @@ export function UserManagement() {
 
     const { error } = await supabase
       .from("users")
-      .update({ status: "active", updated_at: new Date().toISOString() })
+      .update({ status: "active", deactivated_at: null, updated_at: new Date().toISOString() })
       .eq("id", reactivatingUser.id);
 
     if (error) {
@@ -498,7 +517,7 @@ export function UserManagement() {
 
     setUsers((currentUsers) =>
       currentUsers.map((user) =>
-        user.id === reactivatingUser.id ? { ...user, status: "active" } : user
+        user.id === reactivatingUser.id ? { ...user, status: "active", deactivatedAt: null } : user
       )
     );
     setReactivatingUser(null);
@@ -920,6 +939,11 @@ export function UserManagement() {
                         <p className="text-sm font-medium text-gray-900">
                           {user.name}
                         </p>
+                        {accountTab === "deactivated" && (
+                          <p className="mt-1 text-xs text-amber-700">
+                            Scheduled for permanent deletion: {formatDeletionDate(user.deactivatedAt)}
+                          </p>
+                        )}
                       </td>
                       <td className="px-6 py-4">
                         <p className="text-sm text-gray-600">{user.email}</p>
@@ -1517,7 +1541,7 @@ export function UserManagement() {
         title="Deactivate User"
         message={
           deletingUser
-            ? `Deactivate ${deletingUser.name}? Their record will stay in the system, but they will no longer be able to sign in.`
+            ? `Deactivate ${deletingUser.name}? They will no longer be able to sign in. Their account and linked data are scheduled for permanent deletion 30 days after deactivation, unless the account is reactivated before then.`
             : ""
         }
         confirmText="Deactivate User"

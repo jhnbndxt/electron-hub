@@ -21,7 +21,8 @@ export function Login() {
   const location = useLocation();
   const { login } = useAuth();
   const [searchParams] = useSearchParams();
-  const shouldAnimateEntry = Boolean((location.state as { fromPublicLogin?: boolean } | null)?.fromPublicLogin);
+  const locationState = location.state as { fromPublicLogin?: boolean; sessionNotice?: string } | null;
+  const shouldAnimateEntry = Boolean(locationState?.fromPublicLogin);
 
   // Check if user came from assessment link
   useEffect(() => {
@@ -142,6 +143,11 @@ export function Login() {
       <div className="relative z-10 flex w-full max-w-6xl items-center justify-center">
         {/* Assessment Banner */}
         <div className="w-full max-w-[27rem]">
+        {locationState?.sessionNotice && (
+          <div role="status" className="mb-4 rounded-[1.25rem] border border-blue-200 bg-blue-50/90 px-4 py-3.5 text-sm leading-6 text-blue-900 shadow-lg">
+            {locationState.sessionNotice}
+          </div>
+        )}
         {showBanner && (
           <div
             className="mb-4 rounded-[1.25rem] border border-white/60 bg-white/75 px-4 py-3.5 shadow-lg backdrop-blur-xl animate-slide-down"

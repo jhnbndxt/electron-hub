@@ -59,6 +59,9 @@ const formatNotification = (notification: any) => ({
   actionUrl: notification.data?.actionUrl,
 });
 
+const STUDENT_IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+const STUDENT_IDLE_WARNING_MS = 2 * 60 * 1000;
+
 function DashboardLayoutContent() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -85,6 +88,11 @@ function DashboardLayoutContent() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [maintenanceCountdown, setMaintenanceCountdown] = useState(5);
   const [showMaintenanceNotice, setShowMaintenanceNotice] = useState(false);
+  const [idleWarningSeconds, setIdleWarningSeconds] = useState<number | null>(null);
+  const lastStudentActivityAt = useRef(Date.now());
+  const idleLogoutStarted = useRef(false);
+  const logoutAction = useRef(logout);
+  logoutAction.current = logout;
   const notificationRef = useRef<HTMLDivElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
   const paymentTooltipRef = useRef<HTMLDivElement>(null);
@@ -169,6 +177,56 @@ function DashboardLayoutContent() {
       setMaintenanceCountdown(5);
     }
   }, [settingsLoaded, isMaintenanceModeActive, isStudentUser]);
+
+  useEffect(() => {
+    if (!isStudentUser || !userData?.id) {
+      setIdleWarningSeconds(null);
+      return;
+    }
+
+    const recordActivity = () => {
+      lastStudentActivityAt.current = Date.now();
+      setIdleWarningSeconds((current) => current === null ? current : null);
+    };
+
+    const checkIdleTimeout = () => {
+      const remainingMs = STUDENT_IDLE_TIMEOUT_MS - (Date.now() - lastStudentActivityAt.current);
+      if (remainingMs <= 0) {
+        if (idleLogoutStarted.current) return;
+        idleLogoutStarted.current = true;
+        logoutAction.current();
+        navigate("/login", {
+          replace: true,
+          state: { sessionNotice: "You were logged out after 30 minutes of inactivity." },
+        });
+        return;
+      }
+
+      if (remainingMs <= STUDENT_IDLE_WARNING_MS) {
+        setIdleWarningSeconds(Math.ceil(remainingMs / 1000));
+      } else {
+        setIdleWarningSeconds(null);
+      }
+    };
+
+    lastStudentActivityAt.current = Date.now();
+    idleLogoutStarted.current = false;
+    const activityEvents: Array<keyof WindowEventMap> = [
+      "pointerdown",
+      "pointermove",
+      "keydown",
+      "scroll",
+      "touchstart",
+      "click",
+    ];
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, recordActivity, { passive: true }));
+    const idleCheckInterval = window.setInterval(checkIdleTimeout, 1000);
+
+    return () => {
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, recordActivity));
+      window.clearInterval(idleCheckInterval);
+    };
+  }, [isStudentUser, userData?.id, navigate]);
 
   useEffect(() => {
     if (!showMaintenanceNotice) {
@@ -544,6 +602,53 @@ function DashboardLayoutContent() {
 
   return (
     <div className="portal-glass-shell min-h-screen flex lg:h-screen lg:overflow-hidden">
+      {idleWarningSeconds !== null && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="idle-warning-title"
+          aria-describedby="idle-warning-description"
+        >
+          <div className="w-full max-w-md rounded-3xl border border-white/70 bg-white p-6 shadow-2xl sm:p-8">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <h2 id="idle-warning-title" className="mt-5 text-xl font-bold text-slate-900">
+              You&apos;re about to be logged out
+            </h2>
+            <p id="idle-warning-description" className="mt-2 text-sm leading-6 text-slate-600">
+              You&apos;ve been inactive. For your security, you&apos;ll be logged out in{" "}
+              <span className="font-bold text-slate-900">
+                {Math.floor(idleWarningSeconds / 60)}:{String(idleWarningSeconds % 60).padStart(2, "0")}
+              </span>
+              . Continue your session to stay signed in.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={() => {
+                  lastStudentActivityAt.current = Date.now();
+                  setIdleWarningSeconds(null);
+                }}
+                className="flex-1 rounded-xl bg-blue-800 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-900"
+              >
+                Stay logged in
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  navigate("/login", { replace: true });
+                }}
+                className="flex-1 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Log out now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         className={`fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
           isMobileNavOpen ? "opacity-100" : "pointer-events-none opacity-0"
