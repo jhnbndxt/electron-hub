@@ -462,6 +462,23 @@ export function Profile() {
   }, [userData, location]); // Re-run when location changes (navigation)
 
   useEffect(() => {
+    if (!userData?.email) return;
+
+    const enrollmentChannel = supabase
+      .channel(`student-profile-enrollment-status-${userData.email}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "enrollments", filter: `user_id=eq.${userData.email}` },
+        () => void checkStatus()
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(enrollmentChannel);
+    };
+  }, [userData?.email]);
+
+  useEffect(() => {
     const enrollmentId = enrollmentData?.id;
     if (!enrollmentId || (!userData?.id && !userData?.email)) {
       return;
@@ -559,6 +576,11 @@ export function Profile() {
   
   // Get enrollment status from progress
   const getEnrollmentStatus = () => {
+    const persistedStatus = String(enrollmentData?.status || "").toLowerCase();
+    if (persistedStatus === "unenrolled") {
+      return { label: "Unenrolled", color: "bg-red-100 text-red-700" };
+    }
+
     const paymentVerifiedStep = enrollmentProgress.find(step => step.name === "Payment Verified");
     const enrolledStep = enrollmentProgress.find(step => step.name === "Enrolled");
     const documentsVerifiedStep = enrollmentProgress.find(step => step.name === "Documents Verified");

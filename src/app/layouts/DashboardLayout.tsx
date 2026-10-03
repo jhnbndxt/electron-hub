@@ -674,7 +674,7 @@ function DashboardLayoutContent() {
           </ul>
         </nav>
 
-        {/* Back to Home Button */}
+        {/* Sidebar Actions */}
         <div className="p-4 border-t border-white/10">
           <button
             onClick={() => navigate("/")}
@@ -682,6 +682,14 @@ function DashboardLayoutContent() {
           >
             <Home className="w-5 h-5" />
             <span>Back to Home</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowLogoutModal(true)}
+            className="portal-glass-nav-link mt-2 flex w-full items-center gap-3 rounded-md px-4 py-3 text-white/80 transition-colors hover:text-white"
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Log Out</span>
           </button>
         </div>
       </aside>

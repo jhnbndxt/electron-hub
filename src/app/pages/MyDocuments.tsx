@@ -4,6 +4,7 @@ import { useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
 import { triggerNotification } from "../../services/notificationService";
+import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
 
 
 interface DocumentStatus {
@@ -261,7 +262,7 @@ export function MyDocuments() {
                 <input
                   type="file"
                   className="hidden"
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                  accept={DOCUMENT_ACCEPT_ATTRIBUTE}
                   disabled={uploadingDoc !== null}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -278,6 +279,12 @@ export function MyDocuments() {
 
   const handleFileUpload = async (docName: string, file: File) => {
     if (!userData?.email) return;
+
+    const fileError = validateDocumentFile(file);
+    if (fileError) {
+      alert(fileError);
+      return;
+    }
 
     setUploadingDoc(docName);
 
@@ -487,7 +494,7 @@ export function MyDocuments() {
                             <input
                               type="file"
                               className="hidden"
-                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                              accept={DOCUMENT_ACCEPT_ATTRIBUTE}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) handleFileUpload(doc.name, file);

@@ -62,6 +62,59 @@ const buildAuditDetails = (details, fallbackAction = '') => {
   }
 };
 
+const isPublicIpAddress = (value) => {
+  const ipAddress = String(value || '').trim();
+
+  if (!ipAddress || /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|::ffff:127\.0\.0\.1)$/i.test(ipAddress)) {
+    return false;
+  }
+
+  if (!/^[0-9a-f:.]+$/i.test(ipAddress)) {
+    return false;
+  }
+
+  const ipv4Segments = ipAddress.match(/^\d{1,3}(?:\.\d{1,3}){3}$/) ? ipAddress.split('.').map(Number) : null;
+  if (ipv4Segments) {
+    const [first, second] = ipv4Segments;
+    if (ipv4Segments.some((segment) => segment > 255)) return false;
+
+    return !(
+      first === 0 ||
+      first === 10 ||
+      first === 127 ||
+      first >= 224 ||
+      (first === 100 && second >= 64 && second <= 127) ||
+      (first === 169 && second === 254) ||
+      (first === 172 && second >= 16 && second <= 31) ||
+      (first === 192 && second === 168)
+    );
+  }
+
+  return !/^(?:fc|fd|fe80:)/i.test(ipAddress);
+};
+
+const getAuditClientContext = async () => {
+  const userAgent = typeof navigator === 'undefined' ? null : navigator.userAgent || null;
+  const endpoints = ['/api/client-ip', 'https://api.ipify.org?format=json'];
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, { headers: { Accept: 'application/json' } });
+      if (!response.ok) continue;
+
+      const payload = await response.json();
+      const ipAddress = payload?.ip;
+      if (isPublicIpAddress(ipAddress)) {
+        return { ipAddress, userAgent };
+      }
+    } catch (_error) {
+      // Try the next trusted client-IP source. Audit events must never use a local or proxy placeholder.
+    }
+  }
+
+  return { ipAddress: null, userAgent };
+};
+
 const mapAuditLogRecord = (log, userMap = new Map()) => {
   const changes = log?.changes && typeof log.changes === 'object' && !Array.isArray(log.changes)
     ? log.changes
@@ -822,7 +875,6 @@ export const unenrollStudent = async (enrollmentId, reason, removedBy = 'admin')
       return { error: 'Enrollment record not found', data: null };
     }
 
-    const studentId = await resolveUserId(enrollmentRecord.user_id);
     const { data, error } = await supabase
       .from('enrollments')
       .update({
@@ -840,26 +892,11 @@ export const unenrollStudent = async (enrollmentId, reason, removedBy = 'admin')
       return { error: error.message, data: null };
     }
 
-    if (studentId) {
-      const [progressReset, draftReset] = await Promise.all([
-        supabase.from('enrollment_progress').delete().eq('student_id', studentId),
-        supabase.from('enrollment_drafts').delete().eq('user_id', enrollmentRecord.user_id),
-      ]);
-
-      if (progressReset.error) {
-        console.error('Unenroll progress reset error:', progressReset.error);
-      }
-
-      if (draftReset.error) {
-        console.error('Unenroll draft reset error:', draftReset.error);
-      }
-    }
-
     const notification = await notifyStudent(enrollmentRecord.user_id, 'ENROLLMENT_UNENROLLED', {
       reason: trimmedReason,
       enrollmentId,
       status: 'unenrolled',
-      message: 'You have been unenrolled from the enrollment system. Please contact the registrar for more information.',
+      message: 'Your enrollment status has been changed to Unenrolled by the Registrar/Branch Coordinator. If you believe this was done accidentally, please contact the Registrar for assistance. If not, please disregard.',
     });
 
     if (!notification) {
@@ -870,7 +907,17 @@ export const unenrollStudent = async (enrollmentId, reason, removedBy = 'admin')
       removedBy,
       'STUDENT_UNENROLLED',
       `Student unenrolled: ${enrollmentRecord.user_id} (Enrollment: ${enrollmentId}) - Reason: ${trimmedReason}`,
-      'warning'
+      'warning',
+      {
+        resourceType: 'enrollment',
+        resourceId: enrollmentId,
+        changes: {
+          student_reference: enrollmentRecord.user_id,
+          previous_status: enrollmentRecord.status,
+          new_status: 'unenrolled',
+          reason: trimmedReason,
+        },
+      }
     );
 
     return { error: null, data };
@@ -985,6 +1032,7 @@ export const createAuditLog = async (userId, action, details, status = 'success'
     const resolvedUserEmail = await resolveUserEmail(userId);
     const detailsText = buildAuditDetails(details, action);
     const severity = normalizeAuditSeverity(status);
+    const auditClientContext = await getAuditClientContext();
     const changes = {
       details: detailsText,
       severity,
@@ -1026,6 +1074,14 @@ export const createAuditLog = async (userId, action, details, status = 'success'
 
     if (severity === 'failed') {
       payload.error_message = detailsText;
+    }
+
+    if (auditClientContext.ipAddress) {
+      payload.ip_address = auditClientContext.ipAddress;
+    }
+
+    if (auditClientContext.userAgent) {
+      payload.user_agent = auditClientContext.userAgent;
     }
 
     const { data, error } = await supabase

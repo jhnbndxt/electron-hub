@@ -450,6 +450,26 @@ export function UserManagement() {
         return;
       }
 
+      await createAuditLog(
+        userData?.id || userData?.email || "system",
+        deletingUser.role === "student" ? "STUDENT_DELETED" : "USER_DEACTIVATED",
+        deletingUser.role === "student"
+          ? `Student deleted (deactivated): ${deletingUser.name} (${deletingUser.email}).`
+          : `User deactivated: ${deletingUser.name} (${deletingUser.email}).`,
+        "warning",
+        {
+          resourceType: "user",
+          resourceId: deletingUser.id,
+          changes: {
+            student_name: deletingUser.name,
+            student_email: deletingUser.email,
+            previous_status: deletingUser.status || "active",
+            new_status: "inactive",
+            deletion_type: "deactivated",
+          },
+        }
+      );
+
       const updatedUsers = users.map((user) =>
         user.id === deletingUser.id ? { ...user, status: 'inactive' } : user
       );
@@ -510,6 +530,25 @@ export function UserManagement() {
       showError("The user could not be deleted. Check database permissions and try again.");
       return;
     }
+
+    await createAuditLog(
+      userData?.id || userData?.email || "system",
+      permanentlyDeletingUser.role === "student" ? "STUDENT_DELETED" : "USER_DELETED",
+      permanentlyDeletingUser.role === "student"
+        ? `Student permanently deleted: ${permanentlyDeletingUser.name} (${permanentlyDeletingUser.email}).`
+        : `User permanently deleted: ${permanentlyDeletingUser.name} (${permanentlyDeletingUser.email}).`,
+      "warning",
+      {
+        resourceType: "user",
+        resourceId: permanentlyDeletingUser.id,
+        changes: {
+          student_name: permanentlyDeletingUser.name,
+          student_email: permanentlyDeletingUser.email,
+          previous_status: permanentlyDeletingUser.status || "inactive",
+          deletion_type: "permanent",
+        },
+      }
+    );
 
     setUsers((currentUsers) =>
       currentUsers.filter((user) => user.id !== permanentlyDeletingUser.id)

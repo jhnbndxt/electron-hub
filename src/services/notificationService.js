@@ -103,10 +103,10 @@ const NOTIFICATION_MAP = {
       additionalData.message || `Your enrollment status has been updated to ${additionalData.status || 'a new status'}.`,
   },
   ENROLLMENT_UNENROLLED: {
-    title: 'Unenrolled from Enrollment System',
+    title: 'You Have Been Unenrolled',
     message: additionalData =>
       additionalData.message ||
-      `You have been unenrolled from the enrollment system. Please contact the registrar for more information.${additionalData.reason ? ` Official reason: ${additionalData.reason}` : ''}`,
+      'Your enrollment status has been changed to Unenrolled by the Registrar/Branch Coordinator. If you believe this was done accidentally, please contact the Registrar for assistance. If not, please disregard.',
   },
   DOCUMENTS_REJECTED: {
     title: 'Documents Rejected',

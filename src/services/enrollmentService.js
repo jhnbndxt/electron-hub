@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { validateDocumentFile } from '../utils/documentValidation';
 
 /**
  * Enrollment Service
@@ -90,6 +91,16 @@ export const checkExistingEnrollment = async (userId) => {
 // Submit enrollment
 export const submitEnrollment = async (userId, enrollmentData, documentFiles = {}) => {
   try {
+    const currentYear = new Date().getFullYear();
+    const hasValidGraduationYear = (year) => {
+      const value = String(year || "");
+      return /^\d{4}$/.test(value) && Number(value) >= 1900 && Number(value) <= currentYear;
+    };
+
+    if (!hasValidGraduationYear(enrollmentData?.primaryYearGraduated) || !hasValidGraduationYear(enrollmentData?.secondaryYearGraduated)) {
+      return { error: "Select valid four-digit graduation years that are not in the future.", data: null };
+    }
+
     // Insert main enrollment record
     const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
@@ -201,6 +212,10 @@ export const updateEnrollmentStatus = async (enrollmentId, status) => {
 // Upload document file to Supabase Storage
 export const uploadDocument = async (enrollmentId, file, documentType) => {
   try {
+    const validationError = validateDocumentFile(file);
+    if (validationError) {
+      return { error: validationError, data: null };
+    }
     // Generate unique file name
     const timestamp = Date.now();
     const fileExt = file.name.split('.').pop();

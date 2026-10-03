@@ -292,8 +292,9 @@ export function PendingApplications() {
       const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
       const hasPendingDocuments = hasPendingDocumentReview(app.enrollment_documents || []);
       return (
-        !ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus) &&
-        (normalizedEnrollmentStatus !== "enrolled" || hasPendingDocuments)
+        normalizedEnrollmentStatus === "rejected" ||
+        (!ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus) &&
+          (normalizedEnrollmentStatus !== "enrolled" || hasPendingDocuments))
       );
     });
 
@@ -311,7 +312,9 @@ export function PendingApplications() {
       const isDocumentReviewOnly = normalizedEnrollmentStatus === "enrolled" && hasPendingDocuments;
       const isPaymentComplete = COMPLETED_PAYMENT_STATUSES.has(String(payment?.status || "").toLowerCase());
       const applicationStatus: Student["status"] =
-        isDocumentReviewOnly
+        normalizedEnrollmentStatus === "rejected"
+          ? "rejected"
+          : isDocumentReviewOnly
           ? "pending"
           : APPROVED_MONITORING_STATUSES.has(normalizedEnrollmentStatus) || isPaymentComplete
           ? "approved"
@@ -335,7 +338,9 @@ export function PendingApplications() {
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         status: applicationStatus,
         currentStatus:
-          isDocumentReviewOnly
+          normalizedEnrollmentStatus === "rejected"
+            ? "Rejected"
+            : isDocumentReviewOnly
             ? "Pending Documents"
             : applicationStatus === "approved"
             ? formatEnrollmentStatus(app.status)
@@ -418,7 +423,8 @@ export function PendingApplications() {
 
   const activeStudents = filteredStudents.filter((student) => student.status === "pending" || student.status === "re-submit");
   const completedStudents = filteredStudents.filter((student) => student.status === "approved");
-  const visibleStudents = [...activeStudents, ...completedStudents];
+  const rejectedStudents = filteredStudents.filter((student) => student.status === "rejected");
+  const visibleStudents = [...activeStudents, ...completedStudents, ...rejectedStudents];
   const registrarDashboardCards = [
     {
       label: "Pending Applications",
@@ -525,6 +531,7 @@ export function PendingApplications() {
 
   const renderStatusLabel = (student: Student) => {
     if (student.status === "approved") return "Monitoring";
+    if (student.status === "rejected") return "Rejected";
     if (student.isDocumentReviewOnly) return "Pending Documents";
     if (student.hasReuploadedDocuments) return "Re-uploaded";
     if (student.status === "re-submit") return "Needs Corrections";
@@ -734,6 +741,7 @@ export function PendingApplications() {
               <option value="pending">Pending</option>
               <option value="re-submit">Re-submit</option>
               <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
 
