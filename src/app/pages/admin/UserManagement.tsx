@@ -466,23 +466,39 @@ export function UserManagement() {
         return;
       }
 
-      const deactivatedAt = new Date().toISOString();
-      // Deactivate in Supabase instead of deleting the record
-      const { error } = await supabase
-        .from('users')
-        .update({
-          status: 'inactive',
-          deactivated_at: deactivatedAt,
-          updated_at: deactivatedAt,
-        })
-        .eq('id', deletingUser.id);
-
-      if (error) {
-        console.error('Error deactivating user:', error);
-        alert('Failed to deactivate user');
+      const coordinatorPassword = window.prompt("Enter your Branch Coordinator password to authorize deactivation:");
+      if (coordinatorPassword === null) return;
+      if (!coordinatorPassword) {
+        alert("Branch Coordinator password is required to deactivate an account.");
         return;
       }
 
+      let response: Response;
+      let result: { error?: string; deactivatedAt?: string; deletionScheduled?: boolean; notice?: string };
+      try {
+        response = await fetch("/api/user-management", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "deactivate",
+            coordinatorId: userData?.id,
+            coordinatorPassword,
+            targetUserId: deletingUser.id,
+          }),
+        });
+        result = await response.json();
+      } catch (error) {
+        console.error("Error requesting account deactivation:", error);
+        alert("Unable to reach the account management service. Please try again.");
+        return;
+      }
+
+      if (!response.ok || !result.deactivatedAt) {
+        alert(result.error || "Failed to deactivate the account.");
+        return;
+      }
+
+      const deactivatedAt = result.deactivatedAt;
       await createAuditLog(
         userData?.id || userData?.email || "system",
         deletingUser.role === "student" ? "STUDENT_DELETED" : "USER_DEACTIVATED",
@@ -513,7 +529,11 @@ export function UserManagement() {
       
       setDeletingUser(null);
       setShowSuccessToast(true);
-      setSuccessMessage(`User deactivated. Permanent deletion is scheduled for ${formatDeletionDate(deactivatedAt)}.`);
+      setSuccessMessage(
+        result.deletionScheduled
+          ? `User deactivated. Permanent deletion is scheduled for ${formatDeletionDate(deactivatedAt)}.`
+          : result.notice || "User deactivated, but permanent deletion is not scheduled yet."
+      );
       setTimeout(() => setShowSuccessToast(false), 3000);
     }
   };
