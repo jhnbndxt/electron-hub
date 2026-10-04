@@ -200,25 +200,40 @@ export function UserManagement() {
 
   // Load users from Supabase
   const [users, setUsers] = useState<UserAccount[]>([]);
+  const [userLoadError, setUserLoadError] = useState("");
 
-  const loadUsers = async () => {
+  const loadUsers = async (): Promise<boolean> => {
     setIsLoading(true);
-    const { data, error } = await supabase
+    setUserLoadError("");
+
+    let { data, error } = await supabase
       .from('users')
       .select('id, email, full_name, contact_number, role, status, created_at, deactivated_at, updated_at')
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.warn('Could not load account deletion dates; retrying without the optional deactivated_at column:', error);
+      const fallbackResult = await supabase
+        .from('users')
+        .select('id, email, full_name, contact_number, role, status, created_at, updated_at')
+        .order('created_at', { ascending: false });
+
+      data = fallbackResult.data;
+      error = fallbackResult.error;
+    }
+
+    if (error) {
       console.error('Error loading users:', error);
       setUsers([]);
+      setUserLoadError(error.message || "Unable to load user accounts. Check database access and try again.");
       setIsLoading(false);
-      return;
+      return false;
     }
 
     if (!data) {
       setUsers([]);
       setIsLoading(false);
-      return;
+      return true;
     }
 
     const formattedUsers = (data || []).map((user: any) => ({
@@ -233,7 +248,9 @@ export function UserManagement() {
     }));
 
     setUsers(formattedUsers);
+    setUserLoadError("");
     setIsLoading(false);
+    return true;
   };
 
   useEffect(() => {
@@ -826,12 +843,15 @@ export function UserManagement() {
             </div>
           </div>
           <button
-            onClick={() => {
-              loadUsers();
-              setSuccessMessage("User list refreshed");
-              setShowSuccessToast(true);
-              setTimeout(() => setShowSuccessToast(false), 2000);
+            onClick={async () => {
+              const loaded = await loadUsers();
+              if (loaded) {
+                setSuccessMessage("User list refreshed");
+                setShowSuccessToast(true);
+                setTimeout(() => setShowSuccessToast(false), 2000);
+              }
             }}
+            disabled={isLoading}
             className="w-full sm:w-auto justify-center px-4 py-3 rounded-lg border-2 border-gray-300 font-medium transition-all hover:bg-gray-50 flex items-center gap-2"
           >
             <RefreshCw className="w-5 h-5" />
@@ -850,6 +870,21 @@ export function UserManagement() {
           </>
         }
       />
+
+      {userLoadError && (
+        <div role="alert" className="mb-6 flex flex-col gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Unable to load user accounts: {userLoadError}. Existing and unverified accounts have not been filtered out.
+          </p>
+          <button
+            type="button"
+            onClick={() => void loadUsers()}
+            className="shrink-0 rounded-lg border border-red-300 bg-white px-4 py-2 font-semibold text-red-800 hover:bg-red-100"
+          >
+            Retry
+          </button>
+        </div>
+      )}
 
       <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-6 pt-5">
@@ -923,7 +958,9 @@ export function UserManagement() {
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
-                    No users match the current search and role filters.
+                    {userLoadError
+                      ? "User accounts could not be loaded. Use Retry after resolving the database access issue."
+                      : "No users match the current search and role filters."}
                   </td>
                 </tr>
               ) : (
