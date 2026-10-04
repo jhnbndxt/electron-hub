@@ -1,5 +1,5 @@
 // Register page component
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, LoaderCircle, Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
 import bcrypt from "bcryptjs";
@@ -44,6 +44,8 @@ type RegisterField = keyof RegisterFormData;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CONTACT_NUMBER_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'.-]*$/u;
+const REGISTRATION_OTP_LENGTH = 8;
+const VERIFICATION_RESEND_COOLDOWN_SECONDS = 60;
 
 const getPasswordRequirements = (password: string) => {
   const missingRequirements: string[] = [];
@@ -137,10 +139,26 @@ export function Register() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [verificationPending, setVerificationPending] = useState(false);
   const [verificationCode, setVerificationCode] = useState("");
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
   const [emailVerified, setEmailVerified] = useState(false);
   const [cleanupWarning, setCleanupWarning] = useState("");
   const [notice, setNotice] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (resendAvailableAt === null) return;
+
+    const updateRemainingTime = () => {
+      const remainingSeconds = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000));
+      setResendCooldownSeconds(remainingSeconds);
+      if (remainingSeconds === 0) setResendAvailableAt(null);
+    };
+
+    updateRemainingTime();
+    const intervalId = window.setInterval(updateRemainingTime, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [resendAvailableAt]);
 
   const fieldErrors = (Object.keys(initialFormData) as RegisterField[]).reduce((errors, field) => {
     errors[field] = getFieldError(field, formData);
@@ -197,6 +215,11 @@ export function Register() {
       setError(firstValidationError);
       return;
     }
+    if (resendCooldownSeconds > 0) {
+      setVerificationPending(true);
+      setNotice(`A verification email was sent recently. You can request another in ${resendCooldownSeconds} seconds.`);
+      return;
+    }
     setIsLoading(true);
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
@@ -207,6 +230,8 @@ export function Register() {
       }
       setFormData((current) => ({ ...current, email: normalizedEmail }));
       setVerificationCode("");
+      setResendAvailableAt(Date.now() + VERIFICATION_RESEND_COOLDOWN_SECONDS * 1000);
+      setResendCooldownSeconds(VERIFICATION_RESEND_COOLDOWN_SECONDS);
       setVerificationPending(true);
     } catch (error: any) {
       setError(error.message || "An error occurred during registration");
@@ -281,6 +306,8 @@ export function Register() {
   };
 
   const handleResendVerificationCode = async () => {
+    if (isLoading || resendCooldownSeconds > 0) return;
+
     setError("");
     setNotice("");
     setIsLoading(true);
@@ -291,7 +318,9 @@ export function Register() {
       } else {
         setVerificationCode("");
         setEmailVerified(false);
-        setNotice("A new verification code has been sent. Check your inbox and spam folder.");
+        setResendAvailableAt(Date.now() + VERIFICATION_RESEND_COOLDOWN_SECONDS * 1000);
+        setResendCooldownSeconds(VERIFICATION_RESEND_COOLDOWN_SECONDS);
+        setNotice("A new 8-digit verification code has been sent. Check your inbox and spam folder, and use the latest code.");
       }
     } catch (error: unknown) {
       console.error("Error resending registration verification code:", error);
@@ -384,7 +413,7 @@ export function Register() {
               {!emailVerified ? (
                 <div>
                   <label htmlFor="verificationCode" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
-                    Email verification code
+                    8-digit email verification code
                   </label>
                   <div className="auth-input-surface rounded-2xl px-4 py-3">
                     <Mail className="h-5 w-5 text-slate-400" />
@@ -393,16 +422,16 @@ export function Register() {
                       id="verificationCode"
                       value={verificationCode}
                       onChange={(event) => {
-                        setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6));
+                        setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, REGISTRATION_OTP_LENGTH));
                         setError("");
                       }}
                       inputMode="numeric"
-                      pattern="[0-9]{6}"
-                      maxLength={6}
+                      pattern={`[0-9]{${REGISTRATION_OTP_LENGTH}}`}
+                      maxLength={REGISTRATION_OTP_LENGTH}
                       autoComplete="one-time-code"
                       required
                       className="min-w-0 text-center text-lg font-semibold tracking-[0.35em] placeholder:text-slate-400"
-                      placeholder="000000"
+                      placeholder={"0".repeat(REGISTRATION_OTP_LENGTH)}
                     />
                   </div>
                 </div>
@@ -414,7 +443,7 @@ export function Register() {
 
               <button
                 type="submit"
-                disabled={isLoading || (!emailVerified && verificationCode.length !== 6)}
+                disabled={isLoading || (!emailVerified && verificationCode.length !== REGISTRATION_OTP_LENGTH)}
                 className="auth-primary-button flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isLoading ? (
@@ -429,10 +458,12 @@ export function Register() {
                 <button
                   type="button"
                   onClick={handleResendVerificationCode}
-                  disabled={isLoading}
+                  disabled={isLoading || resendCooldownSeconds > 0}
                   className="w-full text-sm font-semibold text-[#1E3A8A] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Resend verification code
+                  {resendCooldownSeconds > 0
+                    ? `Resend verification code in ${resendCooldownSeconds}s`
+                    : "Resend verification code"}
                 </button>
               )}
 

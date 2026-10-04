@@ -266,6 +266,10 @@ export async function verifyRegistrationOtp(email, token) {
       return { error: 'Verification code is required', success: false };
     }
 
+    if (!/^\d{8}$/.test(normalizedToken)) {
+      return { error: 'Enter the complete 8-digit verification code from the latest email.', success: false };
+    }
+
     const { error } = await supabase.auth.verifyOtp({
       email: normalizedEmail,
       token: normalizedToken,
