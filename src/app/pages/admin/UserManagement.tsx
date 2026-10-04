@@ -177,6 +177,8 @@ export function UserManagement() {
   const [deletingUser, setDeletingUser] = useState<UserAccount | null>(null);
   const [reactivatingUser, setReactivatingUser] = useState<UserAccount | null>(null);
   const [permanentlyDeletingUser, setPermanentlyDeletingUser] = useState<UserAccount | null>(null);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isProcessingAccountAction, setIsProcessingAccountAction] = useState(false);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showErrorToast, setShowErrorToast] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -269,6 +271,140 @@ export function UserManagement() {
     setTimeout(() => setShowErrorToast(false), 4000);
   };
 
+  const executeAccountAction = async (action: "deactivate" | "delete", targets: UserAccount[]) => {
+    if (!targets.length) return false;
+    if (targets.some((target) => target.id === userData?.id)) {
+      showError("You cannot deactivate or permanently delete your own account while logged in.");
+      return false;
+    }
+
+    const coordinatorPassword = window.prompt(
+      `Enter your Branch Coordinator password to authorize ${action === "deactivate" ? "deactivation" : "permanent deletion"}:`
+    );
+    if (coordinatorPassword === null) return false;
+    if (!coordinatorPassword) {
+      showError("Branch Coordinator password is required to authorize this action.");
+      return false;
+    }
+
+    setIsProcessingAccountAction(true);
+    try {
+      const response = await fetch("/api/user-management", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          coordinatorId: userData?.id,
+          coordinatorPassword,
+          targetUserIds: targets.map(({ id }) => id),
+        }),
+      });
+      const result: {
+        error?: string;
+        updatedIds?: string[];
+        deletedIds?: string[];
+        deactivatedAt?: string;
+        deletionScheduled?: boolean;
+        notice?: string;
+      } = await response.json();
+
+      if (!response.ok) {
+        showError(result.error || `Failed to ${action} the selected accounts.`);
+        await loadUsers();
+        return false;
+      }
+
+      if (action === "deactivate" && result.deactivatedAt) {
+        const updatedIds = new Set(result.updatedIds || []);
+        setUsers((currentUsers) =>
+          currentUsers.map((user) =>
+            updatedIds.has(user.id)
+              ? { ...user, status: "inactive", deactivatedAt: result.deactivatedAt }
+              : user
+          )
+        );
+        await Promise.all(targets.map((target) =>
+          createAuditLog(
+            userData?.id || userData?.email || "system",
+            target.role === "student" ? "STUDENT_DELETED" : "USER_DEACTIVATED",
+            target.role === "student"
+              ? `Student deleted (deactivated): ${target.name} (${target.email}).`
+              : `User deactivated: ${target.name} (${target.email}).`,
+            "warning",
+            {
+              resourceType: "user",
+              resourceId: target.id,
+              changes: {
+                student_name: target.name,
+                student_email: target.email,
+                previous_status: target.status || "active",
+                new_status: "inactive",
+                deletion_type: "deactivated",
+                scheduled_deletion_at: formatDeletionDate(result.deactivatedAt),
+              },
+            }
+          )
+        ));
+        showSuccess(
+          targets.length === 1
+            ? result.deletionScheduled
+              ? `User deactivated. Permanent deletion is scheduled for ${formatDeletionDate(result.deactivatedAt)}.`
+              : result.notice || "User deactivated, but permanent deletion is not scheduled yet."
+            : `${targets.length} accounts deactivated${result.deletionScheduled ? `; permanent deletion is scheduled for ${formatDeletionDate(result.deactivatedAt)}` : ""}.`
+        );
+      } else if (action === "delete") {
+        const deletedIds = new Set(result.deletedIds || []);
+        if (deletedIds.size !== targets.length) {
+          showError("The server did not confirm deletion of every selected account. Refresh the list and verify the results.");
+          await loadUsers();
+          return false;
+        }
+        setUsers((currentUsers) => currentUsers.filter((user) => !deletedIds.has(user.id)));
+        await Promise.all(targets.map((target) =>
+          createAuditLog(
+            userData?.id || userData?.email || "system",
+            target.role === "student" ? "STUDENT_DELETED" : "USER_DELETED",
+            target.role === "student"
+              ? `Student permanently deleted: ${target.name} (${target.email}).`
+              : `User permanently deleted: ${target.name} (${target.email}).`,
+            "warning",
+            {
+              resourceType: "user",
+              resourceId: target.id,
+              changes: {
+                student_name: target.name,
+                student_email: target.email,
+                previous_status: target.status || "inactive",
+                deletion_type: "permanent",
+              },
+            }
+          )
+        ));
+        showSuccess(
+          targets.length === 1
+            ? "User permanently deleted from the database."
+            : `${targets.length} accounts permanently deleted from the database.`
+        );
+      } else {
+        showError("The account management service returned an incomplete response.");
+        await loadUsers();
+        return false;
+      }
+
+      setSelectedUserIds([]);
+      setDeletingUser(null);
+      setPermanentlyDeletingUser(null);
+      return true;
+    } catch (error) {
+      console.error(`Error requesting account ${action}:`, error);
+      showError("Unable to reach the account management service. Please try again.");
+      await loadUsers();
+      return false;
+    } finally {
+      setIsProcessingAccountAction(false);
+    }
+  };
+
   const setAddUserFieldTouched = (field: AddUserField) => {
     setTouchedAddUserFields((current) => ({ ...current, [field]: true }));
   };
@@ -313,6 +449,37 @@ export function UserManagement() {
       user.role.toLowerCase() === roleFilter.toLowerCase()
     );
   }
+  const selectedVisibleUsers = filteredUsers.filter((user) => selectedUserIds.includes(user.id));
+  const allVisibleUsersSelected =
+    filteredUsers.length > 0 && filteredUsers.every((user) => selectedUserIds.includes(user.id));
+
+  const toggleVisibleUserSelection = () => {
+    setSelectedUserIds((currentIds) =>
+      allVisibleUsersSelected
+        ? currentIds.filter((id) => !filteredUsers.some((user) => user.id === id))
+        : [...new Set([...currentIds, ...filteredUsers.map((user) => user.id)])]
+    );
+  };
+
+  const toggleUserSelection = (userId: string) => {
+    setSelectedUserIds((currentIds) =>
+      currentIds.includes(userId)
+        ? currentIds.filter((id) => id !== userId)
+        : [...currentIds, userId]
+    );
+  };
+
+  const handleBulkAccountAction = async () => {
+    const action = accountTab === "active" ? "deactivate" : "delete";
+    const targets = selectedVisibleUsers;
+    if (!targets.length) return;
+
+    const confirmation = action === "deactivate"
+      ? `Deactivate ${targets.length} selected account${targets.length === 1 ? "" : "s"}?`
+      : `Permanently delete ${targets.length} selected deactivated account${targets.length === 1 ? "" : "s"}? This cannot be undone.`;
+    if (!window.confirm(confirmation)) return;
+    await executeAccountAction(action, targets);
+  };
 
   const handleEditClick = (user: UserAccount) => {
     setEditingUser(user);
@@ -460,82 +627,7 @@ export function UserManagement() {
   };
 
   const handleConfirmDelete = async () => {
-    if (deletingUser) {
-      if (deletingUser.id === userData?.id) {
-        alert('You cannot deactivate your own account while logged in.');
-        return;
-      }
-
-      const coordinatorPassword = window.prompt("Enter your Branch Coordinator password to authorize deactivation:");
-      if (coordinatorPassword === null) return;
-      if (!coordinatorPassword) {
-        alert("Branch Coordinator password is required to deactivate an account.");
-        return;
-      }
-
-      let response: Response;
-      let result: { error?: string; deactivatedAt?: string; deletionScheduled?: boolean; notice?: string };
-      try {
-        response = await fetch("/api/user-management", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "deactivate",
-            coordinatorId: userData?.id,
-            coordinatorPassword,
-            targetUserId: deletingUser.id,
-          }),
-        });
-        result = await response.json();
-      } catch (error) {
-        console.error("Error requesting account deactivation:", error);
-        alert("Unable to reach the account management service. Please try again.");
-        return;
-      }
-
-      if (!response.ok || !result.deactivatedAt) {
-        alert(result.error || "Failed to deactivate the account.");
-        return;
-      }
-
-      const deactivatedAt = result.deactivatedAt;
-      await createAuditLog(
-        userData?.id || userData?.email || "system",
-        deletingUser.role === "student" ? "STUDENT_DELETED" : "USER_DEACTIVATED",
-        deletingUser.role === "student"
-          ? `Student deleted (deactivated): ${deletingUser.name} (${deletingUser.email}).`
-          : `User deactivated: ${deletingUser.name} (${deletingUser.email}).`,
-        "warning",
-        {
-          resourceType: "user",
-          resourceId: deletingUser.id,
-          changes: {
-            student_name: deletingUser.name,
-            student_email: deletingUser.email,
-            previous_status: deletingUser.status || "active",
-            new_status: "inactive",
-            deletion_type: "deactivated",
-            scheduled_deletion_at: formatDeletionDate(deactivatedAt),
-          },
-        }
-      );
-
-      const updatedUsers = users.map((user) =>
-        user.id === deletingUser.id
-          ? { ...user, status: 'inactive', deactivatedAt }
-          : user
-      );
-      setUsers(updatedUsers);
-      
-      setDeletingUser(null);
-      setShowSuccessToast(true);
-      setSuccessMessage(
-        result.deletionScheduled
-          ? `User deactivated. Permanent deletion is scheduled for ${formatDeletionDate(deactivatedAt)}.`
-          : result.notice || "User deactivated, but permanent deletion is not scheduled yet."
-      );
-      setTimeout(() => setShowSuccessToast(false), 3000);
-    }
+    if (deletingUser) await executeAccountAction("deactivate", [deletingUser]);
   };
 
   const handleConfirmReactivate = async () => {
@@ -563,54 +655,7 @@ export function UserManagement() {
 
   const handleConfirmPermanentDelete = async () => {
     if (!permanentlyDeletingUser) return;
-
-    if (permanentlyDeletingUser.id === userData?.id) {
-      showError("You cannot permanently delete your own account while logged in.");
-      return;
-    }
-
-    const { data: deletedUser, error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", permanentlyDeletingUser.id)
-      .select("id")
-      .maybeSingle();
-
-    if (error) {
-      console.error("Error permanently deleting user:", error);
-      showError(error.message || "Failed to permanently delete user.");
-      return;
-    }
-
-    if (!deletedUser) {
-      showError("The user could not be deleted. Check database permissions and try again.");
-      return;
-    }
-
-    await createAuditLog(
-      userData?.id || userData?.email || "system",
-      permanentlyDeletingUser.role === "student" ? "STUDENT_DELETED" : "USER_DELETED",
-      permanentlyDeletingUser.role === "student"
-        ? `Student permanently deleted: ${permanentlyDeletingUser.name} (${permanentlyDeletingUser.email}).`
-        : `User permanently deleted: ${permanentlyDeletingUser.name} (${permanentlyDeletingUser.email}).`,
-      "warning",
-      {
-        resourceType: "user",
-        resourceId: permanentlyDeletingUser.id,
-        changes: {
-          student_name: permanentlyDeletingUser.name,
-          student_email: permanentlyDeletingUser.email,
-          previous_status: permanentlyDeletingUser.status || "inactive",
-          deletion_type: "permanent",
-        },
-      }
-    );
-
-    setUsers((currentUsers) =>
-      currentUsers.filter((user) => user.id !== permanentlyDeletingUser.id)
-    );
-    setPermanentlyDeletingUser(null);
-    showSuccess("User permanently deleted from the database.");
+    await executeAccountAction("delete", [permanentlyDeletingUser]);
   };
 
   const handleAddUser = () => {
@@ -910,7 +955,10 @@ export function UserManagement() {
         <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 bg-white px-6 pt-5">
           <button
             type="button"
-            onClick={() => setAccountTab("active")}
+            onClick={() => {
+              setAccountTab("active");
+              setSelectedUserIds([]);
+            }}
             className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
               accountTab === "active"
                 ? "border-blue-800 text-blue-900"
@@ -922,7 +970,10 @@ export function UserManagement() {
           </button>
           <button
             type="button"
-            onClick={() => setAccountTab("deactivated")}
+            onClick={() => {
+              setAccountTab("deactivated");
+              setSelectedUserIds([]);
+            }}
             className={`border-b-2 px-4 py-3 text-sm font-semibold transition-colors ${
               accountTab === "deactivated"
                 ? "border-amber-600 text-amber-800"
@@ -940,7 +991,10 @@ export function UserManagement() {
             <input
               type="text"
               value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setSelectedUserIds([]);
+              }}
               placeholder="Search by name or email"
               className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-10 pr-4 text-sm text-gray-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
             />
@@ -950,7 +1004,10 @@ export function UserManagement() {
             <Filter className="h-4 w-4 text-gray-400" />
             <select
               value={roleFilter}
-              onChange={(event) => setRoleFilter(event.target.value)}
+              onChange={(event) => {
+                setRoleFilter(event.target.value);
+                setSelectedUserIds([]);
+              }}
               className="w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-700 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-100 lg:w-auto"
             >
               <option value="all">All Roles</option>
@@ -962,10 +1019,51 @@ export function UserManagement() {
           </div>
         </div>
 
+        {selectedVisibleUsers.length > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-6 py-3">
+            <p className="text-sm font-medium text-blue-900">
+              {selectedVisibleUsers.length} account{selectedVisibleUsers.length === 1 ? "" : "s"} selected
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setSelectedUserIds([])}
+                disabled={isProcessingAccountAction}
+                className="rounded-lg px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-white disabled:opacity-50"
+              >
+                Clear selection
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleBulkAccountAction()}
+                disabled={isProcessingAccountAction}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-800 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {isProcessingAccountAction
+                  ? "Processing..."
+                  : accountTab === "active"
+                    ? "Deactivate selected"
+                    : "Delete selected permanently"}
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] divide-y divide-gray-200">
+          <table className="w-full min-w-[820px] divide-y divide-gray-200">
             <thead className="bg-white">
               <tr>
+                <th className="w-12 px-4 py-4 text-left">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleUsersSelected}
+                    onChange={toggleVisibleUserSelection}
+                    disabled={filteredUsers.length === 0 || isProcessingAccountAction}
+                    aria-label="Select all visible accounts"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-700 focus:ring-blue-600"
+                  />
+                </th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Name</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Email</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-[0.18em] text-gray-500">Contact</th>
@@ -977,7 +1075,7 @@ export function UserManagement() {
             <tbody className="divide-y divide-gray-100">
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-sm text-gray-500">
                     {userLoadError
                       ? "User accounts could not be loaded. Use Retry after resolving the database access issue."
                       : "No users match the current search and role filters."}
@@ -992,6 +1090,16 @@ export function UserManagement() {
                       key={user.id}
                       className="hover:bg-gray-50 transition-colors"
                     >
+                      <td className="px-4 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(user.id)}
+                          onChange={() => toggleUserSelection(user.id)}
+                          disabled={isProcessingAccountAction}
+                          aria-label={`Select ${user.name}`}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-700 focus:ring-blue-600"
+                        />
+                      </td>
                       <td className="px-6 py-4">
                         <p className="text-sm font-medium text-gray-900">
                           {user.name}
