@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { createAuditLog, resolveUserId } from './adminService';
 import { broadcastNotificationToStudents } from './notificationService';
+import { validatePaymentAmount } from '../utils/paymentAmountValidation.js';
 
 const STORAGE_KEY = 'electron_hub_system_settings';
 
@@ -710,6 +711,17 @@ export async function updateSystemSetting(settingKey, nextValue, actorReference)
 }
 
 export async function saveSystemSettings(nextSettings, actorReference) {
+  const paymentAmountError = validatePaymentAmount(nextSettings?.payment_tuition_amount);
+  if (paymentAmountError) {
+    return {
+      error: paymentAmountError,
+      data: null,
+      source: 'validation',
+      lastUpdatedAt: null,
+      warning: null,
+    };
+  }
+
   const timestamp = new Date().toISOString();
   const previousLocalPayload = await getLocalPayload();
   const previousSettings = previousLocalPayload?.settings || buildDefaultSettings();

@@ -394,7 +394,7 @@ export function PublicLayout() {
                 </div>
                 <div className="flex items-center gap-2 text-sm">
                   <Mail className="w-4 h-4 flex-shrink-0" style={{ color: "#1E3A8A" }} />
-                  <a href="mailto:electroncollege2002@electroncollege.edu.ph" className="text-gray-300 hover:text-white transition-colors">
+                  <a href="mailto:electroncollege2002@electroncollege.edu.ph" className="break-all text-gray-300 transition-colors hover:text-white">
                     electroncollege2002@electroncollege.edu.ph
                   </a>
                 </div>

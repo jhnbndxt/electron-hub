@@ -33,6 +33,7 @@ import { useAuth } from "../../context/AuthContext";
 import { expireOverdueCashPayments } from "../../../services/adminService";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
 import { exportToCSV, formatCurrencyForCSV } from "../../../utils/csvExport";
+import { validatePaymentAmount, INVALID_PAYMENT_AMOUNT_MESSAGE } from "../../../utils/paymentAmountValidation";
 import electronLogo from "../../../assets/electronLogo";
 
 interface PaymentRecord {
@@ -104,8 +105,7 @@ const formatCurrency = (amount: number) =>
     maximumFractionDigits: 2,
   });
 
-const PAYMENT_AMOUNT_PATTERN = /^\d*(\.\d{0,2})?$/;
-const INVALID_PAYMENT_AMOUNT_MESSAGE = "Invalid payment amount. Please enter an amount greater than zero.";
+const PAYMENT_AMOUNT_INPUT_PATTERN = /^\d*(\.\d{0,2})?$/;
 
 type PaymentSettingsForm = {
   payment_bank_enabled: boolean;
@@ -362,11 +362,9 @@ export function BranchCoordinatorPayments() {
   };
 
   const handleSavePaymentSettings = async () => {
-    if (
-      !Number.isFinite(settingsDraft.payment_tuition_amount) ||
-      settingsDraft.payment_tuition_amount <= 0
-    ) {
-      setSettingsError(INVALID_PAYMENT_AMOUNT_MESSAGE);
+    const paymentAmountError = validatePaymentAmount(paymentAmountInput);
+    if (paymentAmountError) {
+      setSettingsError(paymentAmountError);
       return;
     }
 
@@ -431,10 +429,14 @@ export function BranchCoordinatorPayments() {
       );
 
       const currentSettingsResult = await getSystemSettings();
-      const { warning } = await saveSystemSettings(
-        { ...(currentSettingsResult.data || {}), ...settingsDraft },
+      const { warning, error: settingsSaveError } = await saveSystemSettings(
+        { ...(currentSettingsResult.data || {}), ...settingsDraft, payment_tuition_amount: Number(paymentAmountInput) },
         userData?.id || userData?.email
       );
+      if (settingsSaveError) {
+        setSettingsError(settingsSaveError);
+        return;
+      }
       setPaymentSettings(settingsDraft);
       setConfirmationPassword("");
       setEditingCategory(null);
@@ -1160,13 +1162,13 @@ export function BranchCoordinatorPayments() {
                           }}
                           onPaste={(e) => {
                             const pastedValue = e.clipboardData.getData("text");
-                            if (!PAYMENT_AMOUNT_PATTERN.test(pastedValue)) {
+                            if (!PAYMENT_AMOUNT_INPUT_PATTERN.test(pastedValue)) {
                               e.preventDefault();
                             }
                           }}
                           onChange={(e) => {
                             const nextValue = e.target.value;
-                            if (!PAYMENT_AMOUNT_PATTERN.test(nextValue)) {
+                            if (!PAYMENT_AMOUNT_INPUT_PATTERN.test(nextValue)) {
                               return;
                             }
 
@@ -1176,8 +1178,12 @@ export function BranchCoordinatorPayments() {
                             });
                             setPaymentAmountInput(nextValue);
                           }}
+                          aria-invalid={Boolean(paymentAmountInput && validatePaymentAmount(paymentAmountInput))}
                           className="mt-2 w-full rounded-xl border border-slate-200 px-3 py-2"
                         />
+                        {paymentAmountInput && validatePaymentAmount(paymentAmountInput) && (
+                          <span className="mt-1 block text-xs font-medium text-red-600">{INVALID_PAYMENT_AMOUNT_MESSAGE}</span>
+                        )}
                       </label>
                     ),
                     toggle: null,
@@ -1235,7 +1241,7 @@ export function BranchCoordinatorPayments() {
                 )}
                 <button
                   onClick={handleSavePaymentSettings}
-                  disabled={processingState.active || Boolean(settingsLockedUntil && Date.now() < settingsLockedUntil)}
+                  disabled={processingState.active || Boolean(settingsLockedUntil && Date.now() < settingsLockedUntil) || Boolean(validatePaymentAmount(paymentAmountInput))}
                   className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-700/20 transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="h-4 w-4" />
