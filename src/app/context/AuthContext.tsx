@@ -594,37 +594,3 @@ export function useAuth() {
   }
   return context;
 }
-
-const registerUser = async (userDetails) => {
-  const { email, password, firstName, lastName, middleName, sex, contactNumber } = userDetails;
-
-  console.log("[AuthContext] Registering user with details:", userDetails);
-
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-  });
-
-  if (error) {
-    console.error("[AuthContext] Error during user registration:", error);
-    return { success: false, error };
-  }
-
-  console.log("[AuthContext] User registered successfully:", data);
-
-  const userData = {
-    email,
-    firstName,
-    lastName,
-    middleName,
-    sex,
-    contactNumber,
-  };
-
-  setUserData(userData);
-  localStorage.setItem("userData", JSON.stringify(userData));
-
-  console.log("[AuthContext] User data stored in context:", userData);
-
-  return { success: true, data };
-};

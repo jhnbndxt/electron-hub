@@ -78,11 +78,11 @@ function mapOtpSendError(error, email) {
   const errorMessage = String(error?.message || '').toLowerCase();
 
   if (errorCode === 'over_email_send_rate_limit' || error?.status === 429 || /rate.limit|too many requests/.test(errorMessage)) {
-    return 'Verification email could not be sent because the Supabase email sender is rate-limited right now. Supabase\'s default sender is often limited to only a few auth emails per hour. Try again later, or configure custom SMTP in Supabase Auth > Emails > SMTP Settings.';
+    return 'Verification email could not be sent because Supabase email sending is rate-limited. Try again later or configure custom SMTP in Supabase Auth settings.';
   }
 
   if (errorCode === 'email_address_not_authorized' || /email address not authorized|not authorized/.test(errorMessage)) {
-    return `Verification email could not be sent to ${email}. The current Supabase email sender only delivers to authorized project-team addresses. Configure custom SMTP or add this address in the Supabase organization team settings.`;
+    return `Verification email could not be sent to ${email}. Configure custom SMTP in Supabase Auth settings or authorize this recipient for the project sender.`;
   }
 
   return error?.message || 'Unable to send verification email right now.';
@@ -199,32 +199,23 @@ export async function registerVerifiedUser(email, passwordHash, profile = {}) {
     return await createUserRecord(email, passwordHash, profile);
   } catch (error) {
     console.error('Verified register error:', error);
-    return { error: error.message, user: null };
+    return {
+      error: error instanceof Error ? error.message : 'Unable to reach the registration service.',
+      user: null,
+    };
   }
 }
 
 /**
- * Send registration OTP to email address before creating the custom user record
+ * Send a registration OTP to the email address before creating the custom user record
  * @param {string} email - User email
  * @returns {Promise<{error: string | null, success: boolean}>}
  */
 export async function sendRegistrationOtp(email, emailRedirectTo = null) {
   try {
     const normalizedEmail = normalizeEmailAddress(email);
-
     if (!normalizedEmail) {
       return { error: 'Email is required', success: false };
-    }
-
-    const { user: existingUser, error: lookupError } = await findUserByEmail(normalizedEmail);
-
-    if (lookupError) {
-      console.error('OTP lookup error:', lookupError);
-      return { error: lookupError, success: false };
-    }
-
-    if (existingUser) {
-      return { error: 'Email already registered', success: false };
     }
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -243,7 +234,10 @@ export async function sendRegistrationOtp(email, emailRedirectTo = null) {
     return { error: null, success: true };
   } catch (error) {
     console.error('Send OTP error:', error);
-    return { error: error.message, success: false };
+    return {
+      error: error instanceof Error ? error.message : 'Unable to reach the email verification service.',
+      success: false,
+    };
   }
 }
 
@@ -284,12 +278,15 @@ export async function verifyRegistrationOtp(email, token) {
     return { error: null, success: true };
   } catch (error) {
     console.error('Verify OTP error:', error);
-    return { error: error.message, success: false };
+    return {
+      error: error instanceof Error ? error.message : 'Unable to reach the email verification service.',
+      success: false,
+    };
   }
 }
 
 /**
- * Clear temporary verification session created by Supabase OTP auth
+ * Clear the temporary Supabase Auth session created by OTP verification.
  * @returns {Promise<{error: string | null}>}
  */
 export async function clearRegistrationVerification() {
