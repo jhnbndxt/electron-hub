@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { Calendar, Camera, LoaderCircle, Lock, Mail, Phone, Save, User } from "lucide-react";
-import bcrypt from "bcryptjs";
+import { Calendar, Camera, LoaderCircle, Lock, Mail, MapPin, Phone, Save, User } from "lucide-react";
 import toast, { Toaster } from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
@@ -15,6 +14,7 @@ export function EditProfile() {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [profileImageUrl, setProfileImageUrl] = useState(userData?.profilePictureUrl || "");
+  const [permanentAddress, setPermanentAddress] = useState("Not specified");
   const [formData, setFormData] = useState({
     fullName: userData?.name || user?.name || "",
     email: userData?.email || user?.email || "",
@@ -57,6 +57,23 @@ export function EditProfile() {
         }));
       }
 
+      const { data: enrollment } = await supabase
+        .from("enrollments")
+        .select("form_data")
+        .eq("user_id", userData.email)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const addressData = enrollment?.form_data || {};
+      const savedPermanentAddress = addressData.permanentAddress || addressData.permanent_address;
+      const address = [savedPermanentAddress, addressData.homeAddress, addressData.barangay, addressData.city]
+        .map((value) => (typeof value === "string" ? value.trim() : ""))
+        .filter(Boolean)
+        .filter((value, index, values) => values.indexOf(value) === index)
+        .join(", ");
+      setPermanentAddress(address || "Not specified");
+
       const imageUrl = await loadProfileImageUrl(userData.id, userData.email);
       if (imageUrl) setProfileImageUrl(imageUrl);
     };
@@ -73,9 +90,13 @@ export function EditProfile() {
       .join("") || "S";
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const value = e.target.name === "contactNumber"
+      ? e.target.value.replace(/\D/g, "").slice(0, 11)
+      : e.target.value;
+
     setFormData((current) => ({
       ...current,
-      [e.target.name]: e.target.value,
+      [e.target.name]: value,
     }));
   };
 
@@ -94,23 +115,6 @@ export function EditProfile() {
     setSelectedPhoto(file);
   };
 
-  const verifyCurrentPassword = async () => {
-    const { data, error } = await supabase
-      .from("users")
-      .select("password_hash")
-      .eq("id", userData?.id)
-      .single();
-
-    if (error || !data?.password_hash) {
-      throw new Error("Unable to verify your password right now.");
-    }
-
-    const passwordMatches = await bcrypt.compare(formData.currentPassword, data.password_hash);
-    if (!passwordMatches) {
-      throw new Error("The current password you entered is incorrect.");
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -122,10 +126,13 @@ export function EditProfile() {
       return;
     }
 
+    if (formData.contactNumber && !/^\d{1,11}$/.test(formData.contactNumber)) {
+      toast.error("Contact number must contain numbers only and be at most 11 digits.");
+      return;
+    }
+
     try {
       setIsSaving(true);
-      await verifyCurrentPassword();
-
       let nextProfileImageUrl = profileImageUrl;
       if (selectedPhoto) {
         const { imageUrl } = await uploadProfileImage({
@@ -136,19 +143,21 @@ export function EditProfile() {
         nextProfileImageUrl = imageUrl;
       }
 
-      const { error } = await supabase
-        .from("users")
-        .update({
-          full_name: formData.fullName,
-          contact_number: formData.contactNumber,
-          birth_date: formData.dateOfBirth || null,
-          sex: formData.sex || null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId);
-
-      if (error) {
-        throw new Error(error.message || "Failed to update profile.");
+      const response = await fetch("/api/profile-update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          fullName: formData.fullName,
+          contactNumber: formData.contactNumber,
+          dateOfBirth: formData.dateOfBirth,
+          sex: formData.sex,
+          currentPassword: formData.currentPassword,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to update profile.");
       }
 
       updateUserData({
@@ -266,9 +275,13 @@ export function EditProfile() {
                   name="contactNumber"
                   value={formData.contactNumber}
                   onChange={handleChange}
+                  inputMode="numeric"
+                  pattern="[0-9]{0,11}"
+                  maxLength={11}
                   className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-200"
-                  placeholder="09XX-XXX-XXXX"
+                  placeholder="09XXXXXXXXX"
                 />
+                <span className="mt-1 block text-xs text-slate-500">Numbers only, up to 11 digits.</span>
               </label>
 
               <label>
@@ -284,6 +297,18 @@ export function EditProfile() {
                   className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-200"
                 />
               </label>
+
+              <div className="sm:col-span-2">
+                <span className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-700">
+                  <MapPin className="h-4 w-4 text-blue-900" />
+                  Permanent Address
+                  <Lock className="ml-1 h-3.5 w-3.5 text-slate-500" aria-label="Locked" />
+                </span>
+                <p className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600" aria-readonly="true">
+                  {permanentAddress}
+                </p>
+                <span className="mt-1 block text-xs text-slate-500">Permanent address is provided from your enrollment record and cannot be changed here.</span>
+              </div>
 
               <div className="sm:col-span-2">
                 <p className="mb-2 text-sm font-semibold text-slate-700">Sex</p>

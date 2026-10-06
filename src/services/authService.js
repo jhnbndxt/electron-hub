@@ -123,7 +123,16 @@ export async function loginUser(email, password) {
     }
 
     if (user.status === 'inactive') {
-      return { error: 'This account has been deactivated', user: null };
+      const deactivatedAt = new Date(user.deactivated_at || user.updated_at);
+      const deletionDate = new Date(deactivatedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const deletionNotice = Number.isNaN(deletionDate.getTime())
+        ? 'Your account has been deactivated and is scheduled for permanent deletion after 30 days. Contact the Branch Coordinator for assistance.'
+        : `Your account has been deactivated and is scheduled for permanent deletion on ${deletionDate.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}. Contact the Branch Coordinator before then if you need assistance.`;
+      return { error: deletionNotice, user: null };
     }
 
     if (user.status === 'suspended') {
@@ -255,6 +264,10 @@ export async function verifyRegistrationOtp(email, token) {
 
     if (!normalizedToken) {
       return { error: 'Verification code is required', success: false };
+    }
+
+    if (!/^\d{8}$/.test(normalizedToken)) {
+      return { error: 'Enter the complete 8-digit verification code from the latest email.', success: false };
     }
 
     const { error } = await supabase.auth.verifyOtp({

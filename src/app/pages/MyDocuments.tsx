@@ -4,6 +4,7 @@ import { useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
 import { triggerNotification } from "../../services/notificationService";
+import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
 
 
 interface DocumentStatus {
@@ -112,7 +113,7 @@ export function MyDocuments() {
     // Find the student's enrollment by email
     const { data: enrollment, error: enrollError } = await supabase
       .from("enrollments")
-      .select("id")
+      .select("id, status")
       .eq("user_id", userData.email)
       .neq("status", "rejected")
       .order("created_at", { ascending: false })
@@ -261,7 +262,7 @@ export function MyDocuments() {
                 <input
                   type="file"
                   className="hidden"
-                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                  accept={DOCUMENT_ACCEPT_ATTRIBUTE}
                   disabled={uploadingDoc !== null}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -278,6 +279,12 @@ export function MyDocuments() {
 
   const handleFileUpload = async (docName: string, file: File) => {
     if (!userData?.email) return;
+
+    const fileError = validateDocumentFile(file);
+    if (fileError) {
+      alert(fileError);
+      return;
+    }
 
     setUploadingDoc(docName);
 
@@ -334,6 +341,7 @@ export function MyDocuments() {
         .maybeSingle();
 
       const isRejectedCorrection = existingDoc?.status === "rejected";
+      const isAlreadyEnrolled = String(enrollment?.status || "").toLowerCase() === "enrolled";
       const nextStatus = isRejectedCorrection ? "reuploaded" : "pending_review";
 
       if (existingDoc) {
@@ -364,17 +372,17 @@ export function MyDocuments() {
         });
       }
 
-      await supabase
-        .from("enrollments")
-        .update({
-          status: "pending_review",
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", currentEnrollmentId);
-
-      if (isRejectedCorrection) {
-        await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });
+      if (!isAlreadyEnrolled) {
+        await supabase
+          .from("enrollments")
+          .update({
+            status: "pending_review",
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", currentEnrollmentId);
       }
+
+      await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });
 
       await loadDocuments();
     } catch (err) {
@@ -486,7 +494,7 @@ export function MyDocuments() {
                             <input
                               type="file"
                               className="hidden"
-                              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+                              accept={DOCUMENT_ACCEPT_ATTRIBUTE}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) handleFileUpload(doc.name, file);

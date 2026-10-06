@@ -6,6 +6,7 @@ import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { getEnrolledStudents, unenrollStudent } from "../../../services/adminService";
 import { useLocation, useNavigate } from "react-router";
 import { useAuth } from "../../context/AuthContext";
+import { exportToCSV, formatDateForCSV } from "../../../utils/csvExport";
 
 interface Student {
   id: string;
@@ -167,6 +168,24 @@ export function StudentRecords() {
     });
   };
 
+  const handleExportStudents = () => {
+    exportToCSV({
+      filename: "student-records",
+      title: "Student Records",
+      subtitle: "Electron College of Technological Education",
+      headers: ["Student ID", "Student Name", "Email", "Track", "Year Level", "Enrollment Date", "Status"],
+      rows: filteredStudents.map((student) => [
+        student.studentId,
+        student.name,
+        student.email || "Not provided",
+        student.track,
+        student.yearLevel,
+        student.enrollmentDate ? formatDateForCSV(student.enrollmentDate) : "Not provided",
+        student.status,
+      ]),
+    });
+  };
+
   const openUnenrollModal = (student: Student) => {
     setSelectedStudent(student);
     setUnenrollReason("");
@@ -277,6 +296,7 @@ export function StudentRecords() {
 
           {/* Export Button */}
           <button
+            onClick={handleExportStudents}
             className="w-full sm:w-auto justify-center px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
             style={{ backgroundColor: "#10B981" }}
           >
@@ -311,7 +331,14 @@ export function StudentRecords() {
                 <article key={student.id} className="space-y-4 p-5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate text-base font-bold text-gray-900">{student.name}</p>
+                      <button
+                        type="button"
+                        onClick={() => handleViewStudent(student)}
+                        className="truncate text-left text-base font-bold text-gray-900 hover:text-blue-700 hover:underline"
+                        title={`Open ${student.name}'s student record`}
+                      >
+                        {student.name}
+                      </button>
                       <p className="mt-1 text-xs font-semibold text-gray-500">ID: {student.studentId}</p>
                     </div>
                     <span
@@ -422,9 +449,14 @@ export function StudentRecords() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-xs font-medium text-gray-900">
+                        <button
+                          type="button"
+                          onClick={() => handleViewStudent(student)}
+                          className="text-left text-xs font-medium text-gray-900 hover:text-blue-700 hover:underline"
+                          title={`Open ${student.name}'s student record`}
+                        >
                           {student.name}
-                        </p>
+                        </button>
                       </td>
                       <td className="px-6 py-4">
                         <span

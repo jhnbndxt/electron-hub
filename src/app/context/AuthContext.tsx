@@ -259,6 +259,7 @@ async function buildRemoteEnrollmentProgress(studentId: string, userEmail: strin
   if (
     (isVoucherCovered || (paymentStatus && COMPLETED_PAYMENT_STATUSES.has(paymentStatus))) &&
     enrollmentStatus !== "enrolled" &&
+    !INACTIVE_ENROLLMENT_STATUSES.has(enrollmentStatus || "") &&
     enrollmentResponse.data?.id
   ) {
     const { error: enrollmentSyncError } = await supabase

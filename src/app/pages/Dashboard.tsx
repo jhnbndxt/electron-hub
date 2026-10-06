@@ -166,8 +166,22 @@ export function Dashboard() {
       setRejectedDocuments(rejected);
     };
 
-    loadEnrollmentReadiness();
-  }, [userData]);
+    void loadEnrollmentReadiness();
+
+    // Keep status changes made by the registrar/branch coordinator visible without a page refresh.
+    const enrollmentChannel = supabase
+      .channel(`student-enrollment-status-${userData.email}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "enrollments", filter: `user_id=eq.${userData.email}` },
+        () => void loadEnrollmentReadiness()
+      )
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(enrollmentChannel);
+    };
+  }, [userData?.email, userData?.id]);
 
   // Define the 7 enrollment steps with icons
   const enrollmentStepsConfig = [
@@ -233,12 +247,12 @@ export function Dashboard() {
   };
   
   // Check if student is fully enrolled
-  const isFullyEnrolled = enrollmentSteps.find(step => step.name === "Enrolled")?.status === "completed";
-
-  const currentStatusInfo = currentStep ? statusMessages[currentStep.name] : null;
   const enrollmentStatus = enrollmentSnapshot?.status?.toLowerCase() || "";
   const isApplicationRejected = enrollmentStatus === "rejected";
   const isApplicationInactive = enrollmentStatus ? inactiveEnrollmentStatuses.has(enrollmentStatus) : false;
+  const isFullyEnrolled = !isApplicationInactive && enrollmentSteps.find(step => step.name === "Enrolled")?.status === "completed";
+
+  const currentStatusInfo = currentStep ? statusMessages[currentStep.name] : null;
   const isVoucherCovered =
     enrollmentSnapshot?.voucherStatus === "eligible" ||
     enrollmentSnapshot?.isTuitionFree === true ||
@@ -246,6 +260,17 @@ export function Dashboard() {
   const rejectionReason = enrollmentSnapshot?.rejectionReason || "Please contact the registrar for more details.";
   // Dynamic upcoming tasks based on enrollment progress
   const getUpcomingTasks = () => {
+    if (isApplicationInactive) {
+      return [{
+        title: "Review Enrollment Status",
+        description: "Your enrollment is currently inactive. Contact the registrar if you need assistance.",
+        dueDate: "Status updated",
+        priority: "high",
+        link: "/dashboard/enrollment",
+        icon: "info",
+      }];
+    }
+
     const tasks = [];
     
     // Check if assessment is completed
@@ -767,7 +792,7 @@ export function Dashboard() {
                 <p className="text-sm leading-relaxed text-gray-700">
                   {isApplicationRejected
                     ? "Your application was reviewed by the registrar and was not approved."
-                    : "You have been unenrolled from the enrollment system. Please contact the registrar for more information."}
+                    : "Your enrollment status has been changed to Unenrolled by the Registrar/Branch Coordinator. If you believe this was done accidentally, please contact the Registrar for assistance. If not, please disregard."}
                 </p>
                 <div className="mt-4 rounded-lg border border-red-200 bg-white p-4">
                   <p className="text-xs font-semibold uppercase tracking-wide text-red-700">Registrar feedback</p>

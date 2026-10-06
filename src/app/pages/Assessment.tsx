@@ -10,6 +10,7 @@ import { getDefaultAssessmentQuestions } from "../../services/assessmentService"
 import { supabase } from "../../supabase";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
+import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
 interface Question {
   id: number;
@@ -39,7 +40,14 @@ export function Assessment() {
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
+  const [assessmentStarted, setAssessmentStarted] = useState(false);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
   const hasRestoredProgress = useRef(false);
+  const hasAutoSubmitted = useRef(false);
+  const submitAssessmentRef = useRef<() => void>(() => undefined);
+  const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
+  const totalDurationSeconds = getAssessmentDurationSeconds(totalQuestions);
 
   const isInterestQuestion = (question: Question) => question.category === "Interests";
 
@@ -120,6 +128,15 @@ export function Assessment() {
       if (Number.isInteger(parsedProgress?.currentSection)) {
         setCurrentSection(Math.min(Math.max(parsedProgress.currentSection, 0), sections.length - 1));
       }
+
+      if (typeof parsedProgress?.startedAt === "number") {
+        setStartedAt(parsedProgress.startedAt);
+        setAssessmentStarted(true);
+      } else if (parsedProgress?.answers || Number.isInteger(parsedProgress?.currentSection)) {
+        // Preserve previously saved in-progress assessments created before timing was added.
+        setStartedAt(Date.now());
+        setAssessmentStarted(true);
+      }
     } catch (error) {
       console.error("Failed to restore assessment progress:", error);
     } finally {
@@ -135,10 +152,11 @@ export function Assessment() {
       JSON.stringify({
         answers,
         currentSection,
+        startedAt,
         updatedAt: new Date().toISOString(),
       })
     );
-  }, [answers, assessmentCompleted, assessmentProgressKey, currentSection, loading, sections.length]);
+  }, [answers, assessmentCompleted, assessmentProgressKey, currentSection, loading, sections.length, startedAt]);
 
   useEffect(() => {
     const shellMain = document.querySelector(".portal-glass-main") as HTMLElement | null;
@@ -162,6 +180,23 @@ export function Assessment() {
       shellMain.style.overscrollBehavior = previousOverscrollBehavior;
     };
   }, [loading, assessmentCompleted]);
+
+  useEffect(() => {
+    if (!assessmentStarted || !startedAt || assessmentCompleted || totalQuestions === 0) return;
+
+    const updateTimer = () => {
+      const nextRemaining = getRemainingAssessmentSeconds(startedAt, totalQuestions);
+      setRemainingSeconds(nextRemaining);
+      if (nextRemaining === 0 && !hasAutoSubmitted.current) {
+        hasAutoSubmitted.current = true;
+        submitAssessmentRef.current();
+      }
+    };
+
+    updateTimer();
+    const intervalId = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [assessmentCompleted, assessmentStarted, startedAt, totalQuestions]);
 
   const loadQuestionsFromSupabase = async () => {
     try {
@@ -389,7 +424,6 @@ export function Assessment() {
   }
 
   const currentSectionData = sections[currentSection];
-  const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
   const answeredQuestions = sections.reduce((sum, section) => {
     return sum + section.questions.filter((question) => isQuestionAnswered(question)).length;
   }, 0);
@@ -546,11 +580,37 @@ export function Assessment() {
     }, 0);
   };
 
+  submitAssessmentRef.current = handleSubmit;
+
   const allCurrentQuestionsAnswered = currentSectionData.questions.every(
     (question) => isQuestionAnswered(question)
   );
 
   const isLastSection = currentSection === sections.length - 1;
+
+  if (!assessmentStarted) {
+    return (
+      <div className="portal-dashboard-page flex min-h-[calc(100dvh-4rem)] items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="portal-glass-panel-strong max-w-2xl rounded-2xl p-8 text-center shadow-2xl">
+          <h1 className="text-3xl font-bold text-[#1E3A8A]">Timed Assessment</h1>
+          <p className="mt-4 text-lg leading-7 text-gray-700">
+            You have <strong>{totalDurationSeconds / 60} minutes</strong> to complete this assessment. Please submit your answers before the timer runs out.
+          </p>
+          <p className="mt-3 text-sm text-gray-500">{totalQuestions} questions at 30 seconds each.</p>
+          <button
+            onClick={() => {
+              hasAutoSubmitted.current = false;
+              setStartedAt(Date.now());
+              setAssessmentStarted(true);
+            }}
+            className="mt-8 rounded-xl bg-[#1E3A8A] px-7 py-3 font-semibold text-white shadow-md transition hover:bg-[#1E40AF]"
+          >
+            Start Assessment
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
@@ -574,6 +634,12 @@ export function Assessment() {
           <p className="text-gray-600 mt-2">
             Answer the following to determine your recommended track and electives
           </p>
+          <div className={`mx-auto mt-4 inline-flex rounded-full px-4 py-2 text-sm font-bold ${remainingSeconds <= FIVE_MINUTES_IN_SECONDS ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-900"}`} aria-live="polite">
+            Time remaining: {formatAssessmentDuration(remainingSeconds)}
+          </div>
+          {remainingSeconds <= FIVE_MINUTES_IN_SECONDS && remainingSeconds > 0 && (
+            <p className="mt-2 text-sm font-semibold text-red-600">5-minute warning: please review and submit your answers.</p>
+          )}
         </div>
 
         <div className="mb-8">

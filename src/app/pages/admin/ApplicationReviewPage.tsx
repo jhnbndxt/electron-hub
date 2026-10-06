@@ -270,6 +270,7 @@ export function ApplicationReviewPage() {
     studentProfile?.profile_picture_url ||
     getFormProfileImageUrl(formData) ||
     null;
+  const isAlreadyEnrolled = String(enrollment?.status || "").toLowerCase() === "enrolled";
 
   const documents = useMemo(() => {
     const uploaded = enrollment?.enrollment_documents || [];
@@ -673,6 +674,10 @@ export function ApplicationReviewPage() {
   };
 
   const approveApplication = async () => {
+    if (isAlreadyEnrolled) {
+      toast.error("This student is already enrolled. Review the pending document only.");
+      return;
+    }
     if (!canApproveApplication) {
       setShowApprovalValidation(true);
       return;
@@ -757,6 +762,10 @@ export function ApplicationReviewPage() {
   };
 
   const rejectApplication = async () => {
+    if (isAlreadyEnrolled) {
+      toast.error("This student is already enrolled. Reject the document only.");
+      return;
+    }
     if (!applicationRejectReason.trim()) {
       toast.error("Rejection reason is required.");
       return;
@@ -1369,7 +1378,7 @@ export function ApplicationReviewPage() {
           </div>
         </section>
 
-        <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
+        {!isAlreadyEnrolled && <section className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
           <div className="grid gap-3 lg:grid-cols-[1fr_350px] lg:items-center">
             <div>
               <p className="text-xs font-black text-slate-900">Is the student eligible for the voucher program? <span className="text-rose-600">*</span></p>
@@ -1387,9 +1396,13 @@ export function ApplicationReviewPage() {
             </div>
           </div>
           {existingVoucherStatus && <p className="mt-2 text-[11px] font-semibold text-slate-500">Saved decision: {String(existingVoucherStatus).replace("_", " ")}</p>}
-        </section>
+        </section>}
 
-        <footer className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
+        {isAlreadyEnrolled ? (
+          <div className="mt-3 rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3 text-center text-sm font-semibold text-blue-800">
+            Student already enrolled. This review concerns an uploaded document only.
+          </div>
+        ) : <footer className="mt-3 rounded-2xl border border-white/70 bg-white/45 p-3 shadow-lg shadow-blue-950/5 ring-1 ring-blue-100/50 backdrop-blur-2xl">
           <div className="grid gap-3 lg:grid-cols-2">
             <button
               onClick={() => setShowApplicationReject(true)}
@@ -1417,7 +1430,7 @@ export function ApplicationReviewPage() {
           <p className="mt-2 text-center text-[11px] font-medium text-slate-500">
             Please ensure all documents are verified and eligibility is selected before approving.
           </p>
-        </footer>
+        </footer>}
       </div>
 
       {(docRejectKey || docRejectKeys.length > 0) && (

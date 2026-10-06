@@ -33,6 +33,7 @@ interface Student {
   profileImageUrl?: string;
   enrollmentData?: any;
   hasReuploadedDocuments?: boolean;
+  isDocumentReviewOnly?: boolean;
   queuePriority: number;
 }
 
@@ -81,6 +82,9 @@ const hasReuploadedRejectedDocument = (docs: any[]) => {
     return previousRejectedDocument && getNormalizedDocumentStatus(latestDocument) === "pending";
   });
 };
+
+const hasPendingDocumentReview = (docs: any[]) =>
+  docs.some((doc) => getNormalizedDocumentStatus(doc) === "pending");
 
 const getCurrentEnrollmentStatus = ({
   hasAssessment,
@@ -262,6 +266,9 @@ export function PendingApplications() {
 
         if (normalizedEnrollmentStatus === "enrolled") {
           stats.totalEnrolledStudents += 1;
+          if (hasPendingDocumentReview(app.enrollment_documents || [])) {
+            stats.pendingApplications += 1;
+          }
         } else if (normalizedEnrollmentStatus === "rejected") {
           stats.rejectedApplications += 1;
         } else if (APPROVED_MONITORING_STATUSES.has(normalizedEnrollmentStatus)) {
@@ -283,7 +290,12 @@ export function PendingApplications() {
 
     const visibleApplications = applications.filter((app: any) => {
       const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
-      return normalizedEnrollmentStatus !== "enrolled" && !ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus);
+      const hasPendingDocuments = hasPendingDocumentReview(app.enrollment_documents || []);
+      return (
+        normalizedEnrollmentStatus === "rejected" ||
+        (!ARCHIVED_ENROLLMENT_STATUSES.has(normalizedEnrollmentStatus) &&
+          (normalizedEnrollmentStatus !== "enrolled" || hasPendingDocuments))
+      );
     });
 
     const formattedApps = await Promise.all(visibleApplications.map(async (app: any) => {
@@ -296,9 +308,15 @@ export function PendingApplications() {
       const payment = paymentStatusResponse?.data;
       const normalizedEnrollmentStatus = String(app.status || "").toLowerCase();
       const hasReuploadedDocuments = hasReuploadedRejectedDocument(docs);
+      const hasPendingDocuments = hasPendingDocumentReview(docs);
+      const isDocumentReviewOnly = normalizedEnrollmentStatus === "enrolled" && hasPendingDocuments;
       const isPaymentComplete = COMPLETED_PAYMENT_STATUSES.has(String(payment?.status || "").toLowerCase());
       const applicationStatus: Student["status"] =
-        APPROVED_MONITORING_STATUSES.has(normalizedEnrollmentStatus) || isPaymentComplete
+        normalizedEnrollmentStatus === "rejected"
+          ? "rejected"
+          : isDocumentReviewOnly
+          ? "pending"
+          : APPROVED_MONITORING_STATUSES.has(normalizedEnrollmentStatus) || isPaymentComplete
           ? "approved"
           : hasReuploadedDocuments || rejectedDocuments > 0
           ? "re-submit"
@@ -320,7 +338,11 @@ export function PendingApplications() {
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         status: applicationStatus,
         currentStatus:
-          applicationStatus === "approved"
+          normalizedEnrollmentStatus === "rejected"
+            ? "Rejected"
+            : isDocumentReviewOnly
+            ? "Pending Documents"
+            : applicationStatus === "approved"
             ? formatEnrollmentStatus(app.status)
             : getCurrentEnrollmentStatus({
                 enrollmentStatus: app.status,
@@ -335,6 +357,7 @@ export function PendingApplications() {
         enrollmentId: app.id,
         enrollmentData: app,
         hasReuploadedDocuments,
+        isDocumentReviewOnly,
         queuePriority,
       };
     }));
@@ -400,7 +423,8 @@ export function PendingApplications() {
 
   const activeStudents = filteredStudents.filter((student) => student.status === "pending" || student.status === "re-submit");
   const completedStudents = filteredStudents.filter((student) => student.status === "approved");
-  const visibleStudents = [...activeStudents, ...completedStudents];
+  const rejectedStudents = filteredStudents.filter((student) => student.status === "rejected");
+  const visibleStudents = [...activeStudents, ...completedStudents, ...rejectedStudents];
   const registrarDashboardCards = [
     {
       label: "Pending Applications",
@@ -507,6 +531,8 @@ export function PendingApplications() {
 
   const renderStatusLabel = (student: Student) => {
     if (student.status === "approved") return "Monitoring";
+    if (student.status === "rejected") return "Rejected";
+    if (student.isDocumentReviewOnly) return "Pending Documents";
     if (student.hasReuploadedDocuments) return "Re-uploaded";
     if (student.status === "re-submit") return "Needs Corrections";
     return "Pending Review";
@@ -561,6 +587,9 @@ export function PendingApplications() {
               )}
               {student.hasReuploadedDocuments && !isApproved && (
                 <p className="mt-1 text-xs font-semibold text-amber-700">Updated documents need review</p>
+              )}
+              {student.isDocumentReviewOnly && (
+                <p className="mt-1 text-xs font-semibold text-blue-700">Document awaiting review</p>
               )}
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${getAdmissionTypeStyle(student.admissionType)}`}>
@@ -624,7 +653,7 @@ export function PendingApplications() {
               className="mx-auto inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
               title="Review Application"
             >
-              Review Application
+              {student.isDocumentReviewOnly ? "Review Documents" : "Review Application"}
             </button>
           )}
         </td>
@@ -712,6 +741,7 @@ export function PendingApplications() {
               <option value="pending">Pending</option>
               <option value="re-submit">Re-submit</option>
               <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
             </select>
           </div>
 
@@ -761,9 +791,6 @@ export function PendingApplications() {
               <h2 className="text-xl font-semibold text-gray-900">
                 Application Queue
               </h2>
-              <p className="mt-1 text-sm text-slate-500">
-                Re-uploaded submissions stay first, pending reviews stay next, and approved applications stay below for monitoring until enrollment.
-              </p>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-xs sm:min-w-[360px]">
               <div className="rounded-xl border border-amber-100 bg-amber-50 px-3 py-2 text-amber-800">
@@ -808,6 +835,9 @@ export function PendingApplications() {
                       <p className="mt-1 text-xs text-gray-500">{student.email}</p>
                       {student.hasReuploadedDocuments && !isApproved && (
                         <p className="mt-1 text-xs font-semibold text-amber-700">Updated documents need review</p>
+                      )}
+                      {student.isDocumentReviewOnly && (
+                        <p className="mt-1 text-xs font-semibold text-blue-700">Document awaiting review</p>
                       )}
                     </div>
                     <span
@@ -857,7 +887,7 @@ export function PendingApplications() {
                       onClick={() => navigate(`${reviewBasePath}/review/${student.id}`)}
                       className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     >
-                      Review Application
+                      {student.isDocumentReviewOnly ? "Review Documents" : "Review Application"}
                     </button>
                   )}
                 </article>

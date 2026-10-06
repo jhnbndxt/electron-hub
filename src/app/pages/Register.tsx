@@ -1,8 +1,14 @@
 // Register page component
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { CheckCircle2, Eye, EyeOff, Lock, Mail, Phone, User } from "lucide-react";
-import { registerUser } from "../../services/authService";
+import { ArrowLeft, CheckCircle2, Eye, EyeOff, LoaderCircle, Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
+import bcrypt from "bcryptjs";
+import {
+  clearRegistrationVerification,
+  registerVerifiedUser,
+  sendRegistrationOtp,
+  verifyRegistrationOtp,
+} from "../../services/authService";
 import { linkPendingPublicAssessmentResult } from "../../services/assessmentResultService";
 import { motion } from "motion/react";
 import logo from "../../assets/electronLogo";
@@ -38,6 +44,8 @@ type RegisterField = keyof RegisterFormData;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CONTACT_NUMBER_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'.-]*$/u;
+const REGISTRATION_OTP_LENGTH = 8;
+const VERIFICATION_RESEND_COOLDOWN_SECONDS = 60;
 
 const getPasswordRequirements = (password: string) => {
   const missingRequirements: string[] = [];
@@ -129,7 +137,28 @@ export function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [resendAvailableAt, setResendAvailableAt] = useState<number | null>(null);
+  const [resendCooldownSeconds, setResendCooldownSeconds] = useState(0);
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [cleanupWarning, setCleanupWarning] = useState("");
+  const [notice, setNotice] = useState("");
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (resendAvailableAt === null) return;
+
+    const updateRemainingTime = () => {
+      const remainingSeconds = Math.max(0, Math.ceil((resendAvailableAt - Date.now()) / 1000));
+      setResendCooldownSeconds(remainingSeconds);
+      if (remainingSeconds === 0) setResendAvailableAt(null);
+    };
+
+    updateRemainingTime();
+    const intervalId = window.setInterval(updateRemainingTime, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [resendAvailableAt]);
 
   const fieldErrors = (Object.keys(initialFormData) as RegisterField[]).reduce((errors, field) => {
     errors[field] = getFieldError(field, formData);
@@ -186,40 +215,134 @@ export function Register() {
       setError(firstValidationError);
       return;
     }
+    if (resendCooldownSeconds > 0) {
+      setVerificationPending(true);
+      setNotice(`A verification email was sent recently. You can request another in ${resendCooldownSeconds} seconds.`);
+      return;
+    }
     setIsLoading(true);
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
-      const { error: registerError, user } = await registerUser(
-        normalizedEmail,
-        formData.password,
-        {
-          firstName: formData.firstName.trim(),
-          lastName: formData.lastName.trim(),
-          middleName: formData.middleName.trim() || null,
-          sex: formData.sex,
-          birthDate: formData.birthDate.trim(),
-          contactNumber: formData.contactNumber.trim(),
-        }
-      );
-      if (registerError || !user) {
-        setError(registerError || "Unable to create your account right now.");
+      const { error: otpError, success } = await sendRegistrationOtp(normalizedEmail);
+      if (otpError || !success) {
+        setError(otpError || "Unable to send an email verification code right now.");
         return;
       }
-      try {
-        await linkPendingPublicAssessmentResult(normalizedEmail);
-      } catch (syncError) {
-        console.error("Unable to sync pending public assessment result:", syncError);
-      }
-      setFormData({
-        ...formData,
-        email: normalizedEmail,
-      });
-      setShowSuccessModal(true);
+      setFormData((current) => ({ ...current, email: normalizedEmail }));
+      setVerificationCode("");
+      setResendAvailableAt(Date.now() + VERIFICATION_RESEND_COOLDOWN_SECONDS * 1000);
+      setResendCooldownSeconds(VERIFICATION_RESEND_COOLDOWN_SECONDS);
+      setVerificationPending(true);
     } catch (error: any) {
       setError(error.message || "An error occurred during registration");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const completeVerifiedRegistration = async () => {
+    setError("");
+
+    try {
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      const passwordHash = await bcrypt.hash(formData.password, 10);
+      const { error: registerError, user } = await registerVerifiedUser(normalizedEmail, passwordHash, {
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        middleName: formData.middleName.trim() || null,
+        sex: formData.sex,
+        birthDate: formData.birthDate.trim(),
+        contactNumber: formData.contactNumber.trim(),
+      });
+
+      if (registerError || !user) {
+        setError(registerError || "Unable to create your account right now. Try again.");
+        return;
+      }
+
+      try {
+        await linkPendingPublicAssessmentResult(normalizedEmail);
+      } catch (syncError) {
+        console.error("Unable to sync pending public assessment result:", syncError);
+      }
+
+      const { error: clearSessionError } = await clearRegistrationVerification();
+      if (clearSessionError) {
+        console.error("Account created, but the email verification session could not be cleared:", clearSessionError);
+        setCleanupWarning("Your account was created, but the temporary email-verification session could not be cleared. Sign in to continue.");
+      }
+
+      setFormData((current) => ({ ...current, password: "", confirmPassword: "" }));
+      setShowSuccessModal(true);
+    } catch (error: unknown) {
+      console.error("Error creating verified account:", error);
+      setError(error instanceof Error ? error.message : "Unable to create your account right now. Try again.");
+    }
+  };
+
+  const handleVerifyEmail = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+    setIsLoading(true);
+
+    try {
+      if (!emailVerified) {
+        const { error: verificationError, success } = await verifyRegistrationOtp(formData.email, verificationCode);
+        if (verificationError || !success) {
+          setError(verificationError || "The verification code could not be confirmed.");
+          return;
+        }
+        setEmailVerified(true);
+      }
+
+      await completeVerifiedRegistration();
+    } catch (error: unknown) {
+      console.error("Error verifying registration email:", error);
+      setError(error instanceof Error ? error.message : "Unable to verify this email right now.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerificationCode = async () => {
+    if (isLoading || resendCooldownSeconds > 0) return;
+
+    setError("");
+    setNotice("");
+    setIsLoading(true);
+    try {
+      const { error: otpError, success } = await sendRegistrationOtp(formData.email);
+      if (otpError || !success) {
+        setError(otpError || "Unable to resend the verification code right now.");
+      } else {
+        setVerificationCode("");
+        setEmailVerified(false);
+        setResendAvailableAt(Date.now() + VERIFICATION_RESEND_COOLDOWN_SECONDS * 1000);
+        setResendCooldownSeconds(VERIFICATION_RESEND_COOLDOWN_SECONDS);
+        setNotice("A new 8-digit verification code has been sent. Check your inbox and spam folder, and use the latest code.");
+      }
+    } catch (error: unknown) {
+      console.error("Error resending registration verification code:", error);
+      setError(error instanceof Error ? error.message : "Unable to resend the verification code right now.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const returnToRegistrationDetails = async () => {
+    setError("");
+    setNotice("");
+    if (emailVerified) {
+      const { error: clearSessionError } = await clearRegistrationVerification();
+      if (clearSessionError) {
+        setError(`Unable to clear the verified session: ${clearSessionError}`);
+        return;
+      }
+    }
+    setVerificationPending(false);
+    setVerificationCode("");
+    setEmailVerified(false);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -229,6 +352,7 @@ export function Register() {
     if (error) {
       setError("");
     }
+    if (notice) setNotice("");
 
     setFormData({
       ...formData,
@@ -254,10 +378,12 @@ export function Register() {
               Student Registration
             </p>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-              Create your account
+              {verificationPending ? "Verify your email" : "Create your account"}
             </h1>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-              Add your details to start your Electron Hub account and enrollment flow.
+              {verificationPending
+                ? `Enter the verification code sent to ${formData.email}.`
+                : "Add your details to start your Electron Hub account and enrollment flow."}
             </p>
           </div>
 
@@ -267,6 +393,91 @@ export function Register() {
             </div>
           )}
 
+          {notice && (
+            <div role="status" className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              {notice}
+            </div>
+          )}
+
+          {verificationPending ? (
+            <form onSubmit={handleVerifyEmail} className="mt-6 space-y-5">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50/80 p-4">
+                <div className="flex items-start gap-3">
+                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-blue-800" />
+                  <p className="text-sm leading-6 text-blue-900">
+                    Verify that you can access this email before we create your account. The code expires, so use the latest email.
+                  </p>
+                </div>
+              </div>
+
+              {!emailVerified ? (
+                <div>
+                  <label htmlFor="verificationCode" className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
+                    8-digit email verification code
+                  </label>
+                  <div className="auth-input-surface rounded-2xl px-4 py-3">
+                    <Mail className="h-5 w-5 text-slate-400" />
+                    <input
+                      type="text"
+                      id="verificationCode"
+                      value={verificationCode}
+                      onChange={(event) => {
+                        setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, REGISTRATION_OTP_LENGTH));
+                        setError("");
+                      }}
+                      inputMode="numeric"
+                      pattern={`[0-9]{${REGISTRATION_OTP_LENGTH}}`}
+                      maxLength={REGISTRATION_OTP_LENGTH}
+                      autoComplete="one-time-code"
+                      required
+                      className="min-w-0 text-center text-lg font-semibold tracking-[0.35em] placeholder:text-slate-400"
+                      placeholder={"0".repeat(REGISTRATION_OTP_LENGTH)}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-800">
+                  Email verified. Finish creating your account.
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading || (!emailVerified && verificationCode.length !== REGISTRATION_OTP_LENGTH)}
+                className="auth-primary-button flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-base font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <>
+                    <LoaderCircle className="h-5 w-5 animate-spin" />
+                    {emailVerified ? "Creating account..." : "Verifying email..."}
+                  </>
+                ) : emailVerified ? "Create Account" : "Verify Email"}
+              </button>
+
+              {!emailVerified && (
+                <button
+                  type="button"
+                  onClick={handleResendVerificationCode}
+                  disabled={isLoading || resendCooldownSeconds > 0}
+                  className="w-full text-sm font-semibold text-[#1E3A8A] hover:underline disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {resendCooldownSeconds > 0
+                    ? `Resend verification code in ${resendCooldownSeconds}s`
+                    : "Resend verification code"}
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={returnToRegistrationDetails}
+                disabled={isLoading}
+                className="flex w-full items-center justify-center gap-2 text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to registration details
+              </button>
+            </form>
+          ) : (
           <form onSubmit={handleSubmit} noValidate className="mt-5 space-y-4">
             {/* Last Name and First Name */}
             <div className="grid gap-4 sm:grid-cols-2">
@@ -543,6 +754,7 @@ export function Register() {
               )}
             </button>
           </form>
+          )}
 
           <div className="mt-5 space-y-2 text-center">
             <p className="text-sm text-slate-600">
@@ -591,6 +803,11 @@ export function Register() {
             <p className="mt-3 text-base leading-7 text-slate-600">
               Your account has been created. You may now log in to access your dashboard.
             </p>
+            {cleanupWarning && (
+              <p role="status" className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {cleanupWarning}
+              </p>
+            )}
 
             <button
               type="button"

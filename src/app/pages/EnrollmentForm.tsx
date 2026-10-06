@@ -33,6 +33,7 @@ import {
 } from "../../services/enrollmentService";
 import { triggerNotification } from "../../services/notificationService";
 import { supabase } from "../../supabase";
+import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
 import electivesDataset from "../../data/electives";
 import {
   validateElectiveSequence,
@@ -961,6 +962,13 @@ export function EnrollmentForm() {
   const handleFileChange = (field: keyof FormData, file: File | null) => {
     // Don't allow changes if this is a submitted enrollment
     if (isSubmittedEnrollment) return;
+
+    const fileError = validateDocumentFile(file);
+    if (fileError) {
+      setFormData(prev => ({ ...prev, [field]: null }));
+      setErrors(prev => ({ ...prev, [field]: fileError }));
+      return;
+    }
     
     setFormData(prev => ({ ...prev, [field]: file }));
     if (errors[field]) {
@@ -984,6 +992,17 @@ export function EnrollmentForm() {
     const today = new Date();
     const birthDate = new Date(date);
     return birthDate <= today;
+  };
+
+  const currentYear = new Date().getFullYear();
+  const graduationYears = Array.from(
+    { length: currentYear - 1900 + 1 },
+    (_, index) => String(currentYear - index)
+  );
+  const isValidGraduationYear = (year: string) => {
+    if (!/^\d{4}$/.test(year)) return false;
+    const numericYear = Number(year);
+    return numericYear >= 1900 && numericYear <= currentYear;
   };
 
   const validatePage = (page: number): boolean => {
@@ -1100,8 +1119,14 @@ export function EnrollmentForm() {
     if (page === 5) {
       if (!formData.primarySchool) newErrors.primarySchool = "This field is required";
       if (!formData.primaryYearGraduated) newErrors.primaryYearGraduated = "This field is required";
+      else if (!isValidGraduationYear(formData.primaryYearGraduated)) {
+        newErrors.primaryYearGraduated = "Select a valid graduation year up to the current year.";
+      }
       if (!formData.secondarySchool) newErrors.secondarySchool = "This field is required";
       if (!formData.secondaryYearGraduated) newErrors.secondaryYearGraduated = "This field is required";
+      else if (!isValidGraduationYear(formData.secondaryYearGraduated)) {
+        newErrors.secondaryYearGraduated = "Select a valid graduation year up to the current year.";
+      }
       if (formData.admissionType === "New Regular" && !formData.grade10Adviser) {
         newErrors.grade10Adviser = "This field is required for New Regular students";
       }
@@ -1144,6 +1169,11 @@ export function EnrollmentForm() {
 
     if (!validatePage(3)) {
       setCurrentPage(3);
+      return;
+    }
+
+    if (!validatePage(5)) {
+      setCurrentPage(5);
       return;
     }
 
@@ -1474,7 +1504,7 @@ export function EnrollmentForm() {
       >
         <input
           type="file"
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv"
+          accept={DOCUMENT_ACCEPT_ATTRIBUTE}
           onChange={(e) => handleFileChange(field, e.target.files?.[0] || null)}
           disabled={isSubmittedEnrollment}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -1925,14 +1955,14 @@ export function EnrollmentForm() {
       </div>
 
       {renderInput("School Name", "primarySchool")}
-      {renderInput("Year Graduated", "primaryYearGraduated", "number", true, "YYYY")}
+      {renderSelect("Year Graduated", "primaryYearGraduated", graduationYears)}
 
       <div className="bg-green-50 border-l-4 border-green-600 p-4 rounded mt-8">
         <h3 className="font-bold text-green-900 mb-2">Secondary Education (Junior High School)</h3>
       </div>
 
       {renderInput("School Name", "secondarySchool")}
-      {renderInput("Year Graduated", "secondaryYearGraduated", "number", true, "YYYY")}
+      {renderSelect("Year Graduated", "secondaryYearGraduated", graduationYears)}
 
       {formData.admissionType === "New Regular" && (
         renderInput("Grade 10 Adviser", "grade10Adviser", "text", true, "Full name of adviser")

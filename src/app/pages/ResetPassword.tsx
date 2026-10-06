@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { AlertCircle, ArrowLeft, CheckCircle, Eye, EyeOff, LockKeyhole, LoaderCircle } from "lucide-react";
+import bcrypt from "bcryptjs";
 import { ChatAssistant } from "../components/ChatAssistant";
 import logo from "../../assets/electronLogo";
+import { supabase } from "../../supabase";
 
 export function ResetPassword() {
-  const [resetToken, setResetToken] = useState("");
   const [isCheckingRecovery, setIsCheckingRecovery] = useState(true);
+  const [hasRecoverySession, setHasRecoverySession] = useState(false);
+  const [recoveryEmail, setRecoveryEmail] = useState("");
   const [isComplete, setIsComplete] = useState(false);
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -15,20 +18,64 @@ export function ResetPassword() {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
-    const token = new URLSearchParams(window.location.search).get("token") || "";
-    setResetToken(token);
-    if (!token) {
-      setErrorMessage("This password reset link is missing or invalid. Request a new reset link.");
-    }
-    setIsCheckingRecovery(false);
+    let isActive = true;
+    let recoverySessionReceived = false;
+    let invalidLinkTimeoutId: number | undefined;
+    const subscription = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" && session?.user) {
+        recoverySessionReceived = true;
+        setRecoveryEmail(session.user.email || "");
+        setHasRecoverySession(true);
+        setIsCheckingRecovery(false);
+        setErrorMessage("");
+      }
+    });
+
+    void supabase.auth.getSession().then(({ error }) => {
+      if (!isActive) return;
+
+      if (error) {
+        setErrorMessage(error.message || "Unable to verify the password reset session.");
+        setIsCheckingRecovery(false);
+        return;
+      }
+
+      invalidLinkTimeoutId = window.setTimeout(() => {
+        if (!isActive || recoverySessionReceived) return;
+
+        const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        const authError = params.get("error_description") || hashParams.get("error_description");
+
+        setErrorMessage(
+          authError || "This password reset link is invalid or has expired. Request a new reset link and try again."
+        );
+        setIsCheckingRecovery(false);
+      }, 0);
+    }).catch((error: unknown) => {
+      if (!isActive) return;
+      console.error("Error checking password recovery session:", error);
+      setErrorMessage(error instanceof Error ? error.message : "Unable to verify the password reset session.");
+      setIsCheckingRecovery(false);
+    });
+
+    return () => {
+      isActive = false;
+      if (invalidLinkTimeoutId !== undefined) window.clearTimeout(invalidLinkTimeoutId);
+      subscription.data.subscription.unsubscribe();
+    };
   }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage("");
 
-    if (!resetToken) {
-      setErrorMessage("A valid password reset link is required. Request a new reset link.");
+    if (!hasRecoverySession) {
+      setErrorMessage("A valid password reset session is required. Request a new reset link.");
+      return;
+    }
+    if (!recoveryEmail) {
+      setErrorMessage("The recovery session does not include an account email. Request a new reset link.");
       return;
     }
     if (newPassword.length < 8) {
@@ -42,14 +89,23 @@ export function ResetPassword() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch("/api/password-reset", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "reset", token: resetToken, password: newPassword }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        throw new Error(result.error || "Unable to update your password. Please try again.");
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+
+      const passwordHash = await bcrypt.hash(newPassword, 10);
+      const { data: updatedUser, error: syncError } = await supabase
+        .from("users")
+        .update({ password_hash: passwordHash, updated_at: new Date().toISOString() })
+        .eq("email", recoveryEmail)
+        .select("id")
+        .maybeSingle();
+
+      if (syncError) {
+        console.error("Supabase Auth password updated but application password sync failed:", syncError);
+        throw new Error(`Your Supabase password was updated, but Electron Hub could not synchronize the login credential: ${syncError.message}`);
+      }
+      if (!updatedUser) {
+        throw new Error("Your Supabase password was updated, but no matching Electron Hub account was found to synchronize.");
       }
 
       setNewPassword("");
@@ -130,7 +186,7 @@ export function ResetPassword() {
                 Return to Login
               </Link>
             </div>
-          ) : resetToken ? (
+          ) : hasRecoverySession ? (
             <>
               <h1 className="text-center text-3xl font-semibold text-slate-900 sm:text-[2.2rem]">Choose a new password</h1>
               <p className="mt-2 text-center text-sm leading-6 text-slate-500 sm:text-base">

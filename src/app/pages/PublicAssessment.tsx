@@ -10,6 +10,7 @@ import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
 import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
 import electivesCatalog from "../../data/electives.js";
+import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
 interface Question {
   id: number;
@@ -607,8 +608,13 @@ export function PublicAssessment() {
   const [saveMessage, setSaveMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [showExitConfirmation, setShowExitConfirmation] = useState(false);
   const hasRestoredProgress = useRef(false);
   const assessmentStartedRef = useRef(false);
+  const hasAutoSubmitted = useRef(false);
+  const submitAssessmentRef = useRef<() => void>(() => undefined);
   const publicAssessmentShellStyle = {
     background:
       "radial-gradient(circle at top left, rgba(37, 99, 235, 0.16) 0%, transparent 26%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.1) 0%, transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f8fafc 100%)",
@@ -676,6 +682,13 @@ export function PublicAssessment() {
         setAssessmentStarted(parsedProgress.assessmentStarted);
         assessmentStartedRef.current = parsedProgress.assessmentStarted;
       }
+
+      if (typeof parsedProgress?.startedAt === "number") {
+        setStartedAt(parsedProgress.startedAt);
+      } else if (parsedProgress?.assessmentStarted) {
+        // Older saved attempts did not include a timer; begin timing when restored.
+        setStartedAt(Date.now());
+      }
     } catch (error) {
       console.error("Failed to restore public assessment progress:", error);
     } finally {
@@ -690,6 +703,7 @@ export function PublicAssessment() {
       answers,
       currentSection,
       assessmentStarted,
+      startedAt,
       updatedAt: new Date().toISOString(),
     });
 
@@ -702,7 +716,28 @@ export function PublicAssessment() {
     currentSection,
     loading,
     sections.length,
+    startedAt,
   ]);
+
+  const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
+  const totalDurationSeconds = getAssessmentDurationSeconds(totalQuestions);
+
+  useEffect(() => {
+    if (!assessmentStarted || !startedAt || assessmentCompleted || totalQuestions === 0) return;
+
+    const updateTimer = () => {
+      const nextRemaining = getRemainingAssessmentSeconds(startedAt, totalQuestions);
+      setRemainingSeconds(nextRemaining);
+      if (nextRemaining === 0 && !hasAutoSubmitted.current) {
+        hasAutoSubmitted.current = true;
+        submitAssessmentRef.current();
+      }
+    };
+
+    updateTimer();
+    const intervalId = window.setInterval(updateTimer, 1000);
+    return () => window.clearInterval(intervalId);
+  }, [assessmentCompleted, assessmentStarted, startedAt, totalQuestions]);
 
   useEffect(() => {
     if (!loading && sections.length > 0 && assessmentStarted) {
@@ -1249,7 +1284,6 @@ export function PublicAssessment() {
   }
 
   const currentSectionData = sections[currentSection];
-  const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
   const answeredQuestions = sections.reduce((sum, section) => {
     return sum + section.questions.filter((question) => isQuestionAnswered(question)).length;
   }, 0);
@@ -1421,9 +1455,24 @@ export function PublicAssessment() {
 
   const handleStartAssessment = () => {
     assessmentStartedRef.current = true;
+    hasAutoSubmitted.current = false;
+    setStartedAt(Date.now());
     setAssessmentStarted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
+
+  const handleExitAssessment = () => {
+    localStorage.removeItem(assessmentProgressKey);
+    setShowExitConfirmation(false);
+    assessmentStartedRef.current = false;
+    setAssessmentStarted(false);
+    setStartedAt(null);
+    setRemainingSeconds(0);
+    setCurrentSection(0);
+    setAnswers({});
+  };
+
+  submitAssessmentRef.current = handleSubmit;
 
   async function handleSaveResult() {
     if (!results) return;
@@ -1604,6 +1653,13 @@ export function PublicAssessment() {
                 </div>
               </div>
 
+              <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-left text-amber-950">
+                <p className="font-bold">Timed Assessment</p>
+                <p className="mt-1 text-sm leading-6">
+                  You have <strong>{totalDurationSeconds / 60} minutes</strong> to complete this assessment. Please submit your answers before the timer runs out.
+                </p>
+              </div>
+
               <button
                 onClick={handleStartAssessment}
                 className="mx-auto mt-6 flex w-full max-w-md items-center justify-center gap-3 rounded-2xl px-6 py-5 text-lg font-bold text-white shadow-lg transition-all hover:-translate-y-0.5 hover:shadow-xl"
@@ -1654,8 +1710,35 @@ export function PublicAssessment() {
           <p className="mx-auto max-w-3xl text-lg text-blue-100 md:text-xl">
             Work through each section in order. Your answers are used to build your final track and elective recommendation.
           </p>
+          <div className={`mx-auto mt-6 inline-flex rounded-full px-5 py-3 text-base font-bold ${remainingSeconds <= FIVE_MINUTES_IN_SECONDS ? "bg-red-100 text-red-700" : "bg-white text-blue-900"}`} aria-live="polite">
+            Time remaining: {formatAssessmentDuration(remainingSeconds)}
+          </div>
+          {remainingSeconds <= FIVE_MINUTES_IN_SECONDS && remainingSeconds > 0 && (
+            <p className="mt-3 font-semibold text-yellow-200">5-minute warning: please review and submit your answers.</p>
+          )}
+          <button
+            onClick={() => setShowExitConfirmation(true)}
+            disabled={isSubmitting}
+            className="mx-auto mt-5 flex items-center gap-2 rounded-xl border border-white/50 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10 disabled:opacity-50"
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Exit Assessment
+          </button>
         </div>
       </section>
+
+      {showExitConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4" role="dialog" aria-modal="true" aria-labelledby="exit-assessment-title">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 id="exit-assessment-title" className="text-2xl font-bold text-slate-950">Are you sure?</h2>
+            <p className="mt-3 leading-6 text-slate-600">Your assessment progress may be lost if you exit. Are you sure you want to leave?</p>
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button onClick={() => setShowExitConfirmation(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 font-semibold text-slate-700">Continue Assessment</button>
+              <button onClick={handleExitAssessment} className="rounded-xl bg-red-600 px-4 py-2.5 font-semibold text-white">Exit Assessment</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <section className="bg-white py-16">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
