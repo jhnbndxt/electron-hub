@@ -9,6 +9,7 @@ import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
 import { addNotification } from "../../../services/notificationService";
+import { notify } from "../../utils/notify";
 
 interface EnrolledStudent {
   id: string;
@@ -667,7 +668,7 @@ export function SectionManagement() {
             .eq("id", section.id);
 
           if (updateError) {
-            alert(`Failed to update existing section: ${updateError.message}`);
+            notify.error(`Failed to update existing section: ${updateError.message}`);
             return;
           }
         }
@@ -691,7 +692,7 @@ export function SectionManagement() {
             }
             
             if (checkError && checkError.code !== "PGRST116") {
-              alert(`Failed to check section code: ${checkError.message}`);
+              notify.error(`Failed to check section code: ${checkError.message}`);
               return;
             }
 
@@ -702,7 +703,7 @@ export function SectionManagement() {
           }
 
           if (attemptNumber > 10) {
-            alert(`Failed to save section: Could not generate unique section code after multiple attempts.`);
+            notify.error(`Failed to save section: Could not generate unique section code after multiple attempts.`);
             return;
           }
 
@@ -721,7 +722,7 @@ export function SectionManagement() {
             .single();
 
           if (sectionInsertError || !insertedSection) {
-            alert(`Failed to save section: ${sectionInsertError?.message || "Unknown error"}`);
+            notify.error(`Failed to save section: ${sectionInsertError?.message || "Unknown error"}`);
             return;
           }
 
@@ -740,7 +741,7 @@ export function SectionManagement() {
             .in("section_id", currentSectionIds);
 
           if (assignmentDeleteError) {
-            alert(`Failed to refresh section assignments: ${assignmentDeleteError.message}`);
+            notify.error(`Failed to refresh section assignments: ${assignmentDeleteError.message}`);
             return;
           }
         }
@@ -762,7 +763,7 @@ export function SectionManagement() {
             .insert(assignmentPayload);
 
           if (assignmentInsertError) {
-            alert(`Failed to save section assignments: ${assignmentInsertError.message}`);
+            notify.error(`Failed to save section assignments: ${assignmentInsertError.message}`);
             return;
           }
 
@@ -776,18 +777,18 @@ export function SectionManagement() {
             .in("id", sectionsToDelete);
 
           if (sectionDeleteError) {
-            alert(`Failed to remove duplicate sections: ${sectionDeleteError.message}`);
+            notify.error(`Failed to remove duplicate sections: ${sectionDeleteError.message}`);
             return;
           }
         }
 
-        alert(
+        notify.error(
           `Successfully organized ${assignmentPayload.length} students into ${finalSections.length} sections!`
         );
         await loadSectionData();
       } catch (error) {
         console.error("Auto-generate sections error:", error);
-        alert("Failed to auto-generate sections. Please try again.");
+        notify.error("Failed to auto-generate sections. Please try again.");
       }
     } finally {
       setIsAutoGenerating(false);
@@ -815,12 +816,12 @@ export function SectionManagement() {
 
     if (checkError && checkError.code !== "PGRST116") {
       // PGRST116 is "no rows found" which is what we want
-      alert(`Failed to check section code: ${checkError.message}`);
+      notify.error(`Failed to check section code: ${checkError.message}`);
       return;
     }
 
     if (existingSection) {
-      alert(`Failed to update section: A section with code "${normalizedSectionName}" already exists.`);
+      notify.error(`Failed to update section: A section with code "${normalizedSectionName}" already exists.`);
       return;
     }
 
@@ -834,13 +835,13 @@ export function SectionManagement() {
       .eq("id", sectionId);
 
     if (error) {
-      alert(`Failed to update section: ${error.message}`);
+      notify.error(`Failed to update section: ${error.message}`);
       return;
     }
 
     setEditingSection(null);
     await loadSectionData();
-    alert("Section updated successfully!");
+    notify.success("Section updated successfully!");
   };
 
   const handleCancelEdit = () => {
@@ -867,7 +868,7 @@ export function SectionManagement() {
       .eq("section_id", sectionId);
 
     if (assignmentDeleteError) {
-      alert(`Failed to unassign students from section: ${assignmentDeleteError.message}`);
+      notify.error(`Failed to unassign students from section: ${assignmentDeleteError.message}`);
       return;
     }
 
@@ -877,12 +878,12 @@ export function SectionManagement() {
       .eq("id", sectionId);
 
     if (error) {
-      alert(`Failed to delete section: ${error.message}`);
+      notify.error(`Failed to delete section: ${error.message}`);
       return;
     }
 
     await loadSectionData();
-    alert("Section deleted successfully!");
+    notify.success("Section deleted successfully!");
   };
 
   const handleRemoveStudentFromSection = (
@@ -909,12 +910,12 @@ export function SectionManagement() {
       .eq("status", "active");
 
     if (error) {
-      alert(`Failed to remove student from section: ${error.message}`);
+      notify.error(`Failed to remove student from section: ${error.message}`);
       return;
     }
 
     await loadSectionData();
-    alert("Student removed from section successfully!");
+    notify.success("Student removed from section successfully!");
   };
 
   const handleConfirmPendingAction = async () => {
@@ -1213,7 +1214,7 @@ export function SectionManagement() {
       doc.save(`section-roster-${sanitizeFileName(section.name) || "section"}.pdf`);
     } catch (error) {
       console.error("Error generating section PDF:", error);
-      window.alert("Unable to generate the section PDF right now. Please try again.");
+      notify.error("Unable to generate the section PDF right now. Please try again.");
     } finally {
       setDownloadingSectionId((currentId) => (currentId === section.id ? null : currentId));
     }

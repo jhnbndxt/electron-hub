@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Download, TrendingUp, Users, Award, GraduationCap } from "lucide-react";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { notify } from "../../utils/notify";
 
 export function Reports() {
   const enrollmentData = [
@@ -34,7 +35,7 @@ export function Reports() {
   const enrollmentGrowth = 12.3;
 
   const handleExportReport = () => {
-    alert("Exporting comprehensive report to PDF...");
+    notify.info("Exporting comprehensive report to PDF...");
   };
 
   return (

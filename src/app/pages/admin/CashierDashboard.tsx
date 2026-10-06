@@ -31,6 +31,8 @@ import { supabase } from "../../../supabase";
 import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { loadProfileImageUrl } from "../../utils/profileImage";
+import DocumentViewerModal from "../../components/DocumentViewerModal";
+import { ConfirmedDownloadButton } from "../../components/ConfirmedDownloadButton";
 
 const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
 
@@ -170,6 +172,7 @@ export function CashierDashboard() {
   const [cashPayments, setCashPayments] = useState<CashPayment[]>([]);
   const [queueStats, setQueueStats] = useState<PaymentQueueStats>(defaultPaymentQueueStats);
   const [selectedPayment, setSelectedPayment] = useState<OnlinePayment | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<OnlinePayment | null>(null);
   const [selectedCashPayment, setSelectedCashPayment] = useState<CashPayment | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -733,6 +736,14 @@ export function CashierDashboard() {
         title={processingTitle}
         message={processingMessage}
       />
+      {viewingReceipt && (
+        <DocumentViewerModal
+          isOpen={Boolean(viewingReceipt)}
+          onClose={() => setViewingReceipt(null)}
+          documentName="Receipt / Proof of Payment"
+          documentData={{ id: viewingReceipt.id, status: viewingReceipt.status, uploadDate: viewingReceipt.submittedDate, fileName: viewingReceipt.receiptFileName || "receipt", fileUrl: viewingReceipt.receiptFiles[0] || null, rejectionComment: "" }}
+        />
+      )}
       <ConfirmationModal
         isOpen={showConfirmModal}
         onClose={() => setShowConfirmModal(false)}
@@ -1115,21 +1126,14 @@ export function CashierDashboard() {
                       </div>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => {
-                            const container = document.querySelector('.receipt-preview') as HTMLElement;
-                            if (container?.requestFullscreen) container.requestFullscreen();
-                          }}
+                          onClick={() => setViewingReceipt(selectedPayment)}
                           className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
                         >
                           <Maximize className="w-4 h-4" />
                         </button>
-                        <a
-                          href={selectedReceiptUrls[0] || ''}
-                          download={selectedPayment.receiptFileName}
-                          className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700"
-                        >
+                        <ConfirmedDownloadButton fileName={selectedPayment.receiptFileName} fileUrl={selectedReceiptUrls[0]} onError={() => toast.error("The receipt could not be downloaded.")} className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700">
                           <Download className="w-4 h-4" />
-                        </a>
+                        </ConfirmedDownloadButton>
                       </div>
                     </div>
                   </div>

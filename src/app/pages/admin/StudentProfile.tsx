@@ -22,11 +22,16 @@ import {
   BadgeCheck,
   AlertCircle,
   ExternalLink,
+  Eye,
+  Download,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { LoadingState } from "../../components/LoadingState";
 import { getStudentProfileByEnrollmentId } from "../../../services/adminService";
+import DocumentViewerModal from "../../components/DocumentViewerModal";
+import { ConfirmedDownloadButton } from "../../components/ConfirmedDownloadButton";
+import toast from "react-hot-toast";
 
 const DOCUMENT_LABELS: Record<string, string> = {
   form138: "Form 138 (Report Card)",
@@ -116,6 +121,7 @@ export function StudentProfile() {
   const [profile, setProfile] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [viewingDocument, setViewingDocument] = useState<any>(null);
 
   const isSuperAdmin = userRole === "superadmin" || location.pathname.startsWith("/branchcoordinator");
   const recordsPath = isSuperAdmin ? "/branchcoordinator/students" : "/registrar/students";
@@ -433,15 +439,10 @@ export function StudentProfile() {
                       </span>
                     </div>
                     {(document.file_path || document.file_url) && (
-                      <a
-                        href={document.file_url || document.file_path}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-3 inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"
-                      >
-                        View File
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button onClick={() => setViewingDocument(document)} className="inline-flex items-center gap-2 rounded-lg bg-blue-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-800"><Eye className="h-3.5 w-3.5" />View</button>
+                        <ConfirmedDownloadButton fileName={document.file_name} filePath={document.file_path} fileUrl={document.file_url} onError={() => toast.error("The document could not be downloaded.")} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"><Download className="h-3.5 w-3.5" />Download</ConfirmedDownloadButton>
+                      </div>
                     )}
                   </div>
                 ))
@@ -487,6 +488,22 @@ export function StudentProfile() {
           </RecordSection>
         </div>
       </div>
+      {viewingDocument && (
+        <DocumentViewerModal
+          isOpen={Boolean(viewingDocument)}
+          onClose={() => setViewingDocument(null)}
+          documentName={DOCUMENT_LABELS[viewingDocument.document_type] || viewingDocument.document_type || "Document"}
+          documentData={{
+            id: viewingDocument.id,
+            status: viewingDocument.status || "pending",
+            uploadDate: viewingDocument.uploaded_at || viewingDocument.updated_at || "",
+            fileName: viewingDocument.file_name || "document",
+            filePath: viewingDocument.file_path,
+            fileUrl: viewingDocument.file_url || null,
+            rejectionComment: viewingDocument.rejection_comment || "",
+          }}
+        />
+      )}
 
       <div className="mt-5 grid gap-5 xl:grid-cols-2">
         <RecordSection title="Assessment Summary" description="Recorded AI assessment recommendation and score data." icon={ClipboardList}>

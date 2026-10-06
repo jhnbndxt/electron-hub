@@ -1,4 +1,5 @@
 import { CreditCard, DollarSign, TrendingUp, Calendar, Download, CheckCircle } from "lucide-react";
+import { notify } from "../../utils/notify";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 
 export function Billing() {
@@ -152,14 +153,14 @@ export function Billing() {
 
           <div className="flex gap-3">
             <button
-              onClick={() => alert("Upgrade plan functionality coming soon")}
+              onClick={() => notify.info("Upgrade plan functionality coming soon")}
               className="px-6 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90"
               style={{ backgroundColor: "#7C3AED" }}
             >
               Upgrade Plan
             </button>
             <button
-              onClick={() => alert("Manage subscription functionality coming soon")}
+              onClick={() => notify.info("Manage subscription functionality coming soon")}
               className="px-6 py-3 rounded-lg font-medium transition-all hover:bg-gray-100 border border-gray-300"
               style={{ color: "#374151" }}
             >
@@ -221,7 +222,7 @@ export function Billing() {
               </p>
             </div>
             <button
-              onClick={() => alert("Add payment method functionality coming soon")}
+              onClick={() => notify.info("Add payment method functionality coming soon")}
               className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90"
               style={{ backgroundColor: "#7C3AED" }}
             >
@@ -246,7 +247,7 @@ export function Billing() {
               </p>
             </div>
             <button
-              onClick={() => alert("Edit payment method")}
+              onClick={() => notify.info("Edit payment method")}
               className="text-sm font-medium hover:underline"
               style={{ color: "#7C3AED" }}
             >
@@ -269,7 +270,7 @@ export function Billing() {
               </p>
             </div>
             <button
-              onClick={() => alert("Download all invoices")}
+              onClick={() => notify.info("Download all invoices")}
               className="px-4 py-2 rounded-lg font-medium text-sm transition-all hover:bg-gray-100 border border-gray-300 flex items-center gap-2"
               style={{ color: "#374151" }}
             >
@@ -331,7 +332,7 @@ export function Billing() {
                   </td>
                   <td className="px-6 py-4">
                     <button
-                      onClick={() => alert(`Download invoice ${invoice.id}`)}
+                      onClick={() => notify.info(`Download invoice ${invoice.id}`)}
                       className="text-sm font-medium hover:underline flex items-center gap-1"
                       style={{ color: "#7C3AED" }}
                     >

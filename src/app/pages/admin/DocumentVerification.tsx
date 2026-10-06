@@ -18,6 +18,8 @@ import { createAuditLog } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { notify } from "../../utils/notify";
+import { downloadDocument } from "../../utils/documentFiles";
 
 interface StudentDocument {
   studentId: string;
@@ -111,7 +113,7 @@ export function DocumentVerification() {
       setStudents(studentsWithDocuments);
     } catch (error) {
       console.error("Error loading documents:", error);
-      alert("Failed to load documents. Please try again.");
+      notify.error("Failed to load documents. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -218,7 +220,7 @@ export function DocumentVerification() {
       setRejectionComment("");
     } catch (error) {
       console.error("Error approving document:", error);
-      alert("Failed to approve document. Please try again.");
+      notify.error("Failed to approve document. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -228,12 +230,12 @@ export function DocumentVerification() {
     if (!selectedStudent || !selectedDocument) return;
 
     if (!rejectionComment.trim()) {
-      alert("❌ Rejection reason is required. Please provide a clear explanation.");
+      notify.warning("❌ Rejection reason is required. Please provide a clear explanation.");
       return;
     }
 
     if (rejectionComment.trim().length < 10) {
-      alert("❌ Please provide a more detailed rejection reason (at least 10 characters).");
+      notify.warning("❌ Please provide a more detailed rejection reason (at least 10 characters).");
       return;
     }
 
@@ -284,10 +286,10 @@ export function DocumentVerification() {
       setSelectedStudent(null);
       setSelectedDocument(null);
       setRejectionComment("");
-      alert(`✅ Document rejected. The student has been notified with your feedback.`);
+      notify.success("Document rejected. The student has been notified with your feedback.");
     } catch (error) {
       console.error("Error rejecting document:", error);
-      alert("Failed to reject document. Please try again.");
+      notify.error("Failed to reject document. Please try again.");
     } finally {
       setIsSaving(false);
     }
@@ -555,15 +557,10 @@ export function DocumentVerification() {
                               (e.target as HTMLImageElement).src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z'/%3E%3C/svg%3E";
                             }}
                           />
-                          <a
-                            href={selectedDocument.data.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                          >
+                          <button onClick={() => downloadDocument({ fileName: selectedDocument.data.fileName, fileUrl: selectedDocument.data.fileUrl }).catch(() => notify.error("The document could not be downloaded."))} className="mt-4 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                             <Download className="w-4 h-4" />
                             Download Original
-                          </a>
+                          </button>
                         </div>
                       ) : (
                         <div className="p-12 text-center text-gray-500">

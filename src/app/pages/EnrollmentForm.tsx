@@ -32,6 +32,7 @@ import {
   uploadDocument 
 } from "../../services/enrollmentService";
 import { triggerNotification } from "../../services/notificationService";
+import { notify } from "../utils/notify";
 import { supabase } from "../../supabase";
 import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
 import electivesDataset from "../../data/electives";
@@ -1163,7 +1164,7 @@ export function EnrollmentForm() {
 
   const handleSubmit = async () => {
     if (!certificationChecked) {
-      alert("Please certify that the information you provided is true and correct before submitting.");
+      notify.warning("Please certify that the information you provided is true and correct before submitting.");
       return;
     }
 
@@ -1181,7 +1182,7 @@ export function EnrollmentForm() {
 
     const userEmail = userData?.email;
     if (!userEmail) {
-      alert("Unable to submit enrollment. Please sign in again.");
+      notify.error("Unable to submit enrollment. Please sign in again.");
       return;
     }
 
@@ -1223,7 +1224,7 @@ export function EnrollmentForm() {
       const { error, data: enrollmentResult } = await submitEnrollment(userId, enrollmentData, documentFiles);
 
       if (error) {
-        alert(`Error submitting enrollment: ${error}`);
+        notify.error(`Enrollment could not be submitted: ${error}`);
         console.error('Enrollment submission error:', error);
         return;
       }
@@ -1256,7 +1257,7 @@ export function EnrollmentForm() {
       navigate("/dashboard/payment");
     } catch (error) {
       console.error('Enrollment submission error:', error);
-      alert('Failed to submit enrollment. Please try again.');
+      notify.error('Failed to submit enrollment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

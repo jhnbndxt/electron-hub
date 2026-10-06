@@ -50,6 +50,7 @@ import { AssessmentManagement } from "./pages/admin/AssessmentManagement";
 import { SectionManagement } from "./pages/admin/SectionManagement";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { SystemPresenceTracker } from "./components/SystemPresenceTracker";
+import { Toaster } from "react-hot-toast";
 
 type AppRole = "student" | "registrar" | "branchcoordinator" | "cashier";
 
@@ -265,6 +266,7 @@ export default function App() {
 
   return (
     <AuthProvider>
+      <Toaster position="top-right" toastOptions={{ duration: 4500 }} />
       <SystemPresenceTracker />
       <RouterProvider router={router} />
     </AuthProvider>

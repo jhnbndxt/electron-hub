@@ -21,6 +21,7 @@ import { Link } from "react-router";
 import { EmptyState } from "../../components/EmptyState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import ReviewApplicationModal from "../../components/ReviewApplicationModal";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useAuth } from "../../context/AuthContext";
 import {
   getPendingApplications,
@@ -37,6 +38,8 @@ import {
 } from "../../../services/adminService";
 import { supabase } from "../../../supabase";
 import { triggerNotification } from "../../../services/notificationService";
+import { notify } from "../../utils/notify";
+import { downloadDocument } from "../../utils/documentFiles";
 
 interface Student {
   id: number | string;
@@ -104,6 +107,7 @@ export function AdminDashboard() {
   const [selectedDocument, setSelectedDocument] = useState<{ key: string; name: string; data: any } | null>(null);
   const [documentRejectionComment, setDocumentRejectionComment] = useState("");
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [showRejectApplicationConfirmation, setShowRejectApplicationConfirmation] = useState(false);
 
   const documentNames: Record<string, string> = {
     psaBirthCertificate: "PSA Birth Certificate",
@@ -281,7 +285,7 @@ export function AdminDashboard() {
       });
     } catch (error) {
       console.error('Error loading student data:', error);
-      alert('Failed to load student data');
+      notify.error('Failed to load student data');
     }
   };
 
@@ -356,14 +360,14 @@ export function AdminDashboard() {
       setDocumentRejectionComment("");
     } catch (error) {
       console.error("Error approving document:", error);
-      alert("Failed to approve document");
+      notify.error("Failed to approve document");
     }
   };
 
   // Handle document reject (for new modal)
   const handleRejectDocument = async () => {
     if (!selectedDocument || !reviewingStudent || !documentRejectionComment.trim()) {
-      alert("Please provide a rejection reason");
+      notify.warning("Please provide a rejection reason");
       return;
     }
 
@@ -402,7 +406,7 @@ export function AdminDashboard() {
       setDocumentRejectionComment("");
     } catch (error) {
       console.error("Error rejecting document:", error);
-      alert("Failed to reject document");
+      notify.error("Failed to reject document");
     }
   };
 
@@ -444,10 +448,10 @@ export function AdminDashboard() {
         console.error('Error creating notification:', notificationError);
       }
 
-      alert(`✅ ${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved successfully!`);
+      notify.success(`${documentKeys.length} document${documentKeys.length > 1 ? 's' : ''} approved successfully!`);
     } catch (error) {
       console.error('Bulk approve error:', error);
-      alert('Error during bulk approval. Please try again.');
+      notify.error('Error during bulk approval. Please try again.');
     }
   };
 
@@ -486,10 +490,10 @@ export function AdminDashboard() {
         console.error('Error creating notification:', notificationError);
       }
 
-      alert("✅ Document approved successfully!");
+      notify.success("Document approved successfully!");
     } catch (error) {
       console.error('Error approving document:', error);
-      alert('Error approving document. Please try again.');
+      notify.error('Error approving document. Please try again.');
     }
   };
 
@@ -591,7 +595,7 @@ export function AdminDashboard() {
       loadAuditLogs();
       calculateStats();
 
-      alert(`Documents rejected. Student has been notified to resubmit: ${rejectedDocs.join(", ")}`);
+      notify.success(`Documents rejected. Student has been notified to resubmit: ${rejectedDocs.join(", ")}`);
       setSelectedStudent(null);
     }
   };
@@ -601,7 +605,7 @@ export function AdminDashboard() {
       // Approve enrollment in Supabase (sets status to documents_verified)
       const { error } = await approveEnrollment(selectedStudent.id, actorReference);
       if (error) {
-        alert(`❌ Error approving enrollment: ${error}`);
+        notify.error(`Error approving enrollment: ${error}`);
         return;
       }
 
@@ -639,7 +643,7 @@ export function AdminDashboard() {
       loadAuditLogs();
       calculateStats();
       
-      alert(`Documents verified for ${selectedStudent.name}. Student can now proceed to payment.`);
+      notify.success(`Documents verified for ${selectedStudent.name}. Student can now proceed to payment.`);
       setSelectedStudent(null);
     }
   };
@@ -656,21 +660,18 @@ export function AdminDashboard() {
 
       loadAuditLogs();
       
-      alert(`Correction request sent to: ${selectedStudent.name}`);
+      notify.success(`Correction request sent to: ${selectedStudent.name}`);
       setSelectedStudent(null);
     }
   };
 
-  const handleRejectApplication = async () => {
+  const handleRejectApplication = () => {
     if (!reviewingStudent) return;
+    setShowRejectApplicationConfirmation(true);
+  };
 
-    // Show confirmation before rejecting the entire application
-    const confirmReject = window.confirm(
-      `Are you sure you want to REJECT the entire application for ${reviewingStudent.studentName || reviewingStudent.name || 'this student'}?\n\nThis action will:\n- Mark the application as REJECTED\n- Notify the student\n- Prevent further modifications\n\nThis action cannot be undone easily.`
-    );
-
-    if (!confirmReject) return;
-
+  const executeRejectApplication = async () => {
+    if (!reviewingStudent) return;
     try {
       // Reject the entire enrollment
       const { error } = await rejectEnrollment(
@@ -680,7 +681,7 @@ export function AdminDashboard() {
       );
 
       if (error) {
-        alert(`❌ Error rejecting application: ${error}`);
+        notify.error(`Error rejecting application: ${error}`);
         return;
       }
 
@@ -697,16 +698,17 @@ export function AdminDashboard() {
         console.error('Error creating notification:', notificationError);
       }
 
-      alert(`✅ Application REJECTED. Student has been notified.`);
+      notify.success(`Application rejected. Student has been notified.`);
       setReviewingStudent(null);
       setSelectedDocument(null);
       setDocumentRejectionComment("");
       loadApplications();
       loadAuditLogs();
       calculateStats();
+      setShowRejectApplicationConfirmation(false);
     } catch (error) {
       console.error('Error rejecting application:', error);
-      alert(`❌ Error rejecting application: ${error}`);
+      notify.error(`Error rejecting application: ${error}`);
     }
   };
 
@@ -1116,6 +1118,16 @@ export function AdminDashboard() {
         handleApproveFromTable={handleApproveFromTable}
       />
 
+      <ConfirmationModal
+        isOpen={showRejectApplicationConfirmation}
+        onClose={() => setShowRejectApplicationConfirmation(false)}
+        onConfirm={executeRejectApplication}
+        title="Reject this application?"
+        message={`This will mark ${reviewingStudent?.studentName || reviewingStudent?.name || "this student's"} application as rejected and notify the student. The action cannot be easily undone.`}
+        confirmText="Reject application"
+        type="danger"
+      />
+
       {/* Document View Modal */}
       {viewingDocument && (
         <div className="fixed inset-y-0 right-0 left-0 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm z-50 lg:left-[var(--dashboard-sidebar-offset,0px)]">
@@ -1148,14 +1160,9 @@ export function AdminDashboard() {
                     <div className="text-center">
                       <FileText className="w-16 h-16 mx-auto mb-4 text-gray-400" />
                       <p className="text-gray-600 mb-4 font-medium">{viewingDocument.url}</p>
-                      <a
-                        href={viewingDocument.fileUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                      >
-                        Open Document
-                      </a>
+                      <button onClick={() => downloadDocument({ fileName: viewingDocument.type, fileUrl: viewingDocument.fileUrl }).catch(() => notify.error("The document could not be downloaded."))} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                        Download original file
+                      </button>
                     </div>
                   )}
                 </div>

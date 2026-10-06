@@ -33,6 +33,8 @@ import { useAuth } from "../../context/AuthContext";
 import { expireOverdueCashPayments } from "../../../services/adminService";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
 import { exportToCSV, formatCurrencyForCSV } from "../../../utils/csvExport";
+import DocumentViewerModal from "../../components/DocumentViewerModal";
+import { ConfirmedDownloadButton } from "../../components/ConfirmedDownloadButton";
 import { validatePaymentAmount, INVALID_PAYMENT_AMOUNT_MESSAGE } from "../../../utils/paymentAmountValidation";
 import electronLogo from "../../../assets/electronLogo";
 
@@ -198,6 +200,7 @@ export function BranchCoordinatorPayments() {
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
+  const [viewingReceipt, setViewingReceipt] = useState<PaymentRecord | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [receiptZoom, setReceiptZoom] = useState(100);
@@ -994,23 +997,16 @@ export function BranchCoordinatorPayments() {
                         <ZoomIn className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => selectedPayment.receiptUrl && window.open(selectedPayment.receiptUrl, "_blank", "noopener,noreferrer")}
+                        onClick={() => setViewingReceipt(selectedPayment)}
                         disabled={!selectedPayment.receiptUrl}
                         className="rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
                         title="Open full screen"
                       >
                         <Maximize2 className="h-4 w-4" />
                       </button>
-                      <a
-                        href={selectedPayment.receiptUrl || undefined}
-                        download={selectedPayment.receiptFileName || "receipt"}
-                        className={`rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white ${
-                          selectedPayment.receiptUrl ? "" : "pointer-events-none opacity-45"
-                        }`}
-                        title="Download receipt"
-                      >
+                      <ConfirmedDownloadButton fileName={selectedPayment.receiptFileName} fileUrl={selectedPayment.receiptUrl} onError={() => toast.error("The receipt could not be downloaded.")} className={`rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white ${selectedPayment.receiptUrl ? "" : "pointer-events-none opacity-45"}`} title="Download receipt">
                         <Download className="h-4 w-4" />
-                      </a>
+                      </ConfirmedDownloadButton>
                     </div>
                   </div>
 
@@ -1052,6 +1048,14 @@ export function BranchCoordinatorPayments() {
                   Print Receipt
                 </button>
               </div>
+              {viewingReceipt && (
+                <DocumentViewerModal
+                  isOpen={Boolean(viewingReceipt)}
+                  onClose={() => setViewingReceipt(null)}
+                  documentName="Receipt / Proof of Payment"
+                  documentData={{ id: viewingReceipt.id, status: viewingReceipt.status, uploadDate: viewingReceipt.submittedDate, fileName: viewingReceipt.receiptFileName || "receipt", fileUrl: viewingReceipt.receiptUrl || null, rejectionComment: "" }}
+                />
+              )}
             </div>
           </div>
         </div>

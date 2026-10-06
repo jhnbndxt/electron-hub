@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
 import { exportToCSV, formatDateForCSV } from "../../utils/csvExport";
+import { notify } from "../utils/notify";
 
 interface PaymentRecord {
   id: string;
@@ -384,7 +385,7 @@ export function PaymentHistory() {
       doc.save(`${receiptFileName || "payment-receipt"}.pdf`);
     } catch (error) {
       console.error("Error generating payment receipt PDF:", error);
-      window.alert("Unable to generate the payment receipt PDF right now. Please try again.");
+      notify.error("Unable to generate the payment receipt PDF right now. Please try again.");
     } finally {
       setIsDownloadingReceipt(false);
     }
@@ -392,7 +393,7 @@ export function PaymentHistory() {
 
   const handleExportPaymentHistoryCSV = () => {
     if (payments.length === 0) {
-      alert("No payment history to export.");
+      notify.info("There is no payment history to export.");
       return;
     }
 

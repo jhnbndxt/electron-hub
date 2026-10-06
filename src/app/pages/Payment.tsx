@@ -6,6 +6,8 @@ import { useNavigate } from "react-router";
 import { supabase } from "../../supabase";
 import { getSystemSettings } from "../../services/systemSettingsService";
 import { expireOverdueCashPayments } from "../../services/adminService";
+import { notify } from "../utils/notify";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 
 type PaymentMode = "bank" | "gcash" | "cash" | null;
 
@@ -85,6 +87,7 @@ export function Payment() {
   const navigate = useNavigate();
   const [selectedMode, setSelectedMode] = useState<PaymentMode>(null);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [pendingReceiptFile, setPendingReceiptFile] = useState<File | null>(null);
   const [referenceNumber, setReferenceNumber] = useState("");
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showQueueTicket, setShowQueueTicket] = useState(false);
@@ -505,18 +508,18 @@ export function Payment() {
       const file = e.target.files[0];
 
       if (!RECEIPT_FILE_TYPES.includes(file.type)) {
-        alert("Unsupported receipt file. Please upload a JPG, PNG, WEBP, or PDF file.");
+        notify.error("Unsupported receipt file. Please upload a JPG, PNG, WEBP, or PDF file.");
         e.target.value = "";
         return;
       }
 
       if (file.size > MAX_RECEIPT_SIZE) {
-        alert("Receipt file is too large. Please upload a file up to 5MB only.");
+        notify.error("Receipt file is too large. Please upload a file up to 5MB only.");
         e.target.value = "";
         return;
       }
 
-      setUploadedFile(file);
+      setPendingReceiptFile(file);
     }
   };
 
@@ -543,7 +546,7 @@ export function Payment() {
         .maybeSingle();
 
       if (existingOpenPayment) {
-        alert("You already have a payment submission on file. You can submit again only if the previous payment is rejected.");
+        notify.warning("You already have a payment submission on file. You can submit again only if the previous payment is rejected.");
         return;
       }
 
@@ -589,7 +592,7 @@ export function Payment() {
 
       if (paymentError) {
         console.error("Payment insert error:", paymentError);
-        alert("Failed to submit payment. Please try again.");
+        notify.error("Failed to submit payment. Please try again.");
         return;
       }
 
@@ -599,7 +602,7 @@ export function Payment() {
       setIsSubmitted(true);
     } catch (err) {
       console.error("Payment submission error:", err);
-      alert("An unexpected error occurred. Please try again.");
+      notify.error("Payment submission failed. Please check the receipt and try again.");
     }
   };
 
@@ -676,7 +679,7 @@ export function Payment() {
 
     if (error) {
       console.error("Cash payment queue error:", error);
-      alert("Failed to generate your cash queue number. Please try again.");
+      notify.error("Failed to generate your cash queue number. Please try again.");
       return;
     }
 
@@ -856,6 +859,18 @@ export function Payment() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
+      <ConfirmationModal
+        isOpen={Boolean(pendingReceiptFile)}
+        onClose={() => setPendingReceiptFile(null)}
+        onConfirm={() => {
+          setUploadedFile(pendingReceiptFile);
+          setPendingReceiptFile(null);
+        }}
+        title="Confirm receipt upload"
+        message={pendingReceiptFile ? `Use ${pendingReceiptFile.name} as your payment receipt?` : ""}
+        confirmText="Use this receipt"
+        type="info"
+      />
       {/* Loading State - Prevent form flicker */}
       {isLoading && !paymentApproved && !showQueueTicket && !isSubmitted && (
         <LoadingState

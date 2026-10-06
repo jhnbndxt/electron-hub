@@ -1,10 +1,14 @@
-import { FileText, Upload, CheckCircle, AlertCircle, Download, XCircle } from "lucide-react";
+import { FileText, Upload, CheckCircle, AlertCircle, Download, Eye, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
 import { triggerNotification } from "../../services/notificationService";
 import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
+import toast from "react-hot-toast";
+import DocumentViewerModal from "../components/DocumentViewerModal";
+import { ConfirmationModal } from "../components/ConfirmationModal";
+import { downloadDocument } from "../utils/documentFiles";
 
 
 interface DocumentStatus {
@@ -14,6 +18,8 @@ interface DocumentStatus {
   uploadDate?: string;
   fileSize?: string;
   fileUrl?: string;
+  filePath?: string;
+  fileName?: string;
   rejectionComment?: string;
 }
 
@@ -49,6 +55,9 @@ export function MyDocuments() {
   const [documents, setDocuments] = useState<DocumentStatus[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState<string | null>(null);
   const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<DocumentStatus | null>(null);
+  const [pendingUpload, setPendingUpload] = useState<{ docName: string; file: File } | null>(null);
+  const [pendingDownload, setPendingDownload] = useState<DocumentStatus | null>(null);
   const documentRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
@@ -173,6 +182,8 @@ export function MyDocuments() {
           : undefined,
         fileUrl:
           uploaded.file_url || resolvePublicUrl(uploaded.file_path) || undefined,
+        filePath: uploaded.file_path || undefined,
+        fileName: uploaded.file_name || undefined,
         rejectionComment: uploaded.rejection_comment || undefined,
       };
     });
@@ -266,7 +277,8 @@ export function MyDocuments() {
                   disabled={uploadingDoc !== null}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) handleFileUpload(reqDoc.name, file);
+                    if (file) setPendingUpload({ docName: reqDoc.name, file });
+                    e.target.value = "";
                   }}
                 />
               </label>
@@ -282,7 +294,7 @@ export function MyDocuments() {
 
     const fileError = validateDocumentFile(file);
     if (fileError) {
-      alert(fileError);
+      toast.error(fileError);
       return;
     }
 
@@ -291,23 +303,35 @@ export function MyDocuments() {
     try {
       // Make sure we have an enrollment ID
       let currentEnrollmentId = enrollmentId;
+      let currentEnrollmentStatus: string | null = null;
       if (!currentEnrollmentId) {
-        const { data: enrollment } = await supabase
+        const { data: enrollment, error: enrollmentError } = await supabase
           .from("enrollments")
-          .select("id")
+          .select("id, status")
           .eq("user_id", userData.email)
           .neq("status", "rejected")
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
+        if (enrollmentError) throw enrollmentError;
         if (!enrollment) {
-          alert("No enrollment found. Please complete your enrollment form first.");
+          toast.error("No enrollment found. Please complete your enrollment form first.");
           setUploadingDoc(null);
           return;
         }
         currentEnrollmentId = enrollment.id;
+        currentEnrollmentStatus = enrollment.status;
         setEnrollmentId(enrollment.id);
+      } else {
+        const { data: enrollment, error: enrollmentError } = await supabase
+          .from("enrollments")
+          .select("status")
+          .eq("id", currentEnrollmentId)
+          .maybeSingle();
+
+        if (enrollmentError) throw enrollmentError;
+        currentEnrollmentStatus = enrollment?.status || null;
       }
 
       const docType = DOC_NAME_TO_KEY[docName];
@@ -322,7 +346,7 @@ export function MyDocuments() {
 
       if (storageError) {
         console.error("Storage upload error:", storageError);
-        alert("Failed to upload file. Please try again.");
+        toast.error("Upload failed. Please check the file type and size, then try again.");
         setUploadingDoc(null);
         return;
       }
@@ -341,12 +365,11 @@ export function MyDocuments() {
         .maybeSingle();
 
       const isRejectedCorrection = existingDoc?.status === "rejected";
-      const isAlreadyEnrolled = String(enrollment?.status || "").toLowerCase() === "enrolled";
       const nextStatus = isRejectedCorrection ? "reuploaded" : "pending_review";
 
       if (existingDoc) {
         // Update the existing record
-        await supabase
+        const { error: updateError } = await supabase
           .from("enrollment_documents")
           .update({
             file_url: urlData.publicUrl,
@@ -358,9 +381,10 @@ export function MyDocuments() {
             rejection_comment: null,
           })
           .eq("id", existingDoc.id);
+        if (updateError) throw updateError;
       } else {
         // Insert a new record
-        await supabase.from("enrollment_documents").insert({
+        const { error: insertError } = await supabase.from("enrollment_documents").insert({
           enrollment_id: currentEnrollmentId,
           document_type: docType,
           file_url: urlData.publicUrl,
@@ -370,24 +394,28 @@ export function MyDocuments() {
           uploaded_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
+        if (insertError) throw insertError;
       }
 
+      const isAlreadyEnrolled = String(currentEnrollmentStatus || "").toLowerCase() === "enrolled";
       if (!isAlreadyEnrolled) {
-        await supabase
+        const { error: enrollmentUpdateError } = await supabase
           .from("enrollments")
           .update({
             status: "pending_review",
             updated_at: new Date().toISOString(),
           })
           .eq("id", currentEnrollmentId);
+        if (enrollmentUpdateError) throw enrollmentUpdateError;
       }
 
       await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });
 
       await loadDocuments();
+      toast.success(`${docName} uploaded successfully and sent for review.`);
     } catch (err) {
       console.error("Upload error:", err);
-      alert("An unexpected error occurred. Please try again.");
+      toast.error("Upload failed. Please try again with a JPG, JPEG, or PDF file up to 5 MB.");
     } finally {
       setUploadingDoc(null);
     }
@@ -472,15 +500,14 @@ export function MyDocuments() {
                         Uploaded on {doc.uploadDate} • {doc.fileSize}
                       </p>
                       {doc.fileUrl && (
-                        <a
-                          href={doc.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline mt-1"
-                        >
-                          <Download className="w-3 h-3" />
-                          View / Download
-                        </a>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button onClick={() => setViewingDocument(doc)} className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                            <Eye className="w-3 h-3" />View
+                          </button>
+                          <button onClick={() => setPendingDownload(doc)} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                            <Download className="w-3 h-3" />Download
+                          </button>
+                        </div>
                       )}
                       
                       {/* Rejection Comment */}
@@ -497,7 +524,8 @@ export function MyDocuments() {
                               accept={DOCUMENT_ACCEPT_ATTRIBUTE}
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
-                                if (file) handleFileUpload(doc.name, file);
+                                if (file) setPendingUpload({ docName: doc.name, file });
+                                e.target.value = "";
                               }}
                             />
                           </label>
@@ -561,6 +589,48 @@ export function MyDocuments() {
           {renderDocumentChecklist(OPTIONAL_DOCS)}
         </div>
       </div>
+      {viewingDocument && (
+        <DocumentViewerModal
+          isOpen={Boolean(viewingDocument)}
+          onClose={() => setViewingDocument(null)}
+          documentName={viewingDocument.name}
+          documentData={{
+            id: viewingDocument.documentType,
+            status: viewingDocument.status,
+            uploadDate: viewingDocument.uploadDate || "",
+            fileName: viewingDocument.fileName || viewingDocument.name,
+            filePath: viewingDocument.filePath,
+            fileUrl: viewingDocument.fileUrl || null,
+            rejectionComment: viewingDocument.rejectionComment || "",
+          }}
+        />
+      )}
+      <ConfirmationModal
+        isOpen={Boolean(pendingUpload)}
+        onClose={() => setPendingUpload(null)}
+        onConfirm={async () => {
+          if (pendingUpload) await handleFileUpload(pendingUpload.docName, pendingUpload.file);
+          setPendingUpload(null);
+        }}
+        title="Confirm document upload"
+        message={pendingUpload ? `Upload ${pendingUpload.file.name} as ${pendingUpload.docName}? The file will replace the current submission if this document was rejected.` : ""}
+        confirmText="Upload document"
+        type="info"
+      />
+      <ConfirmationModal
+        isOpen={Boolean(pendingDownload)}
+        onClose={() => setPendingDownload(null)}
+        onConfirm={async () => {
+          if (pendingDownload) {
+            await downloadDocument(pendingDownload).catch(() => toast.error("The document could not be downloaded."));
+          }
+          setPendingDownload(null);
+        }}
+        title="Download document"
+        message={pendingDownload ? `Download the original file for ${pendingDownload.name}?` : ""}
+        confirmText="Download"
+        type="info"
+      />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../../supabase";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { notify } from "../../utils/notify";
 
 interface StudentPaymentStatus {
   email: string;
@@ -40,7 +41,7 @@ export function StudentPaymentLookup() {
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) {
-      alert("Please enter a student email or name");
+      notify.warning("Please enter a student email or name");
       return;
     }
 

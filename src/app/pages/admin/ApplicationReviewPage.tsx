@@ -27,6 +27,8 @@ import { useAuth } from "../../context/AuthContext";
 import { LoadingState } from "../../components/LoadingState";
 import { ProcessingModal } from "../../components/modals/ProcessingModal";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { downloadDocument } from "../../utils/documentFiles";
+import { ConfirmedDownloadButton } from "../../components/ConfirmedDownloadButton";
 import {
   approveEnrollment,
   createAuditLog,
@@ -962,14 +964,10 @@ export function ApplicationReviewPage() {
             The file is uploaded and can still be reviewed by opening it in a new tab or downloading the original copy.
           </p>
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
-            <a href={fileUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm">
-              <Maximize2 className="h-4 w-4" />
-              Open File
-            </a>
-            <a href={fileUrl} download className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm">
+            <button onClick={() => downloadDocument({ fileName: selectedDocument.fileName, fileUrl }).catch(() => toast.error("The document could not be downloaded."))} className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-700 px-4 py-3 text-sm font-black text-white shadow-sm">
               <Download className="h-4 w-4" />
-              Download
-            </a>
+              Download original file
+            </button>
           </div>
         </div>
       </div>
@@ -1359,14 +1357,14 @@ export function ApplicationReviewPage() {
                     <Plus className="h-4 w-4" />
                   </button>
                   {selectedDocument?.fileUrl && (
-                    <a href={selectedDocument.fileUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Open file">
+                    <button onClick={() => toast.info("The selected document is shown in the preview panel.")} className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="View file">
                       <Maximize2 className="h-4 w-4" />
-                    </a>
+                    </button>
                   )}
                   {selectedDocument?.fileUrl && (
-                    <a href={selectedDocument.fileUrl} download className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Download file">
+                    <ConfirmedDownloadButton fileName={selectedDocument.fileName} fileUrl={selectedDocument.fileUrl} onError={() => toast.error("The document could not be downloaded.")} className="rounded-lg border border-white/80 bg-white/75 p-2 text-slate-700 shadow-sm transition hover:bg-blue-50" title="Download file">
                       <Download className="h-4 w-4" />
-                    </a>
+                    </ConfirmedDownloadButton>
                   )}
                 </div>
               </div>
