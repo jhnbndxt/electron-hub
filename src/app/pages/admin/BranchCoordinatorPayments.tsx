@@ -34,7 +34,6 @@ import { expireOverdueCashPayments } from "../../../services/adminService";
 import { getSystemSettings, saveSystemSettings } from "../../../services/systemSettingsService";
 import { exportToCSV, formatCurrencyForCSV } from "../../../utils/csvExport";
 import DocumentViewerModal from "../../components/DocumentViewerModal";
-import { ConfirmedDownloadButton } from "../../components/ConfirmedDownloadButton";
 import { validatePaymentAmount, INVALID_PAYMENT_AMOUNT_MESSAGE } from "../../../utils/paymentAmountValidation";
 import electronLogo from "../../../assets/electronLogo";
 
@@ -1004,9 +1003,9 @@ export function BranchCoordinatorPayments() {
                       >
                         <Maximize2 className="h-4 w-4" />
                       </button>
-                      <ConfirmedDownloadButton fileName={selectedPayment.receiptFileName} fileUrl={selectedPayment.receiptUrl} onError={() => toast.error("The receipt could not be downloaded.")} className={`rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white ${selectedPayment.receiptUrl ? "" : "pointer-events-none opacity-45"}`} title="Download receipt">
+                      <button onClick={() => setViewingReceipt(selectedPayment)} disabled={!selectedPayment.receiptUrl} className="rounded-xl border border-slate-200 bg-white/80 p-2 text-slate-600 transition-all hover:bg-white disabled:cursor-not-allowed disabled:opacity-45" title="Preview and download receipt">
                         <Download className="h-4 w-4" />
-                      </ConfirmedDownloadButton>
+                      </button>
                     </div>
                   </div>
 

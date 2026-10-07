@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Download, FileText, Loader2, X } from "lucide-react";
 import { downloadDocument, resolveDocumentUrl } from "../utils/documentFiles";
-import { ConfirmationModal } from "./ConfirmationModal";
 
 interface DocumentData {
   id: string;
@@ -25,7 +24,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ isOpen, onClo
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [downloadError, setDownloadError] = useState(false);
-  const [confirmingDownload, setConfirmingDownload] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [previewType, setPreviewType] = useState<"pdf" | "image" | "unknown">("unknown");
   const fileUrl = resolveDocumentUrl(documentData);
 
@@ -78,24 +77,21 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ isOpen, onClo
   }, [documentData.fileName, documentData.filePath, documentData.fileUrl, fileUrl, isOpen, onClose]);
 
   if (!isOpen) return null;
-  const handleDownload = () => setConfirmingDownload(true);
-  const confirmDownload = async () => {
-    await downloadDocument(documentData).catch(() => setDownloadError(true));
-    setConfirmingDownload(false);
+  const handleDownload = async () => {
+    if (isDownloading) return;
+    setIsDownloading(true);
+    try {
+      await downloadDocument(documentData);
+    } catch {
+      setDownloadError(true);
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   return (
     <div className="fixed inset-y-0 right-0 left-0 z-[10001] flex items-center justify-center p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
       <div className="absolute inset-0 bg-white/35 backdrop-blur-sm" onClick={onClose} />
-      <ConfirmationModal
-        isOpen={confirmingDownload}
-        onClose={() => setConfirmingDownload(false)}
-        onConfirm={confirmDownload}
-        title="Download original file"
-        message={`Download ${documentData.fileName || documentName}?`}
-        confirmText="Download"
-        type="info"
-      />
       <div ref={dialogRef} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="document-viewer-title" className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4">
           <div className="min-w-0">
@@ -105,7 +101,10 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({ isOpen, onClo
               {documentData.status && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">{documentData.status}</span>}
             </div>
           </div>
-          <button onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-400 transition hover:bg-gray-50 hover:text-gray-600" aria-label="Close document viewer"><X className="h-5 w-5" /></button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleDownload} disabled={isDownloading || !fileUrl} className="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"><Download className="h-4 w-4" />{isDownloading ? "Downloading..." : "Download"}</button>
+            <button onClick={onClose} className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-400 transition hover:bg-gray-50 hover:text-gray-600" aria-label="Close document viewer"><X className="h-5 w-5" /></button>
+          </div>
         </div>
         <div className="relative min-h-0 flex-1 overflow-auto bg-gray-950 p-6">
           <div className="flex min-h-[360px] items-center justify-center">

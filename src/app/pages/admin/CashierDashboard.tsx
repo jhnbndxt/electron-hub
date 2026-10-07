@@ -32,7 +32,6 @@ import { getAllPayments, updatePaymentStatus, createAuditLog } from "../../../se
 import { triggerNotification } from "../../../services/notificationService";
 import { loadProfileImageUrl } from "../../utils/profileImage";
 import DocumentViewerModal from "../../components/DocumentViewerModal";
-import { ConfirmedDownloadButton } from "../../components/ConfirmedDownloadButton";
 
 const CASH_QUEUE_TIME_LABEL = "9:00 AM - 4:00 PM";
 
@@ -1131,9 +1130,9 @@ export function CashierDashboard() {
                         >
                           <Maximize className="w-4 h-4" />
                         </button>
-                        <ConfirmedDownloadButton fileName={selectedPayment.receiptFileName} fileUrl={selectedReceiptUrls[0]} onError={() => toast.error("The receipt could not be downloaded.")} className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700">
+                        <button onClick={() => setViewingReceipt(selectedPayment)} disabled={!selectedReceiptUrls[0]} className="portal-glass-icon-button inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-700 disabled:cursor-not-allowed disabled:opacity-45" title="Preview and download receipt">
                           <Download className="w-4 h-4" />
-                        </ConfirmedDownloadButton>
+                        </button>
                       </div>
                     </div>
                   </div>
