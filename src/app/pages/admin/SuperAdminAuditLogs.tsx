@@ -3,6 +3,7 @@ import { exportToCSV } from "../../../utils/csvExport";
 import { useState, useEffect } from "react";
 import { getAuditLogs } from "../../../services/adminService";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { formatAuditAction } from "../../utils/formatAuditAction";
 
 interface AuditLog {
   id: string | number;
@@ -56,7 +57,7 @@ export function SuperAdminAuditLogs() {
       user: log.user_name || log.user || "System",
       email: log.email || '',
       userRole: mapUserRole(log.user_role),
-      action: log.action || "Unknown Action",
+      action: formatAuditAction(log.action),
       category: categorizeAction(log.action, log.details),
       ipAddress: log.ip_address || "N/A",
       status: log.status || "success",

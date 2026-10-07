@@ -5,6 +5,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { getAuditLogs } from "../../../services/adminService";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { formatAuditAction } from "../../utils/formatAuditAction";
 
 interface AuditLog {
   id: string;
@@ -52,7 +53,7 @@ export function AdminAuditLogs() {
     }
     const formatted = logs.map((log: any) => ({
       id: log.id,
-      action: log.action || '',
+      action: formatAuditAction(log.action),
       user: log.user_name || log.user || 'System',
       email: log.email || '',
       timestamp: log.timestamp || log.created_at || new Date().toISOString(),
