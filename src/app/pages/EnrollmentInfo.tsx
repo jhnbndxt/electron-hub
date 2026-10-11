@@ -40,12 +40,12 @@ function getDefaultEnrollmentWindow(academicYear) {
 
 const electiveTrackConfig = [
   {
-    track: "Academic",
+    track: "Academic Track",
     title: "ACADEMIC TRACK ELECTIVES",
     color: "#1E3A8A",
   },
   {
-    track: "Technical-Professional",
+    track: "Technical-Professional Electives",
     title: "TECHNICAL-PROFESSIONAL ELECTIVES",
     color: "#B91C1C",
   },
@@ -363,7 +363,7 @@ export function EnrollmentInfo() {
               Explore Our Electives & Programs
             </h2>
             <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-              Review the specific subjects and NC certificates available under each track to prepare for your enrollment.
+              Review the current electives available under each track and cluster to prepare for your enrollment.
             </p>
           </div>
 
