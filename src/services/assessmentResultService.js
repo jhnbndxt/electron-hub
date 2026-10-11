@@ -54,6 +54,14 @@ function normalizeScores(assessmentData = {}) {
   };
 }
 
+function toDatabaseScore(score) {
+  const numericScore = Number(score);
+  if (!Number.isFinite(numericScore)) {
+    throw new Error(`Assessment score must be a finite number; received "${score}".`);
+  }
+  return Math.round(numericScore);
+}
+
 function normalizeArray(value) {
   if (!value) return [];
 
@@ -143,11 +151,11 @@ function buildAssessmentInsertPayload(studentId, assessmentData = {}, publicProf
     recommended_cluster: cluster,
     elective_1: electives[0] || null,
     ...(electives[1] ? { elective_2: electives[1] } : {}),
-    verbal_ability_score: scores.verbal_ability_score,
-    mathematical_ability_score: scores.mathematical_ability_score,
-    spatial_ability_score: scores.spatial_ability_score,
-    logical_reasoning_score: scores.logical_reasoning_score,
-    overall_score: scores.overall_score,
+    verbal_ability_score: toDatabaseScore(scores.verbal_ability_score),
+    mathematical_ability_score: toDatabaseScore(scores.mathematical_ability_score),
+    spatial_ability_score: toDatabaseScore(scores.spatial_ability_score),
+    logical_reasoning_score: toDatabaseScore(scores.logical_reasoning_score),
+    overall_score: toDatabaseScore(scores.overall_score),
     top_domains: topDomains,
     top_interests: topInterests,
     answer_snapshots: normalizeAnswerSnapshots(assessmentData.answerSnapshots ?? assessmentData.answer_snapshots),
@@ -271,14 +279,11 @@ async function findPendingPublicAssessmentResult(email) {
  */
 export async function saveAssessmentResult(userEmail, assessmentData) {
   try {
-    const scores = normalizeScores(assessmentData);
     const track = assessmentData.recommended_track || assessmentData.track || 'General';
     const cluster = assessmentData.recommended_cluster || assessmentData.recommendedCluster || assessmentData.cluster || null;
     const electives = Array.isArray(assessmentData.electives)
       ? assessmentData.electives.filter(Boolean)
       : [assessmentData.elective_1, assessmentData.elective_2].filter(Boolean);
-    const topDomains = normalizeArray(assessmentData.topDomains ?? assessmentData.top_domains);
-    const topInterests = normalizeArray(assessmentData.topInterests ?? assessmentData.top_interests);
 
     // Get student ID from email
     const student_id = await getStudentIdByEmail(userEmail);
@@ -302,22 +307,7 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
 
     const { data, error } = await supabase
       .from('assessment_results')
-      .insert({
-        student_id,
-        assessment_date: new Date().toISOString().split('T')[0],
-        recommended_track: track,
-        recommended_cluster: cluster,
-        elective_1: electives[0] || null,
-        ...(electives[1] ? { elective_2: electives[1] } : {}),
-        verbal_ability_score: scores.verbal_ability_score,
-        mathematical_ability_score: scores.mathematical_ability_score,
-        spatial_ability_score: scores.spatial_ability_score,
-        logical_reasoning_score: scores.logical_reasoning_score,
-        overall_score: scores.overall_score,
-        top_domains: topDomains,
-        top_interests: topInterests,
-        answer_snapshots: normalizeAnswerSnapshots(assessmentData.answerSnapshots ?? assessmentData.answer_snapshots),
-      })
+      .insert(buildAssessmentInsertPayload(student_id, assessmentData))
       .select();
 
     if (error) throw error;
