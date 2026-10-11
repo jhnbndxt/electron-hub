@@ -35,7 +35,7 @@ import { triggerNotification } from "../../services/notificationService";
 import { notify } from "../utils/notify";
 import { supabase } from "../../supabase";
 import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
-import { ELECTIVE_STRUCTURE, getClustersForTrack, getElectivesForCluster } from "../../data/electives";
+import { ELECTIVE_STRUCTURE, getClusterForElectives, getClustersForTrack, getElectivesForCluster } from "../../data/electives";
 import {
   getBarangays,
   getCities,
@@ -499,9 +499,11 @@ export function EnrollmentForm() {
           const result = await getLatestAssessmentResult(userEmail);
           
           if (result) {
+            const cluster = result.recommendedCluster || result.recommended_cluster || result.cluster ||
+              getClusterForElectives(result.track, result.electives);
             setAiRecommendation({
               track: result.track,
-              cluster: result.recommendedCluster || result.recommended_cluster || result.cluster,
+              cluster,
               electives: result.electives,
             });
             
@@ -510,7 +512,7 @@ export function EnrollmentForm() {
               setFormData(prev => ({
                 ...prev,
                 preferredTrack: result.track,
-                preferredCluster: result.recommendedCluster || result.recommended_cluster || result.cluster || "",
+                preferredCluster: cluster || "",
                 elective1: result.electives[0] || "",
                 elective2: result.electives[1] || "",
               }));
@@ -1072,7 +1074,9 @@ export function EnrollmentForm() {
       if (!formData.elective1) newErrors.elective1 = "This field is required";
       if (assignedElectives.length > 1 && !formData.elective2) newErrors.elective2 = "This field is required";
       if (formData.elective1 !== (assignedElectives[0] || "")) newErrors.elective1 = "Elective 1 must match the selected cluster.";
-      if (formData.elective2 !== (assignedElectives[1] || "")) newErrors.elective2 = "Elective 2 must match the selected cluster.";
+      if (assignedElectives.length > 1 && formData.elective2 !== assignedElectives[1]) {
+        newErrors.elective2 = "Elective 2 must match the selected cluster.";
+      }
       if (!formData.yearLevel) newErrors.yearLevel = "This field is required";
     }
 
@@ -1150,6 +1154,11 @@ export function EnrollmentForm() {
       const userId = userEmail; // Use email as user identifier (custom auth, not Supabase Auth)
       
       const syncedFormData = applyGuardianSelection(formData);
+      const clusterElectives = getElectivesForCluster(
+        syncedFormData.preferredTrack,
+        syncedFormData.preferredCluster
+      );
+      const { elective2: _unusedElective2, ...enrollmentFormData } = syncedFormData;
 
       // Create enrollment submission data
       const enrollmentData = {
@@ -1157,7 +1166,8 @@ export function EnrollmentForm() {
         email: syncedFormData.email,
         contactNumber: syncedFormData.contactNumber,
         submissionDate: new Date().toISOString(),
-        ...syncedFormData,
+        ...enrollmentFormData,
+        ...(clusterElectives[1] ? { elective2: clusterElectives[1] } : {}),
         // Exclude file objects
         form138: undefined,
         form137: undefined,
@@ -1765,7 +1775,7 @@ export function EnrollmentForm() {
 
           <div className="mt-4 flex items-start gap-2 text-xs text-gray-600">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <p>You can follow the AI recommendation or choose your own track and electives below.</p>
+            <p>You can follow your assessment recommendation or choose your own track and assigned electives below.</p>
           </div>
         </div>
       )}

@@ -28,20 +28,24 @@ import { getSystemSettings, parseBooleanStrict } from "../../services/systemSett
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
-import electivesCatalog from "../../data/electives.js";
+import electivesCatalog, { getClusterForElectives } from "../../data/electives.js";
 import { supabase } from "../../supabase";
 
 interface AssessmentResults {
   track: string;
   cluster?: string | null;
+  academicAptitudeScore?: number;
+  trackScores?: Record<string, number>;
+  clusterScores?: Record<string, number>;
+  riasecScores?: Record<string, number>;
   electives: string[];
   electiveRecommendations?: Array<{
     name: string;
     track: string;
     category?: string;
-    compatibilityScore: number;
-    aptitudeScore: number;
-    riasecScore: number;
+    compatibilityScore?: number;
+    aptitudeScore?: number;
+    riasecScore?: number;
     reason: string;
   }>;
   scores: {
@@ -58,6 +62,7 @@ interface AssessmentResults {
   aiRecommendation?: {
     recommendedTrack?: string;
     trackExplanation?: string;
+    clusterExplanation?: string;
     elective1?: string;
     elective1Explanation?: string;
     elective2?: string;
@@ -116,37 +121,26 @@ const DOMAIN_TABS = [
     category: "Interests",
     icon: Heart,
     scoreKey: null,
-    description: "18 behavioral items measuring career and vocational preferences on a 5-point Likert scale.",
+    description: "Measures six RIASEC interest areas using a 5-point Likert scale.",
   },
 ];
 
-const toInterestScore = (interests: string[], labels: string[], fallback = 35) => {
-  const normalizedInterests = interests.map((interest) => interest.toLowerCase());
-  return normalizedInterests.some((interest) =>
-    labels.some((label) => interest.includes(label))
-  )
-    ? 85
-    : fallback;
-};
-
 const buildAssessmentAiPayload = (result: AssessmentResults) => {
-  const { track, scores, topInterests, electives } = result;
-  const trackFallback = track === "Academic Track" ? 65 : 40;
-  const techFallback = track === "Technical-Professional Electives" ? 70 : 35;
-
+  const { track, cluster, scores, topInterests, topDomains, electives } = result;
   return {
     track,
+    cluster: cluster || "",
     VA: scores.VA,
     MA: scores.MA,
     SA: scores.SA,
     LRA: scores.LRA,
-    academicInterest: toInterestScore(topInterests, ["academic", "subject"], trackFallback),
-    communicationInterest: toInterestScore(topInterests, ["helping", "creative", "communication"], 45),
-    creativeInterest: toInterestScore(topInterests, ["creative"], 35),
-    leadershipInterest: toInterestScore(topInterests, ["business"], 35),
-    technicalInterest: toInterestScore(topInterests, ["technology", "practical"], techFallback),
-    socialInterest: toInterestScore(topInterests, ["helping"], 35),
+    academicAptitudeScore: result.academicAptitudeScore ?? (scores.VA + scores.MA + scores.SA + scores.LRA) / 4,
+    trackScores: result.trackScores || {},
+    clusterScores: result.clusterScores || {},
+    riasecScores: result.riasecScores || {},
     electives,
+    topDomains,
+    topInterests,
   };
 };
 
@@ -228,9 +222,15 @@ export function Results() {
         }
 
         if (latestResult) {
+          const cluster =
+            latestResult.recommendedCluster ||
+            latestResult.recommended_cluster ||
+            latestResult.cluster ||
+            getClusterForElectives(latestResult.track, latestResult.electives);
           setResults({
+            ...storedResults,
             track: latestResult.track,
-            cluster: latestResult.recommendedCluster || latestResult.recommended_cluster || latestResult.cluster,
+            cluster,
             electives: latestResult.electives,
             scores: latestResult.scores,
             topDomains: latestResult.topDomains,
@@ -248,6 +248,7 @@ export function Results() {
         if (storedResults) {
           setResults({
             ...storedResults,
+            cluster: storedResults.cluster || getClusterForElectives(storedResults.track, storedResults.electives),
             answers: storedResults.answers || rawAnswers || undefined,
             answerSnapshots: storedAnswerSnapshots,
           });
@@ -258,7 +259,10 @@ export function Results() {
         console.error("Error loading assessment results:", error);
         setQuestions([]);
         if (storedResults) {
-          setResults(storedResults);
+          setResults({
+            ...storedResults,
+            cluster: storedResults.cluster || getClusterForElectives(storedResults.track, storedResults.electives),
+          });
         } else {
           setResults(null);
         }
@@ -328,11 +332,19 @@ export function Results() {
         return;
       }
 
+      const explanationWithoutSecondElective = Object.fromEntries(
+        Object.entries(aiRecommendation).filter(
+          ([key]) => key !== "elective2" && key !== "elective2Explanation"
+        )
+      );
       const mergedRecommendation = {
-        ...aiRecommendation,
-        recommendedTrack: aiRecommendation.recommendedTrack || results.track,
+        ...explanationWithoutSecondElective,
+        recommendedTrack: results.track,
+        recommendedCluster: results.cluster || "",
         elective1: results.electives[0] || aiRecommendation.elective1,
-        elective2: results.electives[1] || aiRecommendation.elective2,
+        ...(results.electives[1]
+          ? { elective2: results.electives[1] }
+          : {}),
       };
       const updatedResults = {
         ...results,
@@ -575,8 +587,24 @@ export function Results() {
   const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest domains";
   const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your preferred interests";
 
+  const strongestScores = [
+    { label: "Verbal Ability", score: scores.VA },
+    { label: "Mathematical Ability", score: scores.MA },
+    { label: "Science / Spatial Ability", score: scores.SA },
+    { label: "Logical Reasoning", score: scores.LRA },
+  ]
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 2)
+    .map(({ label, score }) => `${label} (${Math.round(score)}%)`);
   const trackNarrative = aiRecommendation?.trackExplanation ||
-    `The ${track} Track is recommended because your aptitude and interests align strongly with its learning profile.`;
+    `The ${track} is based on your strongest assessment areas in ${strongestScores.join(" and ")}. ` +
+    (topInterests.length
+      ? `Your RIASEC interests provide additional context: ${topInterestSummary}.`
+      : "Your RIASEC interests are considered as supporting information.");
+  const clusterNarrative = aiRecommendation?.clusterExplanation ||
+    (cluster
+      ? `${cluster} is suggested based on its cluster score and the RIASEC interests relevant to this pathway.`
+      : "Your assessment result does not include a saved cluster recommendation.");
 
   const selectedElectiveDetails = electives
     .map((elective) => findCatalogElective(elective))
@@ -861,7 +889,12 @@ export function Results() {
                   Recommended Track
                 </div>
                 <h2 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">{track}</h2>
-                {cluster && <p className="mt-3 text-lg font-semibold text-blue-800">Recommended Cluster: {cluster}</p>}
+                {cluster && (
+                  <>
+                    <p className="mt-3 text-lg font-semibold text-blue-800">Recommended Cluster: {cluster}</p>
+                    <p className="mt-2 max-w-2xl text-sm leading-7 text-slate-600">{clusterNarrative}</p>
+                  </>
+                )}
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
                   {trackNarrative}
                 </p>
@@ -914,15 +947,15 @@ export function Results() {
                       <div className="mt-4 grid gap-2 rounded-2xl bg-white p-4 text-sm text-slate-700">
                         <div className="flex items-center justify-between gap-3">
                           <span className="font-semibold">Compatibility Score</span>
-                          <span className="font-bold text-blue-700">{scoring.compatibilityScore.toFixed(2)}%</span>
+                          <span className="font-bold text-blue-700">{Number(scoring.compatibilityScore).toFixed(2)}%</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span>Aptitude Score</span>
-                          <span>{scoring.aptitudeScore.toFixed(2)}%</span>
+                          <span>{Number(scoring.aptitudeScore).toFixed(2)}%</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span>RIASEC Score</span>
-                          <span>{scoring.riasecScore.toFixed(2)}%</span>
+                          <span>{Number(scoring.riasecScore).toFixed(2)}%</span>
                         </div>
                       </div>
                     ) : null}
@@ -1007,6 +1040,35 @@ export function Results() {
                       </div>
                     ))}
                   </div>
+                  {results.academicAptitudeScore !== undefined && (
+                    <div className="mt-6 grid gap-3 border-t border-white/20 pt-5 sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-blue-200">Academic Aptitude</p>
+                        <p className="mt-1 text-xl font-bold">{results.academicAptitudeScore.toFixed(2)}%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-blue-200">Academic Track</p>
+                        <p className="mt-1 text-xl font-bold">{results.trackScores?.academic?.toFixed(2) ?? "—"}%</p>
+                      </div>
+                      <div>
+                        <p className="text-xs uppercase tracking-wide text-blue-200">Technical-Professional</p>
+                        <p className="mt-1 text-xl font-bold">{results.trackScores?.technicalProfessional?.toFixed(2) ?? "—"}%</p>
+                      </div>
+                    </div>
+                  )}
+                  {results.riasecScores && Object.keys(results.riasecScores).length > 0 && (
+                    <div className="mt-6 border-t border-white/20 pt-5">
+                      <h4 className="text-sm font-bold text-white">RIASEC Interest Scores</h4>
+                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"].map((type) => (
+                          <div key={type} className="rounded-xl bg-white/10 p-3">
+                            <p className="text-xs text-blue-100">{type}</p>
+                            <p className="mt-1 font-bold">{results.riasecScores?.[type] ?? 0}%</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </section>
             ) : (
@@ -1064,7 +1126,7 @@ export function Results() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700">
-                  {questions.length || 78} Questions Total
+                  {questions.length} Questions Total
                 </span>
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-700">
                   Overall Score: {overallScore}%

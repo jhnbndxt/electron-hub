@@ -28,4 +28,31 @@ export function getElectivesForCluster(track, cluster) {
   return getClustersForTrack(track).find((entry) => entry.name === cluster)?.electives || [];
 }
 
+export function getClusterForElectives(track, electiveNames = []) {
+  const normalizedTrack = String(track || "").trim().toLowerCase();
+  const canonicalTrack =
+    normalizedTrack === "academic" ? "Academic Track" :
+    normalizedTrack === "technical-professional" ? "Technical-Professional Electives" :
+    track;
+  const knownNames = [...new Set(
+    (Array.isArray(electiveNames) ? electiveNames : [])
+      .map((name) => String(name || "").trim().toLowerCase())
+      .filter((name) => electives.some(
+        (elective) => elective.track === canonicalTrack && elective.name.toLowerCase() === name
+      ))
+  )];
+
+  if (!knownNames.length) {
+    return null;
+  }
+
+  const matchingClusters = getClustersForTrack(canonicalTrack).filter((cluster) =>
+    knownNames.every((name) =>
+      cluster.electives.some((elective) => elective.toLowerCase() === name)
+    )
+  );
+
+  return matchingClusters.length === 1 ? matchingClusters[0].name : null;
+}
+
 export default electives;

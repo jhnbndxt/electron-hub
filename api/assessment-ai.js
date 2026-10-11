@@ -1,20 +1,5 @@
 import electives from "../src/data/electives.js";
-import {
-  isAdvancedElective,
-  selectElectivesWithPrerequisites,
-  validateElectiveSequence,
-} from "../src/utils/electivePrerequisites.js";
-import { scoreElectiveRecommendation } from "../src/utils/electiveRecommendationScoring.js";
 import { DEFAULT_GROQ_MODEL, DEFAULT_OPENROUTER_MODEL } from "./ai-models.js";
-
-console.log(
-  "ENV:",
-  process.env.GROQ_API_KEY
-    ? "GROQ_API_KEY is set"
-    : process.env.OPENROUTER_API_KEY
-    ? "OPENROUTER_API_KEY is set"
-    : "Assessment AI key is missing"
-);
 
 const jsonHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,292 +8,119 @@ const jsonHeaders = {
 };
 
 function sendJson(response, status, payload) {
-  Object.entries(jsonHeaders).forEach(([key, value]) => {
-    response.setHeader(key, value);
-  });
-
+  Object.entries(jsonHeaders).forEach(([key, value]) => response.setHeader(key, value));
   return response.status(status).json(payload);
-}
-
-function parseAiJson(text = "") {
-  const cleanedText = String(text)
-    .trim()
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
-
-  try {
-    return JSON.parse(cleanedText);
-  } catch {
-    return {
-      raw: cleanedText,
-    };
-  }
 }
 
 function toScore(value) {
   const score = Number(value);
-  return Number.isFinite(score) ? score : 0;
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : 0;
 }
 
-function calculateElectiveScore(elective, data) {
-  return calculateElectiveScoring(elective, data).finalScore;
+function formatList(items, fallback = "related fields") {
+  const uniqueItems = Array.from(new Set(items.filter(Boolean)));
+  if (!uniqueItems.length) return fallback;
+  if (uniqueItems.length === 1) return uniqueItems[0];
+  return `${uniqueItems.slice(0, -1).join(", ")} and ${uniqueItems.at(-1)}`;
 }
 
-function calculateElectiveScoring(elective, data) {
-  return scoreElectiveRecommendation(elective, {
-    scores: {
-      VA: data.VA,
-      MA: data.MA,
-      SA: data.SA,
-      LRA: data.LRA,
-    },
-    interestClusters: {
-      academic: data.academicInterest,
-      creative: data.creativeInterest,
-      helping: data.socialInterest,
-      business: data.leadershipInterest,
-      tech: data.technicalInterest,
-      practical: data.practicalInterest,
-      home: data.homeInterest,
-      outdoor: data.outdoorInterest,
-      physical: data.physicalInterest,
-    },
-    riasecScores: data.riasecScores,
-  });
+function getAssignedElectives(data) {
+  const requestedNames = Array.isArray(data.electives) ? data.electives : [];
+  return requestedNames
+    .map((name) => electives.find(
+      (elective) =>
+        elective.name === name &&
+        elective.track === data.track &&
+        elective.cluster === data.cluster
+    ))
+    .filter(Boolean);
 }
 
-function buildElectiveTieBreaker(elective, data) {
-  const seed = [
-    elective?.name,
-    data.track,
-    toScore(data.academicInterest),
-    toScore(data.communicationInterest),
-    toScore(data.creativeInterest),
-    toScore(data.leadershipInterest),
-    toScore(data.technicalInterest),
-    toScore(data.socialInterest),
-    toScore(data.VA),
-    toScore(data.MA),
-    toScore(data.SA),
-    toScore(data.LRA),
-  ].join("|");
-
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 1000003;
-  }
-
-  return hash / 1000003;
-}
-
-function rankElectivesForAssessment(data) {
-  const trackElectives = electives.filter((elective) => elective.track === data.track);
-  const sourceElectives = trackElectives.length ? trackElectives : electives;
-
-  return sourceElectives
-    .map((elective) => {
-      const scoring = calculateElectiveScoring(elective, data);
-
-      return {
-        ...elective,
-        compatibilityScore: scoring.finalScore,
-        aptitudeFit: scoring.aptitudeFit,
-        riasecFit: scoring.riasecFit,
-        tieBreaker: buildElectiveTieBreaker(elective, data),
-      };
-    })
-    .sort((first, second) => {
-      const scoreDifference = second.compatibilityScore - first.compatibilityScore;
-
-      if (Math.abs(scoreDifference) > 0.0001) {
-        return scoreDifference;
-      }
-
-      return second.tieBreaker - first.tieBreaker;
-    })
-    .slice(0, 20);
-}
-
-function findElectiveByName(name, rankedElectives) {
-  const normalizedName = String(name || "").toLowerCase().trim();
-
-  return (
-    rankedElectives.find((elective) => elective.name.toLowerCase() === normalizedName) ||
-    rankedElectives.find((elective) => elective.name.toLowerCase().includes(normalizedName)) ||
-    rankedElectives.find((elective) => normalizedName.includes(elective.name.toLowerCase()))
-  );
-}
-
-function getStrongestDomain(data) {
-  const domains = [
-    { label: "verbal and communication skills", score: toScore(data.VA) },
-    { label: "mathematical ability", score: toScore(data.MA) },
-    { label: "scientific and technical aptitude", score: toScore(data.SA) },
-    { label: "logical reasoning", score: toScore(data.LRA) },
+function buildFallbackRecommendation(data) {
+  const aptitude = [
+    { name: "Verbal", score: toScore(data.VA) },
+    { name: "Math", score: toScore(data.MA) },
+    { name: "Science", score: toScore(data.SA) },
+    { name: "Logical", score: toScore(data.LRA) },
   ];
-
-  return domains.sort((first, second) => second.score - first.score)[0];
-}
-
-function getStrongestInterests(data) {
-  return [
-    { label: "academic interests", score: toScore(data.academicInterest) },
-    { label: "communication and people-oriented interests", score: toScore(data.communicationInterest) },
-    { label: "creative interests", score: toScore(data.creativeInterest) },
-    { label: "leadership and business interests", score: toScore(data.leadershipInterest) },
-    { label: "technical interests", score: toScore(data.technicalInterest) },
-    { label: "social and helping interests", score: toScore(data.socialInterest) },
-  ]
-    .filter((interest) => interest.score > 0)
+  const strongestAptitudes = aptitude
     .sort((first, second) => second.score - first.score)
-    .slice(0, 2);
-}
-
-function formatList(items = [], fallback = "related fields") {
-  const values = Array.from(new Set(items.filter(Boolean)));
-
-  if (!values.length) {
-    return fallback;
-  }
-
-  if (values.length === 1) {
-    return values[0];
-  }
-
-  return `${values.slice(0, -1).join(", ")} and ${values[values.length - 1]}`;
-}
-
-function buildElectiveExplanation(elective, data, positionLabel) {
-  const strongestDomain = getStrongestDomain(data);
-  const strongestInterests = getStrongestInterests(data);
-  const interestSummary = formatList(
-    strongestInterests.map((interest) => `${interest.label} (${interest.score}%)`),
-    "your interest profile"
-  );
-  const strengths = formatList(elective?.strengths || [], "the skills used in this subject");
-  const idealFor = formatList(elective?.idealFor || [], "your assessment profile");
-  const courses = formatList(elective?.relatedCourses || [], "related college programs");
-  const careers = formatList(elective?.careerPathways || [], "future career opportunities");
-  const trackContext = data.track === 'Academic' 
-    ? 'within the Academic Track, where theoretical knowledge and research are emphasized'
-    : 'within the Technical-Professional Track, where practical skills and career-ready training are emphasized';
-
-  return `${positionLabel} is recommended for ${trackContext}. Your ${strongestDomain.label} score (${strongestDomain.score}%) and ${interestSummary} align well with ${idealFor}. This elective develops strengths such as ${strengths} through subject knowledge, applied skills, problem-solving, and career awareness. Foundation-level understanding here prepares you for related college programs in ${courses} and career opportunities in ${careers}.`;
-}
-
-
-function buildFallbackRecommendation(data, rankedElectives) {
-  const savedElectives = Array.isArray(data.electives)
-    ? data.electives.map((elective) => String(elective || "").trim()).filter(Boolean)
-    : [];
-  const validSavedSequence =
-    savedElectives.length === 2 &&
-    validateElectiveSequence(savedElectives[0], savedElectives[1], electives.map((elective) => elective.name)).valid;
-  const selectedElectives = validSavedSequence
-    ? savedElectives.map((name) => ({
-        ...(findElectiveByName(name, rankedElectives) || {}),
-        name,
-      }))
-    : selectElectivesWithPrerequisites(rankedElectives, 2);
-  const [firstElective = rankedElectives[0], secondElective = rankedElectives[1]] = selectedElectives;
-  const strongestDomain = getStrongestDomain(data);
-
-  // Build track explanation with more context
-  let trackExplanation = "";
-  if (data.track === "Academic") {
-    trackExplanation = `The Academic Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), which is essential for college-preparatory learning. This track emphasizes theoretical knowledge, research skills, and academic specialization—preparing you for university-level study and careers requiring advanced education.`;
-  } else if (data.track === "Technical-Professional") {
-    trackExplanation = `The Technical-Professional Track is recommended because your assessment shows strength in ${strongestDomain.label} (${strongestDomain.score}%), combined with practical and technical interests. This track emphasizes hands-on skills, career readiness, and industry-relevant training—preparing you for immediate career entry or further technical education.`;
-  } else {
-    trackExplanation = `The ${data.track} Track fits you because your assessment shows strength in ${strongestDomain.label}, with a score of ${strongestDomain.score}%. This track gives you a learning path where those strengths can be used in both core subjects and specialized preparation.`;
-  }
-
-  const courses = Array.from(
-    new Set(
-      [firstElective, secondElective]
-        .flatMap((elective) => elective?.relatedCourses || [])
-        .filter(Boolean)
-    )
-  );
-  const careerPathways = [firstElective, secondElective]
-    .filter(Boolean)
-    .map((elective) => ({
-      category: elective.group || elective.category || elective.name,
-      careers: (elective.careerPathways || []).slice(0, 4),
-    }))
-    .filter((pathway) => pathway.careers.length > 0);
+    .slice(0, 2)
+    .map(({ name, score }) => `${name} (${Math.round(score)}%)`);
+  const interests = Object.entries(data.riasecScores || {})
+    .map(([name, score]) => ({ name, score: toScore(score) }))
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 2)
+    .map(({ name, score }) => `${name} (${Math.round(score)}%)`);
+  const assignedElectives = getAssignedElectives(data);
+  const academicScore = toScore(data.trackScores?.academic);
+  const technicalScore = toScore(data.trackScores?.technicalProfessional);
+  const clusterScore = toScore(data.clusterScores?.[data.cluster]);
+  const trackName = data.track === "Academic Track"
+    ? "Academic Track"
+    : "Technical-Professional Track";
+  const trackExplanation =
+    `Your ${trackName} recommendation follows your aptitude results. Its calculated track score is ${
+      data.track === "Academic Track" ? academicScore : technicalScore
+    }%, compared with ${
+      data.track === "Academic Track" ? technicalScore : academicScore
+    }% for the other track. Your strongest areas are ${formatList(strongestAptitudes)}.${
+      interests.length ? ` Your strongest RIASEC interests are ${formatList(interests)}; these add context but do not override your aptitude-based track score.` : ""
+    }`;
+  const clusterExplanation = data.cluster
+    ? `${data.cluster} is the highest-scoring cluster within your recommended track, with a calculated score of ${clusterScore}%. The cluster score combines its specified aptitude weights with the relevant RIASEC percentages${
+        interests.length ? `, including your strongest interests in ${formatList(interests)}` : ""
+      }.`
+    : "A cluster could not be determined from the current track structure.";
+  const electivesSummary = formatList(assignedElectives.map((elective) => elective.name));
+  const overallAnalysis =
+    `Your results point to ${trackName} and the ${data.cluster || "recommended"} cluster. ` +
+    `${assignedElectives.length ? `${electivesSummary} are assigned by that cluster;` : "The cluster determines the elective assignment;"} ` +
+    `they are not separately selected by AI. Consider how your strongest areas in ${formatList(strongestAptitudes)} connect with your interests and future study goals.`;
+  const suggestedCollegeCourses = Array.from(new Set(
+    assignedElectives.flatMap((elective) => elective.relatedCourses)
+  ));
+  const careerPathways = assignedElectives.map((elective) => ({
+    category: elective.cluster,
+    careers: elective.careerPathways,
+  }));
 
   return {
     recommendedTrack: data.track,
+    recommendedCluster: data.cluster || "",
     trackExplanation,
-    elective1: firstElective?.name || "",
-    elective1Explanation: buildElectiveExplanation(firstElective, data, "Elective 1"),
-    elective2: secondElective?.name || "",
-    elective2Explanation: buildElectiveExplanation(secondElective, data, "Elective 2"),
-    overallAnalysis: `Your ${data.track} Track recommendation is based on your strongest aptitudes and interests. The suggested electives—${firstElective?.name || "Elective 1"} and ${secondElective?.name || "Elective 2"}—are foundational subjects that will strengthen your skills and open pathways to related college programs and careers.`,
-    suggestedCollegeCourses: courses,
+    clusterExplanation,
+    elective1: assignedElectives[0]?.name || "",
+    elective1Explanation: assignedElectives[0]?.description || "",
+    ...(assignedElectives[1]
+      ? {
+          elective2: assignedElectives[1].name,
+          elective2Explanation: assignedElectives[1].description,
+        }
+      : {}),
+    overallAnalysis,
+    suggestedCollegeCourses,
     careerPathways,
   };
 }
 
-function removeFinalizedWording(text = "") {
-  return String(text)
-    .replace(/you have already saved/gi, "this recommendation includes")
-    .replace(/you already saved/gi, "this recommendation includes")
-    .replace(/saved as one of your electives/gi, "recommended as one of your electives")
-    .replace(/saved elective/gi, "recommended elective")
-    .trim();
+function parseAiJson(content) {
+  try {
+    return JSON.parse(String(content || "").trim().replace(/```json|```/g, "").trim());
+  } catch {
+    return null;
+  }
 }
 
-function normalizeRecommendationResult(result, fallbackRecommendation, rankedElectives, data) {
-  if (!result || result.raw) {
-    return result;
-  }
-
-  const availableElectives = electives.map((elective) => elective.name);
-  const elective1 = String(result.elective1 || "").trim();
-  const elective2 = String(result.elective2 || "").trim();
-  const sequenceValidation = validateElectiveSequence(elective1, elective2, availableElectives);
-  const firstElective = findElectiveByName(elective1, rankedElectives);
-  const secondElective = findElectiveByName(elective2, rankedElectives);
-  const useFallbackElectives =
-    !sequenceValidation.valid ||
-    !firstElective ||
-    !secondElective ||
-    isAdvancedElective(elective1) ||
-    isAdvancedElective(elective2);
-  const resolvedFirstElective = useFallbackElectives
-    ? findElectiveByName(fallbackRecommendation.elective1, rankedElectives)
-    : firstElective;
-  const resolvedSecondElective = useFallbackElectives
-    ? findElectiveByName(fallbackRecommendation.elective2, rankedElectives)
-    : secondElective;
-  const resolvedElectives = [resolvedFirstElective, resolvedSecondElective].filter(Boolean);
-  const careerPathways = resolvedElectives
-    .map((elective) => ({
-      category: elective.group || elective.category || elective.name,
-      careers: (elective.careerPathways || []).slice(0, 4),
-    }))
-    .filter((pathway) => pathway.careers.length > 0);
+function mergeExplanation(result, fallback) {
+  const safeText = (value, fallbackText) =>
+    typeof value === "string" && value.trim() ? value.trim().slice(0, 3000) : fallbackText;
 
   return {
-    ...result,
-    elective1: resolvedFirstElective?.name || fallbackRecommendation.elective1,
-    elective2: resolvedSecondElective?.name || fallbackRecommendation.elective2,
-    elective1Explanation: buildElectiveExplanation(
-      resolvedFirstElective,
-      data,
-      "Elective 1"
-    ),
-    elective2Explanation: buildElectiveExplanation(
-      resolvedSecondElective,
-      data,
-      "Elective 2"
-    ),
-    careerPathways,
-    trackExplanation: removeFinalizedWording(result.trackExplanation || fallbackRecommendation.trackExplanation),
-    overallAnalysis: removeFinalizedWording(result.overallAnalysis || fallbackRecommendation.overallAnalysis),
+    ...fallback,
+    trackExplanation: safeText(result?.trackExplanation, fallback.trackExplanation),
+    clusterExplanation: safeText(result?.clusterExplanation, fallback.clusterExplanation),
+    overallAnalysis: safeText(result?.overallAnalysis, fallback.overallAnalysis),
   };
 }
 
@@ -323,20 +135,15 @@ export default async function handler(request, response) {
   }
 
   const data = request.body || {};
-  const rankedElectives = rankElectivesForAssessment(data);
-  const fallbackRecommendation = buildFallbackRecommendation(data, rankedElectives);
-  const provider = process.env.GROQ_API_KEY ? "groq" : "openrouter";
-  const apiKey =
-    provider === "groq" ? process.env.GROQ_API_KEY : process.env.OPENROUTER_API_KEY;
-  const apiUrl =
-    provider === "groq"
-      ? "https://api.groq.com/openai/v1/chat/completions"
-      : "https://openrouter.ai/api/v1/chat/completions";
-  const model =
-    provider === "groq"
-      ? process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL
-      : process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
+  if (!data.track || !data.cluster || !Array.isArray(data.electives)) {
+    return sendJson(response, 400, {
+      error: "A computed track, cluster, and cluster-assigned electives are required.",
+    });
+  }
 
+  const fallbackRecommendation = buildFallbackRecommendation(data);
+  const provider = process.env.GROQ_API_KEY ? "groq" : "openrouter";
+  const apiKey = provider === "groq" ? process.env.GROQ_API_KEY : process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     return sendJson(response, 200, {
       success: true,
@@ -345,189 +152,14 @@ export default async function handler(request, response) {
     });
   }
 
+  const apiUrl = provider === "groq"
+    ? "https://api.groq.com/openai/v1/chat/completions"
+    : "https://openrouter.ai/api/v1/chat/completions";
+  const model = provider === "groq"
+    ? process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL
+    : process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
+
   try {
-    const prompt = `
-
-You are an AI assessment recommendation system.
-
-The student's track is already determined.
-
-Your tasks:
-1. Recommend ONLY the BEST 2 electives, unless local scoring electives are provided for explanation.
-2. Explain why those electives fit the student in detail.
-3. Suggest possible college courses.
-4. Match recommendations using:
-   - aptitude scores
-   - interest scores
-   - strengths
-   - compatibility
-5. Explain the system-selected electives, even when an elective belongs to a different curriculum grouping than the recommended track.
-
-Track:
-${data.track}
-
-LOCAL SCORING ELECTIVES TO EXPLAIN, IF PROVIDED:
-${Array.isArray(data.electives) && data.electives.length ? JSON.stringify(data.electives) : "None"}
-
-APTITUDE SCORES:
-VA: ${data.VA}
-MA: ${data.MA}
-SA: ${data.SA}
-LRA: ${data.LRA}
-
-INTEREST SCORES:
-Academic: ${data.academicInterest}
-Communication: ${data.communicationInterest}
-Creative: ${data.creativeInterest}
-Leadership: ${data.leadershipInterest}
-Technical: ${data.technicalInterest}
-Social: ${data.socialInterest}
-
-RIASEC SCORES:
-${data.riasecScores ? JSON.stringify(data.riasecScores) : "Not available"}
-
-RECOMMENDATION FORMULA:
-Each elective is scored independently using the student's actual assessment results.
-Final elective score = aptitude fit * 0.50 + RIASEC interest fit * 0.50 when both signals are available.
-Aptitude fit uses the elective's own verbal, math, science, and logical weights.
-RIASEC interest fit uses the student's Realistic, Investigative, Artistic, Social, Enterprising, and Conventional scores mapped to the elective's learning/work profile.
-Use compatibilityScore from TOP MATCHING ELECTIVES as the computed final elective score.
-
-TOP MATCHING ELECTIVES:
-${JSON.stringify(rankedElectives)}
-
-Choose electives based on:
-- strongest aptitude scores
-- strongest interest scores
-- compatibilityScore
-- elective weights
-- elective idealFor fields
-- elective strengths
-- related college courses and career pathways
-
-IMPORTANT:
-Electives must strongly align with the student's dominant interests and aptitude scores.
-Do not recommend broad or unrelated electives.
-Prioritize electives with the highest compatibility scores, but treat all valid electives as eligible and do not favor any elective because of list order, popularity, or familiarity.
-Use ONLY electives from TOP MATCHING ELECTIVES.
-Electives may come from any available curriculum grouping when their compatibility scores are highest.
-If local scoring electives are provided and they are valid for the prerequisite sequence, explain those recommendations instead of replacing them.
-Never say the student has already saved, finalized, chosen, or enrolled in an elective. Use recommendation-based wording such as "This elective is recommended..." or "This option fits your results...".
-Prerequisite rule: any Level 2 elective, including names ending in " 2" or using a pattern like "Subject 2: Topic", must only appear as elective2 when the matching Level 1 elective is elective1. Examples: Chemistry 2 requires Chemistry 1 first; Biology 2 requires Biology 1 first; Human Movement 2: Motor Skills Development requires Human Movement 1: Basic Anatomy in Sports and Exercise first. Do not return Programming + Chemistry 2 or any unrelated Level 1 + Level 2 pair.
-
-Return ONLY VALID JSON using this exact format:
-
-IMPORTANT:
-Return ONLY raw JSON.
-Do not use markdown.
-Do not wrap in triple backticks.
-Do not add explanations outside JSON.
-
-{
-  "recommendedTrack": "",
-
-  "trackExplanation": "",
-
-  "elective1": "",
-
-  "elective1Explanation": "",
-
-  "elective2": "",
-
-  "elective2Explanation": "",
-
-  "overallAnalysis": "",
-
-  "suggestedCollegeCourses": [],
-
-  "careerPathways": [
-    {
-      "category": "",
-      "careers": [
-        "",
-        ""
-      ]
-    }
-  ]
-}
-
-Requirements:
-- Choose ONLY the BEST 2 electives.
-- Use ONLY electives from TOP MATCHING ELECTIVES.
-- Match electives based on strongest aptitude and interest scores.
-- Prioritize electives with highest compatibility scores.
-- Do not bias recommendations toward specific elective names, groups, or earlier list positions.
-- Electives may come from any available curriculum grouping; do not reject an elective only because its catalog track differs from the recommended track.
-- Follow prerequisite order: elective1 must be the Level 1 prerequisite if elective2 is the matching Level 2 subject.
-- Do not recommend any Level 2 elective unless its matching Level 1 elective is also recommended first.
-- Avoid unrelated or weak recommendations.
-- trackExplanation must explain WHY the track fits the student based on aptitude and interests.
-- elective1Explanation must be detailed and include: why elective 1 was recommended from the assessment results, what the elective is about, what students can expect to learn or do, and possible career pathways, college courses, or future opportunities related to that elective.
-- elective2Explanation must be detailed and include: why elective 2 was recommended from the assessment results, what the elective is about, what students can expect to learn or do, and possible career pathways, college courses, or future opportunities related to that elective.
-- overallAnalysis must provide a career/academic assessment summary.
-- suggestedCollegeCourses must list college programs aligned with the track and electives.
-- careerPathways must be grouped by specialization/category.
-- Each careerPathways category should contain related career opportunities.
-- Avoid duplicate careerPathways categories.
-- Make explanations professional, student-friendly, and guidance-oriented.
-- Use the student's aptitude scores and interest scores in the reasoning.
-- Ensure explanations are not generic.
-- Speak directly to the student using second-person perspective.
-- Use "you" instead of "the student".
-- Make the explanation sound like a guidance counselor talking personally to the student.
-- Keep the tone supportive, professional, and personalized.
-- Avoid robotic or repetitive wording.
-- Keep explanations natural and conversational.
-- Avoid overly technical or AI-sounding phrases.
-
-Example output for tone and structure only:
-Do not copy these elective names unless they are valid TOP MATCHING ELECTIVES for the actual student.
-
-{
-  "recommendedTrack": "Academic",
-  "trackExplanation": "The Academic Track is recommended because your assessment shows strong science, mathematics, and logical reasoning results, with interests that connect well to structured academic and laboratory-based learning.",
-  "elective1": "Chemistry 1",
-  "elective1Explanation": "Chemistry 1 is recommended because your science, math, and logical reasoning results show that you may do well in a subject that uses analysis, precision, and laboratory thinking. This elective introduces important chemistry concepts such as matter, chemical reactions, measurement, laboratory safety, and scientific problem solving. You can expect to work with experiments, interpret data, practice careful observation, and build a foundation for science-related study. This elective can support college courses such as BS Chemistry, BS Chemical Engineering, BS Pharmacy, BS Medical Technology, and BS Nursing, with future pathways such as chemist, pharmacist, laboratory analyst, medical technologist, chemical engineer, or science researcher.",
-  "elective2": "Chemistry 2",
-  "elective2Explanation": "Chemistry 2 is recommended as the next step after Chemistry 1 because your results suggest readiness for deeper scientific analysis and more advanced laboratory work. This elective builds on foundational chemistry by exploring more complex chemical concepts, laboratory procedures, and applied problem-solving tasks. You can expect to strengthen your analytical thinking, handle more detailed experiments, and connect chemistry learning to health, engineering, and research fields. Related college courses include BS Chemistry, BS Chemical Engineering, BS Medical Technology, BS Pharmacy, and other science or health programs, with career pathways such as laboratory analyst, chemist, chemical engineer, pharmacist, medical technologist, researcher, or science educator.",
-  "overallAnalysis": "Your results suggest that science-focused electives can help you build a strong pathway toward college programs and careers that use analysis, precision, laboratory skills, and problem solving.",
-  "suggestedCollegeCourses": [
-    "BS Chemistry",
-    "BS Chemical Engineering",
-    "BS Pharmacy",
-    "BS Medical Technology",
-    "BS Nursing"
-  ],
-  "careerPathways": [
-    {
-      "category": "Chemistry and Laboratory Science",
-      "careers": [
-        "Chemist",
-        "Laboratory Analyst",
-        "Research Assistant",
-        "Science Educator"
-      ]
-    },
-    {
-      "category": "Health and Applied Science",
-      "careers": [
-        "Pharmacist",
-        "Medical Technologist",
-        "Healthcare Professional"
-      ]
-    }
-  ]
-}
-
-`;
-    const input = prompt.trim();
-
-    if (!input) {
-      return sendJson(response, 400, {
-        error: "Assessment prompt or assessment data is required",
-      });
-    }
-
     const aiResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -539,12 +171,29 @@ Do not copy these elective names unless they are valid TOP MATCHING ELECTIVES fo
         messages: [
           {
             role: "system",
-            content:
-              "You are Electron Hub's AI assessment assistant. Return only valid JSON with no markdown formatting.",
+            content: "You are a supportive, professional school guidance counselor. Return only valid JSON.",
           },
           {
             role: "user",
-            content: input,
+            content: `Explain this already-computed assessment in student-friendly, specific language.
+
+Do not recalculate or change the track, cluster, scores, or electives. Do not recommend, remove, reorder, or invent electives. The assigned electives are determined only by the supplied cluster.
+
+Computed recommendation:
+${JSON.stringify({
+              track: data.track,
+              cluster: data.cluster,
+              trackScores: data.trackScores,
+              clusterScores: data.clusterScores,
+              academicAptitudeScore: data.academicAptitudeScore,
+              aptitudeScores: { verbal: data.VA, math: data.MA, science: data.SA, logical: data.LRA },
+              riasecScores: data.riasecScores,
+              assignedElectives: data.electives,
+            })}
+
+Write a helpful explanation of why the computed aptitude scores support this track, how the chosen cluster's aptitude and RIASEC strengths relate to the student, and what the assigned electives can help the student explore. RIASEC supports context and never overrides the computed track score. Do not claim scores or interests that are not in the input. Use "you" naturally and avoid promising career outcomes.
+
+Return JSON with exactly these string keys: trackExplanation, clusterExplanation, overallAnalysis.`,
           },
         ],
         temperature: 0.2,
@@ -553,38 +202,24 @@ Do not copy these elective names unless they are valid TOP MATCHING ELECTIVES fo
     });
 
     const completion = await aiResponse.json();
-
     if (!aiResponse.ok) {
       console.error("Assessment AI provider error:", completion);
-      return sendJson(response, 200, {
-        success: true,
-        result: fallbackRecommendation,
-        fallback: true,
-      });
+      return sendJson(response, 200, { success: true, result: fallbackRecommendation, fallback: true });
     }
 
-    const reply = String(completion.choices?.[0]?.message?.content || "")
-      .trim()
-      .replace(/```json/g, "")
-      .replace(/```/g, "");
-
-    const parsedResult = normalizeRecommendationResult(
-      parseAiJson(reply),
-      fallbackRecommendation,
-      rankedElectives,
-      data
-    );
+    const aiText = completion.choices?.[0]?.message?.content;
+    const result = parseAiJson(aiText);
+    if (!result || typeof result !== "object") {
+      console.error("Assessment AI returned invalid explanation JSON");
+      return sendJson(response, 200, { success: true, result: fallbackRecommendation, fallback: true });
+    }
 
     return sendJson(response, 200, {
       success: true,
-      result: parsedResult,
+      result: mergeExplanation(result, fallbackRecommendation),
     });
   } catch (error) {
-    console.error("Assessment AI error:", error);
-    return sendJson(response, 200, {
-      success: true,
-      result: fallbackRecommendation,
-      fallback: true,
-    });
+    console.error("Assessment AI explanation request failed:", error);
+    return sendJson(response, 200, { success: true, result: fallbackRecommendation, fallback: true });
   }
 }

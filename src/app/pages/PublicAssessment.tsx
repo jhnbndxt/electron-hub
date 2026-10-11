@@ -9,7 +9,7 @@ import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
 import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
-import electivesCatalog from "../../data/electives.js";
+import electivesCatalog, { getClusterForElectives } from "../../data/electives.js";
 import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
 interface Question {
@@ -30,13 +30,31 @@ interface Section {
 }
 
 function organizeAssessmentSections(questions: Question[]): Section[] {
-  return [
+  const aptitudeSections = [
     { name: "Verbal", icon: Brain, questions: questions.filter((question) => question.category === "Verbal") },
     { name: "Math", icon: Calculator, questions: questions.filter((question) => question.category === "Math") },
     { name: "Science", icon: Beaker, questions: questions.filter((question) => question.category === "Science") },
     { name: "Logical", icon: Lightbulb, questions: questions.filter((question) => question.category === "Logical") },
-    { name: "Interests", icon: Heart, questions: questions.filter((question) => question.category === "Interests") },
   ];
+  const riasecTypes = ["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"];
+  const riasecSections = riasecTypes.map((type) => ({
+    name: type,
+    icon: Heart,
+    questions: questions.filter((question) => {
+      const questionType = question.interestType || question.category;
+      return questionType === type || questionType === type[0];
+    }),
+  }));
+  const untypedInterests = questions.filter((question) =>
+    question.category === "Interests" &&
+    !riasecTypes.some((type) => question.interestType === type || question.interestType === type[0])
+  );
+
+  return [
+    ...aptitudeSections,
+    ...riasecSections,
+    ...(untypedInterests.length ? [{ name: "Interests", icon: Heart, questions: untypedInterests }] : []),
+  ].filter((section) => section.questions.length > 0);
 }
 
 function getBundledAssessmentQuestions(): Question[] {
@@ -52,14 +70,19 @@ function getBundledAssessmentQuestions(): Question[] {
 
 interface AssessmentResult {
   track: string;
+  cluster?: string | null;
+  academicAptitudeScore?: number;
+  trackScores?: Record<string, number>;
+  clusterScores?: Record<string, number>;
+  riasecScores?: Record<string, number>;
   electives: string[];
   electiveRecommendations?: Array<{
     name: string;
     track: string;
     category?: string;
-    compatibilityScore: number;
-    aptitudeScore: number;
-    riasecScore: number;
+    compatibilityScore?: number;
+    aptitudeScore?: number;
+    riasecScore?: number;
     reason: string;
   }>;
   scores: {
@@ -152,9 +175,18 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
 
   const rawScores = result.scores || {};
   const electives = normalizeResultArray(result.electives ?? [result.elective_1, result.elective_2]);
+  const track = normalizeResultText(result.track || result.recommended_track, "General");
+  const cluster =
+    normalizeResultText(result.cluster || result.recommendedCluster || result.recommended_cluster) ||
+    getClusterForElectives(track, electives);
 
   return {
-    track: normalizeResultText(result.track || result.recommended_track, "General"),
+    track,
+    cluster,
+    academicAptitudeScore: normalizeResultScore(result.academicAptitudeScore),
+    trackScores: result.trackScores && typeof result.trackScores === "object" ? result.trackScores : {},
+    clusterScores: result.clusterScores && typeof result.clusterScores === "object" ? result.clusterScores : {},
+    riasecScores: result.riasecScores && typeof result.riasecScores === "object" ? result.riasecScores : {},
     electives,
     scores: {
       VA: normalizeResultScore(rawScores.VA ?? rawScores.verbal_ability_score ?? result.verbal_ability_score),
@@ -177,8 +209,10 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
 
 function getSuggestedCoursesForPublicResult(track: string, elective: string): string[] {
   const normalizedElective = normalizeResultText(elective).toLowerCase();
+  const isAcademicTrack = track.toLowerCase().includes("academic");
+  const isTechnicalProfessionalTrack = track.toLowerCase().includes("technical-professional");
 
-  if (track === "Academic") {
+  if (isAcademicTrack) {
     if (normalizedElective.includes("biology")) {
       return ["Medicine", "Nursing", "Pharmacy", "Biological Sciences"];
     } else if (normalizedElective.includes("physics")) {
@@ -194,7 +228,7 @@ function getSuggestedCoursesForPublicResult(track: string, elective: string): st
     } else if (normalizedElective.includes("coaching") || normalizedElective.includes("fitness")) {
       return ["Physical Education", "Sports Science", "Kinesiology", "Sports Management"];
     }
-  } else if (track === "Technical-Professional") {
+  } else if (isTechnicalProfessionalTrack) {
     if (normalizedElective.includes("ict") || normalizedElective.includes("information") || normalizedElective.includes("technology")) {
       return ["Information Technology", "Computer Science", "Systems Administration", "Cybersecurity"];
     } else if (normalizedElective.includes("programming")) {
@@ -222,14 +256,16 @@ function getSuggestedCoursesForPublicResult(track: string, elective: string): st
 function getPathwayExplanation(track: string, elective: string): string {
   const normalizedElective = normalizeResultText(elective).toLowerCase();
   const courses = getSuggestedCoursesForPublicResult(track, elective);
+  const isAcademicTrack = track.toLowerCase().includes("academic");
+  const isTechnicalProfessionalTrack = track.toLowerCase().includes("technical-professional");
 
   if (courses.length === 0) {
     return `${elective} prepares you with foundational knowledge and skills applicable across various fields in the ${track} pathway.`;
   }
 
-  if (track === "Academic") {
+  if (isAcademicTrack) {
     return `Based on your ${elective} elective and Academic Track, college programs in ${courses.slice(0, 2).join(" or ")} build on these foundations with advanced theory and research.`;
-  } else if (track === "Technical-Professional") {
+  } else if (isTechnicalProfessionalTrack) {
     return `Your ${elective} elective within the Technical-Professional Track leads directly to careers and training in ${courses.slice(0, 2).join(", ")}, combining practical skills with industry credentials.`;
   }
 
@@ -284,6 +320,7 @@ function PublicAssessmentResultsView({
   }
 
   const track = normalizeResultText(normalizedResult.track, "General");
+  const cluster = normalizedResult.cluster;
   const electives = normalizedResult.electives.length > 0 ? normalizedResult.electives : ["Elective recommendation pending"];
   const topDomains = normalizedResult.topDomains.length > 0 ? normalizedResult.topDomains : ["Balanced aptitude profile"];
   const topInterests = normalizedResult.topInterests.length > 0 ? normalizedResult.topInterests : ["General academic interests"];
@@ -295,14 +332,27 @@ function PublicAssessmentResultsView({
       (candidate) => candidate.name.toLowerCase() === elective.toLowerCase()
     ))
     .filter(Boolean);
-  const aiExplanation = selectedElectiveDetails.length > 0
+  const aiExplanation = normalizeResultText(aiRecommendation.overallAnalysis) || (selectedElectiveDetails.length > 0
     ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives match your strengths in ${topDomains.join(" and ")} and interests connected to ${topInterests.join(" and ")}. Together, they develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")} and connect to related study and career pathways.`
-    : `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`;
+    : `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`);
+  const strongestScores = [
+    { label: "Verbal Ability", score: scores.VA },
+    { label: "Mathematical Ability", score: scores.MA },
+    { label: "Science / Spatial Ability", score: scores.SA },
+    { label: "Logical Reasoning", score: scores.LRA },
+  ]
+    .sort((first, second) => second.score - first.score)
+    .slice(0, 2)
+    .map(({ label, score }) => `${label} (${Math.round(score)}%)`);
+  const interestSummary = topInterests.length
+    ? ` Your reported interests include ${topInterests.join(" and ")}.`
+    : "";
   const trackExplanation =
     normalizeResultText(aiRecommendation.trackExplanation) ||
-    (track === "Academic"
-      ? "This path supports college-preparatory learning, research, and academic specialization."
-      : "This path supports practical training, technical competencies, and career-ready preparation.");
+    `The ${track} recommendation is based on your strongest aptitude areas in ${strongestScores.join(" and ")}.${interestSummary}`;
+  const clusterExplanation =
+    normalizeResultText(aiRecommendation.clusterExplanation) ||
+    (cluster ? `${cluster} is the recommended cluster within ${track}. Its assigned electives are determined by the cluster structure.` : "");
   const scoreRows = [
     { label: "Verbal Aptitude", value: scores.VA, icon: Brain },
     { label: "Mathematical Ability", value: scores.MA, icon: Calculator },
@@ -352,6 +402,12 @@ function PublicAssessmentResultsView({
             <div className="rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur">
               <p className="text-sm font-semibold uppercase tracking-[0.16em] text-blue-100">Recommended Track</p>
               <p className="mt-2 text-4xl font-bold">{track}</p>
+              {cluster ? (
+                <div className="mt-3">
+                  <p className="text-lg font-semibold text-blue-100">Suggested Cluster: {cluster}</p>
+                  <p className="mt-2 text-sm leading-6 text-blue-100">{clusterExplanation}</p>
+                </div>
+              ) : null}
               <p className="mt-3 text-sm leading-6 text-blue-100">{trackExplanation}</p>
             </div>
           </div>
@@ -418,15 +474,15 @@ function PublicAssessmentResultsView({
                       <div className="mt-4 grid gap-2 rounded-xl bg-white p-4 text-sm text-slate-700">
                         <div className="flex items-center justify-between gap-3">
                           <span className="font-semibold">Compatibility Score</span>
-                          <span className="font-bold text-blue-700">{scoring.compatibilityScore.toFixed(2)}%</span>
+                          <span className="font-bold text-blue-700">{Number(scoring.compatibilityScore).toFixed(2)}%</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span>Aptitude Score</span>
-                          <span>{scoring.aptitudeScore.toFixed(2)}%</span>
+                          <span>{Number(scoring.aptitudeScore).toFixed(2)}%</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
                           <span>RIASEC Score</span>
-                          <span>{scoring.riasecScore.toFixed(2)}%</span>
+                          <span>{Number(scoring.riasecScore).toFixed(2)}%</span>
                         </div>
                       </div>
                     ) : null}
@@ -495,6 +551,28 @@ function PublicAssessmentResultsView({
               )}
             </div>
           </div>
+        </section>
+
+        <section className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
+          <h2 className="text-xl font-bold text-slate-950">RIASEC Interest Scores</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            Each interest area is scored separately as a percentage of its active questions' maximum possible points.
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            {["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"].map((type) => (
+              <div key={type} className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-600">{type}</p>
+                <p className="mt-2 text-2xl font-bold text-blue-900">
+                  {Math.round(normalizeResultScore(normalizedResult.riasecScores?.[type]))}%
+                </p>
+              </div>
+            ))}
+          </div>
+          {normalizedResult.academicAptitudeScore !== undefined && (
+            <p className="mt-5 text-sm font-semibold text-slate-700">
+              Overall Academic Aptitude Score: {normalizedResult.academicAptitudeScore.toFixed(2)}%
+            </p>
+          )}
         </section>
 
         <section className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
@@ -613,6 +691,7 @@ export function PublicAssessment() {
   const [saveMessage, setSaveMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
+  const [submitError, setSubmitError] = useState("");
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [showExitConfirmation, setShowExitConfirmation] = useState(false);
@@ -625,7 +704,11 @@ export function PublicAssessment() {
       "radial-gradient(circle at top left, rgba(37, 99, 235, 0.16) 0%, transparent 26%), radial-gradient(circle at top right, rgba(185, 28, 28, 0.1) 0%, transparent 22%), linear-gradient(180deg, #f8fbff 0%, #eef4ff 48%, #f8fafc 100%)",
   };
 
-  const isInterestQuestion = (question: Question) => question.category === "Interests";
+  const isInterestQuestion = (question: Question) =>
+    question.category === "Interests" ||
+    Boolean(question.interestType) ||
+    ["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional", "R", "I", "A", "S", "E", "C"]
+      .includes(question.category);
 
   const isQuestionAnswered = (question: Question) => {
     const answer = answers[question.id];
@@ -909,7 +992,7 @@ export function PublicAssessment() {
       `You are showing a strong fit for the ${track} Track because your assessment points to strengths in ${topDomainSummary} and interests connected to ${topInterestSummary}. This path can help you build on how you already think, learn, and solve problems while giving you room to explore future study and career options.`;
     const trackExplanation =
       aiTrackExplanation ||
-      (track === "Academic"
+      (track.toLowerCase().includes("academic")
         ? "You are likely to benefit from a college-preparatory path with structured academic subjects, research tasks, and university-oriented learning."
         : "You are likely to benefit from a practical, skills-based path with hands-on learning, technical competencies, and career-ready preparation.");
 
@@ -956,7 +1039,7 @@ export function PublicAssessment() {
                     {track}
                   </h3>
                   <p className="text-gray-600">
-                    {track === "Academic"
+                    {track.toLowerCase().includes("academic")
                       ? "Prepares you for college and university education"
                       : "Develops technical and vocational skills for immediate employment"}
                   </p>
@@ -1340,6 +1423,7 @@ export function PublicAssessment() {
     }
 
     setIsSubmitting(true);
+    setSubmitError("");
     setSubmitProgress(8);
 
     try {
@@ -1349,6 +1433,12 @@ export function PublicAssessment() {
       Science: [],
       Logical: [],
       Interests: [],
+      Realistic: [],
+      Investigative: [],
+      Artistic: [],
+      Social: [],
+      Enterprising: [],
+      Conventional: [],
     };
 
     sections.forEach((section) => {
@@ -1361,6 +1451,7 @@ export function PublicAssessment() {
     setSubmitProgress(32);
     if (!formattedResult) {
       console.error("❌ Error formatting public assessment result");
+      setSubmitError("We couldn't score this assessment. Please try again, or contact support if the problem continues.");
       setIsSubmitting(false);
       setSubmitProgress(0);
       return;
@@ -1370,39 +1461,24 @@ export function PublicAssessment() {
     const MA = formattedResult.scores.mathematical_ability_score;
     const SA = formattedResult.scores.spatial_ability_score;
     const LRA = formattedResult.scores.logical_reasoning_score;
-    const academicInterest = formattedResult.interestClusters?.academic || 0;
-    const communicationInterest =
-      Math.round(((formattedResult.interestClusters?.creative || 0) + (formattedResult.interestClusters?.helping || 0)) / 2);
-    const creativeInterest = formattedResult.interestClusters?.creative || 0;
-    const leadershipInterest = formattedResult.interestClusters?.business || 0;
-    const technicalInterest = formattedResult.interestClusters?.tech || 0;
-    const socialInterest = formattedResult.interestClusters?.helping || 0;
-    const practicalInterest = formattedResult.interestClusters?.practical || 0;
-    const homeInterest = formattedResult.interestClusters?.home || 0;
-    const outdoorInterest = formattedResult.interestClusters?.outdoor || 0;
-    const physicalInterest = formattedResult.interestClusters?.physical || 0;
     const recommendedTrack = formattedResult.track;
     let aiRecommendation: any = null;
 
     try {
       aiRecommendation = await requestAssessmentAiRecommendation({
         track: recommendedTrack,
+        cluster: formattedResult.recommendedCluster || formattedResult.recommended_cluster || formattedResult.cluster,
         VA,
         MA,
         SA,
         LRA,
-        academicInterest,
-        communicationInterest,
-        creativeInterest,
-        leadershipInterest,
-        technicalInterest,
-        socialInterest,
-        practicalInterest,
-        homeInterest,
-        outdoorInterest,
-        physicalInterest,
+        academicAptitudeScore: formattedResult.academicAptitudeScore,
+        trackScores: formattedResult.trackScores,
+        clusterScores: formattedResult.clusterScores,
         riasecScores: formattedResult.riasecScores,
         electives: formattedResult.electives,
+        topDomains: formattedResult.topDomains,
+        topInterests: formattedResult.topInterests,
       });
       setSubmitProgress(68);
     } catch (error) {
@@ -1410,16 +1486,13 @@ export function PublicAssessment() {
       setSubmitProgress(68);
     }
 
-    if (aiRecommendation && !aiRecommendation.raw) {
-      const aiTrack = normalizeResultText(aiRecommendation.recommendedTrack);
-      formattedResult.track = aiTrack || formattedResult.track;
-      formattedResult.recommended_track = aiTrack || formattedResult.recommended_track;
-      formattedResult.elective_1 = formattedResult.electives[0] || formattedResult.elective_1;
-      formattedResult.elective_2 = formattedResult.electives[1] || formattedResult.elective_2;
-    }
-
     const assessmentResult: AssessmentResult = {
       track: formattedResult.track,
+      cluster: formattedResult.recommendedCluster || formattedResult.recommended_cluster || formattedResult.cluster,
+      academicAptitudeScore: formattedResult.academicAptitudeScore,
+      trackScores: formattedResult.trackScores,
+      clusterScores: formattedResult.clusterScores,
+      riasecScores: formattedResult.riasecScores,
       electives: formattedResult.electives,
       scores: {
         VA: formattedResult.scores.verbal_ability_score,
@@ -1438,6 +1511,7 @@ export function PublicAssessment() {
     const normalizedResult = normalizeAssessmentResult(assessmentResult);
     if (!normalizedResult) {
       console.error("Public assessment result normalization failed");
+      setSubmitError("We couldn't prepare your assessment result. Please try again.");
       setIsSubmitting(false);
       setSubmitProgress(0);
       return;
@@ -1453,6 +1527,7 @@ export function PublicAssessment() {
     window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (error) {
       console.error("Public assessment submission failed:", error);
+      setSubmitError("We couldn't save your assessment result. Please check your connection and try again.");
       setIsSubmitting(false);
       setSubmitProgress(0);
     }
@@ -1693,6 +1768,11 @@ export function PublicAssessment() {
         message="Scoring your answers and preparing your AI elective explanations..."
         progress={submitProgress}
       />
+      {submitError && (
+        <div role="alert" className="mx-auto mb-4 max-w-4xl rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {submitError}
+        </div>
+      )}
       <section
         className="relative overflow-hidden py-20 text-white"
         style={{
@@ -1883,7 +1963,7 @@ export function PublicAssessment() {
                     {currentSectionData.name}
                   </h2>
                   <p className="mt-2 text-gray-600">
-                    {currentSectionData.name === "Interests"
+                    {currentSectionData.questions.every(isInterestQuestion)
                       ? "Rate each statement using the 5-point scale before moving to the next section."
                       : "Answer every question carefully before moving to the next section."}
                   </p>
@@ -1983,7 +2063,7 @@ export function PublicAssessment() {
 
                 {!allCurrentQuestionsAnswered && (
                   <p className="text-center text-sm text-gray-500 sm:text-left">
-                    {currentSectionData.name === "Interests"
+                    {currentSectionData.questions.every(isInterestQuestion)
                       ? "Rate every interest statement to continue."
                       : "Answer every question in this section to continue."}
                   </p>
