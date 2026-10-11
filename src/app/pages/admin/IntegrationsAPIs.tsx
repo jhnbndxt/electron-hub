@@ -1,6 +1,7 @@
 import { Key, Plus, Trash2, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { notify } from "../../utils/notify";
 
 interface APIKey {
   id: number;
@@ -55,7 +56,7 @@ export function IntegrationsAPIs() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    alert("API key copied to clipboard!");
+    notify.success("API key copied to clipboard!");
   };
 
   return (
@@ -86,7 +87,7 @@ export function IntegrationsAPIs() {
               </div>
             </div>
             <button
-              onClick={() => alert("Create new API key functionality coming soon")}
+              onClick={() => notify.info("Create new API key functionality coming soon")}
               className="px-4 py-2 rounded-lg text-white font-medium text-sm transition-all hover:opacity-90 flex items-center gap-2"
               style={{ backgroundColor: "#7C3AED" }}
             >
@@ -127,7 +128,7 @@ export function IntegrationsAPIs() {
                     </div>
                   </div>
                   <button
-                    onClick={() => alert("Delete API key")}
+                    onClick={() => notify.warning("Delete API key")}
                     className="p-2 rounded-lg hover:bg-red-50 transition-colors"
                   >
                     <Trash2 className="w-4 h-4" style={{ color: "#EF4444" }} />

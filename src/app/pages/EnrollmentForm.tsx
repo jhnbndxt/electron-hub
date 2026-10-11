@@ -32,12 +32,10 @@ import {
   uploadDocument 
 } from "../../services/enrollmentService";
 import { triggerNotification } from "../../services/notificationService";
+import { notify } from "../utils/notify";
 import { supabase } from "../../supabase";
 import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
-import electivesDataset from "../../data/electives";
-import {
-  validateElectiveSequence,
-} from "../../utils/electivePrerequisites";
+import { ELECTIVE_STRUCTURE, getClusterForElectives, getClustersForTrack, getElectivesForCluster } from "../../data/electives";
 import {
   getBarangays,
   getCities,
@@ -45,15 +43,6 @@ import {
   getProvinces,
   getRegions,
 } from "../../services/addressService";
-
-const allElectives = Array.from(
-  new Set(
-    ((electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[])
-      .sort((first, second) => first.localeCompare(second))
-  )
-);
-const electiveCatalogNames = (electivesDataset as Array<{ name?: string }>).map((elective) => elective.name).filter(Boolean) as string[];
-const electiveCatalogNameSet = new Set(electiveCatalogNames.map((elective) => elective.toLowerCase()));
 
 const guardianFields = [
   "guardianLastName",
@@ -131,6 +120,7 @@ interface FormData {
 
   // Page 4: Enrollment Information
   preferredTrack: string;
+  preferredCluster: string;
   elective1: string;
   elective2: string;
   yearLevel: string;
@@ -161,6 +151,7 @@ export function EnrollmentForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [aiRecommendation, setAiRecommendation] = useState<{
     track: string;
+    cluster?: string;
     electives: string[];
   } | null>(null);
   const [hasAssessment, setHasAssessment] = useState(true);
@@ -183,8 +174,6 @@ export function EnrollmentForm() {
     barangays: false,
   });
   const [addressError, setAddressError] = useState("");
-  const [electiveSearch, setElectiveSearch] = useState({ elective1: "", elective2: "" });
-  const [activeElectiveField, setActiveElectiveField] = useState<"elective1" | "elective2" | null>(null);
   const hasRestoredDraft = useRef(false);
 
   const [formData, setFormData] = useState<FormData>({
@@ -239,6 +228,7 @@ export function EnrollmentForm() {
     guardianContact: "",
     is4PsMember: false,
     preferredTrack: "",
+    preferredCluster: "",
     elective1: "",
     elective2: "",
     yearLevel: "",
@@ -394,6 +384,7 @@ export function EnrollmentForm() {
       guardianContact: source.guardianContact || source.guardian_contact || "",
       is4PsMember: source.is4PsMember ?? source.is_4ps_member ?? false,
       preferredTrack: source.preferredTrack || source.preferred_track || "",
+      preferredCluster: source.preferredCluster || source.preferred_cluster || source.cluster || "",
       elective1: source.elective1 || source.elective_1 || "",
       elective2: source.elective2 || source.elective_2 || "",
       yearLevel: source.yearLevel || source.year_level || "",
@@ -508,8 +499,11 @@ export function EnrollmentForm() {
           const result = await getLatestAssessmentResult(userEmail);
           
           if (result) {
+            const cluster = result.recommendedCluster || result.recommended_cluster || result.cluster ||
+              getClusterForElectives(result.track, result.electives);
             setAiRecommendation({
               track: result.track,
+              cluster,
               electives: result.electives,
             });
             
@@ -518,6 +512,7 @@ export function EnrollmentForm() {
               setFormData(prev => ({
                 ...prev,
                 preferredTrack: result.track,
+                preferredCluster: cluster || "",
                 elective1: result.electives[0] || "",
                 elective2: result.electives[1] || "",
               }));
@@ -859,28 +854,17 @@ export function EnrollmentForm() {
     // Don't allow changes if this is a submitted enrollment
     if (isSubmittedEnrollment) return;
 
-    if ((field === "elective1" || field === "elective2") && typeof value === "string") {
-      const nextElective1 = field === "elective1" ? value : formData.elective1;
-      const nextElective2 = field === "elective2" ? value : formData.elective2;
-      const isGrade11Selection = formData.yearLevel === "Grade 11" || formData.admissionType === "New Regular";
-
-      if (isGrade11Selection) {
-        const sequenceValidation = validateElectiveSequence(nextElective1, nextElective2, electiveCatalogNames);
-
-        if (!sequenceValidation.valid) {
-          setErrors((prev) => ({
-            ...prev,
-            [field]: sequenceValidation.message,
-          }));
-          setElectiveSearch((prev) => ({ ...prev, [field]: formData[field] || "" }));
-          return;
-        }
-      }
-    }
-    
     setFormData(prev => {
       const nextValue = field === "sex" && typeof value === "string" ? normalizeSexForEnrollment(value) : value;
       let newData = { ...prev, [field]: nextValue };
+
+      if (field === "preferredTrack") {
+        newData = { ...newData, preferredCluster: "", elective1: "", elective2: "" };
+      }
+      if (field === "preferredCluster") {
+        const assigned = getElectivesForCluster(newData.preferredTrack, String(value));
+        newData = { ...newData, elective1: assigned[0] || "", elective2: assigned[1] || "" };
+      }
       
       // Handle address cascade resets inline to avoid multiple useEffect chains
       if (field === "region") {
@@ -897,17 +881,6 @@ export function EnrollmentForm() {
       // Handle admission type year level auto-set
       if (field === "admissionType" && value === "New Regular") {
         newData.yearLevel = "Grade 11";
-      }
-
-      if (field === "yearLevel" && value === "Grade 11") {
-        const sequenceValidation = validateElectiveSequence(newData.elective1, newData.elective2, electiveCatalogNames);
-
-        if (!sequenceValidation.valid) {
-          newData = {
-            ...newData,
-            [sequenceValidation.field]: "",
-          };
-        }
       }
 
       if (field === "admissionType" && value !== "Transferee") {
@@ -945,9 +918,10 @@ export function EnrollmentForm() {
       setErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[field];
-        if (field === "elective1" || field === "elective2") {
+        if (field === "elective1" || field === "elective2" || field === "preferredCluster" || field === "preferredTrack") {
           delete newErrors.elective1;
           delete newErrors.elective2;
+          delete newErrors.preferredCluster;
         }
         if (field === "guardianSource") {
           guardianFields.forEach((guardianField) => {
@@ -1095,23 +1069,13 @@ export function EnrollmentForm() {
 
     if (page === 4) {
       if (!formData.preferredTrack) newErrors.preferredTrack = "This field is required";
+      if (!formData.preferredCluster) newErrors.preferredCluster = "Please select a cluster";
+      const assignedElectives = getElectivesForCluster(formData.preferredTrack, formData.preferredCluster);
       if (!formData.elective1) newErrors.elective1 = "This field is required";
-      if (!formData.elective2) newErrors.elective2 = "This field is required";
-      if (formData.elective1 && !isAvailableElective(formData.elective1)) {
-        newErrors.elective1 = getElectiveAvailabilityMessage("Elective 1");
-      }
-      if (formData.elective2 && !isAvailableElective(formData.elective2)) {
-        newErrors.elective2 = getElectiveAvailabilityMessage("Elective 2");
-      }
-      if (formData.elective1 && formData.elective2 && formData.elective1 === formData.elective2) {
-        newErrors.elective2 = "Elective 1 and Elective 2 must be different";
-      }
-      if (formData.yearLevel === "Grade 11" || formData.admissionType === "New Regular") {
-        const sequenceValidation = validateElectiveSequence(formData.elective1, formData.elective2, electiveCatalogNames);
-
-        if (!sequenceValidation.valid && sequenceValidation.field) {
-          newErrors[sequenceValidation.field] = sequenceValidation.message || "Please follow the required elective prerequisite sequence.";
-        }
+      if (assignedElectives.length > 1 && !formData.elective2) newErrors.elective2 = "This field is required";
+      if (formData.elective1 !== (assignedElectives[0] || "")) newErrors.elective1 = "Elective 1 must match the selected cluster.";
+      if (assignedElectives.length > 1 && formData.elective2 !== assignedElectives[1]) {
+        newErrors.elective2 = "Elective 2 must match the selected cluster.";
       }
       if (!formData.yearLevel) newErrors.yearLevel = "This field is required";
     }
@@ -1163,7 +1127,7 @@ export function EnrollmentForm() {
 
   const handleSubmit = async () => {
     if (!certificationChecked) {
-      alert("Please certify that the information you provided is true and correct before submitting.");
+      notify.warning("Please certify that the information you provided is true and correct before submitting.");
       return;
     }
 
@@ -1181,7 +1145,7 @@ export function EnrollmentForm() {
 
     const userEmail = userData?.email;
     if (!userEmail) {
-      alert("Unable to submit enrollment. Please sign in again.");
+      notify.error("Unable to submit enrollment. Please sign in again.");
       return;
     }
 
@@ -1190,6 +1154,11 @@ export function EnrollmentForm() {
       const userId = userEmail; // Use email as user identifier (custom auth, not Supabase Auth)
       
       const syncedFormData = applyGuardianSelection(formData);
+      const clusterElectives = getElectivesForCluster(
+        syncedFormData.preferredTrack,
+        syncedFormData.preferredCluster
+      );
+      const { elective2: _unusedElective2, ...enrollmentFormData } = syncedFormData;
 
       // Create enrollment submission data
       const enrollmentData = {
@@ -1197,7 +1166,8 @@ export function EnrollmentForm() {
         email: syncedFormData.email,
         contactNumber: syncedFormData.contactNumber,
         submissionDate: new Date().toISOString(),
-        ...syncedFormData,
+        ...enrollmentFormData,
+        ...(clusterElectives[1] ? { elective2: clusterElectives[1] } : {}),
         // Exclude file objects
         form138: undefined,
         form137: undefined,
@@ -1223,7 +1193,7 @@ export function EnrollmentForm() {
       const { error, data: enrollmentResult } = await submitEnrollment(userId, enrollmentData, documentFiles);
 
       if (error) {
-        alert(`Error submitting enrollment: ${error}`);
+        notify.error(`Enrollment could not be submitted: ${error}`);
         console.error('Enrollment submission error:', error);
         return;
       }
@@ -1256,30 +1226,10 @@ export function EnrollmentForm() {
       navigate("/dashboard/payment");
     } catch (error) {
       console.error('Enrollment submission error:', error);
-      alert('Failed to submit enrollment. Please try again.');
+      notify.error('Failed to submit enrollment. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const getFilteredElectives = (query: string) => {
-    const normalizedQuery = query.trim().toLowerCase();
-
-    if (!normalizedQuery) {
-      return allElectives.slice(0, 12);
-    }
-
-    return allElectives
-      .filter((elective) => elective.toLowerCase().includes(normalizedQuery))
-      .slice(0, 12);
-  };
-
-  const isAvailableElective = (elective: string) => {
-    return electiveCatalogNameSet.has(String(elective || "").trim().toLowerCase());
-  };
-
-  const getElectiveAvailabilityMessage = (label: string) => {
-    return `${label} must be selected from the available elective list. Please choose one of the matching dropdown options.`;
   };
 
   const renderPageIndicator = () => {
@@ -1404,88 +1354,6 @@ export function EnrollmentForm() {
       )}
     </div>
   );
-
-  const renderElectiveCombobox = (
-    label: string,
-    field: "elective1" | "elective2"
-  ) => {
-    const searchValue = electiveSearch[field] || formData[field] || "";
-    const filteredElectives = getFilteredElectives(searchValue);
-    const showOptions = activeElectiveField === field && !isSubmittedEnrollment;
-
-    return (
-      <div className="relative">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          {label} <span className="text-red-500">*</span>
-        </label>
-        <input
-          type="text"
-          value={searchValue}
-          onFocus={() => {
-            setActiveElectiveField(field);
-            setElectiveSearch((prev) => ({ ...prev, [field]: prev[field] || formData[field] || "" }));
-          }}
-          onChange={(event) => {
-            setActiveElectiveField(field);
-            setElectiveSearch((prev) => ({ ...prev, [field]: event.target.value }));
-          }}
-          onBlur={() => {
-            window.setTimeout(() => {
-              const typedValue = electiveSearch[field].trim();
-              if (typedValue && typedValue !== formData[field]) {
-                setErrors((prev) => ({
-                  ...prev,
-                  [field]: getElectiveAvailabilityMessage(label),
-                }));
-              }
-              setActiveElectiveField((currentField) => (currentField === field ? null : currentField));
-              setElectiveSearch((prev) => ({ ...prev, [field]: formData[field] || "" }));
-            }, 150);
-          }}
-          disabled={isSubmittedEnrollment}
-          placeholder={`Search ${label.toLowerCase()}`}
-          className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-            errors[field] ? "border-red-500" : "border-gray-300"
-          } ${isSubmittedEnrollment ? "bg-gray-50 cursor-not-allowed opacity-60" : ""}`}
-          role="combobox"
-          aria-expanded={showOptions}
-          aria-controls={`${field}-elective-options`}
-          autoComplete="off"
-        />
-        {showOptions && (
-          <div
-            id={`${field}-elective-options`}
-            className="absolute z-30 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl"
-          >
-            {filteredElectives.length > 0 ? (
-              filteredElectives.map((elective) => (
-                <button
-                  key={elective}
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => {
-                    handleInputChange(field, elective);
-                    setElectiveSearch((prev) => ({ ...prev, [field]: elective }));
-                    setActiveElectiveField(null);
-                  }}
-                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-blue-50 ${
-                    formData[field] === elective ? "bg-blue-50 font-semibold text-blue-900" : "text-slate-700"
-                  }`}
-                >
-                  {elective}
-                </button>
-              ))
-            ) : (
-              <p className="px-3 py-2 text-sm text-slate-500">No matching elective found.</p>
-            )}
-          </div>
-        )}
-        {errors[field] && (
-          <p className="text-red-500 text-xs mt-1">{errors[field]}</p>
-        )}
-      </div>
-    );
-  };
 
   const renderFileUpload = (
     label: string,
@@ -1883,6 +1751,13 @@ export function EnrollmentForm() {
               <p className="text-lg font-bold text-blue-900">{aiRecommendation.track}</p>
             </div>
 
+            {aiRecommendation.cluster && (
+              <div className="bg-white rounded-lg p-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Recommended Cluster</p>
+                <p className="text-lg font-bold text-blue-900">{aiRecommendation.cluster}</p>
+              </div>
+            )}
+
             <div className="bg-white rounded-lg p-4">
               <p className="text-xs font-semibold text-gray-500 uppercase mb-2">Recommended Electives</p>
               <div className="flex flex-wrap gap-2">
@@ -1900,7 +1775,7 @@ export function EnrollmentForm() {
 
           <div className="mt-4 flex items-start gap-2 text-xs text-gray-600">
             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <p>You can follow the AI recommendation or choose your own track and electives below.</p>
+            <p>You can follow your assessment recommendation or choose your own track and assigned electives below.</p>
           </div>
         </div>
       )}
@@ -1909,12 +1784,21 @@ export function EnrollmentForm() {
       <div className="portal-glass-panel rounded-xl p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">Your Choice</h3>
 
-        {renderSelect("Preferred Track", "preferredTrack", ["Academic", "Technical-Professional"])}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-          {renderElectiveCombobox("Elective 1", "elective1")}
-          {renderElectiveCombobox("Elective 2", "elective2")}
-        </div>
+        {renderSelect("Track", "preferredTrack", ELECTIVE_STRUCTURE.map((entry) => entry.track))}
+        {formData.preferredTrack && renderSelect(
+          "Cluster",
+          "preferredCluster",
+          getClustersForTrack(formData.preferredTrack).map((cluster) => cluster.name)
+        )}
+        {formData.preferredCluster && (
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50 p-4">
+            <p className="mb-3 text-sm font-semibold text-blue-900">Electives assigned to this cluster</p>
+            <div className="space-y-2 text-sm text-slate-800">
+              <p><span className="font-semibold">Elective 1:</span> {formData.elective1}</p>
+              {formData.elective2 && <p><span className="font-semibold">Elective 2:</span> {formData.elective2}</p>}
+            </div>
+          </div>
+        )}
       </div>
 
       {formData.admissionType === "New Regular" ? (
@@ -2184,9 +2068,10 @@ export function EnrollmentForm() {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-700">
               <div><span className="text-gray-500">Preferred Track:</span> <span className="font-medium">{summaryData.preferredTrack}</span></div>
+              <div><span className="text-gray-500">Cluster:</span> <span className="font-medium">{summaryData.preferredCluster}</span></div>
               <div><span className="text-gray-500">Year Level:</span> <span className="font-medium">{summaryData.yearLevel}</span></div>
               <div><span className="text-gray-500">Elective 1:</span> <span className="font-medium">{summaryData.elective1}</span></div>
-              <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{summaryData.elective2}</span></div>
+              {summaryData.elective2 && <div><span className="text-gray-500">Elective 2:</span> <span className="font-medium">{summaryData.elective2}</span></div>}
             </div>
           </section>
 

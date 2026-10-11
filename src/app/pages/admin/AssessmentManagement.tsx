@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
+import { notify } from "../../utils/notify";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import {
@@ -274,7 +275,7 @@ export function AssessmentManagement() {
       const validationError = validateQuestionDraft(editedQuestion, editedQuestion.category);
 
       if (validationError) {
-        alert(validationError);
+        notify.warning(validationError);
         return;
       }
 
@@ -284,7 +285,7 @@ export function AssessmentManagement() {
       const { error, data } = await updateQuestion(id, payload);
 
       if (error) {
-        alert(`Error saving question: ${error}`);
+        notify.error(`Error saving question: ${error}`);
         return;
       }
 
@@ -315,7 +316,7 @@ export function AssessmentManagement() {
     const { error } = await deleteQuestion(id);
 
     if (error) {
-      alert(`Error deleting question: ${error}`);
+      notify.error(`Error deleting question: ${error}`);
       return;
     }
 
@@ -329,7 +330,7 @@ export function AssessmentManagement() {
     const validationError = validateQuestionDraft(newQuestion, category);
 
     if (validationError) {
-      alert(validationError);
+      notify.warning(validationError);
       return;
     }
 
@@ -345,7 +346,7 @@ export function AssessmentManagement() {
     });
 
     if (error) {
-      alert(`Error adding question: ${error}`);
+      notify.error(`Error adding question: ${error}`);
       return;
     }
 

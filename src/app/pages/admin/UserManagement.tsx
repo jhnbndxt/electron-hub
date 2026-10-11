@@ -8,6 +8,7 @@ import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { supabase } from "../../../supabase";
 import { registerUser } from "../../../services/authService";
 import { createAuditLog } from "../../../services/adminService";
+import { notify } from "../../utils/notify";
 
 interface UserAccount {
   id: string;
@@ -185,6 +186,8 @@ export function UserManagement() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [passwordPrompt, setPasswordPrompt] = useState<{ action: "deactivate" | "delete"; targets: UserAccount[] } | null>(null);
+  const [passwordInput, setPasswordInput] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [touchedAddUserFields, setTouchedAddUserFields] = useState<Partial<Record<AddUserField, boolean>>>({});
   const { userRole, userData } = useAuth();
@@ -271,19 +274,21 @@ export function UserManagement() {
     setTimeout(() => setShowErrorToast(false), 4000);
   };
 
-  const executeAccountAction = async (action: "deactivate" | "delete", targets: UserAccount[]) => {
+  const executeAccountAction = async (action: "deactivate" | "delete", targets: UserAccount[], password?: string) => {
     if (!targets.length) return false;
     if (targets.some((target) => target.id === userData?.id)) {
       showError("You cannot deactivate or permanently delete your own account while logged in.");
       return false;
     }
 
-    const coordinatorPassword = window.prompt(
-      `Enter your Branch Coordinator password to authorize ${action === "deactivate" ? "deactivation" : "permanent deletion"}:`
-    );
-    if (coordinatorPassword === null) return false;
+    if (password === undefined) {
+      setPasswordInput("");
+      setPasswordPrompt({ action, targets });
+      return false;
+    }
+    const coordinatorPassword = password.trim();
     if (!coordinatorPassword) {
-      showError("Branch Coordinator password is required to authorize this action.");
+      notify.warning("Branch Coordinator password is required to authorize this action.");
       return false;
     }
 
@@ -477,8 +482,7 @@ export function UserManagement() {
     const confirmation = action === "deactivate"
       ? `Deactivate ${targets.length} selected account${targets.length === 1 ? "" : "s"}?`
       : `Permanently delete ${targets.length} selected deactivated account${targets.length === 1 ? "" : "s"}? This cannot be undone.`;
-    if (!window.confirm(confirmation)) return;
-    await executeAccountAction(action, targets);
+    setPasswordPrompt({ action, targets });
   };
 
   const handleEditClick = (user: UserAccount) => {
@@ -1698,6 +1702,20 @@ export function UserManagement() {
           >
             <X className="w-4 h-4 text-gray-700" />
           </button>
+        </div>
+      )}
+
+      {passwordPrompt && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm" onClick={() => setPasswordPrompt(null)}>
+          <div role="dialog" aria-modal="true" aria-labelledby="account-action-password-title" className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <h2 id="account-action-password-title" className="text-xl font-semibold text-slate-950">Authorize account action</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Enter your Branch Coordinator password to authorize this {passwordPrompt.action === "deactivate" ? "deactivation" : "permanent deletion"}.</p>
+            <input autoFocus type="password" value={passwordInput} onChange={(event) => setPasswordInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setPasswordPrompt(null); }} className="mt-5 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" autoComplete="current-password" />
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => setPasswordPrompt(null)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button onClick={async () => { const request = passwordPrompt; setPasswordPrompt(null); await executeAccountAction(request.action, request.targets, passwordInput); }} className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Authorize</button>
+            </div>
+          </div>
         </div>
       )}
 

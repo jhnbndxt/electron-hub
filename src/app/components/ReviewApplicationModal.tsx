@@ -22,6 +22,7 @@ interface DocumentData {
   uploadDate: string;
   fileName: string;
   fileUrl: string | null;
+  filePath?: string | null;
   rejectionComment: string;
 }
 
@@ -120,7 +121,8 @@ const ReviewApplicationModal: React.FC<ReviewApplicationModalProps> = ({
       id: d.id,
       status: status,
       uploadDate: d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : "—",
-      fileName: (d.file_path || d.file_url || "").split("/").pop() || "document",
+      fileName: d.file_name || (d.file_path || d.file_url || "").split("/").pop() || "document",
+      filePath: d.file_path || null,
       fileUrl: d.file_path || d.file_url || null,
       rejectionComment: d.rejection_comment || d.rejection_reason || "",
     };

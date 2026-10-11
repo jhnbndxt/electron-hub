@@ -1,26 +1,23 @@
 export interface AssessmentAiPayload {
   track: string;
+  cluster: string | null;
   VA: number;
   MA: number;
   SA: number;
   LRA: number;
-  academicInterest: number;
-  communicationInterest: number;
-  creativeInterest: number;
-  leadershipInterest: number;
-  technicalInterest: number;
-  socialInterest: number;
-  practicalInterest?: number;
-  homeInterest?: number;
-  outdoorInterest?: number;
-  physicalInterest?: number;
+  academicAptitudeScore: number;
+  trackScores: Record<string, number>;
+  clusterScores: Record<string, number>;
   riasecScores?: Record<string, number>;
   electives?: string[];
+  topDomains?: string[];
+  topInterests?: string[];
 }
 
 export interface AssessmentAiRecommendation {
   recommendedTrack?: string;
   trackExplanation?: string;
+  clusterExplanation?: string;
   elective1?: string;
   elective1Explanation?: string;
   elective2?: string;

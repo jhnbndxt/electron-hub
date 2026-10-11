@@ -99,6 +99,7 @@ CREATE TABLE enrollments (
   
   -- Page 4: Enrollment Information
   preferred_track VARCHAR(100),
+  preferred_cluster VARCHAR(150),
   elective_1 VARCHAR(100),
   elective_2 VARCHAR(100),
   year_level VARCHAR(50),
@@ -176,6 +177,7 @@ CREATE TABLE assessment_results (
   
   -- Results
   recommended_track VARCHAR(100),
+  recommended_cluster VARCHAR(150),
   elective_1 VARCHAR(100),
   elective_2 VARCHAR(100),
   

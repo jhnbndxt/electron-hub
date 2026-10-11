@@ -91,20 +91,14 @@ export const chatbotKnowledge = {
   },
   tracks: {
     title: "Tracks and Electives",
-    tracks: ["Academic", "Technical-Professional"],
+    tracks: ["Academic Track", "Technical-Professional Electives"],
     academicElectives: [
-      "Biology and Physics",
-      "Entrepreneurship and Marketing",
-      "Psychology and Creative Writing",
-      "Media Arts and Visual Arts",
-      "Coaching and Fitness",
+      "Business and Entrepreneurship: Business 1 – Basic Accounting; Introduction to Organization and Management",
+      "Arts, Social Sciences, and Humanities: Biology 1; Creative Writing",
+      "Science, Technology, Engineering, and Mathematics (STEM): Biology 1; Chemistry 1",
     ],
     technicalElectives: [
-      "ICT and Programming",
-      "Cookery and Bread & Pastry",
-      "Automotive and Electrical",
-      "Agriculture and Fishery",
-      "Fitness Training and Coaching",
+      "ICT Support and Computer Programming Technologies: Computer Programming",
     ],
   },
   navigation: {

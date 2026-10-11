@@ -1,5 +1,6 @@
 import { Shield, Lock, Key, AlertTriangle, CheckCircle } from "lucide-react";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
+import { notify } from "../../utils/notify";
 
 export function SecurityPolicies() {
   const securitySettings = [
@@ -186,7 +187,7 @@ export function SecurityPolicies() {
                 <div className="mt-4">
                   <button
                     onClick={() =>
-                      alert(`Edit ${section.category} settings coming soon`)
+                      notify.info(`Edit ${section.category} settings coming soon`)
                     }
                     className="w-full py-2 rounded-lg font-medium text-sm transition-all hover:bg-gray-100 border border-gray-300"
                     style={{ color: "#374151" }}
@@ -237,7 +238,7 @@ export function SecurityPolicies() {
                     </div>
                   </div>
                   <button
-                    onClick={() => alert("View event details")}
+                    onClick={() => notify.info("View event details")}
                     className="text-sm font-medium hover:underline flex-shrink-0"
                     style={{ color: "#7C3AED" }}
                   >

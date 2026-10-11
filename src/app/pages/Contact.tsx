@@ -1,5 +1,6 @@
 import { Mail, Phone, MapPin, Clock, Sparkles, MessageCircle } from "lucide-react";
 import { useState } from "react";
+import { notify } from "../utils/notify";
 
 export function Contact() {
   const [formData, setFormData] = useState({
@@ -12,7 +13,7 @@ export function Contact() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Handle form submission
-    alert("Thank you for your message. We will get back to you soon!");
+    notify.success("Thank you for your message. We will get back to you soon!");
     setFormData({ name: "", email: "", subject: "", message: "" });
   };
 

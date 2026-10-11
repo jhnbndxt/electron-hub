@@ -30,6 +30,34 @@ interface Section {
   questions: Question[];
 }
 
+function organizeAssessmentSections(questions: Question[]): Section[] {
+  const aptitudeSections = [
+    { name: "Verbal", icon: Brain, questions: questions.filter((question) => question.category === "Verbal") },
+    { name: "Math", icon: Calculator, questions: questions.filter((question) => question.category === "Math") },
+    { name: "Science", icon: Beaker, questions: questions.filter((question) => question.category === "Science") },
+    { name: "Logical", icon: Lightbulb, questions: questions.filter((question) => question.category === "Logical") },
+  ];
+  const riasecTypes = ["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"];
+  const riasecSections = riasecTypes.map((type) => ({
+    name: type,
+    icon: Heart,
+    questions: questions.filter((question) => {
+      const questionType = question.interestType || question.category;
+      return questionType === type || questionType === type[0];
+    }),
+  }));
+  const untypedInterests = questions.filter((question) =>
+    question.category === "Interests" &&
+    !riasecTypes.some((type) => question.interestType === type || question.interestType === type[0])
+  );
+
+  return [
+    ...aptitudeSections,
+    ...riasecSections,
+    ...(untypedInterests.length ? [{ name: "Interests", icon: Heart, questions: untypedInterests }] : []),
+  ].filter((section) => section.questions.length > 0);
+}
+
 export function Assessment() {
   const navigate = useNavigate();
   const { userData, updateEnrollmentProgress, logout } = useAuth();
@@ -41,6 +69,7 @@ export function Assessment() {
   const [assessmentCompleted, setAssessmentCompleted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
+  const [submitError, setSubmitError] = useState("");
   const [assessmentStarted, setAssessmentStarted] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
@@ -50,7 +79,11 @@ export function Assessment() {
   const totalQuestions = sections.reduce((sum, section) => sum + section.questions.length, 0);
   const totalDurationSeconds = getAssessmentDurationSeconds(totalQuestions);
 
-  const isInterestQuestion = (question: Question) => question.category === "Interests";
+  const isInterestQuestion = (question: Question) =>
+    question.category === "Interests" ||
+    Boolean(question.interestType) ||
+    ["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional", "R", "I", "A", "S", "E", "C"]
+      .includes(question.category);
 
   const isQuestionAnswered = (question: Question) => {
     const answer = answers[question.id];
@@ -225,35 +258,7 @@ export function Assessment() {
 
       console.log(`✅ Loaded ${questions.length} questions from Supabase`);
 
-      const organizedSections: Section[] = [
-        {
-          name: "Verbal",
-          icon: Brain,
-          questions: questions.filter((question) => question.category === "Verbal"),
-        },
-        {
-          name: "Math",
-          icon: Calculator,
-          questions: questions.filter((question) => question.category === "Math"),
-        },
-        {
-          name: "Science",
-          icon: Beaker,
-          questions: questions.filter((question) => question.category === "Science"),
-        },
-        {
-          name: "Logical",
-          icon: Lightbulb,
-          questions: questions.filter((question) => question.category === "Logical"),
-        },
-        {
-          name: "Interests",
-          icon: Heart,
-          questions: questions.filter((question) => question.category === "Interests"),
-        },
-      ];
-
-      setSections(organizedSections);
+      setSections(organizeAssessmentSections(questions));
     } catch (error) {
       console.error("❌ Error loading questions from Supabase:", error);
       loadQuestionsFromStorage();
@@ -272,35 +277,7 @@ export function Assessment() {
       localStorage.setItem("assessment_questions", JSON.stringify(questions));
     }
 
-    const organizedSections: Section[] = [
-      {
-        name: "Verbal",
-        icon: Brain,
-        questions: questions.filter((question) => question.category === "Verbal"),
-      },
-      {
-        name: "Math",
-        icon: Calculator,
-        questions: questions.filter((question) => question.category === "Math"),
-      },
-      {
-        name: "Science",
-        icon: Beaker,
-        questions: questions.filter((question) => question.category === "Science"),
-      },
-      {
-        name: "Logical",
-        icon: Lightbulb,
-        questions: questions.filter((question) => question.category === "Logical"),
-      },
-      {
-        name: "Interests",
-        icon: Heart,
-        questions: questions.filter((question) => question.category === "Interests"),
-      },
-    ];
-
-    setSections(organizedSections);
+    setSections(organizeAssessmentSections(questions));
   };
 
   const getDefaultQuestions = (): Question[] => {
@@ -354,8 +331,8 @@ export function Assessment() {
               <div className="mb-6 rounded-r-lg border-l-4 border-blue-500 bg-blue-50/70 p-6 backdrop-blur-sm">
                 <p className="text-gray-800 leading-relaxed">
                   Your responses have been <strong className="text-blue-700">recorded and evaluated</strong>.
-                  The AI has analyzed your answers and generated personalized track and elective recommendations
-                  tailored to your strengths and interests.
+                  Your aptitude scores determine your track and cluster, and electives are assigned by that cluster.
+                  The AI provides a personalized explanation of your results.
                 </p>
               </div>
 
@@ -366,7 +343,7 @@ export function Assessment() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Track Recommendation Ready</h3>
-                    <p className="text-sm text-gray-600">View your AI-powered track analysis (Academic or Technical-Professional)</p>
+                    <p className="text-sm text-gray-600">View your aptitude-based track recommendation and personalized AI explanation</p>
                   </div>
                 </div>
 
@@ -457,6 +434,7 @@ export function Assessment() {
     }
 
     setIsSubmitting(true);
+    setSubmitError("");
     setSubmitProgress(8);
     console.log("🚀 Submitting assessment with dynamic scoring...");
 
@@ -466,6 +444,12 @@ export function Assessment() {
       Science: [],
       Logical: [],
       Interests: [],
+      Realistic: [],
+      Investigative: [],
+      Artistic: [],
+      Social: [],
+      Enterprising: [],
+      Conventional: [],
     };
 
     sections.forEach((section) => {
@@ -478,6 +462,10 @@ export function Assessment() {
     setSubmitProgress(32);
     if (!assessmentResult) {
       console.error("❌ Error formatting assessment result");
+      setSubmitError("We couldn't score this assessment. Please try again, or contact support if the problem continues.");
+      setIsSubmitting(false);
+      setSubmitProgress(0);
+      return;
     }
 
     console.log("📊 Assessment Result:", assessmentResult);
@@ -486,47 +474,25 @@ export function Assessment() {
     const MA = assessmentResult.scores.mathematical_ability_score;
     const SA = assessmentResult.scores.spatial_ability_score;
     const LRA = assessmentResult.scores.logical_reasoning_score;
-    const academicInterest = assessmentResult.interestClusters?.academic || 0;
-    const communicationInterest =
-      Math.round(((assessmentResult.interestClusters?.creative || 0) + (assessmentResult.interestClusters?.helping || 0)) / 2);
-    const creativeInterest = assessmentResult.interestClusters?.creative || 0;
-    const leadershipInterest = assessmentResult.interestClusters?.business || 0;
-    const technicalInterest = assessmentResult.interestClusters?.tech || 0;
-    const socialInterest = assessmentResult.interestClusters?.helping || 0;
-    const practicalInterest = assessmentResult.interestClusters?.practical || 0;
-    const homeInterest = assessmentResult.interestClusters?.home || 0;
-    const outdoorInterest = assessmentResult.interestClusters?.outdoor || 0;
-    const physicalInterest = assessmentResult.interestClusters?.physical || 0;
     const recommendedTrack = assessmentResult.track;
     let aiRecommendation: any = null;
 
     aiRecommendation = await requestAssessmentAiRecommendation({
       track: recommendedTrack,
+      cluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
       VA,
       MA,
       SA,
       LRA,
-      academicInterest,
-      communicationInterest,
-      creativeInterest,
-      leadershipInterest,
-      technicalInterest,
-      socialInterest,
-      practicalInterest,
-      homeInterest,
-      outdoorInterest,
-      physicalInterest,
+      academicAptitudeScore: assessmentResult.academicAptitudeScore,
+      trackScores: assessmentResult.trackScores,
+      clusterScores: assessmentResult.clusterScores,
       riasecScores: assessmentResult.riasecScores,
       electives: assessmentResult.electives,
+      topDomains: assessmentResult.topDomains,
+      topInterests: assessmentResult.topInterests,
     });
     setSubmitProgress(68);
-
-    if (aiRecommendation && !aiRecommendation.raw) {
-      assessmentResult.track = aiRecommendation.recommendedTrack || assessmentResult.track;
-      assessmentResult.recommended_track = aiRecommendation.recommendedTrack || assessmentResult.recommended_track;
-      assessmentResult.elective_1 = assessmentResult.electives[0] || assessmentResult.elective_1;
-      assessmentResult.elective_2 = assessmentResult.electives[1] || assessmentResult.elective_2;
-    }
 
     const userEmail = userData?.email || "student@gmail.com";
     const answerSnapshots = buildAssessmentAnswerSnapshots(answers, questionsByCategory);
@@ -535,6 +501,12 @@ export function Assessment() {
       `assessmentResults_${userEmail}`,
       JSON.stringify({
         track: assessmentResult.track,
+        cluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
+        recommendedCluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
+        academicAptitudeScore: assessmentResult.academicAptitudeScore,
+        trackScores: assessmentResult.trackScores,
+        clusterScores: assessmentResult.clusterScores,
+        riasecScores: assessmentResult.riasecScores,
         electives: assessmentResult.electives,
         scores: {
           VA: assessmentResult.scores.verbal_ability_score,
@@ -588,6 +560,7 @@ export function Assessment() {
       setSubmitProgress(94);
     } catch (error) {
       console.error("❌ Error saving assessment result:", error);
+      setSubmitError("Your assessment was scored, but we couldn't save the result. Please try again.");
       setIsSubmitting(false);
       setSubmitProgress(0);
       return;
@@ -643,6 +616,11 @@ export function Assessment() {
         message="Scoring your answers and preparing your AI elective explanations..."
         progress={submitProgress}
       />
+      {submitError && (
+        <div role="alert" className="mx-auto mb-4 max-w-4xl rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          {submitError}
+        </div>
+      )}
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1
@@ -652,7 +630,7 @@ export function Assessment() {
             Track Recommendation Assessment
           </h1>
           <p className="text-xl" style={{ color: "var(--electron-blue)" }}>
-            Powered by AI
+            Formula-based scoring with AI explanations
           </p>
           <p className="text-gray-600 mt-2">
             Answer the following to determine your recommended track and electives
@@ -851,7 +829,7 @@ export function Assessment() {
 
         {!allCurrentQuestionsAnswered && (
           <p className="text-center text-sm text-gray-500 mt-4">
-            {currentSectionData.name === "Interests"
+            {currentSectionData.questions.every(isInterestQuestion)
               ? "Please rate every interest statement to continue"
               : "Please answer all questions in this section to continue"}
           </p>
