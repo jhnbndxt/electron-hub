@@ -404,12 +404,17 @@ function PublicAssessmentResultsView({
                   const scoring = normalizedResult.electiveRecommendations?.find(
                     (recommendation) => recommendation.name === elective
                   );
+                  const hasScoring = [
+                    scoring?.compatibilityScore,
+                    scoring?.aptitudeScore,
+                    scoring?.riasecScore,
+                  ].every((score) => typeof score === "number" && Number.isFinite(score));
 
                   return (
                   <div key={`${elective}-${index}`} className="rounded-xl border border-blue-100 bg-blue-50 p-5">
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-blue-700">Elective {index + 1}</p>
                     <p className="mt-2 text-xl font-bold text-slate-950">{normalizeResultText(elective, "Elective")}</p>
-                    {scoring ? (
+                    {hasScoring && scoring ? (
                       <div className="mt-4 grid gap-2 rounded-xl bg-white p-4 text-sm text-slate-700">
                         <div className="flex items-center justify-between gap-3">
                           <span className="font-semibold">Compatibility Score</span>

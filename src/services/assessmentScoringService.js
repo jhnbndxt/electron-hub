@@ -8,7 +8,7 @@
 
 import { supabase } from '../supabase';
 import electivesCatalog, { getElectivesForCluster } from '../data/electives.js';
-import { RIASEC_TYPES } from '../utils/electiveRecommendationScoring.js';
+import { RIASEC_TYPES, scoreElectiveRecommendation } from '../utils/electiveRecommendationScoring.js';
 
 const EMPTY_GROUPED_QUESTIONS = {
   Verbal: [],
@@ -670,19 +670,19 @@ export function recommendElectiveDetails(track, scores, interestClusters = {}, r
   }
 
   const cluster = determineRecommendedCluster(track, scores, interestClusters, riasecScores);
-  return getElectivesForCluster(track, cluster).map((name) => {
+  const selectedElectives = getElectivesForCluster(track, cluster).map((name) => {
     const elective = electivesCatalog.find((entry) => entry.name === name && entry.cluster === cluster) || { name, track, cluster };
+    const scoring = scoreElectiveRecommendation(elective, { scores, interestClusters, riasecScores });
+
     return {
-      name,
-      track,
-      cluster,
-      category: cluster,
-      compatibilityScore: null,
-      aptitudeScore: null,
-      riasecScore: null,
-      reason: `Assigned to the ${cluster} cluster.`,
+      ...elective,
+      score: scoring.finalScore,
+      aptitudeFit: scoring.aptitudeFit,
+      riasecFit: scoring.riasecFit,
     };
   });
+
+  return buildElectiveRecommendationDetails(selectedElectives);
 }
 
 /**

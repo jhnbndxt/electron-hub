@@ -906,7 +906,11 @@ export function Results() {
                         <h4 className="mt-2 text-lg font-semibold text-slate-950">{elective}</h4>
                       </div>
                     </div>
-                    {scoring && assessmentAnswersVisible && typeof scoring.compatibilityScore === "number" ? (
+                    {scoring &&
+                    assessmentAnswersVisible &&
+                    [scoring.compatibilityScore, scoring.aptitudeScore, scoring.riasecScore].every(
+                      (score) => typeof score === "number" && Number.isFinite(score)
+                    ) ? (
                       <div className="mt-4 grid gap-2 rounded-2xl bg-white p-4 text-sm text-slate-700">
                         <div className="flex items-center justify-between gap-3">
                           <span className="font-semibold">Compatibility Score</span>
