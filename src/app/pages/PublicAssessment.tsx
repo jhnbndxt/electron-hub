@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router";
 import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase, AlertTriangle } from "lucide-react";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
+import { createAuditLog } from "../../services/adminService";
 import { supabase } from "../../supabase";
 import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
@@ -1443,6 +1444,28 @@ export function PublicAssessment() {
     localStorage.removeItem("publicAssessmentProgress_guest");
     setSubmitProgress(100);
 
+    const { error: auditError } = await createAuditLog(
+      saveInfo.email.trim().toLowerCase() || "public-assessment",
+      "PUBLIC_ASSESSMENT_COMPLETED",
+      "A visitor completed the public assessment.",
+      "success",
+      {
+        resourceType: "assessment",
+        changes: {
+          actor_label: saveInfo.fullName.trim() || "Public Visitor",
+          actor_role: "public",
+          assessment_source: "public",
+          recommended_track: normalizedResult.track,
+          overall_score: normalizedResult.overallScore,
+          question_count: totalQuestions,
+          duration_seconds: startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 1000)) : null,
+        },
+      }
+    );
+    if (auditError) {
+      console.error("Unable to record public assessment activity:", auditError);
+    }
+
     setResults(normalizedResult);
     setAssessmentCompleted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1510,6 +1533,26 @@ export function PublicAssessment() {
         email: normalizedEmail,
         assessmentData: results,
       });
+      const { error: auditError } = await createAuditLog(
+        normalizedEmail,
+        "PUBLIC_ASSESSMENT_RESULT_SAVED",
+        `Public assessment result saved for ${saveInfo.fullName.trim()}.`,
+        "success",
+        {
+          resourceType: "assessment",
+          resourceId: response?.data?.id,
+          changes: {
+            actor_label: saveInfo.fullName.trim(),
+            actor_role: "public",
+            assessment_source: "public",
+            assessment_result_status: response?.status || "saved",
+            recommended_track: results?.track,
+          },
+        }
+      );
+      if (auditError) {
+        console.error("Unable to record saved public assessment activity:", auditError);
+      }
       setSaveInfo((current) => ({ ...current, email: normalizedEmail }));
       setSaveStatus("saved");
       setSaveMessage(response?.message || "Your assessment result has been saved.");

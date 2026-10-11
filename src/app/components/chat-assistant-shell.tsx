@@ -774,7 +774,7 @@ export function ChatAssistantShell({
           type="button"
           onClick={() => openStateChange(!isOpen)}
           aria-label={isOpen ? "Close chat assistant" : "Open chat assistant"}
-          className="relative flex h-14 w-14 items-center justify-center rounded-full border border-white/30 text-white shadow-[0_22px_42px_-24px_rgba(15,23,42,0.72)] sm:h-16 sm:w-16 lg:h-20 lg:w-20"
+          className="relative flex h-12 w-12 items-center justify-center rounded-full border border-white/30 text-white shadow-[0_22px_42px_-24px_rgba(15,23,42,0.72)] sm:h-16 sm:w-16 lg:h-20 lg:w-20"
           style={{
             background:
               "linear-gradient(135deg, var(--electron-blue) 0%, #2d5cc9 55%, var(--electron-red) 100%)",
@@ -793,7 +793,7 @@ export function ChatAssistantShell({
           <img
             src={chatbotLogo}
             alt=""
-            className="relative h-9 w-9 object-contain drop-shadow-[0_8px_14px_rgba(15,23,42,0.22)] sm:h-11 sm:w-11 lg:h-14 lg:w-14"
+            className="relative h-8 w-8 object-contain drop-shadow-[0_8px_14px_rgba(15,23,42,0.22)] sm:h-11 sm:w-11 lg:h-14 lg:w-14"
             aria-hidden="true"
           />
           <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-white/18 ring-1 ring-white/40 sm:right-2 sm:top-2 sm:h-5 sm:w-5 lg:right-3 lg:top-3">
@@ -822,8 +822,8 @@ export function ChatAssistantShell({
             <motion.section
               role="dialog"
               aria-label="EHub AI Assistant"
-              className={`fixed inset-x-3 bottom-3 z-[80] flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/55 bg-white/80 shadow-[0_32px_90px_-48px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[390px] sm:max-w-[calc(100vw-3rem)] sm:rounded-[1.75rem] lg:bottom-8 lg:right-8 lg:w-[430px] lg:rounded-[2rem] ${
-                isConversationEmpty ? "h-auto max-h-[calc(100dvh-1rem)]" : "h-[min(74dvh,620px)] sm:h-[min(78vh,680px)] lg:h-[min(82vh,760px)]"
+              className={`fixed inset-x-4 bottom-4 z-[80] flex min-h-0 flex-col overflow-hidden rounded-[1.25rem] border border-white/55 bg-white/80 shadow-[0_32px_90px_-48px_rgba(15,23,42,0.75)] backdrop-blur-xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-[390px] sm:max-w-[calc(100vw-3rem)] sm:rounded-[1.75rem] lg:bottom-8 lg:right-8 lg:w-[430px] lg:rounded-[2rem] ${
+                isConversationEmpty ? "h-auto max-h-[calc(100dvh-2rem)]" : "h-[min(66dvh,560px)] sm:h-[min(78vh,680px)] lg:h-[min(82vh,760px)]"
               }`}
               initial={{ opacity: 0, y: 24, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}

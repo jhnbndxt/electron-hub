@@ -7,6 +7,7 @@ import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/assessmentResultService";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
+import { createAuditLog } from "../../services/adminService";
 import { supabase } from "../../supabase";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
@@ -555,12 +556,34 @@ export function Assessment() {
     setSubmitProgress(82);
 
     try {
-      await saveAssessmentResult(userEmail, {
+      const savedAssessment = await saveAssessmentResult(userEmail, {
         ...assessmentResult,
         answers,
         answerSnapshots,
       });
       console.log("✅ Assessment result saved to Supabase");
+      const { error: auditError } = await createAuditLog(
+        userData?.email || userEmail,
+        "DASHBOARD_ASSESSMENT_COMPLETED",
+        "Student completed the dashboard assessment.",
+        "success",
+        {
+          resourceType: "assessment",
+          resourceId: savedAssessment?.id,
+          changes: {
+            actor_label: userData?.name || userData?.email || userEmail,
+            actor_role: "student",
+            assessment_source: "dashboard",
+            recommended_track: assessmentResult.track,
+            overall_score: assessmentResult.scores.overall_score,
+            question_count: totalQuestions,
+            duration_seconds: startedAt ? Math.max(0, Math.round((Date.now() - startedAt) / 1000)) : null,
+          },
+        }
+      );
+      if (auditError) {
+        console.error("Unable to record dashboard assessment activity:", auditError);
+      }
       localStorage.removeItem(assessmentProgressKey);
       setSubmitProgress(94);
     } catch (error) {
