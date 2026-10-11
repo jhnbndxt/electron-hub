@@ -534,6 +534,8 @@ export function Assessment() {
       `assessmentResults_${userEmail}`,
       JSON.stringify({
         track: assessmentResult.track,
+        cluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
+        recommendedCluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
         electives: assessmentResult.electives,
         scores: {
           VA: assessmentResult.scores.verbal_ability_score,

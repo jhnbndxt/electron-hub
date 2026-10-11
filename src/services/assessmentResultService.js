@@ -110,12 +110,15 @@ function mapAssessmentResult(result) {
     id: result.id,
     date: result.assessment_date || result.created_at || new Date().toISOString(),
     track: result.recommended_track || result.track || 'General',
+    cluster: result.recommended_cluster || result.cluster || null,
+    recommendedCluster: result.recommended_cluster || result.cluster || null,
     electives,
     scores,
     topDomains: normalizeArray(result.top_domains ?? result.topDomains),
     topInterests: normalizeArray(result.top_interests ?? result.topInterests),
     overallScore,
     recommended_track: result.recommended_track || result.track || 'General',
+    recommended_cluster: result.recommended_cluster || result.cluster || null,
     elective_1: electives[0] || null,
     elective_2: electives[1] || null,
     answers: result.answers || result.top_interests?.answers || null,
@@ -126,6 +129,7 @@ function mapAssessmentResult(result) {
 function buildAssessmentInsertPayload(studentId, assessmentData = {}, publicProfile = null) {
   const scores = normalizeScores(assessmentData);
   const track = assessmentData.recommended_track || assessmentData.track || 'General';
+  const cluster = assessmentData.recommended_cluster || assessmentData.recommendedCluster || assessmentData.cluster || null;
   const electives = Array.isArray(assessmentData.electives)
     ? assessmentData.electives.filter(Boolean)
     : [assessmentData.elective_1, assessmentData.elective_2].filter(Boolean);
@@ -136,6 +140,7 @@ function buildAssessmentInsertPayload(studentId, assessmentData = {}, publicProf
     student_id: studentId || null,
     assessment_date: new Date().toISOString().split('T')[0],
     recommended_track: track,
+    recommended_cluster: cluster,
     elective_1: electives[0] || null,
     elective_2: electives[1] || null,
     verbal_ability_score: scores.verbal_ability_score,
@@ -268,6 +273,7 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
   try {
     const scores = normalizeScores(assessmentData);
     const track = assessmentData.recommended_track || assessmentData.track || 'General';
+    const cluster = assessmentData.recommended_cluster || assessmentData.recommendedCluster || assessmentData.cluster || null;
     const electives = Array.isArray(assessmentData.electives)
       ? assessmentData.electives.filter(Boolean)
       : [assessmentData.elective_1, assessmentData.elective_2].filter(Boolean);
@@ -300,6 +306,7 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
         student_id,
         assessment_date: new Date().toISOString().split('T')[0],
         recommended_track: track,
+        recommended_cluster: cluster,
         elective_1: electives[0] || null,
         elective_2: electives[1] || null,
         verbal_ability_score: scores.verbal_ability_score,
@@ -319,6 +326,7 @@ export async function saveAssessmentResult(userEmail, assessmentData) {
     try {
       await triggerNotification(userEmail, 'ASSESSMENT_UPDATED', {
         track,
+        cluster,
         electives,
         assessmentResultId: data[0]?.id,
       });

@@ -279,9 +279,10 @@ export function StudentProfile() {
 
   const academicFields = [
     ["Preferred Track", read("preferredTrack", "preferred_track", "recommendedTrack", "recommended_track", "track")],
+    ["Cluster", read("preferredCluster", "preferred_cluster", "recommendedCluster", "recommended_cluster", "cluster")],
     ["Year Level", read("yearLevel", "year_level")],
     ["Elective 1", read("elective1", "elective_1")],
-    ["Elective 2", read("elective2", "elective_2")],
+    ...(read("elective2", "elective_2") ? [["Elective 2", read("elective2", "elective_2")]] : []),
     ["Primary School", read("primarySchool", "primary_school")],
     ["Primary Year Graduated", read("primaryYearGraduated", "primary_year_graduated")],
     ["Secondary School", read("secondarySchool", "secondary_school")],

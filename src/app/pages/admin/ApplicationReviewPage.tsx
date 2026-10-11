@@ -398,6 +398,7 @@ export function ApplicationReviewPage() {
       label: "Enrollment and Education",
       fields: [
         ["Preferred Track", formData.preferredTrack || formData.track],
+        ["Cluster", formData.preferredCluster || formData.preferred_cluster || formData.cluster],
         ["Elective 1", formData.elective1],
         ["Elective 2", formData.elective2],
         ["Year Level", formData.yearLevel],
@@ -1164,9 +1165,10 @@ export function ApplicationReviewPage() {
               {renderEnrollmentSection("Enrollment Details", GraduationCap, (
                 <div className="grid grid-cols-1 gap-3 text-base text-slate-700 sm:grid-cols-2">
                   {renderSubmittedField("Preferred Track", formData.preferredTrack || formData.track)}
+                  {renderSubmittedField("Cluster", formData.preferredCluster || formData.preferred_cluster || formData.cluster)}
                   {renderSubmittedField("Year Level", formData.yearLevel)}
                   {renderSubmittedField("Elective 1", formData.elective1)}
-                  {renderSubmittedField("Elective 2", formData.elective2)}
+                  {formData.elective2 && renderSubmittedField("Elective 2", formData.elective2)}
                 </div>
               ))}
 

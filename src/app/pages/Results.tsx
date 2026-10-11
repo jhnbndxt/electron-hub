@@ -33,6 +33,7 @@ import { supabase } from "../../supabase";
 
 interface AssessmentResults {
   track: string;
+  cluster?: string | null;
   electives: string[];
   electiveRecommendations?: Array<{
     name: string;
@@ -130,8 +131,8 @@ const toInterestScore = (interests: string[], labels: string[], fallback = 35) =
 
 const buildAssessmentAiPayload = (result: AssessmentResults) => {
   const { track, scores, topInterests, electives } = result;
-  const trackFallback = track === "Academic" ? 65 : 40;
-  const techFallback = track === "Technical-Professional" ? 70 : 35;
+  const trackFallback = track === "Academic Track" ? 65 : 40;
+  const techFallback = track === "Technical-Professional Electives" ? 70 : 35;
 
   return {
     track,
@@ -229,6 +230,7 @@ export function Results() {
         if (latestResult) {
           setResults({
             track: latestResult.track,
+            cluster: latestResult.recommendedCluster || latestResult.recommended_cluster || latestResult.cluster,
             electives: latestResult.electives,
             scores: latestResult.scores,
             topDomains: latestResult.topDomains,
@@ -566,7 +568,7 @@ export function Results() {
     );
   }
 
-  const { track, electives, scores, topDomains, topInterests, overallScore: storedOverallScore, aiRecommendation } = results;
+  const { track, cluster, electives, scores, topDomains, topInterests, overallScore: storedOverallScore, aiRecommendation } = results;
 
   // Calculate overall score (average of all domains) when not provided by stored results
   const overallScore = storedOverallScore ?? Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
@@ -610,7 +612,7 @@ export function Results() {
   const getSuggestedCourses = (track: string, elective: string): string[] => {
     const normalizedElective = elective.toLowerCase();
     
-    if (track === "Academic") {
+    if (track === "Academic Track") {
       if (normalizedElective.includes("biology")) {
         return ["Medicine", "Nursing", "Biology"];
       } else if (normalizedElective.includes("physics")) {
@@ -624,7 +626,7 @@ export function Results() {
       } else if (normalizedElective.includes("media arts")) {
         return ["Multimedia Arts", "Film", "Graphic Design"];
       }
-    } else if (track === "Technical-Professional") {
+    } else if (track === "Technical-Professional Electives") {
       if (normalizedElective.includes("ict")) {
         return ["Information Technology", "Computer Science", "Software Engineering"];
       } else if (normalizedElective.includes("programming")) {
@@ -659,7 +661,7 @@ export function Results() {
 
     const normalizedElective = elective.toLowerCase();
 
-    if (track === "Academic") {
+    if (track === "Academic Track") {
       if (normalizedElective.includes("biology")) {
         return [
           { course: "Medicine", careers: ["Doctor", "Surgeon", "Medical Researcher"] },
@@ -701,7 +703,7 @@ export function Results() {
           { course: "Sports Science", careers: ["Sports Scientist", "Fitness Trainer"] },
         ];
       }
-    } else if (track === "Technical-Professional") {
+    } else if (track === "Technical-Professional Electives") {
       if (normalizedElective.includes("ict")) {
         return [
           { course: "Information Technology", careers: ["IT Specialist", "Systems Administrator", "Network Engineer"] },
@@ -859,6 +861,7 @@ export function Results() {
                   Recommended Track
                 </div>
                 <h2 className="mt-6 text-4xl font-bold tracking-tight text-slate-950">{track}</h2>
+                {cluster && <p className="mt-3 text-lg font-semibold text-blue-800">Recommended Cluster: {cluster}</p>}
                 <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-600">
                   {trackNarrative}
                 </p>
@@ -882,7 +885,7 @@ export function Results() {
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-slate-400">Suggested Electives</p>
-                  <h3 className="mt-3 text-3xl font-bold text-slate-950">Courses that fit your profile</h3>
+                  <h3 className="mt-3 text-3xl font-bold text-slate-950">Assigned cluster electives</h3>
                 </div>
                 <span className="inline-flex items-center rounded-full bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700">
                   Priority picks
@@ -903,7 +906,7 @@ export function Results() {
                         <h4 className="mt-2 text-lg font-semibold text-slate-950">{elective}</h4>
                       </div>
                     </div>
-                    {scoring && assessmentAnswersVisible ? (
+                    {scoring && assessmentAnswersVisible && typeof scoring.compatibilityScore === "number" ? (
                       <div className="mt-4 grid gap-2 rounded-2xl bg-white p-4 text-sm text-slate-700">
                         <div className="flex items-center justify-between gap-3">
                           <span className="font-semibold">Compatibility Score</span>
@@ -1027,11 +1030,11 @@ export function Results() {
               <div className="mt-6 space-y-3">
                 <div className="rounded-3xl bg-slate-50 p-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Core focus</p>
-                  <p className="mt-2 text-sm text-slate-700">{track === "Academic" ? "Academic rigor, research orientation, and strong college-readiness" : "Hands-on skills, technical practice, and industry-aligned preparation"}.</p>
+                  <p className="mt-2 text-sm text-slate-700">{track === "Academic Track" ? "Academic rigor, research orientation, and strong college-readiness" : "Hands-on skills, technical practice, and industry-aligned preparation"}.</p>
                 </div>
                 <div className="rounded-3xl bg-slate-50 p-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-400">Future outlook</p>
-                  <p className="mt-2 text-sm text-slate-700">{track === "Academic" ? "Prep for university programs, scholarships, and professional careers." : "Prep for vocational pathways, certification, and early employment opportunities."}</p>
+                  <p className="mt-2 text-sm text-slate-700">{track === "Academic Track" ? "Prep for university programs, scholarships, and professional careers." : "Prep for vocational pathways, certification, and early employment opportunities."}</p>
                 </div>
               </div>
             </section>
@@ -1428,7 +1431,7 @@ export function Results() {
                 📚 What You'll Study
               </h4>
               <ul className="space-y-2 text-gray-700">
-                {track === "Academic" ? (
+                {track === "Academic Track" ? (
                   <>
                     <li className="flex items-start gap-2">
                       <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: "var(--electron-blue)" }} />
@@ -1474,7 +1477,7 @@ export function Results() {
                 🎯 Future Opportunities
               </h4>
               <ul className="space-y-2 text-gray-700">
-                {track === "Academic" ? (
+                {track === "Academic Track" ? (
                   <>
                     <li className="flex items-start gap-2">
                       <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: "var(--electron-blue)" }} />

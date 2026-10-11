@@ -2,6 +2,7 @@ export interface AssessmentResult {
   id: string;
   date: string; // ISO date string
   track: string;
+  cluster?: string | null;
   electives: string[];
   scores: {
     VA: number;
@@ -60,6 +61,7 @@ export function saveAssessmentResult(
     assessmentKey,
     JSON.stringify({
       track: result.track,
+      cluster: result.cluster,
       electives: result.electives,
       scores: result.scores,
       topDomains: result.topDomains,

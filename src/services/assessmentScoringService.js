@@ -7,10 +7,8 @@
  */
 
 import { supabase } from '../supabase';
-import electivesCatalog from '../data/electives.js';
-import { validateElectiveWeightProfiles } from '../data/electiveWeightProfiles.js';
-import { selectElectivesWithPrerequisites } from '../utils/electivePrerequisites.js';
-import { RIASEC_TYPES, scoreElectiveRecommendation } from '../utils/electiveRecommendationScoring.js';
+import electivesCatalog, { getElectivesForCluster } from '../data/electives.js';
+import { RIASEC_TYPES } from '../utils/electiveRecommendationScoring.js';
 
 const EMPTY_GROUPED_QUESTIONS = {
   Verbal: [],
@@ -560,7 +558,7 @@ function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) 
     return {
       academicScore: 100,
       techProScore: 0,
-      recommendedTrack: 'Academic',
+      recommendedTrack: 'Academic Track',
     };
   }
 
@@ -573,7 +571,7 @@ function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) 
     return {
       academicScore: 100,
       techProScore: 0,
-      recommendedTrack: 'Academic',
+      recommendedTrack: 'Academic Track',
     };
   }
 
@@ -586,7 +584,7 @@ function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) 
     return {
       academicScore: 0,
       techProScore: 100,
-      recommendedTrack: 'Technical-Professional',
+      recommendedTrack: 'Technical-Professional Electives',
     };
   }
 
@@ -601,7 +599,7 @@ function calculateTrackScores(scores, interestClusters = {}, riasecScores = {}) 
   return {
     academicScore,
     techProScore: technicalScore,
-    recommendedTrack: academicScore >= technicalScore ? 'Academic' : 'Technical-Professional',
+    recommendedTrack: academicScore >= technicalScore ? 'Academic Track' : 'Technical-Professional Electives',
   };
 }
 
@@ -621,14 +619,30 @@ function buildElectiveRecommendationDetails(selectedElectives = []) {
 }
 
 export function determineTrack(scores, interestClusters = {}, riasecScores = {}) {
-  if (!scores) return 'General';
+  if (!scores) return 'Academic Track';
 
   const { recommendedTrack } = calculateTrackScores(scores, interestClusters, riasecScores);
 
   return recommendedTrack;
 }
 
+export function determineRecommendedCluster(track, scores = {}, interestClusters = {}, riasecScores = {}) {
+  if (track === 'Technical-Professional Electives') {
+    return 'ICT Support and Computer Programming Technologies';
+  }
 
+  const business = toScore(interestClusters.business) + toScore(riasecScores.Enterprising) * 20;
+  const arts = toScore(interestClusters.creative) + toScore(interestClusters.helping) * 0.25 + toScore(riasecScores.Artistic) * 20;
+  const stem = toScore(interestClusters.academic) + toScore(interestClusters.tech) * 0.35 +
+    (toScore(scores.mathematical_ability_score) + toScore(scores.spatial_ability_score) + toScore(scores.logical_reasoning_score)) / 6 +
+    toScore(riasecScores.Investigative) * 20;
+
+  if (business >= arts && business >= stem) return 'Business and Entrepreneurship';
+  if (arts >= stem) return 'Arts, Social Sciences, and Humanities';
+  return 'Science, Technology, Engineering, and Mathematics (STEM)';
+}
+
+/** Return the assigned electives for the recommended cluster; never shuffle or rank individual electives. */
 export function recommendElectives(trackOrScores, scoresOrInterestClusters = {}, maybeInterestClusters = {}, maybeRiasecScores = {}) {
   let track = trackOrScores;
   let scores = scoresOrInterestClusters;
@@ -646,14 +660,8 @@ export function recommendElectives(trackOrScores, scoresOrInterestClusters = {},
     return [];
   }
 
-  const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters, riasecScores);
-
-  if (rankedCatalogElectives.length > 0) {
-    return selectElectivesWithPrerequisites(rankedCatalogElectives, 2).map((elective) => elective.name);
-  }
-
-  const rankedGroups = rankElectiveGroups(track, scores, interestClusters);
-  return rankedGroups.flatMap((group) => group.electives).slice(0, 2);
+  const cluster = determineRecommendedCluster(track, scores, interestClusters, riasecScores);
+  return getElectivesForCluster(track, cluster);
 }
 
 export function recommendElectiveDetails(track, scores, interestClusters = {}, riasecScores = {}) {
@@ -661,10 +669,20 @@ export function recommendElectiveDetails(track, scores, interestClusters = {}, r
     return [];
   }
 
-  const rankedCatalogElectives = rankCatalogElectives(track, scores, interestClusters, riasecScores);
-  const selectedElectives = selectElectivesWithPrerequisites(rankedCatalogElectives, 2);
-
-  return buildElectiveRecommendationDetails(selectedElectives);
+  const cluster = determineRecommendedCluster(track, scores, interestClusters, riasecScores);
+  return getElectivesForCluster(track, cluster).map((name) => {
+    const elective = electivesCatalog.find((entry) => entry.name === name && entry.cluster === cluster) || { name, track, cluster };
+    return {
+      name,
+      track,
+      cluster,
+      category: cluster,
+      compatibilityScore: null,
+      aptitudeScore: null,
+      riasecScore: null,
+      reason: `Assigned to the ${cluster} cluster.`,
+    };
+  });
 }
 
 /**
@@ -824,13 +842,8 @@ export async function formatAssessmentResult(answers, questionsByCategory = null
 
     const interestClusters = calculateInterestClusterScores(answers, groupedQuestions);
     const riasecScores = calculateRiasecInterestScores(answers, groupedQuestions);
-    const electiveWeightErrors = validateElectiveWeightProfiles(electivesCatalog.map((elective) => elective.name));
-
-    if (electiveWeightErrors.length > 0) {
-      console.error('Elective weight validation errors:', electiveWeightErrors);
-    }
-
     const track = determineTrack(scores, interestClusters, riasecScores);
+    const recommendedCluster = determineRecommendedCluster(track, scores, interestClusters, riasecScores);
     const electiveRecommendations = recommendElectiveDetails(track, scores, interestClusters, riasecScores);
     const electives = electiveRecommendations.map((elective) => elective.name);
     const topDomains = getTopDomains(scores);
@@ -841,11 +854,14 @@ export async function formatAssessmentResult(answers, questionsByCategory = null
       interestClusters,
       riasecScores,
       recommended_track: track,
+      recommended_cluster: recommendedCluster,
       elective_1: electives[0] || null,
       elective_2: electives[1] || null,
       top_domains: topDomains,
       top_interests: topInterests,
       track,
+      cluster: recommendedCluster,
+      recommendedCluster,
       electives,
       electiveRecommendations,
       topDomains,
