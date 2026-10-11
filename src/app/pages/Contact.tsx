@@ -27,10 +27,10 @@ export function Contact() {
   };
 
   return (
-    <div>
+    <div className="w-full overflow-x-hidden">
       {/* Hero Section with Gradient */}
       <section
-        className="relative text-white py-32 overflow-hidden"
+        className="relative overflow-hidden py-16 text-white sm:py-24 lg:py-32"
         style={{ 
           background: "linear-gradient(135deg, #1E3A8A 0%, #1e40af 50%, #2563eb 100%)"
         }}
@@ -41,45 +41,45 @@ export function Contact() {
           <div className="absolute bottom-20 right-10 w-96 h-96 bg-white rounded-full blur-3xl"></div>
         </div>
 
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full mb-6 border border-white/20">
+        <div className="relative z-10 mx-auto max-w-7xl px-4 text-center sm:px-6 lg:px-8">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-sm sm:mb-6">
             <MessageCircle className="w-4 h-4 text-yellow-300" />
             <span className="text-sm font-medium">We're Here to Help</span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
+          <h1 className="mb-4 text-4xl font-bold tracking-tight sm:mb-6 sm:text-5xl md:text-7xl">
             Contact Us
           </h1>
-          <p className="text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto font-light">
+          <p className="mx-auto max-w-3xl text-base font-light leading-relaxed text-blue-100 sm:text-xl md:text-2xl">
             Get in touch with us for any inquiries or assistance
           </p>
         </div>
       </section>
 
       {/* Contact Content */}
-      <section className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+      <section className="bg-white py-10 sm:py-14 lg:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid min-w-0 grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
             {/* Contact Information */}
-            <div>
-              <h2 className="text-4xl font-bold mb-6" style={{ color: "#1E3A8A" }}>
+            <div className="min-w-0">
+              <h2 className="mb-4 text-3xl font-bold sm:mb-6 sm:text-4xl" style={{ color: "#1E3A8A" }}>
                 Get In Touch
               </h2>
-              <p className="text-lg text-gray-600 mb-10 leading-relaxed">
+              <p className="mb-6 text-base leading-relaxed text-gray-600 sm:mb-10 sm:text-lg">
                 Have questions about enrollment, our programs, or the assessment system?
                 We're here to help. Reach out to us through any of the following channels:
               </p>
 
-              <div className="space-y-6">
+              <div className="space-y-3 sm:space-y-6">
                 {/* Address */}
-                <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors">
+                <div className="flex min-w-0 items-start gap-3 rounded-xl p-3 transition-colors hover:bg-gray-50 sm:gap-4 sm:p-4">
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md sm:h-14 sm:w-14"
                     style={{ backgroundColor: "#1E3A8A" }}
                   >
-                    <MapPin className="w-7 h-7 text-white" />
+                    <MapPin className="h-5 w-5 text-white sm:h-7 sm:w-7" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-bold mb-2" style={{ color: "#1F2937" }}>
                       Address
                     </h3>
@@ -90,14 +90,14 @@ export function Contact() {
                 </div>
 
                 {/* Phone */}
-                <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors">
+                <div className="flex min-w-0 items-start gap-3 rounded-xl p-3 transition-colors hover:bg-gray-50 sm:gap-4 sm:p-4">
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md sm:h-14 sm:w-14"
                     style={{ backgroundColor: "#1E3A8A" }}
                   >
-                    <Phone className="w-7 h-7 text-white" />
+                    <Phone className="h-5 w-5 text-white sm:h-7 sm:w-7" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-bold mb-2" style={{ color: "#1F2937" }}>
                       Phone
                     </h3>
@@ -111,20 +111,20 @@ export function Contact() {
                 </div>
 
                 {/* Email */}
-                <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors">
+                <div className="flex min-w-0 items-start gap-3 rounded-xl p-3 transition-colors hover:bg-gray-50 sm:gap-4 sm:p-4">
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md sm:h-14 sm:w-14"
                     style={{ backgroundColor: "#1E3A8A" }}
                   >
-                    <Mail className="w-7 h-7 text-white" />
+                    <Mail className="h-5 w-5 text-white sm:h-7 sm:w-7" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-bold mb-2" style={{ color: "#1F2937" }}>
                       Email
                     </h3>
                     <a 
                       href="mailto:electroncollege2002@electroncollege.edu.ph" 
-                      className="text-gray-600 hover:text-blue-600 transition-colors"
+                      className="break-all text-gray-600 transition-colors hover:text-blue-600"
                     >
                       electroncollege2002@electroncollege.edu.ph
                     </a>
@@ -132,14 +132,14 @@ export function Contact() {
                 </div>
 
                 {/* Office Hours */}
-                <div className="flex items-start gap-4 p-4 rounded-xl hover:bg-gray-50 transition-colors">
+                <div className="flex min-w-0 items-start gap-3 rounded-xl p-3 transition-colors hover:bg-gray-50 sm:gap-4 sm:p-4">
                   <div
-                    className="w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 shadow-md"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full shadow-md sm:h-14 sm:w-14"
                     style={{ backgroundColor: "#B91C1C" }}
                   >
-                    <Clock className="w-7 h-7 text-white" />
+                    <Clock className="h-5 w-5 text-white sm:h-7 sm:w-7" />
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h3 className="font-bold mb-2" style={{ color: "#1F2937" }}>
                       Office Hours
                     </h3>
@@ -152,11 +152,11 @@ export function Contact() {
             </div>
 
             {/* Contact Form */}
-            <div className="bg-gradient-to-br from-gray-50 to-blue-50 p-10 rounded-2xl shadow-xl">
-              <h2 className="text-3xl font-bold mb-6" style={{ color: "#1E3A8A" }}>
+            <div className="min-w-0 rounded-2xl bg-gradient-to-br from-gray-50 to-blue-50 p-5 shadow-xl sm:p-8 lg:p-10">
+              <h2 className="mb-5 text-2xl font-bold sm:mb-6 sm:text-3xl" style={{ color: "#1E3A8A" }}>
                 Send Us a Message
               </h2>
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
                 <div>
                   <label
                     htmlFor="name"
@@ -247,12 +247,12 @@ export function Contact() {
       </section>
 
       {/* Map Section */}
-      <section className="py-16" style={{ backgroundColor: "var(--electron-light-gray)" }}>
+      <section className="py-10 sm:py-16" style={{ backgroundColor: "var(--electron-light-gray)" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-3xl mb-8 text-center" style={{ color: "var(--electron-blue)" }}>
+          <h2 className="mb-6 text-center text-2xl sm:mb-8 sm:text-3xl" style={{ color: "var(--electron-blue)" }}>
             Find Us
           </h2>
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden" style={{ height: "450px" }}>
+          <div className="h-[280px] overflow-hidden rounded-lg bg-white shadow-lg sm:h-[380px] lg:h-[450px]">
             <iframe
               src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3858.929256610402!2d120.9550477758758!3d14.71659157422483!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3397b39615a3724f%3A0x4489491a2e00c9a6!2sElectron%20College!5e0!3m2!1sen!2sph!4v1777181635629!5m2!1sen!2sph"
               width="100%"
