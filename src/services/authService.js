@@ -67,6 +67,14 @@ async function createUserRecord(email, passwordHash, profile = {}, authUserId = 
     .single();
 
   if (insertError) {
+    const errorMessage = String(insertError.message || '');
+    if (/auth_user_id|schema cache/i.test(errorMessage)) {
+      return {
+        error: 'The Supabase Auth database migration is not applied or its schema cache has not refreshed. Run STUDENT_AUTH_RLS_MIGRATION.sql in the Supabase SQL Editor, then try again.',
+        user: null,
+      };
+    }
+
     return {
       error: insertError.code === '23505' ? 'Email already registered' : insertError.message,
       user: null,

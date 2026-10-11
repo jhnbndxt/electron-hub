@@ -31,31 +31,36 @@ interface Section {
 }
 
 function organizeAssessmentSections(questions: Question[]): Section[] {
-  const aptitudeSections = [
+  const riasecCategories = new Set([
+    "Realistic",
+    "Investigative",
+    "Artistic",
+    "Social",
+    "Enterprising",
+    "Conventional",
+    "R",
+    "I",
+    "A",
+    "S",
+    "E",
+    "C",
+  ]);
+  const sections = [
     { name: "Verbal", icon: Brain, questions: questions.filter((question) => question.category === "Verbal") },
     { name: "Math", icon: Calculator, questions: questions.filter((question) => question.category === "Math") },
     { name: "Science", icon: Beaker, questions: questions.filter((question) => question.category === "Science") },
     { name: "Logical", icon: Lightbulb, questions: questions.filter((question) => question.category === "Logical") },
+    {
+      name: "Interest",
+      icon: Heart,
+      questions: questions.filter((question) =>
+        question.category === "Interests" ||
+        riasecCategories.has(question.category) ||
+        Boolean(question.interestType)
+      ),
+    },
   ];
-  const riasecTypes = ["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"];
-  const riasecSections = riasecTypes.map((type) => ({
-    name: type,
-    icon: Heart,
-    questions: questions.filter((question) => {
-      const questionType = question.interestType || question.category;
-      return questionType === type || questionType === type[0];
-    }),
-  }));
-  const untypedInterests = questions.filter((question) =>
-    question.category === "Interests" &&
-    !riasecTypes.some((type) => question.interestType === type || question.interestType === type[0])
-  );
-
-  return [
-    ...aptitudeSections,
-    ...riasecSections,
-    ...(untypedInterests.length ? [{ name: "Interests", icon: Heart, questions: untypedInterests }] : []),
-  ].filter((section) => section.questions.length > 0);
+  return sections.filter((section) => section.questions.length > 0);
 }
 
 export function Assessment() {
@@ -444,17 +449,12 @@ export function Assessment() {
       Science: [],
       Logical: [],
       Interests: [],
-      Realistic: [],
-      Investigative: [],
-      Artistic: [],
-      Social: [],
-      Enterprising: [],
-      Conventional: [],
     };
 
     sections.forEach((section) => {
-      if (questionsByCategory[section.name] !== undefined) {
-        questionsByCategory[section.name] = section.questions;
+      const category = section.name === "Interest" ? "Interests" : section.name;
+      if (questionsByCategory[category] !== undefined) {
+        questionsByCategory[category] = section.questions;
       }
     });
 
@@ -629,9 +629,6 @@ export function Assessment() {
           >
             Track Recommendation Assessment
           </h1>
-          <p className="text-xl" style={{ color: "var(--electron-blue)" }}>
-            Formula-based scoring with AI explanations
-          </p>
           <p className="text-gray-600 mt-2">
             Answer the following to determine your recommended track and electives
           </p>
