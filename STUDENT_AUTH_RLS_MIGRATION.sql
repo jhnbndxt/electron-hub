@@ -3,7 +3,8 @@
 -- that other deployed tables have the same columns as the base schema.
 
 ALTER TABLE public.users
-  ADD COLUMN IF NOT EXISTS auth_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL;
+  ADD COLUMN IF NOT EXISTS auth_user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS profile_picture_url text;
 
 CREATE UNIQUE INDEX IF NOT EXISTS users_auth_user_id_unique
   ON public.users (auth_user_id)

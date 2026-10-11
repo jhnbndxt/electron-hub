@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     const supabase = getSupabaseAdmin();
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id, auth_user_id, email, password_hash, full_name, first_name, last_name, middle_name, sex, birth_date, contact_number, profile_picture_url, role, status, deactivated_at, updated_at")
+      .select("*")
       .eq("email", email)
       .maybeSingle();
 
