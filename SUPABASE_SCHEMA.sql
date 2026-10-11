@@ -11,6 +11,7 @@
 
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  auth_user_id UUID UNIQUE REFERENCES auth.users(id) ON DELETE SET NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(255),
@@ -22,6 +23,7 @@ CREATE TABLE users (
   role VARCHAR(50) NOT NULL CHECK (role IN ('student', 'registrar', 'branchcoordinator', 'cashier', 'superadmin')),
   admin_type VARCHAR(50) CHECK (admin_type IN ('registrar', 'branchcoordinator', 'cashier')),
   status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'suspended')),
+  deactivated_at TIMESTAMP WITH TIME ZONE,
   contact_number VARCHAR(20),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -135,8 +137,13 @@ CREATE TABLE enrollment_documents (
   document_type VARCHAR(100) NOT NULL CHECK (document_type IN ('form138', 'form137', 'goodMoral', 'birthCertificate', 'idPicture', 'diploma', 'escCertificate')),
   file_path VARCHAR(500),
   file_url VARCHAR(500),
+  file_name VARCHAR(255),
   file_size BIGINT,
+  status VARCHAR(50) NOT NULL DEFAULT 'pending_review'
+    CHECK (status IN ('pending_review', 'reuploaded', 'approved', 'rejected')),
+  rejection_comment TEXT,
   uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   verified BOOLEAN DEFAULT FALSE,
   verified_by UUID REFERENCES users(id) ON DELETE SET NULL,
   verified_at TIMESTAMP WITH TIME ZONE

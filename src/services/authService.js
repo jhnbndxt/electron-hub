@@ -25,7 +25,7 @@ async function findUserByEmail(email) {
   return { error: null, user };
 }
 
-async function createUserRecord(email, passwordHash, profile = {}) {
+async function createUserRecord(email, passwordHash, profile = {}, authUserId = null) {
   const normalizedEmail = normalizeEmailAddress(email);
 
   if (!normalizedEmail) {
@@ -57,6 +57,7 @@ async function createUserRecord(email, passwordHash, profile = {}) {
     birth_date: profile.birthDate || null,
     role: 'student',
     contact_number: profile.contactNumber || null,
+    ...(authUserId ? { auth_user_id: authUserId } : {}),
   };
 
   const { data: newUser, error: insertError } = await supabase
@@ -66,7 +67,10 @@ async function createUserRecord(email, passwordHash, profile = {}) {
     .single();
 
   if (insertError) {
-    return { error: insertError.message, user: null };
+    return {
+      error: insertError.code === '23505' ? 'Email already registered' : insertError.message,
+      user: null,
+    };
   }
 
   const { password_hash, ...userWithoutPassword } = newUser;
@@ -111,47 +115,32 @@ function mapOtpVerifyError(error) {
  */
 export async function loginUser(email, password) {
   try {
-    // Query user from database
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-
-    if (error || !user) {
-      return { error: 'User not found', user: null };
+    const response = await fetch('/api/auth-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizeEmailAddress(email), password }),
+    });
+    const result = await response.json();
+    if (!response.ok || !result.success || !result.user) {
+      return { error: result.error || 'Unable to sign in right now.', user: null };
     }
 
-    if (user.status === 'inactive') {
-      const deactivatedAt = new Date(user.deactivated_at || user.updated_at);
-      const deletionDate = new Date(deactivatedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
-      const deletionNotice = Number.isNaN(deletionDate.getTime())
-        ? 'Your account has been deactivated and is scheduled for permanent deletion after 30 days. Contact the Branch Coordinator for assistance.'
-        : `Your account has been deactivated and is scheduled for permanent deletion on ${deletionDate.toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        })}. Contact the Branch Coordinator before then if you need assistance.`;
-      return { error: deletionNotice, user: null };
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: normalizeEmailAddress(email),
+      password,
+    });
+    if (signInError) {
+      console.error('Supabase Auth sign-in error after credential migration:', signInError);
+      return { error: 'Your account was prepared for secure sign-in, but the session could not be started. Please try again.', user: null };
     }
 
-    if (user.status === 'suspended') {
-      return { error: 'This account has been suspended', user: null };
-    }
-
-    // Compare passwords
-    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
-
-    if (!isPasswordValid) {
-      return { error: 'Invalid password', user: null };
-    }
-
-    // Remove password hash before returning
-    const { password_hash, ...userWithoutPassword } = user;
-    return { error: null, user: userWithoutPassword };
+    return { error: null, user: result.user };
   } catch (error) {
     console.error('Login error:', error);
-    return { error: error.message, user: null };
+    return {
+      error: error instanceof Error ? error.message : 'Unable to reach the authentication service.',
+      user: null,
+    };
   }
 }
 
@@ -186,17 +175,28 @@ export async function registerUser(email, password, profile = {}) {
 /**
  * Create a verified custom user row using a precomputed password hash
  * @param {string} email - Verified email address
- * @param {string} passwordHash - Precomputed password hash
+ * @param {string} password - Registration password
  * @param {Object} profile - Profile fields (firstName, lastName, middleName, sex, contactNumber)
  * @returns {Promise} - New user data or error
  */
-export async function registerVerifiedUser(email, passwordHash, profile = {}) {
+export async function registerVerifiedUser(email, password, profile = {}) {
   try {
-    if (!passwordHash) {
+    if (!password) {
       return { error: 'Password is required', user: null };
     }
 
-    return await createUserRecord(email, passwordHash, profile);
+    const normalizedEmail = normalizeEmailAddress(email);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) throw authError;
+    if (!authData.user || normalizeEmailAddress(authData.user.email) !== normalizedEmail) {
+      return { error: 'Verify this email address before creating the account.', user: null };
+    }
+
+    const { error: passwordError } = await supabase.auth.updateUser({ password });
+    if (passwordError) throw passwordError;
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    return await createUserRecord(normalizedEmail, passwordHash, profile, authData.user.id);
   } catch (error) {
     console.error('Verified register error:', error);
     return {

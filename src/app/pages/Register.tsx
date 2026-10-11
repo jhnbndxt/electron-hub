@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ArrowLeft, CheckCircle2, Eye, EyeOff, LoaderCircle, Lock, Mail, Phone, ShieldCheck, User } from "lucide-react";
-import bcrypt from "bcryptjs";
 import {
   clearRegistrationVerification,
   registerVerifiedUser,
@@ -245,8 +244,7 @@ export function Register() {
 
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
-      const passwordHash = await bcrypt.hash(formData.password, 10);
-      const { error: registerError, user } = await registerVerifiedUser(normalizedEmail, passwordHash, {
+      const { error: registerError, user } = await registerVerifiedUser(normalizedEmail, formData.password, {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         middleName: formData.middleName.trim() || null,
