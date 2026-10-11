@@ -560,7 +560,10 @@ export function Assessment() {
       setSubmitProgress(94);
     } catch (error) {
       console.error("❌ Error saving assessment result:", error);
-      setSubmitError("Your assessment was scored, but we couldn't save the result. Please try again.");
+      const saveError = error && typeof error === "object" && "message" in error
+        ? String(error.message)
+        : "Unknown database error";
+      setSubmitError(`Your assessment was scored, but couldn't be saved: ${saveError}`);
       setIsSubmitting(false);
       setSubmitProgress(0);
       return;
