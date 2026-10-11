@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import {
   Settings,
   Server,
@@ -15,6 +16,7 @@ import {
   CheckCircle2,
   ArrowRight,
   X,
+  Megaphone,
 } from "lucide-react";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
@@ -603,6 +605,13 @@ export function SystemConfiguration() {
         icon={Settings}
         actions={
           <>
+          <Link
+            to="/#announcements"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800 transition-colors hover:bg-blue-100"
+          >
+            <Megaphone className="h-4 w-4" />
+            Edit Announcements
+          </Link>
           <button
             type="button"
             onClick={() => void loadConfiguration()}
