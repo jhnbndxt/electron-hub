@@ -8,7 +8,27 @@ import computerSchool from "../../assets/computer-school.png";
 import culturalDance from "../../assets/cultural-dance.png";
 import schoolBasketballCourt from "../../assets/school-bassketball-court.png";
 import studentActivityRoom from "../../assets/student-activity-room.png";
-import studentPerformance from "../../assets/b16ae30d5d6d39f2bef489483d492fd75e4a3817.png";
+import cookFest1 from "../../assets/cook fest 1.jpg";
+import cookFest2 from "../../assets/cook fest 2.jpg";
+import cookFest3 from "../../assets/cook fest 3.jpg";
+import educTrip1 from "../../assets/educ trip 1.jpg";
+import educTrip2 from "../../assets/educ trip 2.jpg";
+import educTrip3 from "../../assets/educ trip 3.jpg";
+import intrams1 from "../../assets/intrams 1.jpg";
+import intrams2 from "../../assets/intrams 2.jpg";
+import quizBee1 from "../../assets/quiz bee 1.jpg";
+import quizBee2 from "../../assets/quiz bee 2.jpg";
+import sloganMaking1 from "../../assets/slogan making 1.jpg";
+import sloganMaking2 from "../../assets/slogan making 2.jpg";
+import sloganMaking3 from "../../assets/slogan making 3.jpg";
+import sportsFest1 from "../../assets/sports fest 1.jpg";
+import sportsFest2 from "../../assets/sports fest 2.jpg";
+import sportsFest3 from "../../assets/sports fest 3.jpg";
+import sportsFest4 from "../../assets/sports fest 4.jpg";
+import sportsFest5Muse from "../../assets/sports fest 5 muse.jpg";
+import sportsFest6Basketball from "../../assets/sports fest 6 basketball.jpg";
+import studentsWeldingCourse1 from "../../assets/students welding course 1.jpg";
+import studentsWeldingCourse2 from "../../assets/students welding course 2.jpg";
 
 export function Gallery() {
   const galleryItems = [
@@ -54,17 +74,33 @@ export function Gallery() {
       title: "Campus Overview",
       category: "Campus",
     },
-    {
-      id: 8,
-      src: studentPerformance,
-      title: "Student Performance",
-      category: "Events",
-    },
+    { id: 9, src: cookFest1, title: "Culinary Skills Showcase", category: "Events" },
+    { id: 10, src: cookFest2, title: "Culinary Skills Showcase", category: "Events" },
+    { id: 11, src: cookFest3, title: "Culinary Skills Showcase", category: "Events" },
+    { id: 12, src: educTrip1, title: "Educational Excursion", category: "Events" },
+    { id: 13, src: educTrip2, title: "Educational Excursion", category: "Events" },
+    { id: 14, src: educTrip3, title: "Educational Excursion", category: "Events" },
+    { id: 15, src: intrams1, title: "Intramural Activities", category: "Events" },
+    { id: 16, src: intrams2, title: "Intramural Activities", category: "Events" },
+    { id: 17, src: quizBee1, title: "Academic Quiz Challenge", category: "Events" },
+    { id: 18, src: quizBee2, title: "Academic Quiz Challenge", category: "Events" },
+    { id: 19, src: sloganMaking1, title: "Creative Slogan Workshop", category: "Events" },
+    { id: 20, src: sloganMaking2, title: "Creative Slogan Workshop", category: "Events" },
+    { id: 21, src: sloganMaking3, title: "Creative Slogan Workshop", category: "Events" },
+    { id: 22, src: sportsFest1, title: "Sports Fest Highlights", category: "Events" },
+    { id: 23, src: sportsFest2, title: "Sports Fest Highlights", category: "Events" },
+    { id: 24, src: sportsFest3, title: "Sports Fest Highlights", category: "Events" },
+    { id: 25, src: sportsFest4, title: "Sports Fest Highlights", category: "Events" },
+    { id: 26, src: sportsFest5Muse, title: "Sports Fest Muse", category: "Events" },
+    { id: 27, src: sportsFest6Basketball, title: "Sports Fest Basketball", category: "Events" },
+    { id: 28, src: studentsWeldingCourse1, title: "Welding Course Practicum", category: "Events" },
+    { id: 29, src: studentsWeldingCourse2, title: "Welding Course Practicum", category: "Events" },
   ];
 
   const categories = ["All", "Campus", "Facilities", "Events"];
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedImage, setSelectedImage] = useState<{ src: string; title: string; category: string } | null>(null);
+  const [shuffledGalleryItems] = useState(() => [...galleryItems].sort(() => Math.random() - 0.5));
 
   useEffect(() => {
     if (!selectedImage) {
@@ -89,7 +125,7 @@ export function Gallery() {
 
   const filteredItems =
     selectedCategory === "All"
-      ? galleryItems
+      ? shuffledGalleryItems
       : galleryItems.filter((item) => item.category === selectedCategory);
 
   return (
