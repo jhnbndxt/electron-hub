@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, Download, Users, Eye, AlertTriangle, X, Trash2 } from "lucide-react";
+import { Search, Download, Users, Eye, AlertTriangle, X, Trash2, UserX } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
@@ -17,6 +17,8 @@ interface Student {
   track: string;
   status: string;
   yearLevel: string;
+  accountStatus?: string | null;
+  accountDeactivatedAt?: string | null;
 }
 
 const TRACK_OPTIONS = ["Academic", "Technical-Professional"] as const;
@@ -119,6 +121,8 @@ export function StudentRecords() {
         ) || 'Not Set',
         status: enrollment.status || 'Enrolled',
         yearLevel: formData.yearLevel || formData.year_level || 'Grade 11',
+        accountStatus: enrollment.user_profile?.status ?? null,
+        accountDeactivatedAt: enrollment.user_profile?.deactivated_at ?? null,
       };
     });
 
@@ -254,6 +258,11 @@ export function StudentRecords() {
     }
   };
 
+  const isAccountDeactivated = (student: Student) => {
+    const s = String(student.accountStatus || "").toLowerCase();
+    return s === "inactive" || s === "deactivated" || s === "deleted" || s === "suspended";
+  };
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
       <DashboardPageHeader
@@ -328,7 +337,7 @@ export function StudentRecords() {
             paginatedStudents.map((student) => {
               const statusStyle = getStatusStyle(student.status);
               return (
-                <article key={student.id} className="space-y-4 p-5">
+                <article key={student.id} className={`space-y-4 p-5 ${isAccountDeactivated(student) ? "bg-red-50/60" : ""}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <button
@@ -352,6 +361,26 @@ export function StudentRecords() {
                       {student.status}
                     </span>
                   </div>
+
+                  {/* Account deactivated/deleted warning */}
+                  {isAccountDeactivated(student) && (
+                    <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                      <UserX className="h-4 w-4 shrink-0 text-red-600" />
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-red-700">Account Deactivated / Deleted</p>
+                        {student.accountDeactivatedAt && (
+                          <p className="text-xs text-red-500">
+                            Since{" "}
+                            {new Date(student.accountDeactivatedAt).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                            })}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div className="rounded-xl bg-slate-50 p-3">
@@ -438,10 +467,11 @@ export function StudentRecords() {
               ) : (
                 paginatedStudents.map((student) => {
                   const statusStyle = getStatusStyle(student.status);
+                  const deactivated = isAccountDeactivated(student);
                   return (
                     <tr
                       key={student.id}
-                      className="hover:bg-gray-50 transition-colors"
+                      className={`transition-colors ${deactivated ? "bg-red-50/50 hover:bg-red-50" : "hover:bg-gray-50"}`}
                     >
                       <td className="px-6 py-4">
                         <p className="text-xs font-medium text-gray-900">
@@ -449,14 +479,29 @@ export function StudentRecords() {
                         </p>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          type="button"
-                          onClick={() => handleViewStudent(student)}
-                          className="text-left text-xs font-medium text-gray-900 hover:text-blue-700 hover:underline"
-                          title={`Open ${student.name}'s student record`}
-                        >
-                          {student.name}
-                        </button>
+                        <div className="flex flex-col gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleViewStudent(student)}
+                            className="text-left text-xs font-medium text-gray-900 hover:text-blue-700 hover:underline"
+                            title={`Open ${student.name}'s student record`}
+                          >
+                            {student.name}
+                          </button>
+                          {deactivated && (
+                            <span
+                              className="inline-flex w-fit items-center gap-1 rounded-md border border-red-200 bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700"
+                              title={
+                                student.accountDeactivatedAt
+                                  ? `Account deactivated on ${new Date(student.accountDeactivatedAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}`
+                                  : "Account has been deactivated or deleted"
+                              }
+                            >
+                              <UserX className="h-3 w-3" />
+                              Account Deactivated
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span

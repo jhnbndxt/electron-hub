@@ -334,7 +334,7 @@ export function MyDocuments() {
         currentEnrollmentStatus = enrollment?.status || null;
       }
 
-      const docType = DOC_NAME_TO_KEY[docName];
+      const docType = DOC_NAME_TO_KEY[docName] || docName;
       const timestamp = Date.now();
       const fileExt = file.name.split(".").pop();
       const storagePath = `${currentEnrollmentId}/${docType}/${timestamp}.${fileExt}`;
@@ -406,7 +406,9 @@ export function MyDocuments() {
             updated_at: new Date().toISOString(),
           })
           .eq("id", currentEnrollmentId);
-        if (enrollmentUpdateError) throw enrollmentUpdateError;
+        if (enrollmentUpdateError) {
+          console.warn("Could not update enrollment status (non-fatal):", enrollmentUpdateError);
+        }
       }
 
       await notifyDocumentReviewers({ currentEnrollmentId, docName, docType });

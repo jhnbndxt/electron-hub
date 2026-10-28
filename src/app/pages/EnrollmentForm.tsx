@@ -414,9 +414,10 @@ export function EnrollmentForm() {
 
     const initializeForm = async () => {
       try {
+        const isReupload = searchParams.get('reupload') === 'true';
         // Check if enrollment already submitted
         const { data: existingEnrollment } = await checkExistingEnrollment(userEmail);
-        if (existingEnrollment) {
+        if (existingEnrollment && !isReupload) {
           // Load the full enrollment data
           const { data: enrollmentData } = await getUserEnrollment(userEmail);
           if (enrollmentData) {
@@ -838,7 +839,8 @@ export function EnrollmentForm() {
               escCertificate: null,
             }));
 
-            // Navigate directly to page 6 (document upload)
+            // Navigate directly to page 6 (document upload) and unlock for upload
+            setIsSubmittedEnrollment(false);
             setCurrentPage(6);
           } catch (e) {
             console.error("Failed to load enrollment data:", e);
@@ -1097,16 +1099,28 @@ export function EnrollmentForm() {
     }
 
     if (page === 6) {
-      if (!formData.form138) newErrors.form138 = "This document is required";
-      if (formData.admissionType === "Transferee" && !formData.form137) {
+      const existingDocs = formData.documents || [];
+      const hasExistingDoc = (docType: string) =>
+        existingDocs.some((d: any) => (d.document_type || d.type) === docType && d.status !== 'rejected');
+
+      if (!formData.form138 && !hasExistingDoc("form138")) {
+        newErrors.form138 = "Form 138 (Report Card) is required";
+      }
+      if (formData.admissionType === "Transferee" && !formData.form137 && !hasExistingDoc("form137")) {
         newErrors.form137 = "Form 137 is required for Transferees";
       }
-      if (formData.admissionType === "Transferee" && !formData.goodMoral) {
+      if (formData.admissionType === "Transferee" && !formData.goodMoral && !hasExistingDoc("goodMoral")) {
         newErrors.goodMoral = "Good Moral Certificate is required for Transferees";
       }
-      if (!formData.birthCertificate) newErrors.birthCertificate = "This document is required";
-      if (!formData.idPicture) newErrors.idPicture = "This document is required";
-      if (!formData.diploma) newErrors.diploma = "This document is required";
+      if (!formData.birthCertificate && !hasExistingDoc("birthCertificate")) {
+        newErrors.birthCertificate = "PSA Birth Certificate is required";
+      }
+      if (!formData.idPicture && !hasExistingDoc("idPicture")) {
+        newErrors.idPicture = "2x2 ID Picture is required";
+      }
+      if (!formData.diploma && !hasExistingDoc("diploma")) {
+        newErrors.diploma = "Grade 10 Diploma (or Certificate of Completion) is required";
+      }
     }
 
     setErrors(newErrors);
@@ -1116,6 +1130,13 @@ export function EnrollmentForm() {
   const handleNext = () => {
     if (validatePage(currentPage)) {
       setCurrentPage(prev => Math.min(prev + 1, 7));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      if (currentPage === 6) {
+        notify.warning("Please upload all required documents to proceed.");
+      } else {
+        notify.warning("Please complete all required fields to proceed.");
+      }
       window.scrollTo({ top: 0, behavior: "smooth" });
     }
   };
@@ -1141,7 +1162,12 @@ export function EnrollmentForm() {
       return;
     }
 
-    if (!validatePage(6)) return;
+    if (!validatePage(6)) {
+      setCurrentPage(6);
+      notify.warning("Please upload all required documents before submitting.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     const userEmail = userData?.email;
     if (!userEmail) {
@@ -1359,51 +1385,64 @@ export function EnrollmentForm() {
     label: string,
     field: keyof FormData,
     required: boolean = true
-  ) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700 mb-1">
-        {label} {required && <span className="text-red-500">*</span>}
-        {!required && <span className="text-gray-500 text-xs">(Optional)</span>}
-      </label>
-      <div
-        className={`relative border-2 border-dashed rounded-md p-4 transition-colors ${
-          errors[field] ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-blue-500"
-        } ${isSubmittedEnrollment ? "opacity-60 cursor-not-allowed bg-gray-50" : ""}`}
-      >
-        <input
-          type="file"
-          accept={DOCUMENT_ACCEPT_ATTRIBUTE}
-          onChange={(e) => handleFileChange(field, e.target.files?.[0] || null)}
-          disabled={isSubmittedEnrollment}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        />
-        <div className="flex items-center gap-3">
-          <Upload className="w-5 h-5 text-gray-400" />
-          <div>
-            <p className="text-sm text-gray-700">
-              {formData[field] ? (formData[field] as File).name : "Click to upload or drag and drop"}
-            </p>
-            <p className="text-xs text-gray-500">PDF, image, Office document, or text file</p>
+  ) => {
+    const existingDoc = (formData.documents || []).find(
+      (d: any) => (d.document_type || d.type) === field && d.status !== "rejected"
+    );
+    const uploadedFile = formData[field] as File | null;
+    const displayName = uploadedFile ? uploadedFile.name : (existingDoc?.file_name || (existingDoc ? "Uploaded Document (Saved)" : null));
+
+    return (
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          {label} {required && <span className="text-red-500">*</span>}
+          {!required && <span className="text-gray-500 text-xs">(Optional)</span>}
+        </label>
+        <div
+          className={`relative border-2 border-dashed rounded-md p-4 transition-colors ${
+            errors[field] ? "border-red-500 bg-red-50" : "border-gray-300 hover:border-blue-500"
+          } ${isSubmittedEnrollment ? "opacity-60 cursor-not-allowed bg-gray-50" : ""}`}
+        >
+          <input
+            type="file"
+            accept={DOCUMENT_ACCEPT_ATTRIBUTE}
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              handleFileChange(field, file);
+              e.target.value = "";
+            }}
+            disabled={isSubmittedEnrollment}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+          />
+          <div className="flex items-center gap-3">
+            <Upload className="w-5 h-5 text-gray-400 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm text-gray-700 truncate font-medium">
+                {displayName || "Click to upload or drag and drop"}
+              </p>
+              <p className="text-xs text-gray-500">PDF, PNG, JPG, or WEBP (up to 5 MB)</p>
+            </div>
+            {displayName && !isSubmittedEnrollment && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleFileChange(field, null);
+                }}
+                className="relative z-10 ml-auto p-1.5 hover:bg-gray-200 rounded-full text-gray-500 hover:text-gray-700 transition-colors"
+                title="Remove file"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          {formData[field] && !isSubmittedEnrollment && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleFileChange(field, null);
-              }}
-              className="ml-auto p-1 hover:bg-gray-200 rounded-full"
-            >
-              <X className="w-4 h-4 text-gray-500" />
-            </button>
-          )}
         </div>
+        {errors[field] && (
+          <p className="text-red-500 text-xs mt-1">{errors[field]}</p>
+        )}
       </div>
-      {errors[field] && (
-        <p className="text-red-500 text-xs mt-1">{errors[field]}</p>
-      )}
-    </div>
-  );
+    );
+  };
 
   // Page 1: Basic Information
   const renderPage1 = () => (

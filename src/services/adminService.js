@@ -467,7 +467,7 @@ export const getEnrolledStudents = async () => {
         userQueries.push(
           supabase
             .from('users')
-            .select('id, email, full_name, first_name, middle_name, last_name')
+            .select('id, email, full_name, first_name, middle_name, last_name, status, deactivated_at')
             .in('email', emailReferences)
         );
       }
@@ -476,7 +476,7 @@ export const getEnrolledStudents = async () => {
         userQueries.push(
           supabase
             .from('users')
-            .select('id, email, full_name, first_name, middle_name, last_name')
+            .select('id, email, full_name, first_name, middle_name, last_name, status, deactivated_at')
             .in('id', idReferences)
         );
       }

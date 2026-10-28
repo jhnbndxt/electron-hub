@@ -224,7 +224,7 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
     // Upload file to Supabase storage
     const { data: storageData, error: storageError } = await supabase.storage
       .from('enrollment_documents')
-      .upload(fileName, file);
+      .upload(fileName, file, { upsert: true });
 
     if (storageError) {
       console.error('Storage upload error:', storageError);
@@ -236,18 +236,55 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
       .from('enrollment_documents')
       .getPublicUrl(fileName);
 
-    // Record in database
-    const { data: dbData, error: dbError } = await supabase
+    const publicUrl = urlData?.publicUrl || null;
+
+    // Check if an existing record exists for this document type
+    const { data: existingDoc } = await supabase
       .from('enrollment_documents')
-      .insert({
-        enrollment_id: enrollmentId,
-        document_type: documentType,
-        file_name: file.name,
-        file_path: urlData.publicUrl,
-        status: 'pending_review',
-      })
-      .select()
-      .single();
+      .select('id')
+      .eq('enrollment_id', enrollmentId)
+      .eq('document_type', documentType)
+      .maybeSingle();
+
+    let dbData = null;
+    let dbError = null;
+
+    if (existingDoc?.id) {
+      const result = await supabase
+        .from('enrollment_documents')
+        .update({
+          file_name: file.name,
+          file_path: fileName,
+          file_url: publicUrl,
+          file_size: file.size || null,
+          status: 'pending_review',
+          rejection_comment: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingDoc.id)
+        .select()
+        .single();
+      dbData = result.data;
+      dbError = result.error;
+    } else {
+      const result = await supabase
+        .from('enrollment_documents')
+        .insert({
+          enrollment_id: enrollmentId,
+          document_type: documentType,
+          file_name: file.name,
+          file_path: fileName,
+          file_url: publicUrl,
+          file_size: file.size || null,
+          status: 'pending_review',
+          uploaded_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      dbData = result.data;
+      dbError = result.error;
+    }
 
     if (dbError) {
       console.error('Document db insert error:', dbError);
