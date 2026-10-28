@@ -1,4 +1,5 @@
 -- Record when accounts are deactivated and permanently purge accounts after 30 days.
+-- Run STUDENT_ACCOUNT_PURGE_MIGRATION.sql before this migration.
 ALTER TABLE public.users
   ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMPTZ;
 
@@ -23,11 +24,19 @@ DECLARE
   deleted_user_count INTEGER;
 BEGIN
   FOR expired_account IN
-    SELECT id, email
+    SELECT id, email, role, auth_user_id
     FROM public.users
     WHERE status = 'inactive'
       AND deactivated_at <= NOW() - INTERVAL '30 days'
   LOOP
+    IF expired_account.role = 'student' THEN
+      PERFORM public.purge_student_account_data(
+        expired_account.id,
+        expired_account.email,
+        expired_account.auth_user_id
+      );
+    END IF;
+
     IF expired_account.email IS NOT NULL THEN
       DELETE FROM auth.users
       WHERE LOWER(email) = LOWER(expired_account.email);

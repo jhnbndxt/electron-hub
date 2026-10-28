@@ -46,6 +46,38 @@ const CONTACT_NUMBER_PATTERN = /^(09\d{9}|\+639\d{9})$/;
 const NAME_PATTERN = /^[\p{L}][\p{L}\s'.-]*$/u;
 const REGISTRATION_OTP_LENGTH = 8;
 const VERIFICATION_RESEND_COOLDOWN_SECONDS = 60;
+const STUDENT_CACHE_PREFIXES = [
+  "assessmentHistory_",
+  "assessmentResults_",
+  "assessmentProgress_",
+  "assessmentAnswers_",
+  "assessmentAnswerSnapshots_",
+  "enrollment_progress_",
+  "payment_page_visited_",
+  "profile_picture_",
+];
+
+function clearCachedStudentData(email: string) {
+  try {
+    const normalizedEmail = email.trim().toLowerCase();
+    const keysToRemove: string[] = [];
+
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (
+        key &&
+        key.toLowerCase().endsWith(normalizedEmail) &&
+        STUDENT_CACHE_PREFIXES.some((prefix) => key.startsWith(prefix))
+      ) {
+        keysToRemove.push(key);
+      }
+    }
+
+    keysToRemove.forEach((key) => localStorage.removeItem(key));
+  } catch (error) {
+    console.error("Unable to clear cached data for the newly registered student:", error);
+  }
+}
 
 const getPasswordRequirements = (password: string) => {
   const missingRequirements: string[] = [];
@@ -260,6 +292,8 @@ export function Register() {
         setError(registerError || "Unable to create your account right now. Try again.");
         return;
       }
+
+      clearCachedStudentData(normalizedEmail);
 
       try {
         await linkPendingPublicAssessmentResult(normalizedEmail);

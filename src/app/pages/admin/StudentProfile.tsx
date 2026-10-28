@@ -79,9 +79,9 @@ function joinName(...parts: unknown[]) {
 
 function FieldItem({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+    <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
-      <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900">{valueOrDash(value)}</p>
+      <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900 [overflow-wrap:anywhere]">{valueOrDash(value)}</p>
     </div>
   );
 }
@@ -98,13 +98,13 @@ function RecordSection({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/70 sm:p-6">
+    <section className="min-w-0 rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/70 sm:p-6">
       <div className="mb-5 flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-800">
           <Icon className="h-5 w-5" />
         </div>
-        <div>
-          <h3 className="text-lg font-bold text-slate-950">{title}</h3>
+        <div className="min-w-0">
+          <h3 className="break-words text-lg font-bold text-slate-950">{title}</h3>
           {description && <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>}
         </div>
       </div>
@@ -161,7 +161,7 @@ export function StudentProfile() {
 
   if (isLoading) {
     return (
-      <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <div className="portal-dashboard-page min-w-0 max-w-full overflow-x-hidden p-4 pt-10 sm:p-6 lg:p-8">
         <LoadingState message="Loading student profile..." subtext="Retrieving enrollment details, documents, and payments." />
       </div>
     );
@@ -169,7 +169,7 @@ export function StudentProfile() {
 
   if (error || !profile) {
     return (
-      <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+      <div className="portal-dashboard-page min-w-0 max-w-full overflow-x-hidden p-4 pt-10 sm:p-6 lg:p-8">
         <button
           onClick={() => navigate(recordsPath)}
           className="mb-4 flex items-center gap-2 text-sm font-medium text-blue-700 hover:opacity-75"
@@ -306,7 +306,7 @@ export function StudentProfile() {
   ];
 
   return (
-    <div className="portal-dashboard-page p-4 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page min-w-0 max-w-full overflow-x-hidden p-4 pt-10 sm:p-6 lg:p-8">
       <div className="mb-6">
         <button
           onClick={() => navigate(recordsPath)}
@@ -348,9 +348,9 @@ export function StudentProfile() {
                 </div>
               </div>
             </div>
-            <div className="rounded-xl border border-white/25 bg-white/15 px-4 py-3 text-white backdrop-blur">
+            <div className="min-w-0 rounded-xl border border-white/25 bg-white/15 px-4 py-3 text-white backdrop-blur">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/65">Enrollment ID</p>
-              <p className="mt-1 font-mono text-sm font-bold">{enrollment.id || id}</p>
+              <p className="mt-1 break-all font-mono text-sm font-bold">{enrollment.id || id}</p>
             </div>
           </div>
         </div>
@@ -371,7 +371,7 @@ export function StudentProfile() {
         </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
         <div className="space-y-5">
           <RecordSection title="Complete Enrollment Form Information" description="Personal, admission, contact, and demographic details submitted by the student." icon={User}>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

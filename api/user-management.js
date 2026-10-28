@@ -52,6 +52,108 @@ async function deleteAuthUserForAccount(supabase, { email, auth_user_id }) {
   if (error && error.status !== 404) throw error;
 }
 
+function isMissingColumn(error, column) {
+  const message = String(error?.message || "");
+  return (
+    (error?.code === "42703" || error?.code === "PGRST204") &&
+    message.toLowerCase().includes(column.toLowerCase())
+  ) || new RegExp(`column .*${column}.* does not exist|could not find .*${column}`, "i").test(message);
+}
+
+async function getAccountEnrollmentIds(supabase, { id, email, auth_user_id }) {
+  const enrollmentIds = new Set();
+  const accountReferences = [
+    ["student_id", id],
+    ...(auth_user_id ? [["student_id", auth_user_id]] : []),
+    ...(auth_user_id ? [["auth_user_id", auth_user_id], ["firebase_uid", auth_user_id]] : []),
+    ["student_uid", id],
+    ["user_uid", id],
+    ...(auth_user_id ? [["student_uid", auth_user_id], ["user_uid", auth_user_id]] : []),
+    ["user_id", id],
+    ...(auth_user_id ? [["user_id", auth_user_id]] : []),
+    ["user_id", email],
+    ["email", email],
+    ["student_email", email],
+  ];
+
+  for (const [column, value] of accountReferences) {
+    let offset = 0;
+    while (true) {
+      const { data, error } = await supabase
+        .from("enrollments")
+        .select("id")
+        .eq(column, value)
+        .range(offset, offset + 999);
+
+      if (error) {
+        if (isMissingColumn(error, column) || error.code === "22P02") break;
+        throw error;
+      }
+
+      for (const enrollment of data || []) if (enrollment.id) enrollmentIds.add(enrollment.id);
+      if (!data || data.length < 1000) break;
+      offset += data.length;
+    }
+  }
+  return [...enrollmentIds];
+}
+
+async function listStorageFiles(supabase, prefix) {
+  const files = [];
+  const folders = [prefix];
+  const bucket = supabase.storage.from("enrollment_documents");
+
+  while (folders.length > 0) {
+    const folder = folders.pop();
+    let offset = 0;
+
+    while (true) {
+      const { data, error } = await bucket.list(folder, { limit: 1000, offset });
+      if (error) throw error;
+
+      const entries = data || [];
+      for (const entry of entries) {
+        const path = `${folder}/${entry.name}`;
+        if (entry.id === null) {
+          folders.push(path);
+        } else {
+          files.push(path);
+        }
+      }
+
+      if (entries.length < 1000) break;
+      offset += entries.length;
+    }
+  }
+
+  return files;
+}
+
+async function deleteAccountStorage(supabase, account, enrollmentIds) {
+  const prefixes = [
+    ...enrollmentIds,
+    `receipts/${account.id}`,
+    `profile-pictures/${account.id}`,
+    ...(account.auth_user_id
+      ? [`receipts/${account.auth_user_id}`, `profile-pictures/${account.auth_user_id}`]
+      : []),
+  ];
+  const files = new Set();
+  for (const prefix of prefixes) {
+    for (const file of await listStorageFiles(supabase, prefix)) {
+      files.add(file);
+    }
+  }
+
+  const paths = [...files];
+  for (let index = 0; index < paths.length; index += 1000) {
+    const { error } = await supabase.storage
+      .from("enrollment_documents")
+      .remove(paths.slice(index, index + 1000));
+    if (error) throw error;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return sendJson(res, 204, {});
@@ -102,7 +204,7 @@ export default async function handler(req, res) {
     if (action === "delete") {
       const { data: inactiveAccounts, error: lookupError } = await supabase
         .from("users")
-        .select("id, email, auth_user_id")
+        .select("id, email, role, auth_user_id")
         .in("id", normalizedTargetUserIds)
         .eq("status", "inactive");
 
@@ -112,6 +214,23 @@ export default async function handler(req, res) {
       }
 
       for (const account of inactiveAccounts || []) {
+        if (account.role === "student") {
+          const enrollmentIds = await getAccountEnrollmentIds(supabase, account);
+          await deleteAccountStorage(supabase, account, enrollmentIds);
+
+          const { error: purgeError } = await supabase.rpc("purge_student_account_data", {
+            p_student_id: account.id,
+            p_email: account.email,
+            p_auth_user_id: account.auth_user_id,
+          });
+          if (purgeError) {
+            if (/purge_student_account_data/i.test(purgeError.message || "")) {
+              throw new Error("Run STUDENT_ACCOUNT_PURGE_MIGRATION.sql in Supabase before permanently deleting student accounts.");
+            }
+            throw purgeError;
+          }
+        }
+
         await deleteAuthUserForAccount(supabase, account);
       }
 

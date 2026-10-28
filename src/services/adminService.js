@@ -315,12 +315,27 @@ async function syncVerifiedPaymentsToEnrollments() {
       return;
     }
 
+    const studentIds = [...new Set((data || []).map((payment) => payment.student_id).filter(Boolean))];
+    if (studentIds.length === 0) return;
+
+    const { data: activeAccounts, error: accountError } = await supabase
+      .from('users')
+      .select('id')
+      .in('id', studentIds)
+      .eq('status', 'active');
+
+    if (accountError) {
+      console.error('Sync verified payments account-status lookup error:', accountError);
+      return;
+    }
+
+    const activeStudentIds = new Set((activeAccounts || []).map((account) => account.id));
     const uniqueTargets = new Map();
 
     (data || []).forEach((payment) => {
       const key = payment.enrollment_id || payment.student_id;
 
-      if (key && !uniqueTargets.has(key)) {
+      if (key && payment.student_id && activeStudentIds.has(payment.student_id) && !uniqueTargets.has(key)) {
         uniqueTargets.set(key, payment);
       }
     });
@@ -520,7 +535,12 @@ export const getEnrolledStudents = async () => {
       };
     });
 
-    return { error: null, data: enrichedData };
+    return {
+      error: null,
+      data: enrichedData.filter(
+        (enrollment) => String(enrollment.user_profile?.status || '').toLowerCase() !== 'inactive'
+      ),
+    };
   } catch (error) {
     console.error('Get enrolled students error:', error);
     return { error: error.message, data: null };

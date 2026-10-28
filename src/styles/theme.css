@@ -854,6 +854,7 @@
   box-sizing: border-box;
   overflow: hidden;
   min-height: 100vh;
+  min-height: 100svh;
   min-height: 100dvh;
   background:
     linear-gradient(90deg, rgba(20, 39, 98, 0.66) 0%, rgba(35, 64, 149, 0.22) 42%, rgba(255, 255, 255, 0.16) 100%),

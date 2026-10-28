@@ -375,6 +375,10 @@ export function SectionManagement() {
     const enrollments = enrollmentResult.data;
     const baseEnrolled = enrollments
       .map((enrollment: any) => {
+        if (String(enrollment.user_profile?.status || "").toLowerCase() === "inactive") {
+          return null;
+        }
+
         const formData = enrollment.form_data || {};
         const email = getEnrollmentStudentEmail(enrollment);
 
@@ -436,6 +440,10 @@ export function SectionManagement() {
     const studentsByEnrollmentId = new Map<string, EnrolledStudent>();
     const enrolled = enrollments
       .map((enrollment: any) => {
+        if (String(enrollment.user_profile?.status || "").toLowerCase() === "inactive") {
+          return null;
+        }
+
         const formData = enrollment.form_data || {};
         const email = getEnrollmentStudentEmail(enrollment);
 

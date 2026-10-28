@@ -107,6 +107,7 @@ const formatCurrency = (amount: number) =>
   });
 
 const PAYMENT_AMOUNT_INPUT_PATTERN = /^\d*(\.\d{0,2})?$/;
+const PAYMENT_AMOUNT_PASTE_PATTERN = /^\d+(\.\d{1,2})?$/;
 
 type PaymentSettingsForm = {
   payment_bank_enabled: boolean;
@@ -1164,7 +1165,7 @@ export function BranchCoordinatorPayments() {
                           }}
                           onPaste={(e) => {
                             const pastedValue = e.clipboardData.getData("text");
-                            if (!PAYMENT_AMOUNT_INPUT_PATTERN.test(pastedValue)) {
+                            if (!PAYMENT_AMOUNT_PASTE_PATTERN.test(pastedValue)) {
                               e.preventDefault();
                             }
                           }}

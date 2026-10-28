@@ -4,15 +4,18 @@
 @import './print.css';
 
 html {
+	min-height: 100%;
 	-webkit-text-size-adjust: 100%;
 }
 
 body {
+	min-height: 100%;
 	overflow-x: hidden;
 }
 
 #root {
 	min-height: 100vh;
+	min-height: 100dvh;
 }
 
 img,
