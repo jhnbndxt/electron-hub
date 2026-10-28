@@ -35,6 +35,25 @@ export default async function handler(req, res) {
       return sendJson(res, 400, { error: "Contact number must contain numbers only and be at most 11 digits." });
     }
 
+    if (dateOfBirth) {
+      const normalizedBirthDate = String(dateOfBirth);
+      const parsedBirthDate = new Date(`${normalizedBirthDate}T00:00:00`);
+      const latestAllowedDate = new Date();
+      latestAllowedDate.setHours(0, 0, 0, 0);
+      latestAllowedDate.setDate(latestAllowedDate.getDate() - 1);
+      const [year, month, day] = normalizedBirthDate.split("-").map(Number);
+      if (
+        !/^\d{4}-\d{2}-\d{2}$/.test(normalizedBirthDate) ||
+        Number.isNaN(parsedBirthDate.getTime()) ||
+        parsedBirthDate.getFullYear() !== year ||
+        parsedBirthDate.getMonth() !== month - 1 ||
+        parsedBirthDate.getDate() !== day ||
+        parsedBirthDate > latestAllowedDate
+      ) {
+        return sendJson(res, 400, { error: "Date of birth must be a valid date before today." });
+      }
+    }
+
     const supabase = getSupabaseAdmin();
     const { data: user, error: userError } = await supabase
       .from("users")

@@ -200,11 +200,45 @@ export async function registerVerifiedUser(email, password, profile = {}) {
       return { error: 'Verify this email address before creating the account.', user: null };
     }
 
+    let authUserId = authData.user.id;
     const { error: passwordError } = await supabase.auth.updateUser({ password });
-    if (passwordError) throw passwordError;
+    if (passwordError) {
+      if (!/different from the old password/i.test(passwordError.message || '')) {
+        throw passwordError;
+      }
+
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!sessionData.session?.access_token) {
+        throw new Error('Verify this email address again before creating the account.');
+      }
+
+      const recoveryResponse = await fetch('/api/replace-orphaned-registration-auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ email: normalizedEmail, password }),
+      });
+      const recoveryResult = await recoveryResponse.json();
+      if (!recoveryResponse.ok || !recoveryResult.success) {
+        throw new Error(recoveryResult.error || 'Unable to prepare this account for registration.');
+      }
+
+      const { data: replacementAuth, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password,
+      });
+      if (signInError) throw signInError;
+      if (!replacementAuth.user?.id) {
+        throw new Error('Unable to verify the replacement authentication account.');
+      }
+      authUserId = replacementAuth.user.id;
+    }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    return await createUserRecord(normalizedEmail, passwordHash, profile, authData.user.id);
+    return await createUserRecord(normalizedEmail, passwordHash, profile, authUserId);
   } catch (error) {
     console.error('Verified register error:', error);
     return {

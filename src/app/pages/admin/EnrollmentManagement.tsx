@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Search, CheckCircle, User, FileText, CreditCard, GraduationCap } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { getEnrollmentManagementStudents, enrollStudent, getStudentPaymentStatus } from "../../../services/adminService";
 import { triggerNotification } from "../../../services/notificationService";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -159,7 +159,6 @@ export function EnrollmentManagement() {
 
   return (
     <div className="portal-dashboard-page mx-auto w-full max-w-7xl p-4 sm:p-6 lg:p-8">
-      <Toaster position="top-right" />
       <ProcessingModal
         isOpen={processingState.active}
         title={processingState.title}

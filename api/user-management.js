@@ -18,6 +18,40 @@ function getSupabaseAdmin() {
   });
 }
 
+async function findAuthUserByEmail(supabase, email) {
+  for (let page = 1; page <= 100; page += 1) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) throw error;
+
+    const matchingUser = data.users.find((user) => user.email?.toLowerCase() === email.toLowerCase());
+    if (matchingUser) return matchingUser;
+    if (data.users.length < 1000) return null;
+  }
+
+  throw new Error("Unable to locate the linked authentication account.");
+}
+
+async function deleteAuthUserForAccount(supabase, { email, auth_user_id }) {
+  let authUser = null;
+  if (auth_user_id) {
+    const { data, error } = await supabase.auth.admin.getUserById(auth_user_id);
+    if (error && error.status !== 404) throw error;
+    authUser = data?.user || null;
+
+    if (authUser && authUser.email?.toLowerCase() !== email.toLowerCase()) {
+      throw new Error("The linked authentication account does not match the selected user.");
+    }
+  }
+
+  if (!authUser) {
+    authUser = await findAuthUserByEmail(supabase, email);
+  }
+  if (!authUser) return;
+
+  const { error } = await supabase.auth.admin.deleteUser(authUser.id, false);
+  if (error && error.status !== 404) throw error;
+}
+
 export default async function handler(req, res) {
   if (req.method === "OPTIONS") {
     return sendJson(res, 204, {});
@@ -68,13 +102,17 @@ export default async function handler(req, res) {
     if (action === "delete") {
       const { data: inactiveAccounts, error: lookupError } = await supabase
         .from("users")
-        .select("id")
+        .select("id, email, auth_user_id")
         .in("id", normalizedTargetUserIds)
         .eq("status", "inactive");
 
       if (lookupError) throw lookupError;
       if ((inactiveAccounts || []).length !== normalizedTargetUserIds.length) {
         return sendJson(res, 404, { error: "One or more selected accounts were not found or are not deactivated." });
+      }
+
+      for (const account of inactiveAccounts || []) {
+        await deleteAuthUserForAccount(supabase, account);
       }
 
       const { data: deletedAccounts, error: deleteError } = await supabase

@@ -805,7 +805,7 @@ function DashboardLayoutContent() {
         <header
           className="portal-glass-header fixed left-0 right-0 top-0 z-40 lg:left-64"
         >
-          <div className="flex items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:justify-end lg:px-8 lg:py-4">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-6 lg:justify-end lg:px-8 lg:py-4">
             <div className="flex min-w-0 items-center gap-3 lg:hidden">
               <button
                 type="button"
@@ -821,7 +821,7 @@ function DashboardLayoutContent() {
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 sm:gap-6">
               {/* Notification Bell with Badge */}
               <div className="relative" ref={notificationRef}>
                 <button
@@ -844,11 +844,11 @@ function DashboardLayoutContent() {
                 {/* Notification Dropdown */}
                 {showNotifications && (
                   <div
-                    className="portal-glass-menu absolute right-0 z-50 mt-3 w-[calc(100vw-2rem)] max-w-md overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/10 sm:w-96"
+                    className="portal-glass-menu fixed left-3 right-3 top-20 z-[60] flex max-h-[calc(100dvh-6rem)] w-auto max-w-none flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-xl shadow-slate-900/10 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:z-50 sm:mt-3 sm:max-h-none sm:w-96 sm:max-w-md"
                   >
                     {/* Arrow pointing up */}
                     <div
-                      className="absolute -top-2 right-4 h-4 w-4 rotate-45 border-l border-t border-slate-200/80 bg-white"
+                      className="absolute -top-2 right-4 hidden h-4 w-4 rotate-45 border-l border-t border-slate-200/80 bg-white sm:block"
                     />
 
                     {/* Header */}
@@ -867,7 +867,7 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Notification List */}
-                    <div className="relative z-10 max-h-[360px] overflow-y-auto bg-white scroll-smooth [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent">
+                    <div className="relative z-10 min-h-0 flex-1 overflow-y-auto bg-white scroll-smooth [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300 [&::-webkit-scrollbar-track]:bg-transparent sm:max-h-[360px] sm:flex-none">
                       {loadingNotifications ? (
                         <div className="p-3">
                           <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
@@ -1003,7 +1003,7 @@ function DashboardLayoutContent() {
                     </div>
 
                     {/* Footer */}
-                    <div className="relative z-10 flex items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-2.5">
+                    <div className="relative z-10 flex flex-shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-white px-4 py-2.5">
                       {notifications.length > 0 && (
                         <button
                           onClick={async () => {
@@ -1172,7 +1172,7 @@ function DashboardLayoutContent() {
         </header>
 
         {/* Page Content */}
-        <main className="portal-glass-main min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-16 lg:pt-20">
+        <main className="portal-glass-main min-w-0 flex-1 overflow-y-auto overflow-x-hidden pt-24 sm:pt-20">
           <AnimatePresence mode="wait">
             <PageTransition key={location.pathname} className="min-h-full">
               <Outlet />

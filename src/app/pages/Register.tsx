@@ -12,6 +12,7 @@ import { linkPendingPublicAssessmentResult } from "../../services/assessmentResu
 import { motion } from "motion/react";
 import logo from "../../assets/electronLogo";
 import { ChatAssistant } from "../components/ChatAssistant";
+import { getLatestAllowedBirthDate, isPastBirthDate } from "../../utils/birthDateValidation";
 
 const initialFormData = {
   lastName: "",
@@ -67,13 +68,15 @@ const getFieldError = (field: RegisterField, formData: RegisterFormData) => {
     case "birthDate": {
       const value = formData.birthDate.trim();
       if (!value) return "Enter your date of birth.";
-      const birthDate = new Date(value);
+      if (!isPastBirthDate(value)) return "Date of birth must be a valid date before today.";
+      const [year, month, day] = value.split("-").map(Number);
       const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        // Age is one year less if birthday hasn't occurred yet this year
-      }
+      const birthDate = new Date(year, month - 1, day);
+      let age = today.getFullYear() - birthDate.getFullYear();
+      if (
+        today.getMonth() < birthDate.getMonth() ||
+        (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
+      ) age -= 1;
       if (age < 0 || age > 120) return "Please enter a valid date of birth.";
       return "";
     }
@@ -596,6 +599,7 @@ export function Register() {
                     id="birthDate"
                     name="birthDate"
                     value={formData.birthDate}
+                    max={getLatestAllowedBirthDate()}
                     onChange={handleChange}
                     onBlur={handleBlur}
                     required

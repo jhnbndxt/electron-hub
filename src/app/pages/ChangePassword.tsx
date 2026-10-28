@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Eye, EyeOff, LoaderCircle, Lock, Shield } from "lucide-react";
 import bcrypt from "bcryptjs";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../../supabase";
 
@@ -152,7 +152,6 @@ export function ChangePassword() {
 
   return (
     <div className="portal-dashboard-page flex w-full flex-col p-4 sm:p-6 lg:p-8">
-      <Toaster position="top-center" />
       <div className="mx-auto grid w-full max-w-5xl gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
         <section className="portal-glass-panel-strong rounded-2xl p-6">
           <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-[var(--electron-blue)] text-white shadow-lg">

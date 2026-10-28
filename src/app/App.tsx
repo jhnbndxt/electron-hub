@@ -266,7 +266,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <Toaster position="top-right" toastOptions={{ duration: 4500 }} />
+      <Toaster position="top-right" toastOptions={{ duration: 2000 }} />
       <SystemPresenceTracker />
       <RouterProvider router={router} />
     </AuthProvider>

@@ -21,7 +21,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { type ComponentType, type ReactNode, useEffect, useMemo, useState } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useNavigate, useParams } from "react-router";
 import { useAuth } from "../../context/AuthContext";
 import { LoadingState } from "../../components/LoadingState";
@@ -996,8 +996,6 @@ export function ApplicationReviewPage() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.24),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(14,165,233,0.18),transparent_30%),linear-gradient(135deg,#f8fafc_0%,#eef6ff_45%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
-      <Toaster position="top-right" />
-
       <ProcessingModal
         isOpen={processingState.active}
         title={processingState.title}

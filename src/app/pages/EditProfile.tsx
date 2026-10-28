@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Calendar, Camera, LoaderCircle, Lock, Mail, MapPin, Phone, Save, User } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { loadProfileImageUrl, uploadProfileImage, validateProfileImageFile } from "../utils/profileImage";
+import { getLatestAllowedBirthDate, isPastBirthDate } from "../../utils/birthDateValidation";
 import { supabase } from "../../supabase";
 
 export function EditProfile() {
@@ -131,6 +132,11 @@ export function EditProfile() {
       return;
     }
 
+    if (formData.dateOfBirth && !isPastBirthDate(formData.dateOfBirth)) {
+      toast.error("Date of birth must be a valid date before today.");
+      return;
+    }
+
     try {
       setIsSaving(true);
       let nextProfileImageUrl = profileImageUrl;
@@ -182,7 +188,6 @@ export function EditProfile() {
 
   return (
     <div className="portal-dashboard-page flex w-full flex-col p-4 sm:p-6 lg:p-8">
-      <Toaster position="top-center" />
       <div className="mx-auto w-full max-w-5xl space-y-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-950 sm:text-4xl">Edit Profile</h1>
@@ -293,6 +298,7 @@ export function EditProfile() {
                   type="date"
                   name="dateOfBirth"
                   value={formData.dateOfBirth}
+                  max={getLatestAllowedBirthDate()}
                   onChange={handleChange}
                   className="w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-3 text-sm outline-none transition focus:ring-2 focus:ring-blue-200"
                 />

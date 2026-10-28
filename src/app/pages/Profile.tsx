@@ -2,7 +2,7 @@ import { Mail, Phone, MapPin, Calendar, Award, CheckCircle, Users2, BookOpen, Al
 import { useAuth } from "../context/AuthContext";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useState, useEffect, useRef } from "react";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { getAssessmentHistory } from "../../services/assessmentResultService";
 import { supabase } from "../../supabase";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
@@ -687,8 +687,6 @@ export function Profile() {
 
   return (
     <div className="portal-dashboard-page flex w-full flex-col gap-6 p-4 sm:p-6 lg:p-8">
-      <Toaster position="top-center" />
-
       {pendingProfilePreviewUrl && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm">
           <div

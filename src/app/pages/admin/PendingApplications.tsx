@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
-import { Toaster } from "react-hot-toast";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
 import { getStudentPaymentStatus } from "../../../services/adminService";
@@ -674,7 +673,6 @@ export function PendingApplications() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen">
-      <Toaster position="top-right" />
       <DashboardPageHeader
         badge="Application Review"
         title="Pending Applications"

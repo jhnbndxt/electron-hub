@@ -35,6 +35,7 @@ import { triggerNotification } from "../../services/notificationService";
 import { notify } from "../utils/notify";
 import { supabase } from "../../supabase";
 import { DOCUMENT_ACCEPT_ATTRIBUTE, validateDocumentFile } from "../../utils/documentValidation";
+import { getLatestAllowedBirthDate, isPastBirthDate } from "../../utils/birthDateValidation";
 import { ELECTIVE_STRUCTURE, getClusterForElectives, getClustersForTrack, getElectivesForCluster } from "../../data/electives";
 import {
   getBarangays,
@@ -148,6 +149,7 @@ export function EnrollmentForm() {
   const { updateEnrollmentProgress, userData, logout } = useAuth();
   const enrollmentDraftKey = `enrollmentFormDraft_${userData?.email || "guest"}`;
   const [currentPage, setCurrentPage] = useState(1);
+  const [stepperFadeEdges, setStepperFadeEdges] = useState({ left: false, right: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [aiRecommendation, setAiRecommendation] = useState<{
     track: string;
@@ -175,6 +177,55 @@ export function EnrollmentForm() {
   });
   const [addressError, setAddressError] = useState("");
   const hasRestoredDraft = useRef(false);
+  const stepperScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const scrollContainer = stepperScrollRef.current;
+    if (!scrollContainer) {
+      setStepperFadeEdges({ left: false, right: false });
+      return;
+    }
+
+    const updateFadeEdges = () => {
+      const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+      const nextFadeEdges = {
+        left: scrollContainer.scrollLeft > 1,
+        right: maxScrollLeft - scrollContainer.scrollLeft > 1,
+      };
+      setStepperFadeEdges((current) =>
+        current.left === nextFadeEdges.left && current.right === nextFadeEdges.right
+          ? current
+          : nextFadeEdges
+      );
+    };
+
+    const activeStep = scrollContainer.querySelector<HTMLElement>("[data-active='true']");
+    if (activeStep) {
+      const containerBounds = scrollContainer.getBoundingClientRect();
+      const activeStepBounds = activeStep.getBoundingClientRect();
+      const targetScrollLeft = Math.max(
+        0,
+        Math.min(
+          scrollContainer.scrollLeft +
+            activeStepBounds.left -
+            containerBounds.left +
+            activeStepBounds.width / 2 -
+            scrollContainer.clientWidth / 2,
+          scrollContainer.scrollWidth - scrollContainer.clientWidth
+        )
+      );
+      scrollContainer.scrollTo({ left: targetScrollLeft, behavior: "smooth" });
+    }
+
+    updateFadeEdges();
+    scrollContainer.addEventListener("scroll", updateFadeEdges, { passive: true });
+    window.addEventListener("resize", updateFadeEdges);
+
+    return () => {
+      scrollContainer.removeEventListener("scroll", updateFadeEdges);
+      window.removeEventListener("resize", updateFadeEdges);
+    };
+  }, [currentPage, isSubmittedEnrollment]);
 
   const [formData, setFormData] = useState<FormData>({
     admissionType: "",
@@ -963,11 +1014,9 @@ export function EnrollmentForm() {
     return phoneRegex.test(normalizedPhone);
   };
 
-  // Birthday validation (no future dates)
+  // Birth dates must be earlier than today.
   const validateBirthday = (date: string): boolean => {
-    const today = new Date();
-    const birthDate = new Date(date);
-    return birthDate <= today;
+    return isPastBirthDate(date);
   };
 
   const currentYear = new Date().getFullYear();
@@ -1018,7 +1067,7 @@ export function EnrollmentForm() {
       if (!formData.birthday) {
         newErrors.birthday = "This field is required";
       } else if (!validateBirthday(formData.birthday)) {
-        newErrors.birthday = "Please enter a valid birthdate. Future dates are not allowed.";
+        newErrors.birthday = "Birthdate must be a valid date before today.";
       }
       if (!formData.email) newErrors.email = "This field is required";
       if (!formData.contactNumber) {
@@ -1270,46 +1319,57 @@ export function EnrollmentForm() {
     ];
 
     return (
-      <div className="mb-8 overflow-x-auto py-4">
-        <div className="flex items-center justify-center gap-2 min-w-max px-4">
-          {pages.map((page, index) => {
-            const Icon = page.icon;
-            const isActive = currentPage === page.num;
-            const isCompleted = currentPage > page.num;
+      <div className="relative mb-8 overflow-hidden py-4">
+        <div
+          ref={stepperScrollRef}
+          className="overflow-x-auto scroll-smooth py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <div className="flex min-w-max items-center justify-start gap-2 px-6 sm:justify-center">
+            {pages.map((page, index) => {
+              const Icon = page.icon;
+              const isActive = currentPage === page.num;
+              const isCompleted = currentPage > page.num;
 
-            return (
-              <div key={page.num} className="flex items-center">
-                <div className="flex flex-col items-center">
-                  <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
-                      isActive
-                        ? "bg-blue-900 text-white scale-110"
-                        : isCompleted
-                        ? "bg-green-500 text-white"
-                        : "bg-gray-200 text-gray-500"
-                    }`}
-                  >
-                    {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
+              return (
+                <div key={page.num} data-active={isActive} className="flex items-center">
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${
+                        isActive
+                          ? "bg-blue-900 text-white scale-110"
+                          : isCompleted
+                          ? "bg-green-500 text-white"
+                          : "bg-gray-200 text-gray-500"
+                      }`}
+                    >
+                      {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Icon className="w-6 h-6" />}
+                    </div>
+                    <span
+                      className={`text-xs mt-1 font-medium whitespace-nowrap ${
+                        isActive ? "text-blue-900" : isCompleted ? "text-green-600" : "text-gray-500"
+                      }`}
+                    >
+                      {page.label}
+                    </span>
                   </div>
-                  <span
-                    className={`text-xs mt-1 font-medium whitespace-nowrap ${
-                      isActive ? "text-blue-900" : isCompleted ? "text-green-600" : "text-gray-500"
-                    }`}
-                  >
-                    {page.label}
-                  </span>
+                  {index < pages.length - 1 && (
+                    <div
+                      className={`w-8 h-0.5 mx-2 ${
+                        isCompleted ? "bg-green-500" : "bg-gray-300"
+                      }`}
+                    />
+                  )}
                 </div>
-                {index < pages.length - 1 && (
-                  <div
-                    className={`w-8 h-0.5 mx-2 ${
-                      isCompleted ? "bg-green-500" : "bg-gray-300"
-                    }`}
-                  />
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
+        {stepperFadeEdges.left && (
+          <div className="pointer-events-none absolute inset-y-4 left-0 z-10 w-8 bg-gradient-to-r from-slate-100/90 via-slate-100/55 to-transparent sm:w-12" />
+        )}
+        {stepperFadeEdges.right && (
+          <div className="pointer-events-none absolute inset-y-4 right-0 z-10 w-8 bg-gradient-to-l from-slate-100/90 via-slate-100/55 to-transparent sm:w-12" />
+        )}
       </div>
     );
   };
@@ -1322,8 +1382,7 @@ export function EnrollmentForm() {
     placeholder?: string,
     disabled: boolean = false
   ) => {
-    // Get max date for birthday (today)
-    const maxDate = type === "date" ? new Date().toISOString().split('T')[0] : undefined;
+    const maxDate = type === "date" ? getLatestAllowedBirthDate() : undefined;
 
     return (
       <div>

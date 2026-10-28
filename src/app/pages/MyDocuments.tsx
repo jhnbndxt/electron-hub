@@ -425,11 +425,11 @@ export function MyDocuments() {
   };
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">My Documents</h1>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">My Documents</h1>
           <p className="text-gray-600 mt-1">Manage your enrollment documents</p>
         </div>
 
@@ -477,7 +477,7 @@ export function MyDocuments() {
 
         {/* Uploaded Documents */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 py-4 border-b border-gray-200 sm:px-6">
             <h2 className="text-lg font-semibold text-gray-900">My Documents</h2>
           </div>
           <div className="divide-y divide-gray-200">
@@ -492,22 +492,51 @@ export function MyDocuments() {
                   ref={(element) => {
                     documentRefs.current[doc.documentType] = element;
                   }}
-                  className="px-6 py-4 hover:bg-gray-50 transition-colors"
+                  className="px-4 py-4 hover:bg-gray-50 transition-colors sm:px-6"
                 >
-                  <div className="flex items-start gap-4">
-                    <FileText className="w-10 h-10 flex-shrink-0" style={{ color: "#1E3A8A" }} />
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <FileText className="mt-1 h-9 w-9 flex-shrink-0 sm:h-10 sm:w-10" style={{ color: "#1E3A8A" }} />
                     
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                      <p className="text-sm text-gray-500">
-                        Uploaded on {doc.uploadDate} • {doc.fileSize}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <h3 className="min-w-0 flex-1 break-words font-medium text-gray-900">{doc.name}</h3>
+                        <div className="flex flex-shrink-0 items-center gap-2">
+                          {doc.status === "approved" && (
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-800 sm:text-sm">
+                              <CheckCircle className="h-4 w-4" />
+                              Approved
+                            </span>
+                          )}
+                          {doc.status === "pending" && (
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-yellow-100 px-3 py-1 text-xs font-medium text-yellow-800 sm:text-sm">
+                              <AlertCircle className="h-4 w-4" />
+                              Pending Review
+                            </span>
+                          )}
+                          {doc.status === "reuploaded" && (
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-blue-100 px-3 py-1 text-xs font-medium text-blue-800 sm:text-sm">
+                              <Upload className="h-4 w-4" />
+                              Re-uploaded
+                            </span>
+                          )}
+                          {doc.status === "rejected" && (
+                            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800 sm:text-sm">
+                              <XCircle className="h-4 w-4" />
+                              Rejected
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="mt-1 break-words text-sm text-gray-500">
+                        {doc.uploadDate ? `Uploaded on ${doc.uploadDate}` : "Uploaded"}
+                        {doc.fileSize ? ` · ${doc.fileSize}` : ""}
                       </p>
                       {doc.fileUrl && (
                         <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <button onClick={() => setViewingDocument(doc)} className="inline-flex items-center gap-1 rounded-md border border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">
+                          <button onClick={() => setViewingDocument(doc)} className="inline-flex min-h-10 items-center gap-1 rounded-md border border-blue-200 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50">
                             <Eye className="w-3 h-3" />View
                           </button>
-                          <button onClick={() => setPendingDownload(doc)} className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50">
+                          <button onClick={() => setPendingDownload(doc)} className="inline-flex min-h-10 items-center gap-1 rounded-md border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50">
                             <Download className="w-3 h-3" />Download
                           </button>
                         </div>
@@ -536,33 +565,6 @@ export function MyDocuments() {
                       )}
                     </div>
 
-                    {/* Status Badge */}
-                    <div className="flex items-center gap-2">
-                      {doc.status === "approved" && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
-                          <CheckCircle className="w-4 h-4" />
-                          Approved
-                        </span>
-                      )}
-                      {doc.status === "pending" && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
-                          <AlertCircle className="w-4 h-4" />
-                          Pending Review
-                        </span>
-                      )}
-                      {doc.status === "reuploaded" && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                          <Upload className="w-4 h-4" />
-                          Re-uploaded
-                        </span>
-                      )}
-                      {doc.status === "rejected" && (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800">
-                          <XCircle className="w-4 h-4" />
-                          Rejected
-                        </span>
-                      )}
-                    </div>
                   </div>
                 </div>
               ))
@@ -571,8 +573,8 @@ export function MyDocuments() {
         </div>
 
         {/* Required Documents Checklist with Upload */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-gray-900">Required Documents</h2>
             <span className="text-xs px-3 py-1 rounded-full bg-blue-50 text-blue-700 font-semibold">
               {getCategoryCounts(REQUIRED_DOCS).uploaded}/{getCategoryCounts(REQUIRED_DOCS).total} uploaded · {getCategoryCounts(REQUIRED_DOCS).approved} approved
@@ -582,8 +584,8 @@ export function MyDocuments() {
         </div>
 
         {/* Optional Documents Checklist with Upload */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mt-6">
-          <div className="flex items-center justify-between gap-4 mb-4">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:mt-6 sm:p-6 mt-6">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold text-gray-900">Optional Documents</h2>
             <span className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-700 font-semibold">
               {getCategoryCounts(OPTIONAL_DOCS).uploaded}/{getCategoryCounts(OPTIONAL_DOCS).total} uploaded · {getCategoryCounts(OPTIONAL_DOCS).approved} approved

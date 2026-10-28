@@ -22,7 +22,7 @@ import {
   Save,
 } from "lucide-react";
 import bcrypt from "bcryptjs";
-import toast, { Toaster } from "react-hot-toast";
+import toast from "react-hot-toast";
 import { Skeleton } from "../../components/ui/skeleton";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
@@ -595,7 +595,6 @@ export function BranchCoordinatorPayments() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8">
-      <Toaster position="top-right" />
       <ProcessingModal
         isOpen={processingState.active}
         title={processingState.title}

@@ -9,6 +9,7 @@ import { supabase } from "../../../supabase";
 import { registerUser } from "../../../services/authService";
 import { createAuditLog } from "../../../services/adminService";
 import { notify } from "../../utils/notify";
+import { getLatestAllowedBirthDate, isPastBirthDate } from "../../../utils/birthDateValidation";
 
 interface UserAccount {
   id: string;
@@ -120,10 +121,16 @@ const getAddUserFieldError = (field: AddUserField, form: AddUserForm) => {
       const value = form.birthDate.trim();
       if (!isStudent) return "";
       if (!value) return "Enter date of birth.";
-      const birthDate = new Date(value);
+      if (!isPastBirthDate(value)) return "Date of birth must be a valid date before today.";
+      const [year, month, day] = value.split("-").map(Number);
+      const birthDate = new Date(year, month - 1, day);
       const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
-      if (Number.isNaN(birthDate.getTime()) || birthDate > today || age > 120) {
+      let age = today.getFullYear() - birthDate.getFullYear();
+      if (
+        today.getMonth() < birthDate.getMonth() ||
+        (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
+      ) age -= 1;
+      if (age > 120) {
         return "Please enter a valid date of birth.";
       }
       return "";
@@ -282,8 +289,7 @@ export function UserManagement() {
     }
 
     if (password === undefined) {
-      setPasswordInput("");
-      setPasswordPrompt({ action, targets });
+      openPasswordPrompt(action, targets);
       return false;
     }
     const coordinatorPassword = password.trim();
@@ -425,6 +431,16 @@ export function UserManagement() {
     }`;
   };
 
+  const openPasswordPrompt = (action: "deactivate" | "delete", targets: UserAccount[]) => {
+    setPasswordInput("");
+    setPasswordPrompt({ action, targets });
+  };
+
+  const closePasswordPrompt = () => {
+    setPasswordPrompt(null);
+    setPasswordInput("");
+  };
+
   const updateAddUserField = (field: AddUserField, value: string) => {
     const nextValue = field === "email" ? value.trimStart().toLowerCase() : value;
     setNewUserForm((current) => ({
@@ -482,7 +498,7 @@ export function UserManagement() {
     const confirmation = action === "deactivate"
       ? `Deactivate ${targets.length} selected account${targets.length === 1 ? "" : "s"}?`
       : `Permanently delete ${targets.length} selected deactivated account${targets.length === 1 ? "" : "s"}? This cannot be undone.`;
-    setPasswordPrompt({ action, targets });
+    openPasswordPrompt(action, targets);
   };
 
   const handleEditClick = (user: UserAccount) => {
@@ -993,7 +1009,10 @@ export function UserManagement() {
           <div className="relative flex-1 max-w-xl">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
-              type="text"
+              type="search"
+              name="account-directory-search"
+              autoComplete="off"
+              role="searchbox"
               value={searchQuery}
               onChange={(event) => {
                 setSearchQuery(event.target.value);
@@ -1523,6 +1542,7 @@ export function UserManagement() {
                       </label>
                       <input
                         type="date"
+                        max={getLatestAllowedBirthDate()}
                         className={getAddUserInputClassName("birthDate")}
                         value={newUserForm.birthDate}
                         onChange={(e) => updateAddUserField("birthDate", e.target.value)}
@@ -1706,14 +1726,32 @@ export function UserManagement() {
       )}
 
       {passwordPrompt && (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm" onClick={() => setPasswordPrompt(null)}>
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm" onClick={closePasswordPrompt}>
           <div role="dialog" aria-modal="true" aria-labelledby="account-action-password-title" className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <h2 id="account-action-password-title" className="text-xl font-semibold text-slate-950">Authorize account action</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">Enter your Branch Coordinator password to authorize this {passwordPrompt.action === "deactivate" ? "deactivation" : "permanent deletion"}.</p>
-            <input autoFocus type="password" value={passwordInput} onChange={(event) => setPasswordInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Escape") setPasswordPrompt(null); }} className="mt-5 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" autoComplete="current-password" />
+            <input
+              type="password"
+              name="branch-coordinator-action-authorization"
+              value={passwordInput}
+              onChange={(event) => setPasswordInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") closePasswordPrompt();
+              }}
+              aria-label="Branch Coordinator authorization password"
+              className="mt-5 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
+              autoComplete="new-password"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
             <div className="mt-5 flex justify-end gap-3">
-              <button onClick={() => setPasswordPrompt(null)} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
-              <button onClick={async () => { const request = passwordPrompt; setPasswordPrompt(null); await executeAccountAction(request.action, request.targets, passwordInput); }} className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Authorize</button>
+              <button onClick={closePasswordPrompt} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button onClick={async () => {
+                const request = passwordPrompt;
+                const password = passwordInput;
+                closePasswordPrompt();
+                await executeAccountAction(request.action, request.targets, password);
+              }} className="rounded-xl bg-blue-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-800">Authorize</button>
             </div>
           </div>
         </div>
