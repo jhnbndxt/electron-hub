@@ -106,8 +106,8 @@ const formatCurrency = (amount: number) =>
     maximumFractionDigits: 2,
   });
 
-const PAYMENT_AMOUNT_INPUT_PATTERN = /^\d*(\.\d{0,2})?$/;
-const PAYMENT_AMOUNT_PASTE_PATTERN = /^\d+(\.\d{1,2})?$/;
+const PAYMENT_AMOUNT_INPUT_PATTERN = /^(?:\d*|0(?:\.\d{0,2})?)$/;
+const PAYMENT_AMOUNT_PASTE_PATTERN = /^0(\.\d{1,2})?$/;
 
 type PaymentSettingsForm = {
   payment_bank_enabled: boolean;

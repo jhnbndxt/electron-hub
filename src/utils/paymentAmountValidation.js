@@ -1,5 +1,5 @@
-export const PAYMENT_AMOUNT_PATTERN = /^\d+(\.\d{1,2})?$/;
-export const INVALID_PAYMENT_AMOUNT_MESSAGE = 'Enter a valid amount, like 12 or 12.50.';
+export const PAYMENT_AMOUNT_PATTERN = /^0(\.\d{1,2})?$/;
+export const INVALID_PAYMENT_AMOUNT_MESSAGE = 'Invalid Amount. Please enter a valid amount based on the required payment.';
 
 export function validatePaymentAmount(value) {
   const normalizedValue = String(value ?? '').trim();
