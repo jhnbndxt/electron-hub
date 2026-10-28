@@ -25,9 +25,66 @@ ALTER TABLE public.enrollments
   ));
 
 -- ============================================================================
--- 2. ALLOW STUDENTS TO UPDATE THEIR OWN ENROLLMENT STATUS
+-- 2. ENROLLMENT RECORD ACCESS FOR STAFF
 -- ============================================================================
--- When students upload or resubmit documents, the client updates enrollment status to 'pending_review'.
+-- Staff auth IDs are stored separately from public.users.id, so resolve staff by
+-- their linked Supabase Auth ID (or the authenticated email for older accounts).
+CREATE OR REPLACE FUNCTION public.can_manage_enrollment_records()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+SET row_security = off
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE (
+      to_jsonb(u) ->> 'auth_user_id' = (SELECT auth.uid()::text)
+      OR lower(u.email) = lower((SELECT auth.jwt() ->> 'email'))
+    )
+    AND u.role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
+  )
+$$;
+
+CREATE OR REPLACE FUNCTION public.can_review_enrollment_documents()
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+SET row_security = off
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.users u
+    WHERE (
+      to_jsonb(u) ->> 'auth_user_id' = (SELECT auth.uid()::text)
+      OR lower(u.email) = lower((SELECT auth.jwt() ->> 'email'))
+    )
+    AND u.role IN ('registrar', 'branchcoordinator', 'superadmin')
+  )
+$$;
+
+REVOKE ALL ON FUNCTION public.can_manage_enrollment_records() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.can_manage_enrollment_records() TO authenticated;
+REVOKE ALL ON FUNCTION public.can_review_enrollment_documents() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.can_review_enrollment_documents() TO authenticated;
+
+-- Preserve cashier access to enrollment records, but not enrollment documents.
+DROP POLICY IF EXISTS enrollments_select_admin ON public.enrollments;
+CREATE POLICY enrollments_select_admin ON public.enrollments FOR SELECT
+  USING (public.can_manage_enrollment_records());
+
+-- Preserve existing staff enrollment update permissions.
+DROP POLICY IF EXISTS enrollments_update_admin ON public.enrollments;
+CREATE POLICY enrollments_update_admin ON public.enrollments FOR UPDATE
+  USING (public.can_manage_enrollment_records())
+  WITH CHECK (public.can_manage_enrollment_records());
+
+-- Students can update their own enrollment status when uploading documents.
+-- Enrollment rows can store either a student_id or a user_id depending on schema version.
 DROP POLICY IF EXISTS enrollments_update_own ON public.enrollments;
 CREATE POLICY enrollments_update_own ON public.enrollments FOR UPDATE
   USING (
@@ -108,35 +165,18 @@ CREATE POLICY enrollment_documents_update_own ON public.enrollment_documents FOR
 -- Staff can view all enrollment documents
 DROP POLICY IF EXISTS enrollment_documents_select_staff ON public.enrollment_documents;
 CREATE POLICY enrollment_documents_select_staff ON public.enrollment_documents FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = (SELECT auth.uid()::uuid)
-      AND u.role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
-    )
-  );
+  USING (public.can_review_enrollment_documents());
 
 -- Staff can update all enrollment documents (for approving/rejecting)
 DROP POLICY IF EXISTS enrollment_documents_update_staff ON public.enrollment_documents;
 CREATE POLICY enrollment_documents_update_staff ON public.enrollment_documents FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = (SELECT auth.uid()::uuid)
-      AND u.role IN ('registrar', 'branchcoordinator', 'cashier', 'superadmin')
-    )
-  );
+  USING (public.can_review_enrollment_documents())
+  WITH CHECK (public.can_review_enrollment_documents());
 
 -- Admins can delete enrollment documents
 DROP POLICY IF EXISTS enrollment_documents_delete_staff ON public.enrollment_documents;
 CREATE POLICY enrollment_documents_delete_staff ON public.enrollment_documents FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.users u
-      WHERE u.id = (SELECT auth.uid()::uuid)
-      AND u.role IN ('branchcoordinator', 'superadmin')
-    )
-  );
+  USING (public.can_review_enrollment_documents());
 
 -- ============================================================================
 -- 4. SUPABASE STORAGE POLICIES FOR enrollment_documents BUCKET
