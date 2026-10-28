@@ -346,7 +346,7 @@ export function MyDocuments() {
 
       if (storageError) {
         console.error("Storage upload error:", storageError);
-        toast.error("Upload failed. Please check the file type and size, then try again.");
+        toast.error(`Upload failed: ${storageError.message}`);
         setUploadingDoc(null);
         return;
       }
@@ -417,7 +417,8 @@ export function MyDocuments() {
       toast.success(`${docName} uploaded successfully and sent for review.`);
     } catch (err) {
       console.error("Upload error:", err);
-      toast.error("Upload failed. Please try again with a JPG, JPEG, or PDF file up to 5 MB.");
+      const message = err instanceof Error ? err.message : "An unexpected error occurred.";
+      toast.error(`Upload failed: ${message}`);
     } finally {
       setUploadingDoc(null);
     }

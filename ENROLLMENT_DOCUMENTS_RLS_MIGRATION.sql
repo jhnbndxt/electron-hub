@@ -142,9 +142,18 @@ CREATE POLICY enrollment_documents_delete_staff ON public.enrollment_documents F
 -- 4. SUPABASE STORAGE POLICIES FOR enrollment_documents BUCKET
 -- ============================================================================
 -- Ensure the storage bucket exists and is public
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('enrollment_documents', 'enrollment_documents', true)
-ON CONFLICT (id) DO UPDATE SET public = true;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'enrollment_documents',
+  'enrollment_documents',
+  true,
+  5242880,
+  ARRAY['image/*', 'application/pdf']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = true,
+  file_size_limit = EXCLUDED.file_size_limit,
+  allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 -- Allow public reads so documents can be viewed in the browser
 DROP POLICY IF EXISTS "Public can view enrollment documents" ON storage.objects;
@@ -171,4 +180,3 @@ CREATE POLICY "Staff can delete enrollment documents"
   USING (bucket_id = 'enrollment_documents');
 
 NOTIFY pgrst, 'reload schema';
-

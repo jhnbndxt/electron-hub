@@ -1420,7 +1420,7 @@ export function EnrollmentForm() {
               <p className="text-sm text-gray-700 truncate font-medium">
                 {displayName || "Click to upload or drag and drop"}
               </p>
-              <p className="text-xs text-gray-500">PDF, PNG, JPG, or WEBP (up to 5 MB)</p>
+              <p className="text-xs text-gray-500">Any image format or PDF (up to 5 MB)</p>
             </div>
             {displayName && !isSubmittedEnrollment && (
               <button
