@@ -31,14 +31,14 @@ ALTER TABLE public.enrollments
 DROP POLICY IF EXISTS enrollments_update_own ON public.enrollments;
 CREATE POLICY enrollments_update_own ON public.enrollments FOR UPDATE
   USING (
-    student_id = (SELECT auth.uid()::uuid)
-    OR user_id = (SELECT auth.jwt() ->> 'email')
-    OR user_id = (SELECT auth.uid()::text)
+    to_jsonb(enrollments) ->> 'student_id' = (SELECT auth.uid()::text)
+    OR to_jsonb(enrollments) ->> 'user_id' = (SELECT auth.jwt() ->> 'email')
+    OR to_jsonb(enrollments) ->> 'user_id' = (SELECT auth.uid()::text)
   )
   WITH CHECK (
-    student_id = (SELECT auth.uid()::uuid)
-    OR user_id = (SELECT auth.jwt() ->> 'email')
-    OR user_id = (SELECT auth.uid()::text)
+    to_jsonb(enrollments) ->> 'student_id' = (SELECT auth.uid()::text)
+    OR to_jsonb(enrollments) ->> 'user_id' = (SELECT auth.jwt() ->> 'email')
+    OR to_jsonb(enrollments) ->> 'user_id' = (SELECT auth.uid()::text)
   );
 
 -- ============================================================================
@@ -57,9 +57,9 @@ CREATE POLICY enrollment_documents_select_own ON public.enrollment_documents FOR
       SELECT 1 FROM public.enrollments e
       WHERE e.id = enrollment_documents.enrollment_id
       AND (
-        e.student_id = (SELECT auth.uid()::uuid)
-        OR e.user_id = (SELECT auth.jwt() ->> 'email')
-        OR e.user_id = (SELECT auth.uid()::text)
+        to_jsonb(e) ->> 'student_id' = (SELECT auth.uid()::text)
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.jwt() ->> 'email')
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.uid()::text)
       )
     )
   );
@@ -72,9 +72,9 @@ CREATE POLICY enrollment_documents_insert_own ON public.enrollment_documents FOR
       SELECT 1 FROM public.enrollments e
       WHERE e.id = enrollment_documents.enrollment_id
       AND (
-        e.student_id = (SELECT auth.uid()::uuid)
-        OR e.user_id = (SELECT auth.jwt() ->> 'email')
-        OR e.user_id = (SELECT auth.uid()::text)
+        to_jsonb(e) ->> 'student_id' = (SELECT auth.uid()::text)
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.jwt() ->> 'email')
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.uid()::text)
       )
     )
   );
@@ -87,9 +87,9 @@ CREATE POLICY enrollment_documents_update_own ON public.enrollment_documents FOR
       SELECT 1 FROM public.enrollments e
       WHERE e.id = enrollment_documents.enrollment_id
       AND (
-        e.student_id = (SELECT auth.uid()::uuid)
-        OR e.user_id = (SELECT auth.jwt() ->> 'email')
-        OR e.user_id = (SELECT auth.uid()::text)
+        to_jsonb(e) ->> 'student_id' = (SELECT auth.uid()::text)
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.jwt() ->> 'email')
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.uid()::text)
       )
     )
   )
@@ -98,9 +98,9 @@ CREATE POLICY enrollment_documents_update_own ON public.enrollment_documents FOR
       SELECT 1 FROM public.enrollments e
       WHERE e.id = enrollment_documents.enrollment_id
       AND (
-        e.student_id = (SELECT auth.uid()::uuid)
-        OR e.user_id = (SELECT auth.jwt() ->> 'email')
-        OR e.user_id = (SELECT auth.uid()::text)
+        to_jsonb(e) ->> 'student_id' = (SELECT auth.uid()::text)
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.jwt() ->> 'email')
+        OR to_jsonb(e) ->> 'user_id' = (SELECT auth.uid()::text)
       )
     )
   );
