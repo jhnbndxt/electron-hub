@@ -110,6 +110,13 @@ function getRiasecPercentages(riasecScores = {}) {
   }, {});
 }
 
+function calculateWeightedClusterEvidence(formula, aptitude, interests) {
+  return Object.entries(formula).reduce((total, [dimension, weight]) => {
+    const value = dimension in aptitude ? aptitude[dimension] : interests[dimension];
+    return total + value * weight;
+  }, 0);
+}
+
 export function getRiasecResponseScore(answer, question) {
   const response = Number(answer);
   if (!Number.isInteger(response)) {
@@ -174,12 +181,30 @@ export function calculateTrackRecommendation(scores = {}, riasecScores = {}) {
     aptitude.math * 0.3333 +
     aptitude.science * 0.3334;
   const technicalProfessionalScore = (aptitude.math + aptitude.logical) * 0.5;
+  const businessEvidence = calculateWeightedClusterEvidence(
+    CLUSTER_FORMULAS['Business and Entrepreneurship'],
+    aptitude,
+    interests
+  );
+  const ictEvidence = calculateWeightedClusterEvidence(
+    CLUSTER_FORMULAS['ICT Support and Computer Programming Technologies'],
+    aptitude,
+    interests
+  );
   let track;
 
   if (Math.abs(academicScore - technicalProfessionalScore) > TRACK_TIE_TOLERANCE) {
     track = academicScore > technicalProfessionalScore
       ? 'Academic Track'
       : 'Technical-Professional Electives';
+
+    // Business and ICT both rely heavily on Math and Logical ability. When
+    // those shared strengths initially point to Tech-Pro, compare their full
+    // path evidence so Enterprising/Conventional interests can properly
+    // distinguish Business from ICT's Realistic/Investigative profile.
+    if (track === 'Technical-Professional Electives' && businessEvidence > ictEvidence) {
+      track = 'Academic Track';
+    }
   } else {
     const academicInterestFit = (
       interests.Investigative +
@@ -212,6 +237,8 @@ export function calculateTrackRecommendation(scores = {}, riasecScores = {}) {
     trackScores: {
       academic: Number(academicScore.toFixed(2)),
       technicalProfessional: Number(technicalProfessionalScore.toFixed(2)),
+      business: Number(businessEvidence.toFixed(2)),
+      ict: Number(ictEvidence.toFixed(2)),
     },
   };
 }
