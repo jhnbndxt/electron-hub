@@ -1039,6 +1039,31 @@
 }
 
 @media (max-width: 1023px) {
+  /* Desktop uses an internal fixed-height scroller. On touch devices that
+     pattern can trap the page at the top, so let the document own vertical
+     scrolling and keep the fixed navigation outside the normal flow. */
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    overflow-y: auto;
+  }
+
+  .portal-glass-shell,
+  .portal-glass-content {
+    display: block;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .portal-glass-main {
+    display: block;
+    min-height: calc(100dvh - 6rem);
+    overflow: visible !important;
+    overscroll-behavior-y: auto;
+    touch-action: pan-y;
+  }
+
   .portal-glass-content,
   .portal-glass-main,
   .portal-dashboard-page,
