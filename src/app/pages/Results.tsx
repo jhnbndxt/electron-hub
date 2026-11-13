@@ -432,6 +432,7 @@ export function Results() {
           id: snapshot.questionId,
           question: snapshot.questionText,
           questionNumber: idx + 1,
+          selectedRating: Number.isInteger(snapshot.selectedRating) ? snapshot.selectedRating : null,
           selectedChoiceText: selectedChoice?.text ?? snapshot.selectedChoiceText ?? null,
         };
       });
@@ -1256,7 +1257,9 @@ export function Results() {
                         Selected response
                       </p>
                       <p className="mt-1 font-bold text-slate-900">
-                        {q.selectedChoiceText || "Not answered"}
+                        {q.selectedRating !== null
+                          ? `${q.selectedRating} — ${q.selectedChoiceText || "Selected rating"}`
+                          : q.selectedChoiceText || "Not answered"}
                       </p>
                     </div>
                   </div>

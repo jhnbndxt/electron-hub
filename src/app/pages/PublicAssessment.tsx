@@ -37,24 +37,17 @@ function organizeAssessmentSections(questions: Question[]): Section[] {
     { name: "Science", icon: Beaker, questions: questions.filter((question) => question.category === "Science") },
     { name: "Logical", icon: Lightbulb, questions: questions.filter((question) => question.category === "Logical") },
   ];
-  const riasecTypes = ["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"];
-  const riasecSections = riasecTypes.map((type) => ({
-    name: type,
-    icon: Heart,
-    questions: questions.filter((question) => {
-      const questionType = question.interestType || question.category;
-      return questionType === type || questionType === type[0];
-    }),
-  }));
-  const untypedInterests = questions.filter((question) =>
-    question.category === "Interests" &&
-    !riasecTypes.some((type) => question.interestType === type || question.interestType === type[0])
+  const interestCategories = new Set([
+    "Interests", "Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional",
+    "R", "I", "A", "S", "E", "C",
+  ]);
+  const interestQuestions = questions.filter((question) =>
+    interestCategories.has(question.category) || Boolean(question.interestType)
   );
 
   return [
     ...aptitudeSections,
-    ...riasecSections,
-    ...(untypedInterests.length ? [{ name: "Interests", icon: Heart, questions: untypedInterests }] : []),
+    ...(interestQuestions.length ? [{ name: "Interests", icon: Heart, questions: interestQuestions }] : []),
   ].filter((section) => section.questions.length > 0);
 }
 
@@ -1404,12 +1397,6 @@ export function PublicAssessment() {
       Science: [],
       Logical: [],
       Interests: [],
-      Realistic: [],
-      Investigative: [],
-      Artistic: [],
-      Social: [],
-      Enterprising: [],
-      Conventional: [],
     };
 
     sections.forEach((section) => {
@@ -2002,7 +1989,7 @@ export function PublicAssessment() {
                           <span className="text-xs font-medium text-blue-700">Higher ratings mean stronger agreement.</span>
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-5">
-                          {[...question.options].reverse().map((option, optIndex) => {
+                          {question.options.map((option, optIndex) => {
                             const ratingValue = optIndex + 1;
                             const isSelected = answers[question.id] === ratingValue;
 

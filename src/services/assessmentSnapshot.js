@@ -32,6 +32,27 @@ const normalizeAnswer = (answers, questionId) => {
   return Number.isInteger(value) ? value : null;
 };
 
+const getLikertRating = (answer) => (
+  Number.isInteger(answer) && answer >= 1 && answer <= 5 ? answer : null
+);
+
+const getLikertChoiceIndex = (options, rating) => {
+  if (rating === null) return null;
+
+  // The persisted answer for an interest question is its 1–5 rating, not an
+  // options-array index. Prefer the label's explicit value so this continues
+  // to work if labels are reordered in the question editor.
+  const labelledIndex = options.findIndex((option) =>
+    new RegExp(`^\\s*${rating}\\s*(?:-|\\.|:|\\))?\\s*`).test(String(option))
+  );
+
+  return labelledIndex >= 0
+    ? labelledIndex
+    : rating - 1 < options.length
+      ? rating - 1
+      : null;
+};
+
 const createChoiceId = (questionId, option, occurrence) => {
   const normalizedOption = String(option || '').trim().toLowerCase();
   let hash = 0;
@@ -49,11 +70,15 @@ export function buildAssessmentAnswerSnapshots(answers = {}, questionsByCategory
     .map((question, questionIndex) => {
       const options = Array.isArray(question.options) ? question.options : [];
       const submittedChoiceIndex = normalizeAnswer(answers, question.id);
-      const selectedChoiceIndex = submittedChoiceIndex !== null &&
-        submittedChoiceIndex >= 0 &&
-        submittedChoiceIndex < options.length
-        ? submittedChoiceIndex
-        : null;
+      const isInterestQuestion = isInterestAnswerSnapshot(question);
+      const selectedRating = isInterestQuestion ? getLikertRating(submittedChoiceIndex) : null;
+      const selectedChoiceIndex = isInterestQuestion
+        ? getLikertChoiceIndex(options, selectedRating)
+        : submittedChoiceIndex !== null &&
+            submittedChoiceIndex >= 0 &&
+            submittedChoiceIndex < options.length
+          ? submittedChoiceIndex
+          : null;
       const choiceOccurrences = new Map();
       const choices = options.map((text, optionIndex) => {
         const normalizedText = String(text || '');
@@ -78,13 +103,14 @@ export function buildAssessmentAnswerSnapshots(answers = {}, questionsByCategory
         questionId: question.id,
         questionNumber: questionIndex + 1,
         questionText: question.question,
-        category: isInterestAnswerSnapshot(question) ? 'Interests' : question.category,
+        category: isInterestQuestion ? 'Interests' : question.category,
         interestType: getInterestType(question),
         choices,
         selectedChoiceId: selectedChoice?.id || null,
         selectedChoiceText: selectedChoice?.text || null,
         selectedChoiceLetter: selectedChoice?.letter || null,
         selectedChoiceIndex,
+        selectedRating,
         correctAnswer,
         correctChoiceId: correctChoice?.id || null,
         correctAnswerText: correctChoice?.text || null,

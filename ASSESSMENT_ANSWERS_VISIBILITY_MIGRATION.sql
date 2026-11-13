@@ -12,7 +12,7 @@ CREATE POLICY system_settings_select_student_assessment_visibility
   );
 
 DROP POLICY IF EXISTS assessment_results_select_student_own
-  ON public.assessmen t_results;
+  ON public.assessment_results;
 CREATE POLICY assessment_results_select_student_own
   ON public.assessment_results FOR SELECT
   USING (

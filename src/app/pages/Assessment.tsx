@@ -752,7 +752,7 @@ export function Assessment() {
                         <span className="text-xs font-medium text-blue-700">Higher ratings mean stronger agreement.</span>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-5 gap-3">
-                        {[...question.options].reverse().map((option, optionIndex) => {
+                        {question.options.map((option, optionIndex) => {
                           const ratingValue = optionIndex + 1;
                           const isSelected = answers[question.id] === ratingValue;
 
