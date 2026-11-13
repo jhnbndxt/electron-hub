@@ -10,6 +10,8 @@ import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
 import { buildAssessmentAnswerSnapshots, isInterestAnswerSnapshot, normalizeAssessmentAnswerSnapshots, resolveAssessmentCorrectAnswer } from "../../services/assessmentSnapshot";
+import { canViewAssessmentAnswers } from "../../services/assessmentAnswersVisibility";
+import { getSystemSettings } from "../../services/systemSettingsService";
 import electivesCatalog, { getClusterForElectives } from "../../data/electives.js";
 import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
@@ -290,7 +292,28 @@ function PublicAssessmentResultsView({
   const [openAnswerSection, setOpenAnswerSection] = useState<string | null>("Verbal");
   const [activeAnswerSection, setActiveAnswerSection] = useState("Verbal");
   const [answerFilter, setAnswerFilter] = useState<"all" | "correct" | "incorrect">("all");
+  const [answerDetailsVisible, setAnswerDetailsVisible] = useState(false);
   const normalizedResult = normalizeAssessmentResult(result);
+
+  useEffect(() => {
+    let active = true;
+    const loadVisibility = async () => {
+      const settingsResult = await getSystemSettings();
+      if (active) setAnswerDetailsVisible(canViewAssessmentAnswers(settingsResult));
+    };
+    void loadVisibility();
+
+    const refreshOnFocus = () => {
+      if (document.visibilityState === "visible") void loadVisibility();
+    };
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnFocus);
+    return () => {
+      active = false;
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnFocus);
+    };
+  }, []);
 
   if (!normalizedResult) {
     return (
@@ -507,7 +530,7 @@ function PublicAssessmentResultsView({
             </div>
           </div>
 
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-lg sm:p-7 lg:col-span-2">
+          {answerDetailsVisible && <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-lg sm:p-7 lg:col-span-2">
             <div className="flex flex-col gap-3 border-b border-slate-100 pb-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-700">Submitted response record</p>
@@ -623,7 +646,7 @@ function PublicAssessmentResultsView({
                 Individual answers were not saved with this assessment result.
               </p>
             )}
-          </div>
+          </div>}
 
           <div className="rounded-2xl bg-white p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-950">Possible Pathways</h2>

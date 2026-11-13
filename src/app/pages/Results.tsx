@@ -247,6 +247,13 @@ export function Results() {
     void loadResults();
 
     const studentEmail = userData?.email || "student@gmail.com";
+    const refreshVisibilityOnFocus = () => {
+      if (document.visibilityState === "visible") {
+        void loadResults();
+      }
+    };
+    window.addEventListener("focus", refreshVisibilityOnFocus);
+    document.addEventListener("visibilitychange", refreshVisibilityOnFocus);
     const channel = supabase
       .channel(`results-settings-${studentEmail}`)
       .on(
@@ -264,6 +271,8 @@ export function Results() {
       .subscribe();
 
     return () => {
+      window.removeEventListener("focus", refreshVisibilityOnFocus);
+      document.removeEventListener("visibilitychange", refreshVisibilityOnFocus);
       supabase.removeChannel(channel);
     };
   }, [userData]);
