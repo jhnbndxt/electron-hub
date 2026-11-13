@@ -531,7 +531,7 @@ function PublicAssessmentResultsView({
                       type="button"
                       onClick={() => setOpenAnswerSection(isOpen ? null : section.key)}
                       aria-expanded={isOpen}
-                      className="flex w-full items-center justify-between gap-3 bg-white px-4 py-3.5 text-left transition hover:bg-slate-50 sm:px-5"
+                      className="flex w-full items-center justify-between gap-3 bg-white px-4 py-3.5 text-left sm:px-5"
                     >
                       <span className="text-base font-bold text-slate-900">{section.label}</span>
                       <span className="flex items-center gap-3">
@@ -542,7 +542,7 @@ function PublicAssessmentResultsView({
                       </span>
                     </button>
                     {isOpen && (section.snapshots.length > 0 ? (
-                      <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+                      <div className="space-y-3 p-4 sm:p-5">
                         {section.snapshots.map((snapshot, index) => {
                           const selectedChoice = Array.isArray(snapshot.choices)
                             ? snapshot.choices.find((choice: any) => choice.id === snapshot.selectedChoiceId)
