@@ -198,6 +198,8 @@ export function BranchCoordinatorPayments() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [paymentTypeFilter, setPaymentTypeFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(null);
   const [viewingReceipt, setViewingReceipt] = useState<PaymentRecord | null>(null);
@@ -549,8 +551,19 @@ export function BranchCoordinatorPayments() {
       }
       });
     }
+
+    if (dateFrom || dateTo) {
+      const rangeStart = dateFrom ? new Date(`${dateFrom}T00:00:00`) : null;
+      const rangeEnd = dateTo ? new Date(`${dateTo}T23:59:59.999`) : null;
+      result = result.filter((payment) => {
+        const paymentDate = new Date(payment.submittedDate);
+        return isValidDate(paymentDate) &&
+          (!rangeStart || paymentDate >= rangeStart) &&
+          (!rangeEnd || paymentDate <= rangeEnd);
+      });
+    }
     return result;
-  }, [payments, searchQuery, statusFilter, paymentTypeFilter, dateFilter]);
+  }, [payments, searchQuery, statusFilter, paymentTypeFilter, dateFilter, dateFrom, dateTo]);
 
   // Stats stay global so table filters do not change the summary cards.
   const totalTransactions = payments.length;
@@ -725,6 +738,37 @@ export function BranchCoordinatorPayments() {
             <option value="week">This Week</option>
             <option value="month">This Month</option>
           </select>
+
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <label htmlFor="payment-date-from" className="shrink-0 text-xs font-semibold text-slate-600">From</label>
+            <input
+              id="payment-date-from"
+              type="date"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={(event) => {
+                setDateFrom(event.target.value);
+                setDateFilter("all");
+              }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
+            />
+          </div>
+
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <label htmlFor="payment-date-to" className="shrink-0 text-xs font-semibold text-slate-600">To</label>
+            <input
+              id="payment-date-to"
+              type="date"
+              value={dateTo}
+              min={dateFrom || undefined}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={(event) => {
+                setDateTo(event.target.value);
+                setDateFilter("all");
+              }}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:w-auto"
+            />
+          </div>
 
           <button
             onClick={handleExportCSV}

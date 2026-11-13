@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
 import { supabase } from "../../supabase";
 
 interface UserData {
@@ -51,6 +51,7 @@ const initialEnrollmentSteps: EnrollmentStep[] = [
 const PENDING_PAYMENT_STATUSES = new Set(["pending", "submitted"]);
 const COMPLETED_PAYMENT_STATUSES = new Set(["verified", "approved", "completed", "paid"]);
 const INACTIVE_ENROLLMENT_STATUSES = new Set(["rejected", "dropped", "unenrolled", "removed"]);
+const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;
 
 function getPaymentVisitedStorageKey(userEmail?: string | null) {
   return userEmail ? `payment_page_visited_${userEmail}` : null;
@@ -464,7 +465,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = useCallback(() => {
     const currentEmail = userData?.email;
     setUserRole(null);
     setUserData(null);
@@ -490,7 +491,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void supabase.auth.signOut().catch((error) => {
       console.error("[AuthContext] Error signing out Supabase session:", error);
     });
-  };
+  }, [userData?.email]);
+
+  // Keep authenticated sessions from remaining open on unattended devices.
+  // Any normal interaction renews the 30-minute inactivity timer.
+  useEffect(() => {
+    if (!userRole || typeof window === "undefined") {
+      return;
+    }
+
+    let timeoutId: number | null = null;
+    const expireSession = () => {
+      logout();
+      window.location.replace("/login?reason=session-timeout");
+    };
+    const restartInactivityTimer = () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      timeoutId = window.setTimeout(expireSession, INACTIVITY_TIMEOUT_MS);
+    };
+    const activityEvents: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart", "scroll", "focus"];
+
+    activityEvents.forEach((eventName) => window.addEventListener(eventName, restartInactivityTimer, { passive: true }));
+    restartInactivityTimer();
+
+    return () => {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+      }
+      activityEvents.forEach((eventName) => window.removeEventListener(eventName, restartInactivityTimer));
+    };
+  }, [logout, userRole]);
 
   const updateUserData = (nextUserData: Partial<UserData>) => {
     setUserData((currentUserData) => {

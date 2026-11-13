@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart,
 import { useAuth } from "../context/AuthContext";
 import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
+import { ConfirmationModal } from "../components/ConfirmationModal";
 import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/assessmentResultService";
 import { canViewAssessmentAnswers } from "../../services/assessmentAnswersVisibility";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
@@ -80,6 +81,7 @@ export function Assessment() {
   const [assessmentStarted, setAssessmentStarted] = useState(false);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [showResetConfirmation, setShowResetConfirmation] = useState(false);
   const hasRestoredProgress = useRef(false);
   const hasAutoSubmitted = useRef(false);
   const submitAssessmentRef = useRef<() => void>(() => undefined);
@@ -110,6 +112,19 @@ export function Assessment() {
 
       window.scrollTo({ top: 0, behavior });
     });
+  };
+
+  const resetAssessment = () => {
+    localStorage.removeItem(assessmentProgressKey);
+    hasAutoSubmitted.current = false;
+    setAnswers({});
+    setCurrentSection(0);
+    setStartedAt(null);
+    setRemainingSeconds(0);
+    setAssessmentStarted(false);
+    setSubmitError("");
+    setShowResetConfirmation(false);
+    scrollAssessmentToTop();
   };
 
   useEffect(() => {
@@ -636,6 +651,15 @@ export function Assessment() {
         message="Scoring your answers and preparing your AI elective explanations..."
         progress={submitProgress}
       />
+      <ConfirmationModal
+        isOpen={showResetConfirmation}
+        onClose={() => setShowResetConfirmation(false)}
+        onConfirm={resetAssessment}
+        title="Restart assessment?"
+        message="Your unfinished answers and remaining time will be cleared. This cannot be undone."
+        confirmText="Restart assessment"
+        type="warning"
+      />
       {submitError && (
         <div role="alert" className="mx-auto mb-4 max-w-4xl rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-800">
           {submitError}
@@ -652,8 +676,18 @@ export function Assessment() {
           <p className="text-gray-600 mt-2">
             Answer the following to determine your recommended track and electives
           </p>
-          <div className={`mx-auto mt-4 inline-flex rounded-full px-4 py-2 text-sm font-bold ${remainingSeconds <= FIVE_MINUTES_IN_SECONDS ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-900"}`} aria-live="polite">
-            Time remaining: {formatAssessmentDuration(remainingSeconds)}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+            <div className={`inline-flex rounded-full px-4 py-2 text-sm font-bold ${remainingSeconds <= FIVE_MINUTES_IN_SECONDS ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-900"}`} aria-live="polite">
+              Time remaining: {formatAssessmentDuration(remainingSeconds)}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowResetConfirmation(true)}
+              disabled={isSubmitting}
+              className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Restart assessment
+            </button>
           </div>
           {remainingSeconds <= FIVE_MINUTES_IN_SECONDS && remainingSeconds > 0 && (
             <p className="mt-2 text-sm font-semibold text-red-600">5-minute warning: please review and submit your answers.</p>

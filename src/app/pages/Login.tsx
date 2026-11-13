@@ -36,6 +36,12 @@ export function Login() {
     }
   }, [searchParams]);
 
+  useEffect(() => {
+    if (searchParams.get("reason") === "session-timeout") {
+      setError("Your session ended after 30 minutes of inactivity. Please sign in again.");
+    }
+  }, [searchParams]);
+
   // Email validation
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

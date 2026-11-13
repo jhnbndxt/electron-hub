@@ -188,7 +188,7 @@ VALUES (
   'enrollment_documents',
   true,
   5242880,
-  ARRAY['image/*', 'application/pdf']
+  ARRAY['image/png', 'image/jpeg', 'application/pdf']
 )
 ON CONFLICT (id) DO UPDATE SET
   public = true,
