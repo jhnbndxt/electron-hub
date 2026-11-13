@@ -804,6 +804,38 @@ export const rejectEnrollment = async (enrollmentId, reason, rejectedBy = 'admin
   }
 };
 
+// Permanently remove only an enrollment that is already rejected. The database
+// function repeats this status check so active applications can never be deleted
+// through this action, even if a stale page is open.
+export const deleteRejectedEnrollment = async (enrollmentId, deletedBy = 'admin') => {
+  try {
+    const { data, error } = await supabase.rpc('delete_rejected_enrollment', {
+      p_enrollment_id: enrollmentId,
+    });
+
+    if (error) {
+      console.error('Delete rejected enrollment error:', error);
+      return { error: error.message, data: null };
+    }
+
+    if (!data) {
+      return { error: 'Only rejected applications can be deleted.', data: null };
+    }
+
+    await createAuditLog(
+      deletedBy,
+      'REJECTED_ENROLLMENT_DELETED',
+      `Permanently deleted rejected enrollment: ${enrollmentId}`,
+      'warning'
+    );
+
+    return { error: null, data };
+  } catch (error) {
+    console.error('Delete rejected enrollment error:', error);
+    return { error: error.message, data: null };
+  }
+};
+
 // Enroll student (finalize enrollment after payment verification)
 export const enrollStudent = async (enrollmentId, userId, enrolledBy = 'admin') => {
   try {

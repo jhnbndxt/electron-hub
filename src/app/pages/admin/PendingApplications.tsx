@@ -10,14 +10,17 @@ import {
   UserCheck,
   Users,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { LoadingState } from "../../components/LoadingState";
 import { DashboardPageHeader } from "../../components/DashboardPageHeader";
-import { getStudentPaymentStatus } from "../../../services/adminService";
+import { deleteRejectedEnrollment, getStudentPaymentStatus } from "../../../services/adminService";
 import { supabase } from "../../../supabase";
 import { loadProfileImageUrl } from "../../utils/profileImage";
+import { getSystemSettings } from "../../../services/systemSettingsService";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
 
 interface Student {
   id: number | string;
@@ -25,6 +28,7 @@ interface Student {
   applicationDate: string;
   status: "pending" | "re-submit" | "approved" | "rejected";
   currentStatus: string;
+  stageOwner: string;
   strandApplied: string;
   admissionType: string;
   yearLevel: string;
@@ -134,6 +138,45 @@ const getCurrentEnrollmentStatus = ({
   return "Application Submitted";
 };
 
+const getApplicationStage = ({
+  enrollmentStatus,
+  paymentStatus,
+  paymentMethod,
+  documentsUploaded,
+  documentsApproved,
+  rejectedDocuments,
+}: {
+  enrollmentStatus?: string | null;
+  paymentStatus?: string | null;
+  paymentMethod?: string | null;
+  documentsUploaded: number;
+  documentsApproved: number;
+  rejectedDocuments: number;
+}) => {
+  const enrollment = String(enrollmentStatus || "").toLowerCase();
+  const payment = String(paymentStatus || "").toLowerCase();
+  const method = String(paymentMethod || "").toLowerCase();
+
+  if (enrollment === "rejected") return { label: "Application rejected", owner: "No action required" };
+  if (enrollment === "enrolled" || COMPLETED_PAYMENT_STATUSES.has(payment)) {
+    return { label: "Enrollment complete", owner: "Completed" };
+  }
+  if (rejectedDocuments > 0) return { label: "Correct rejected documents", owner: "Student" };
+  if (documentsUploaded === 0) return { label: "Upload required documents", owner: "Student" };
+  if (documentsApproved < documentsUploaded) return { label: "Review submitted documents", owner: "Branch Coordinator / Registrar" };
+  if (payment === "rejected") return { label: "Resubmit payment proof", owner: "Student" };
+  if (PENDING_PAYMENT_STATUSES.has(payment)) {
+    return {
+      label: method === "cash" ? "Process payment queue" : "Verify payment proof",
+      owner: "Cashier",
+    };
+  }
+  if (enrollment === "documents_verified" || enrollment === "approved") {
+    return { label: "Submit enrollment payment", owner: "Student" };
+  }
+  return { label: "Review application details", owner: "Branch Coordinator / Registrar" };
+};
+
 const formatEnrollmentStatus = (status?: string | null) => {
   const normalizedStatus = String(status || "").trim().toLowerCase();
 
@@ -217,6 +260,8 @@ export function PendingApplications() {
   const [admissionTypeFilter, setAdmissionTypeFilter] = useState("all");
   const [yearLevelFilter, setYearLevelFilter] = useState("all");
   const [students, setStudents] = useState<Student[]>([]);
+  const [applicationPendingDeletion, setApplicationPendingDeletion] = useState<Student | null>(null);
+  const [deletionError, setDeletionError] = useState("");
   const [dashboardStats, setDashboardStats] = useState<RegistrarDashboardStats>({
     pendingApplications: 0,
     approvedApplications: 0,
@@ -234,6 +279,19 @@ export function PendingApplications() {
 
   const loadApplications = async () => {
     setIsLoading(true);
+    setDeletionError("");
+
+    // Expiration is intentionally server-side and rejected-only. A stale browser
+    // cannot remove an active application because the RPC checks the status again.
+    const settingsResult = await getSystemSettings();
+    const retentionDays = Math.max(1, Number(settingsResult.data?.rejected_application_retention_days) || 90);
+    const { error: cleanupError } = await supabase.rpc("cleanup_expired_rejected_enrollments", {
+      p_retention_days: retentionDays,
+    });
+    if (cleanupError) {
+      console.warn("Rejected application retention cleanup was not run:", cleanupError.message);
+    }
+
     const { data: applications, error } = await supabase
       .from("enrollments")
       .select("id, user_id, form_data, status, enrollment_date, created_at, updated_at, enrollment_documents(*)")
@@ -329,6 +387,15 @@ export function PendingApplications() {
           ? 2
           : 3;
       
+      const stage = getApplicationStage({
+        enrollmentStatus: app.status,
+        paymentStatus: payment?.status,
+        paymentMethod: payment?.payment_method,
+        documentsUploaded: docs.length,
+        documentsApproved: approvedDocuments,
+        rejectedDocuments,
+      });
+
       return {
         id: app.id,
         name: formData.studentName || `${formData.firstName || ''} ${formData.lastName || ''}`,
@@ -336,20 +403,8 @@ export function PendingApplications() {
         profileImageUrl,
         applicationDate: new Date(app.enrollment_date).toLocaleDateString(),
         status: applicationStatus,
-        currentStatus:
-          normalizedEnrollmentStatus === "rejected"
-            ? "Rejected"
-            : isDocumentReviewOnly
-            ? "Pending Documents"
-            : applicationStatus === "approved"
-            ? formatEnrollmentStatus(app.status)
-            : getCurrentEnrollmentStatus({
-                enrollmentStatus: app.status,
-                paymentStatus: payment?.status,
-                paymentMethod: payment?.payment_method,
-                documentsUploaded: docs.length,
-                documentsApproved: approvedDocuments,
-              }),
+        currentStatus: stage.label,
+        stageOwner: stage.owner,
         strandApplied: formData.preferredTrack || formData.track || app.preferred_track || 'Not Set',
         admissionType: formData.admissionType || formData.admission_type || "New Regular",
         yearLevel: formData.yearLevel || formData.year_level || "Not Set",
@@ -376,6 +431,19 @@ export function PendingApplications() {
     );
     setIsLoading(false);
     console.log('📋 Loaded', formattedApps.length, 'pending applications from Supabase');
+  };
+
+  const handleDeleteRejectedApplication = async () => {
+    if (!applicationPendingDeletion || applicationPendingDeletion.status !== "rejected") return;
+
+    const result = await deleteRejectedEnrollment(applicationPendingDeletion.id);
+    if (result.error) {
+      setDeletionError(result.error);
+      return;
+    }
+
+    setApplicationPendingDeletion(null);
+    await loadApplications();
   };
 
   const getDocumentStatus = (student: Student) => {
@@ -495,19 +563,20 @@ export function PendingApplications() {
   };
 
   const getCurrentStatusStyle = (status: string) => {
-    if (status === "Enrolled" || status === "Documents Verified" || status === "Approved") {
+    const normalizedStatus = status.toLowerCase();
+    if (normalizedStatus.includes("complete")) {
       return "border-green-200 bg-green-50 text-green-700";
     }
 
-    if (status.includes("Payment")) {
+    if (normalizedStatus.includes("payment")) {
       return "border-blue-200 bg-blue-50 text-blue-700";
     }
 
-    if (status === "Assessment Completed") {
-      return "border-indigo-200 bg-indigo-50 text-indigo-700";
+    if (normalizedStatus.includes("rejected")) {
+      return "border-red-200 bg-red-50 text-red-700";
     }
 
-    if (status === "Pending Review" || status === "Pending Documents") {
+    if (normalizedStatus.includes("review")) {
       return "border-amber-200 bg-amber-50 text-amber-700";
     }
 
@@ -639,12 +708,26 @@ export function PendingApplications() {
           </span>
         </td>
         <td className="px-6 py-4">
-          <span className={`inline-flex whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold transition-all duration-300 ${getCurrentStatusStyle(student.currentStatus)}`}>
-            {student.currentStatus}
-          </span>
+          <div className="min-w-[210px]">
+            <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${getCurrentStatusStyle(student.currentStatus)}`}>
+              {student.currentStatus}
+            </span>
+            <p className="mt-1.5 text-xs font-medium text-slate-500">Action: {student.stageOwner}</p>
+          </div>
         </td>
         <td className="px-6 py-4 text-center">
-          {isApproved ? (
+          {student.status === "rejected" ? (
+            <button
+              onClick={() => {
+                setDeletionError("");
+                setApplicationPendingDeletion(student);
+              }}
+              className="mx-auto inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+              title="Delete rejected application"
+            >
+              <Trash2 className="h-4 w-4" /> Delete
+            </button>
+          ) : isApproved ? (
             <span className="text-xs font-semibold text-slate-500">Monitoring only</span>
           ) : (
             <button
@@ -871,12 +954,23 @@ export function PendingApplications() {
                       </p>
                     </div>
                     <div className="rounded-xl bg-slate-50 p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current stage</p>
                       <p className="mt-1 font-semibold text-slate-900">{student.currentStatus}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">Action: {student.stageOwner}</p>
                     </div>
                   </div>
 
-                  {isApproved ? (
+                  {student.status === "rejected" ? (
+                    <button
+                      onClick={() => {
+                        setDeletionError("");
+                        setApplicationPendingDeletion(student);
+                      }}
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-5 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300"
+                    >
+                      <Trash2 className="h-4 w-4" /> Delete rejected application
+                    </button>
+                  ) : isApproved ? (
                     <p className="rounded-xl bg-slate-50 px-4 py-3 text-center text-xs font-semibold text-slate-500">
                       Monitoring only
                     </p>
@@ -946,6 +1040,21 @@ export function PendingApplications() {
           </p>
         </div>
       </div>
+      <ConfirmationModal
+        isOpen={Boolean(applicationPendingDeletion)}
+        onClose={() => {
+          setApplicationPendingDeletion(null);
+          setDeletionError("");
+        }}
+        onConfirm={handleDeleteRejectedApplication}
+        title="Delete rejected application?"
+        message={
+          deletionError ||
+          `This permanently deletes ${applicationPendingDeletion?.name || "this application"} and its submitted documents. Only applications already marked Rejected can be deleted.`
+        }
+        confirmText="Delete application"
+        type="danger"
+      />
     </div>
   );
 }

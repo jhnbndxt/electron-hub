@@ -66,6 +66,7 @@ const CONFIGURATION_FIELD_LABELS = {
   enrollment_start_date: "Enrollment Start Date",
   enrollment_end_date: "Enrollment End Date",
   default_section_capacity: "Default Section Capacity",
+  rejected_application_retention_days: "Rejected Application Retention",
   enrollment_open: "Enrollment Status",
   maintenance_mode: "Maintenance Mode",
   assessment_answers_visible: "Student Assessment Answers",
@@ -94,6 +95,10 @@ function formatConfigurationValue(fieldKey, value) {
 
   if (fieldKey === "default_section_capacity") {
     return `${value} students`;
+  }
+
+  if (fieldKey === "rejected_application_retention_days") {
+    return `${value} days`;
   }
 
   return String(value);
@@ -177,6 +182,7 @@ function buildValidationErrors(settings) {
 
   [
     ["default_section_capacity", "Default section capacity"],
+    ["rejected_application_retention_days", "Rejected application retention"],
   ].forEach(([fieldKey, label]) => {
     const parsedValue = Number(settings[fieldKey]);
 
@@ -426,6 +432,7 @@ export function SystemConfiguration() {
           { key: "enrollment_start_date", label: "Enrollment Start Date", type: "date" },
           { key: "enrollment_end_date", label: "Enrollment End Date", type: "date" },
           { key: "default_section_capacity", label: "Default Section Capacity", type: "number", min: 1 },
+          { key: "rejected_application_retention_days", label: "Rejected Application Retention (days)", type: "number", min: 1 },
         ],
         toggles: [
           {

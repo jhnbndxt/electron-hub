@@ -175,6 +175,12 @@ export const SYSTEM_SETTINGS_DEFINITIONS = [
     defaultValue: true,
     description: 'Allow students to view their assessment score breakdown, elective compatibility, performance analysis, and selected interest responses on the Results page.',
   },
+  {
+    key: 'rejected_application_retention_days',
+    type: 'number',
+    defaultValue: 90,
+    description: 'Number of days rejected applications are retained before they are permanently removed.',
+  },
 ];
 
 const SETTINGS_BY_KEY = SYSTEM_SETTINGS_DEFINITIONS.reduce((definitionMap, definition) => {
