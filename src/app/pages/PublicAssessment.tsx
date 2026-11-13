@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router";
-import { ChevronDown, ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, CheckCircle2, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase, AlertTriangle } from "lucide-react";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { createAuditLog } from "../../services/adminService";
@@ -290,6 +290,8 @@ function PublicAssessmentResultsView({
   onRestart,
 }: PublicAssessmentResultsViewProps) {
   const [openAnswerSection, setOpenAnswerSection] = useState<string | null>("Verbal");
+  const [activeAnswerSection, setActiveAnswerSection] = useState("Verbal");
+  const [answerFilter, setAnswerFilter] = useState<"all" | "correct" | "incorrect">("all");
   const normalizedResult = normalizeAssessmentResult(result);
 
   if (!normalizedResult) {
@@ -521,7 +523,45 @@ function PublicAssessmentResultsView({
               These are the original answers you selected in every assessment section.
             </p>
             {normalizedResult.answerSnapshots.length > 0 ? (
-              <div className="mt-6 space-y-6">
+              <>
+              <div className="mt-6">
+                <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-4">
+                  {answerSections.map((section) => {
+                    const active = activeAnswerSection === section.key;
+                    const score = section.key === "Verbal" ? scores.VA : section.key === "Math" ? scores.MA : section.key === "Science" ? scores.SA : section.key === "Logical" ? scores.LRA : null;
+                    return (
+                      <button key={section.key} type="button" onClick={() => { setActiveAnswerSection(section.key); setAnswerFilter("all"); }} className={`rounded-2xl px-4 py-2.5 text-sm font-semibold ${active ? "bg-blue-600 text-white shadow-md" : "bg-slate-100 text-slate-700"}`}>
+                        {section.label} <span className={`ml-1 rounded-full px-2 py-0.5 text-xs ${active ? "bg-white/20" : "bg-slate-200"}`}>{score === null ? `${section.snapshots.length} Qs` : `${Math.round(score)}%`}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {answerSections.map((section) => {
+                  if (section.key !== activeAnswerSection) return null;
+                  const isInterest = section.key === "Interests";
+                  const correctCount = section.snapshots.filter((item) => item.isCorrect === true).length;
+                  const incorrectCount = section.snapshots.filter((item) => item.isCorrect === false).length;
+                  const visibleSnapshots = section.snapshots.filter((item) => answerFilter === "all" || (answerFilter === "correct" ? item.isCorrect === true : item.isCorrect === false));
+                  const score = section.key === "Verbal" ? scores.VA : section.key === "Math" ? scores.MA : section.key === "Science" ? scores.SA : scores.LRA;
+                  return (
+                    <div key={section.key} className="mt-6">
+                      {isInterest ? (
+                        <div className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 sm:p-5"><h3 className="text-lg font-bold text-slate-950">Selected Interest Responses ({section.snapshots.length})</h3><p className="mt-1 text-xs text-slate-600">Responses saved for this assessment attempt.</p></div>
+                      ) : (
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-blue-700">Aptitude Domain</p><p className="mt-2 text-2xl font-bold text-slate-950">{Math.round(score)}% Score <span className="text-sm font-medium text-slate-600">({correctCount} of {section.snapshots.length} correct)</span></p></div><div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setAnswerFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "all" ? "bg-blue-600 text-white" : "text-slate-600"}`}>All ({section.snapshots.length})</button><button onClick={() => setAnswerFilter("correct")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "correct" ? "bg-emerald-600 text-white" : "text-emerald-700"}`}>Correct ({correctCount})</button><button onClick={() => setAnswerFilter("incorrect")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "incorrect" ? "bg-rose-600 text-white" : "text-rose-700"}`}>Incorrect ({incorrectCount})</button></div></div></div>
+                      )}
+                      <div className="mt-6 space-y-4">
+                        {visibleSnapshots.map((snapshot, index) => {
+                          const selectedIndex = Array.isArray(snapshot.choices) ? snapshot.choices.findIndex((choice) => choice.id === snapshot.selectedChoiceId) : -1;
+                          const correctIndex = Array.isArray(snapshot.choices) ? snapshot.choices.findIndex((choice) => choice.id === snapshot.correctChoiceId) : -1;
+                          return <div key={`${snapshot.questionId}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-start justify-between gap-4"><span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700">{index + 1}</span>{!isInterest && <span className={`rounded-full px-3 py-1 text-xs font-bold ${snapshot.isCorrect ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}>{snapshot.isCorrect ? "+1 pt (Correct)" : "0 pts (Incorrect)"}</span>}</div><p className="mt-3 text-base font-semibold text-slate-900 sm:text-lg">{snapshot.questionText}</p>{isInterest ? <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50/60 p-4"><p className="text-xs font-semibold uppercase tracking-wide text-purple-700">Selected response</p><p className="mt-1 font-bold text-slate-900">{snapshot.selectedRating ?? ""} {snapshot.selectedChoiceText || "Not answered"}</p></div> : <div className="mt-4 grid gap-2.5 sm:grid-cols-2">{snapshot.choices.map((choice, choiceIndex) => { const selected = choiceIndex === selectedIndex; const correct = choiceIndex === correctIndex; const state = selected && correct ? "border-emerald-500 bg-emerald-50" : selected ? "border-rose-400 bg-rose-50" : correct ? "border-emerald-300 bg-emerald-50/50" : "border-slate-200 bg-slate-50/70"; return <div key={choice.id} className={`flex items-center gap-3 rounded-xl border p-3.5 text-sm ${state}`}><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-slate-200 text-xs font-bold text-slate-700">{choice.letter || String.fromCharCode(65 + choiceIndex)}</span><span>{choice.text}</span>{selected && <span className="ml-auto text-xs font-bold">{correct ? "Your Answer (Correct)" : "Your Choice"}</span>}{!selected && correct && <span className="ml-auto flex items-center gap-1 text-xs font-bold text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" />Correct Answer</span>}</div>; })}</div>}</div>;
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {false && <div className="mt-6 space-y-6">
                 {answerSections.map((section) => {
                   const isOpen = openAnswerSection === section.key;
 
@@ -578,7 +618,8 @@ function PublicAssessmentResultsView({
                   </section>
                   );
                 })}
-              </div>
+              </div>}
+              </>
             ) : (
               <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
                 Individual answers were not saved with this assessment result.

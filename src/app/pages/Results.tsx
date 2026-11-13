@@ -1005,7 +1005,7 @@ export function Results() {
             </p>
 
             <div className="mt-6 grid gap-4 xl:grid-cols-2">
-              {savedAnswerSections.map((section) => {
+              {false && savedAnswerSections.map((section) => {
                 const SectionIcon = section.icon;
                 const isInterestSection = section.category === "Interests";
 
