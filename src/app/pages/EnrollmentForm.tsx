@@ -149,6 +149,7 @@ export function EnrollmentForm() {
   const [searchParams] = useSearchParams();
   const { updateEnrollmentProgress, userData, logout } = useAuth();
   const enrollmentDraftKey = `enrollmentFormDraft_${userData?.email || "guest"}`;
+  const pendingEnrollmentStorageKey = `${enrollmentDraftKey}_pendingEnrollmentId`;
   const [currentPage, setCurrentPage] = useState(1);
   const [stepperFadeEdges, setStepperFadeEdges] = useState({ left: false, right: false });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -161,6 +162,7 @@ export function EnrollmentForm() {
   const [showAlreadySubmittedModal, setShowAlreadySubmittedModal] = useState(false);
   const [isSubmittedEnrollment, setIsSubmittedEnrollment] = useState(false);
   const [submittedSummaryData, setSubmittedSummaryData] = useState<Record<string, any> | null>(null);
+  const [pendingEnrollmentId, setPendingEnrollmentId] = useState<string | null>(null);
   const [certificationChecked, setCertificationChecked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -467,9 +469,19 @@ export function EnrollmentForm() {
     const initializeForm = async () => {
       try {
         const isReupload = searchParams.get('reupload') === 'true';
+        const savedPendingEnrollmentId = localStorage.getItem(pendingEnrollmentStorageKey);
         // Check if enrollment already submitted
         const { data: existingEnrollment } = await checkExistingEnrollment(userEmail);
-        if (existingEnrollment && !isReupload) {
+        const canRetrySavedSubmission =
+          existingEnrollment?.id && savedPendingEnrollmentId === existingEnrollment.id;
+
+        if (canRetrySavedSubmission) {
+          setPendingEnrollmentId(existingEnrollment.id);
+        } else if (savedPendingEnrollmentId) {
+          localStorage.removeItem(pendingEnrollmentStorageKey);
+        }
+
+        if (existingEnrollment && !isReupload && !canRetrySavedSubmission) {
           // Load the full enrollment data
           const { data: enrollmentData } = await getUserEnrollment(userEmail);
           if (enrollmentData) {
@@ -545,6 +557,10 @@ export function EnrollmentForm() {
           } catch (error) {
             console.error("Failed to restore draft:", error);
           }
+        }
+
+        if (canRetrySavedSubmission) {
+          setCurrentPage(6);
         }
         
         // Load AI assessment results
@@ -1269,14 +1285,29 @@ export function EnrollmentForm() {
       };
 
       // Submit to Supabase
-      const { error, data: enrollmentResult } = await submitEnrollment(userId, enrollmentData, documentFiles);
+      const { error, data: enrollmentResult, documentUploadErrors = [] } = await submitEnrollment(
+        userId,
+        enrollmentData,
+        documentFiles,
+        pendingEnrollmentId
+      );
 
       if (error) {
+        if (enrollmentResult?.id && documentUploadErrors.length > 0) {
+          setPendingEnrollmentId(enrollmentResult.id);
+          localStorage.setItem(pendingEnrollmentStorageKey, enrollmentResult.id);
+          setCurrentPage(6);
+          notify.error(`${error}. Your form is saved; retry the document uploads from this page.`);
+          return;
+        }
+
         notify.error(`Enrollment could not be submitted: ${error}`);
         console.error('Enrollment submission error:', error);
         return;
       }
 
+      setPendingEnrollmentId(null);
+      localStorage.removeItem(pendingEnrollmentStorageKey);
       console.log('✅ Enrollment submitted to Supabase successfully', enrollmentResult);
 
       // Add notification via Supabase

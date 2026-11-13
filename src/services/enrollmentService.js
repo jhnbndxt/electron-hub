@@ -89,7 +89,12 @@ export const checkExistingEnrollment = async (userId) => {
 };
 
 // Submit enrollment
-export const submitEnrollment = async (userId, enrollmentData, documentFiles = {}) => {
+export const submitEnrollment = async (
+  userId,
+  enrollmentData,
+  documentFiles = {},
+  existingEnrollmentId = null
+) => {
   try {
     const currentYear = new Date().getFullYear();
     const hasValidGraduationYear = (year) => {
@@ -101,15 +106,24 @@ export const submitEnrollment = async (userId, enrollmentData, documentFiles = {
       return { error: "Select valid four-digit graduation years that are not in the future.", data: null };
     }
 
-    // Insert main enrollment record
-    const { data: enrollment, error: enrollmentError } = await supabase
-      .from('enrollments')
-      .insert({
-        user_id: userId,
-        enrollment_date: new Date().toISOString(),
-        status: 'pending_documents',
-        form_data: enrollmentData,
-      })
+    const enrollmentQuery = existingEnrollmentId
+      ? supabase
+          .from('enrollments')
+          .update({
+            status: 'pending_documents',
+            form_data: enrollmentData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existingEnrollmentId)
+          .eq('user_id', userId)
+      : supabase.from('enrollments').insert({
+          user_id: userId,
+          enrollment_date: new Date().toISOString(),
+          status: 'pending_documents',
+          form_data: enrollmentData,
+        });
+
+    const { data: enrollment, error: enrollmentError } = await enrollmentQuery
       .select()
       .single();
 
@@ -118,17 +132,28 @@ export const submitEnrollment = async (userId, enrollmentData, documentFiles = {
       return { error: enrollmentError.message, data: null };
     }
 
-    // Upload documents if provided (non-fatal - enrollment saves even if uploads fail)
+    const documentUploadErrors = [];
     if (documentFiles && Object.keys(documentFiles).length > 0) {
       for (const [docType, file] of Object.entries(documentFiles)) {
         if (file) {
           const { error: docError } = await uploadDocument(enrollment.id, file, docType);
           if (docError) {
-            console.warn(`Document upload failed for ${docType} (non-fatal):`, docError);
-            // Continue - don't fail the whole enrollment for a failed upload
+            console.error(`Document upload failed for ${docType}:`, docError);
+            documentUploadErrors.push({ documentType: docType, error: docError });
           }
         }
       }
+    }
+
+    if (documentUploadErrors.length > 0) {
+      const failures = documentUploadErrors
+        .map(({ documentType, error }) => `${documentType}: ${error}`)
+        .join('; ');
+      return {
+        error: `Enrollment was saved, but some documents could not be uploaded: ${failures}`,
+        data: enrollment,
+        documentUploadErrors,
+      };
     }
 
     // Clear draft after successful submission
@@ -221,8 +246,20 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
     const fileExt = file.name.split('.').pop();
     const fileName = `${enrollmentId}/${documentType}/${timestamp}.${fileExt}`;
 
+    const { data: existingDoc, error: existingDocError } = await supabase
+      .from('enrollment_documents')
+      .select('id')
+      .eq('enrollment_id', enrollmentId)
+      .eq('document_type', documentType)
+      .maybeSingle();
+
+    if (existingDocError) {
+      console.error('Existing document lookup error:', existingDocError);
+      return { error: existingDocError.message, data: null };
+    }
+
     // Upload file to Supabase storage
-    const { data: storageData, error: storageError } = await supabase.storage
+    const { error: storageError } = await supabase.storage
       .from('enrollment_documents')
       .upload(fileName, file, { upsert: true });
 
@@ -237,14 +274,6 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
       .getPublicUrl(fileName);
 
     const publicUrl = urlData?.publicUrl || null;
-
-    // Check if an existing record exists for this document type
-    const { data: existingDoc } = await supabase
-      .from('enrollment_documents')
-      .select('id')
-      .eq('enrollment_id', enrollmentId)
-      .eq('document_type', documentType)
-      .maybeSingle();
 
     let dbData = null;
     let dbError = null;
