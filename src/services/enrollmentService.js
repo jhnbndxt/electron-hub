@@ -275,44 +275,52 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
 
     const publicUrl = urlData?.publicUrl || null;
 
-    let dbData = null;
-    let dbError = null;
+    const documentPayload = {
+      file_name: file.name,
+      file_path: fileName,
+      file_url: publicUrl,
+      file_size: file.size || null,
+      status: 'pending_review',
+      updated_at: new Date().toISOString(),
+    };
+    const isMissingFileSizeColumn = (error) =>
+      /file_size.*enrollment_documents|enrollment_documents.*file_size/i.test(String(error?.message || error || ''));
 
-    if (existingDoc?.id) {
-      const result = await supabase
-        .from('enrollment_documents')
-        .update({
-          file_name: file.name,
-          file_path: fileName,
-          file_url: publicUrl,
-          file_size: file.size || null,
-          status: 'pending_review',
-          rejection_comment: null,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existingDoc.id)
-        .select()
-        .single();
-      dbData = result.data;
-      dbError = result.error;
-    } else {
-      const result = await supabase
+    const saveDocumentRecord = async (includeFileSize = true) => {
+      const payload = { ...documentPayload };
+      if (!includeFileSize) {
+        delete payload.file_size;
+      }
+
+      if (existingDoc?.id) {
+        return supabase
+          .from('enrollment_documents')
+          .update({ ...payload, rejection_comment: null })
+          .eq('id', existingDoc.id)
+          .select()
+          .single();
+      }
+
+      return supabase
         .from('enrollment_documents')
         .insert({
           enrollment_id: enrollmentId,
           document_type: documentType,
-          file_name: file.name,
-          file_path: fileName,
-          file_url: publicUrl,
-          file_size: file.size || null,
-          status: 'pending_review',
+          ...payload,
           uploaded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
         })
         .select()
         .single();
-      dbData = result.data;
-      dbError = result.error;
+    };
+
+    let { data: dbData, error: dbError } = await saveDocumentRecord(true);
+
+    // Existing deployments may predate the optional file_size column. Retry
+    // without metadata so a valid student document is never blocked while the
+    // schema migration is being applied.
+    if (dbError && isMissingFileSizeColumn(dbError)) {
+      console.warn('enrollment_documents.file_size is unavailable; saving document without size metadata.');
+      ({ data: dbData, error: dbError } = await saveDocumentRecord(false));
     }
 
     if (dbError) {
