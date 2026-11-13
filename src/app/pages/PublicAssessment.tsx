@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router";
-import { ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase, AlertTriangle } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Brain, Calculator, Beaker, Lightbulb, Heart, CheckCircle, BarChart3, FileText, Award, BookOpen, ArrowRight, Sparkles, TrendingUp, GraduationCap, Briefcase, AlertTriangle } from "lucide-react";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { createAuditLog } from "../../services/adminService";
@@ -289,6 +289,7 @@ function PublicAssessmentResultsView({
   onSave,
   onRestart,
 }: PublicAssessmentResultsViewProps) {
+  const [openAnswerSection, setOpenAnswerSection] = useState<string | null>("Verbal");
   const normalizedResult = normalizeAssessmentResult(result);
 
   if (!normalizedResult) {
@@ -521,15 +522,26 @@ function PublicAssessmentResultsView({
             </p>
             {normalizedResult.answerSnapshots.length > 0 ? (
               <div className="mt-6 space-y-6">
-                {answerSections.map((section) => (
+                {answerSections.map((section) => {
+                  const isOpen = openAnswerSection === section.key;
+
+                  return (
                   <section key={section.key} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80">
-                    <div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3.5 sm:px-5">
-                      <h3 className="text-base font-bold text-slate-900">{section.label}</h3>
-                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
-                        {section.snapshots.length} {section.snapshots.length === 1 ? "answer" : "answers"}
+                    <button
+                      type="button"
+                      onClick={() => setOpenAnswerSection(isOpen ? null : section.key)}
+                      aria-expanded={isOpen}
+                      className="flex w-full items-center justify-between gap-3 bg-white px-4 py-3.5 text-left transition hover:bg-slate-50 sm:px-5"
+                    >
+                      <span className="text-base font-bold text-slate-900">{section.label}</span>
+                      <span className="flex items-center gap-3">
+                        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">
+                          {section.snapshots.length} {section.snapshots.length === 1 ? "answer" : "answers"}
+                        </span>
+                        <ChevronDown className={`h-5 w-5 text-slate-500 transition-transform ${isOpen ? "rotate-180" : ""}`} />
                       </span>
-                    </div>
-                    {section.snapshots.length > 0 ? (
+                    </button>
+                    {isOpen && (section.snapshots.length > 0 ? (
                       <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
                         {section.snapshots.map((snapshot, index) => {
                           const selectedChoice = Array.isArray(snapshot.choices)
@@ -562,9 +574,10 @@ function PublicAssessmentResultsView({
                       </div>
                     ) : (
                       <p className="p-5 text-sm text-slate-500">No saved answers for this section.</p>
-                    )}
+                    ))}
                   </section>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
