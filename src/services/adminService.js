@@ -1155,13 +1155,21 @@ export const createAuditLog = async (userId, action, details, status = 'success'
 };
 
 // Get audit logs
-export const getAuditLogs = async (limit = 100) => {
+export const getAuditLogs = async (limit = 100, { fromDate, toDate } = {}) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('audit_logs')
       .select('id, user_id, action, resource_type, resource_id, changes, status, error_message, ip_address, user_agent, created_at')
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .order('created_at', { ascending: false });
+
+    if (fromDate) query = query.gte('created_at', `${fromDate}T00:00:00`);
+    if (toDate) {
+      const endExclusive = new Date(`${toDate}T00:00:00`);
+      endExclusive.setDate(endExclusive.getDate() + 1);
+      query = query.lt('created_at', endExclusive.toISOString());
+    }
+
+    const { data, error } = await query.limit(limit);
 
     if (error) {
       console.error('Get audit logs error:', error);

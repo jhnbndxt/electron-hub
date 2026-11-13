@@ -32,19 +32,17 @@ export function AdminAuditLogs() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [allLogs, setAllLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  // Date filter state (default: today)
-  const [selectedDate, setSelectedDate] = useState(() => {
-    return getLocalDateKey(new Date());
-  });
+  const [fromDate, setFromDate] = useState(() => getLocalDateKey(new Date()));
+  const [toDate, setToDate] = useState(() => getLocalDateKey(new Date()));
 
   // Load audit logs from Supabase
   useEffect(() => {
     loadAuditLogs();
-  }, []);
+  }, [fromDate, toDate]);
 
   const loadAuditLogs = async () => {
     setIsLoading(true);
-    const { data: logs, error } = await getAuditLogs();
+    const { data: logs, error } = await getAuditLogs(500, { fromDate, toDate });
     if (error || !logs) {
       console.error('Error loading audit logs:', error);
       setAllLogs([]);
@@ -61,21 +59,16 @@ export function AdminAuditLogs() {
       status: log.status || 'success',
     }));
     setAllLogs(formatted);
-    const todayKey = getLocalDateKey(new Date());
-    const availableDates = Array.from(
-      new Set(formatted.map((log) => getLocalDateKey(log.timestamp)).filter(Boolean))
-    ).sort((a, b) => b.localeCompare(a));
-    setSelectedDate(availableDates.includes(todayKey) ? todayKey : availableDates[0] || todayKey);
     setIsLoading(false);
   };
 
 
-  // Filter logs by selected date
+  // Keep the client filter in sync with the inclusive calendar-date range.
   let filteredLogs = allLogs.filter((log) => {
-    // Date match
     const logDateStr = getLocalDateKey(log.timestamp);
     return (
-      logDateStr === selectedDate &&
+      (!fromDate || logDateStr >= fromDate) &&
+      (!toDate || logDateStr <= toDate) &&
       (
         log.action.toLowerCase().includes(searchQuery.toLowerCase()) ||
         log.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -155,7 +148,7 @@ export function AdminAuditLogs() {
       log.details
     ]);
     exportToCSV({
-      filename: `audit-logs-${selectedDate}`,
+      filename: `audit-logs-${fromDate || "all"}-to-${toDate || "all"}`,
       title: "Audit Logs Export",
       subtitle: "Electron Hub - System Activity Logs",
       headers,
@@ -198,16 +191,28 @@ export function AdminAuditLogs() {
             />
           </div>
 
-          {/* Date Filter */}
-          <div className="flex w-full items-center gap-2 sm:w-auto">
+          {/* Date Range */}
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
             <Calendar className="w-4 h-4 text-gray-500" />
             <input
               type="date"
-              value={selectedDate}
-              onChange={e => setSelectedDate(e.target.value)}
+              aria-label="From date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
               className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
               max={new Date().toISOString().slice(0, 10)}
             />
+            <span className="text-sm text-gray-500">to</span>
+            <input
+              type="date"
+              aria-label="To date"
+              value={toDate}
+              min={fromDate || undefined}
+              onChange={e => setToDate(e.target.value)}
+              className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              max={new Date().toISOString().slice(0, 10)}
+            />
+            <button type="button" onClick={() => { setFromDate(""); setToDate(""); }} className="text-sm font-medium text-green-700 hover:text-green-900">Clear</button>
           </div>
 
           {/* Status Filter */}
