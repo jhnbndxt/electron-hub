@@ -43,30 +43,6 @@ const DOCUMENT_LABELS: Record<string, string> = {
   escCertificate: "ESC Certificate",
 };
 
-const ASSESSMENT_ANSWER_SECTIONS = ["Verbal", "Math", "Science", "Logical", "Interests"];
-
-function getAssessmentAnswerSection(snapshot: any) {
-  const category = String(snapshot?.category || "").trim();
-
-  if (["Interests", "Interest", "Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional", "R", "I", "A", "S", "E", "C"].includes(category)) {
-    return "Interests";
-  }
-
-  return ASSESSMENT_ANSWER_SECTIONS.includes(category) ? category : null;
-}
-
-function getSnapshotSelectedAnswer(snapshot: any) {
-  const selectedChoice = Array.isArray(snapshot?.choices)
-    ? snapshot.choices.find((choice: any) => choice.id === snapshot.selectedChoiceId)
-    : null;
-  const answer = selectedChoice?.text ?? snapshot?.selectedChoiceText ?? null;
-  const rating = Number.isInteger(snapshot?.selectedRating) ? snapshot.selectedRating : null;
-
-  return rating !== null
-    ? `${rating} — ${answer || "Selected rating"}`
-    : answer || "Not answered";
-}
-
 function valueOrDash(value: unknown) {
   if (value === false) return "No";
   if (value === true) return "Yes";
@@ -212,15 +188,6 @@ export function StudentProfile() {
   const payments = profile.payments || [];
   const progress = profile.progress || [];
   const assessment = profile.assessment || null;
-  const assessmentAnswerSnapshots = Array.isArray(assessment?.answer_snapshots)
-    ? assessment.answer_snapshots
-    : [];
-  const assessmentAnswersBySection = ASSESSMENT_ANSWER_SECTIONS.reduce((sections, section) => {
-    sections[section] = assessmentAnswerSnapshots.filter(
-      (snapshot: any) => getAssessmentAnswerSection(snapshot) === section
-    );
-    return sections;
-  }, {} as Record<string, any[]>);
 
   const read = (...keys: string[]) => {
     for (const key of keys) {
@@ -581,57 +548,6 @@ export function StudentProfile() {
           </div>
         </RecordSection>
       </div>
-
-      <RecordSection
-        title="Student Assessment Answers"
-        description="Saved answers from this student’s submitted assessment attempt."
-        icon={ClipboardList}
-      >
-        {!assessment ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">
-            No assessment result is recorded for this student.
-          </div>
-        ) : assessmentAnswerSnapshots.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-500">
-            This older assessment does not have saved answer details. New assessment attempts save all five sections.
-          </div>
-        ) : (
-          <div className="grid gap-5 xl:grid-cols-2">
-            {ASSESSMENT_ANSWER_SECTIONS.map((section) => {
-              const snapshots = assessmentAnswersBySection[section];
-
-              return (
-                <div key={section} className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h4 className="text-base font-bold text-slate-950">{section}</h4>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
-                      {snapshots.length} {snapshots.length === 1 ? "answer" : "answers"}
-                    </span>
-                  </div>
-                  {snapshots.length === 0 ? (
-                    <p className="text-sm text-slate-500">No saved answers for this section.</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {snapshots.map((snapshot: any, index: number) => (
-                        <div key={`${snapshot.questionId || section}-${index}`} className="rounded-lg border border-slate-200 bg-white p-3">
-                          <p className="text-sm font-semibold leading-6 text-slate-900">{snapshot.questionText || "Question text was not saved."}</p>
-                          <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Selected answer</p>
-                          <p className="mt-1 text-sm font-semibold text-blue-800">{getSnapshotSelectedAnswer(snapshot)}</p>
-                          {section !== "Interests" && snapshot.isCorrect !== null && snapshot.isCorrect !== undefined && (
-                            <p className={`mt-2 text-xs font-bold ${snapshot.isCorrect ? "text-emerald-700" : "text-rose-700"}`}>
-                              {snapshot.isCorrect ? "Correct" : "Incorrect"}
-                            </p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </RecordSection>
 
       <section className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/80 p-5 shadow-sm">
         <div className="flex items-start gap-3">

@@ -437,6 +437,16 @@ export function Results() {
         };
       });
   }, [answerSnapshots, results]);
+  const savedAnswerSections = useMemo(() => {
+    return DOMAIN_TABS.map((tab) => ({
+      ...tab,
+      snapshots: answerSnapshots.filter((snapshot) =>
+        tab.category === "Interests"
+          ? isInterestAnswerSnapshot(snapshot)
+          : String(snapshot.category || "").toLowerCase() === tab.category.toLowerCase()
+      ),
+    }));
+  }, [answerSnapshots]);
 
   if (loading) {
     return (
@@ -993,6 +1003,55 @@ export function Results() {
             <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
               Review your aptitude answers and scoring, along with the exact options you selected for each interest question.
             </p>
+
+            <div className="mt-6 grid gap-4 xl:grid-cols-2">
+              {savedAnswerSections.map((section) => {
+                const SectionIcon = section.icon;
+                const isInterestSection = section.category === "Interests";
+
+                return (
+                  <div key={section.key} className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-slate-900">
+                        <SectionIcon className="h-4 w-4 text-blue-700" />
+                        <h4 className="font-bold">{section.label}</h4>
+                      </div>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+                        {section.snapshots.length} {section.snapshots.length === 1 ? "answer" : "answers"}
+                      </span>
+                    </div>
+                    {section.snapshots.length > 0 ? (
+                      <div className="mt-3 space-y-3">
+                        {section.snapshots.map((snapshot: any, index: number) => {
+                          const selectedChoice = Array.isArray(snapshot.choices)
+                            ? snapshot.choices.find((choice: any) => choice.id === snapshot.selectedChoiceId)
+                            : null;
+                          const selectedAnswer = selectedChoice?.text ?? snapshot.selectedChoiceText ?? "Not answered";
+                          const rating = Number.isInteger(snapshot.selectedRating) ? snapshot.selectedRating : null;
+
+                          return (
+                            <div key={`${snapshot.questionId || section.key}-${index}`} className="rounded-xl border border-slate-200 bg-white p-3">
+                              <p className="text-sm font-semibold leading-6 text-slate-900">{snapshot.questionText || "Question text was not saved."}</p>
+                              <p className="mt-2 text-xs font-bold uppercase tracking-wide text-slate-500">Selected answer</p>
+                              <p className="mt-1 text-sm font-semibold text-blue-800">
+                                {isInterestSection && rating !== null ? `${rating} — ${selectedAnswer}` : selectedAnswer}
+                              </p>
+                              {!isInterestSection && snapshot.isCorrect !== null && snapshot.isCorrect !== undefined && (
+                                <p className={`mt-2 text-xs font-bold ${snapshot.isCorrect ? "text-emerald-700" : "text-rose-700"}`}>
+                                  {snapshot.isCorrect ? "Correct" : "Incorrect"}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">No saved answers for this section.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
             {/* Domain Tabs Bar */}
             <div className="mt-6 flex flex-wrap gap-2 border-b border-slate-200 pb-4">
