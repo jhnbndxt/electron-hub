@@ -995,7 +995,7 @@ export function ApplicationReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.24),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(14,165,233,0.18),transparent_30%),linear-gradient(135deg,#f8fafc_0%,#eef6ff_45%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
+    <div className="portal-dashboard-page min-h-full min-w-0 bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.24),transparent_34%),radial-gradient(circle_at_88%_18%,rgba(14,165,233,0.18),transparent_30%),linear-gradient(135deg,#f8fafc_0%,#eef6ff_45%,#ffffff_100%)] p-3 text-slate-900 sm:p-4">
       <ProcessingModal
         isOpen={processingState.active}
         title={processingState.title}
@@ -1222,17 +1222,17 @@ export function ApplicationReviewPage() {
               </div>
 
               <div className="mt-4 overflow-hidden rounded-2xl border border-white/70 bg-white/45 shadow-sm backdrop-blur-xl">
-                <div className="grid grid-cols-[40px_1fr_150px] bg-white/70 px-4 py-3 text-xs font-black uppercase tracking-wide text-slate-500 backdrop-blur-xl">
+                <div className="grid grid-cols-[32px_minmax(0,1fr)_auto] gap-2 bg-white/70 px-3 py-3 text-[10px] font-black uppercase tracking-wide text-slate-500 backdrop-blur-xl sm:grid-cols-[40px_1fr_150px] sm:gap-3 sm:px-4 sm:text-xs">
                   <span />
                   <span>Document Name</span>
                   <span>Status</span>
                 </div>
-                <div className="max-h-[52vh] divide-y divide-white/60 overflow-y-auto bg-white/45">
+                <div className="portal-mobile-scroll max-h-[52dvh] divide-y divide-white/60 overflow-y-auto bg-white/45">
                   {documents.map((doc) => (
                     <button
                       key={doc.key}
                       onClick={() => setSelectedDocKey(doc.key)}
-                      className={`grid w-full grid-cols-[40px_1fr_150px] items-center gap-3 px-4 py-3 text-left transition ${
+                      className={`grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-center gap-2 px-3 py-3 text-left transition sm:grid-cols-[40px_1fr_150px] sm:gap-3 sm:px-4 ${
                         selectedDocKey === doc.key ? "bg-blue-100/70 shadow-inner" : "hover:bg-white/70"
                       }`}
                     >
@@ -1253,7 +1253,7 @@ export function ApplicationReviewPage() {
                         <p className="mt-1 truncate text-xs font-medium text-slate-500">{doc.fileName}</p>
                       </div>
                       <span
-                        className={`justify-self-start rounded-full px-3 py-1.5 text-xs font-black ${
+                        className={`max-w-[84px] truncate justify-self-start rounded-full px-2 py-1.5 text-[10px] font-black sm:max-w-none sm:px-3 sm:text-xs ${
                           doc.status === "approved"
                             ? "bg-emerald-100 text-emerald-700"
                           : doc.status === "rejected"
@@ -1318,7 +1318,7 @@ export function ApplicationReviewPage() {
               </div>
             </aside>
 
-            <section className="flex h-[68vh] min-h-[620px] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-lg shadow-blue-950/5 backdrop-blur-xl">
+            <section className="flex h-[56dvh] min-h-[360px] flex-col overflow-hidden rounded-2xl border border-white/70 bg-white/50 shadow-lg shadow-blue-950/5 backdrop-blur-xl lg:h-[68vh] lg:min-h-[620px]">
               <div className="flex items-center justify-between gap-3 border-b border-white/70 bg-white/65 px-4 py-3 backdrop-blur-xl">
                 <div className="min-w-0">
                   <p className="text-sm font-black text-slate-900">Document Preview</p>
@@ -1432,8 +1432,8 @@ export function ApplicationReviewPage() {
       </div>
 
       {(docRejectKey || docRejectKeys.length > 0) && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
-          <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-white/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="portal-mobile-modal w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50 px-5 py-4">
               <div>
                 <h2 className="text-lg font-black text-slate-950">
@@ -1482,8 +1482,8 @@ export function ApplicationReviewPage() {
       )}
 
       {showApplicationReject && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
-          <div className="w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-white/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="portal-mobile-modal w-full max-w-lg overflow-hidden rounded-xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-rose-100 bg-rose-50 px-5 py-4">
               <h2 className="text-lg font-black text-slate-950">Reject Application</h2>
               <button onClick={() => setShowApplicationReject(false)} className="rounded-lg p-2 text-slate-500 hover:bg-white">
@@ -1509,8 +1509,8 @@ export function ApplicationReviewPage() {
       )}
 
       {showApprovalConfirm && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
-          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-slate-950/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="portal-mobile-modal w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-blue-100 bg-blue-50 px-6 py-5">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700">
@@ -1558,8 +1558,8 @@ export function ApplicationReviewPage() {
       )}
 
       {showApprovalValidation && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-slate-950/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="portal-mobile-modal w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-start justify-between gap-4 border-b border-amber-100 bg-amber-50 px-6 py-5">
               <div className="flex items-start gap-4">
                 <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
@@ -1604,8 +1604,8 @@ export function ApplicationReviewPage() {
       )}
 
       {rejectionConfirmation && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]">
-          <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-slate-950/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]">
+          <div className="portal-mobile-modal w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-rose-100 bg-rose-50 px-6 py-5 text-center">
               <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-rose-100 text-rose-700">
                 <XCircle className="h-7 w-7" />

@@ -699,6 +699,34 @@
 
 .portal-glass-main {
   background: transparent;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.portal-mobile-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.portal-mobile-modal-overlay {
+  align-items: flex-start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.portal-mobile-modal {
+  max-height: calc(100dvh - 1.5rem);
+  margin-block: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (min-width: 640px) {
+  .portal-mobile-modal-overlay {
+    align-items: center;
+  }
 }
 
 .portal-glass-sidebar {

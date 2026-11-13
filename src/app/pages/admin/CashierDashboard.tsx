@@ -718,7 +718,7 @@ export function CashierDashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
+      <div className="portal-dashboard-page min-w-0 p-4 sm:p-6 lg:p-8">
         <LoadingState
           message="Loading dashboard data..."
           subtext="Fetching cashier payment queues and transaction summaries."
@@ -728,7 +728,7 @@ export function CashierDashboard() {
   }
 
   return (
-    <div className="p-4 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page min-w-0 p-4 sm:p-6 lg:p-8">
       <ProcessingModal
         isOpen={isProcessing}
         title={processingTitle}
@@ -811,10 +811,10 @@ export function CashierDashboard() {
 
       {/* Tabs */}
       <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        <div className="flex border-b border-gray-200">
+        <div className="flex min-w-0 border-b border-gray-200">
           <button
             onClick={() => setActiveTab("online")}
-            className={`px-6 py-4 font-bold transition-all flex-1 ${
+            className={`min-w-0 px-3 py-3 text-sm font-bold transition-all sm:px-6 sm:py-4 sm:text-base flex-1 ${
               activeTab === "online"
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
@@ -828,7 +828,7 @@ export function CashierDashboard() {
           </button>
           <button
             onClick={() => setActiveTab("cash")}
-            className={`px-6 py-4 font-bold transition-all flex-1 ${
+            className={`min-w-0 px-3 py-3 text-sm font-bold transition-all sm:px-6 sm:py-4 sm:text-base flex-1 ${
               activeTab === "cash"
                 ? "text-white"
                 : "text-gray-600 hover:text-gray-900"
@@ -859,8 +859,8 @@ export function CashierDashboard() {
 
         {/* Online Payments Tab */}
         {activeTab === "online" && (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[980px]">
+          <div className="portal-mobile-scroll overflow-x-auto">
+            <table className="w-full min-w-[820px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -968,8 +968,8 @@ export function CashierDashboard() {
 
         {/* Cash Payments Tab */}
         {activeTab === "cash" && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="portal-mobile-scroll overflow-x-auto">
+            <table className="w-full min-w-[760px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1067,11 +1067,11 @@ export function CashierDashboard() {
 
       {/* Online Payment Review Modal */}
       {showReviewModal && selectedPayment && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowReviewModal(false)}>
-          <div className="w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-white/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowReviewModal(false)}>
+          <div className="portal-mobile-modal w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="portal-glass-modal">
               {/* Header */}
-              <div className="flex items-center justify-between px-8 py-6 border-b border-white/20">
+              <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-white/20 sm:px-8 sm:py-6">
                 <div>
                   <h2 className="text-2xl font-semibold text-slate-900">Payment Verification</h2>
                   <p className="text-slate-600 mt-1 text-sm">
@@ -1087,9 +1087,9 @@ export function CashierDashboard() {
               </div>
 
               {/* Split Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 min-h-[600px]">
+              <div className="grid grid-cols-1 lg:min-h-[600px] lg:grid-cols-2">
                 {/* Left Side: Receipt Viewer */}
-                <div className="p-6 flex flex-col border-r border-white/10">
+                <div className="flex flex-col border-b border-white/10 p-4 sm:p-6 lg:border-b-0 lg:border-r">
                   <div className="flex flex-col gap-2 mb-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1136,7 +1136,7 @@ export function CashierDashboard() {
                     </div>
                   </div>
 
-                  <div className="h-[480px] overflow-hidden rounded-2xl border border-white/20 bg-black/30 backdrop-blur-sm receipt-preview mb-4 flex items-center justify-center">
+                  <div className="mb-4 flex h-[280px] items-center justify-center overflow-hidden rounded-2xl border border-white/20 bg-black/30 backdrop-blur-sm receipt-preview sm:h-[480px]">
                     {selectedReceiptUrls[0] ? (
                       <img
                         src={selectedReceiptUrls[0]}
@@ -1156,7 +1156,7 @@ export function CashierDashboard() {
                 </div>
 
                 {/* Right Side: Verification Panel */}
-                <div className="p-6 flex flex-col">
+                <div className="flex flex-col p-4 sm:p-6">
                   {/* Student Information Card */}
                   <div className="portal-glass-panel rounded-2xl p-5 mb-6">
                     <h4 className="text-sm font-semibold text-slate-900 uppercase tracking-wide mb-4">Student Information</h4>
@@ -1233,7 +1233,7 @@ export function CashierDashboard() {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex gap-3 mt-auto">
+                  <div className="mt-4 flex flex-col gap-3 sm:mt-auto sm:flex-row">
                     <button
                       onClick={() => {
                         setRejectionComment("");
@@ -1270,11 +1270,11 @@ export function CashierDashboard() {
 
       {showRejectReasonModal && selectedPayment && (
         <div
-          className="fixed inset-y-0 right-0 left-0 z-[60] flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]"
+          className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-[60] flex justify-center bg-white/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]"
           onClick={() => setShowRejectReasonModal(false)}
         >
           <div
-            className="w-full max-w-lg overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl"
+            className="portal-mobile-modal w-full max-w-lg overflow-hidden rounded-3xl border border-white/70 bg-white shadow-2xl"
             onClick={(event) => event.stopPropagation()}
           >
             <div className="border-b border-red-100 bg-red-50 px-6 py-5">
@@ -1340,10 +1340,10 @@ export function CashierDashboard() {
 
       {/* Cash Payment Modal */}
       {showCashModal && selectedCashPayment && (
-        <div className="fixed inset-y-0 right-0 left-0 z-50 flex items-center justify-center bg-white/35 p-4 backdrop-blur-sm lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowCashModal(false)}>
-          <div className="w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+        <div className="portal-mobile-modal-overlay fixed inset-y-0 right-0 left-0 z-50 flex justify-center bg-white/35 p-3 backdrop-blur-sm sm:p-4 lg:left-[var(--dashboard-sidebar-offset,0px)]" onClick={() => setShowCashModal(false)}>
+          <div className="portal-mobile-modal w-full max-w-7xl rounded-3xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="portal-glass-modal">
-                <div className="flex items-center justify-between px-8 py-6 border-b border-white/20">
+                <div className="flex items-center justify-between gap-3 px-4 py-4 border-b border-white/20 sm:px-8 sm:py-6">
                   <div>
                     <h2 className="text-2xl font-semibold text-slate-900">Payment Verification</h2>
                     <p className="text-slate-600 mt-1 text-sm">Over-the-Counter Payment Review</p>
@@ -1357,7 +1357,7 @@ export function CashierDashboard() {
                 </div>
 
                 {/* Content */}
-                <div className="grid grid-cols-1 gap-6 overflow-y-auto p-6 lg:grid-cols-2 lg:items-start">
+                <div className="grid grid-cols-1 gap-4 p-4 sm:gap-6 sm:p-6 lg:grid-cols-2 lg:items-start">
                   {/* Queue Info */}
                   <div className="rounded-3xl border border-emerald-200/70 bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-8 text-center shadow-inner lg:row-span-4 lg:min-h-[520px] lg:flex lg:flex-col lg:justify-center">
                     <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-700/20">
