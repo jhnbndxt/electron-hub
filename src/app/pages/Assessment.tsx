@@ -5,9 +5,11 @@ import { useAuth } from "../context/AuthContext";
 import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { getLatestAssessmentResult, saveAssessmentResult } from "../../services/assessmentResultService";
+import { canViewAssessmentAnswers } from "../../services/assessmentAnswersVisibility";
 import { formatAssessmentResult } from "../../services/assessmentScoringService";
 import { getDefaultAssessmentQuestions } from "../../services/assessmentService";
 import { createAuditLog } from "../../services/adminService";
+import { getSystemSettings } from "../../services/systemSettingsService";
 import { supabase } from "../../supabase";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
@@ -115,7 +117,10 @@ export function Assessment() {
 
     const initializeAssessment = async () => {
       const userEmail = userData?.email || "student@gmail.com";
-      const existingResult = await getLatestAssessmentResult(userEmail);
+      const settingsResult = await getSystemSettings();
+      const existingResult = await getLatestAssessmentResult(userEmail, {
+        includeAnswerDetails: canViewAssessmentAnswers(settingsResult),
+      });
 
       if (existingResult) {
         setAssessmentCompleted(true);
@@ -125,7 +130,14 @@ export function Assessment() {
 
       const publicResults = localStorage.getItem("publicAssessmentResults");
       if (publicResults && userEmail) {
-        localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
+        const visibilitySettings = await getSystemSettings();
+        if (canViewAssessmentAnswers(visibilitySettings)) {
+          localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
+        } else {
+          localStorage.removeItem(`assessmentResults_${userEmail}`);
+          localStorage.removeItem(`assessmentAnswers_${userEmail}`);
+          localStorage.removeItem(`assessmentAnswerSnapshots_${userEmail}`);
+        }
 
         try {
           const publicAssessment = JSON.parse(publicResults);
@@ -487,44 +499,49 @@ export function Assessment() {
       academicAptitudeScore: assessmentResult.academicAptitudeScore,
       trackScores: assessmentResult.trackScores,
       clusterScores: assessmentResult.clusterScores,
-      riasecScores: assessmentResult.riasecScores,
       electives: assessmentResult.electives,
       topDomains: assessmentResult.topDomains,
-      topInterests: assessmentResult.topInterests,
     });
     setSubmitProgress(68);
 
     const userEmail = userData?.email || "student@gmail.com";
     const answerSnapshots = buildAssessmentAnswerSnapshots(answers, questionsByCategory);
+    const visibilitySettings = await getSystemSettings();
 
-    localStorage.setItem(
-      `assessmentResults_${userEmail}`,
-      JSON.stringify({
-        track: assessmentResult.track,
-        cluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
-        recommendedCluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
-        academicAptitudeScore: assessmentResult.academicAptitudeScore,
-        trackScores: assessmentResult.trackScores,
-        clusterScores: assessmentResult.clusterScores,
-        riasecScores: assessmentResult.riasecScores,
-        electives: assessmentResult.electives,
-        scores: {
-          VA: assessmentResult.scores.verbal_ability_score,
-          MA: assessmentResult.scores.mathematical_ability_score,
-          SA: assessmentResult.scores.spatial_ability_score,
-          LRA: assessmentResult.scores.logical_reasoning_score,
-        },
-        topDomains: assessmentResult.topDomains,
-        topInterests: assessmentResult.topInterests,
-        electiveRecommendations: assessmentResult.electiveRecommendations,
-        overallScore: assessmentResult.scores.overall_score,
-        aiRecommendation,
-        answers,
-        answerSnapshots,
-      })
-    );
-    localStorage.setItem(`assessmentAnswers_${userEmail}`, JSON.stringify(answers));
-    localStorage.setItem(`assessmentAnswerSnapshots_${userEmail}`, JSON.stringify(answerSnapshots));
+    if (canViewAssessmentAnswers(visibilitySettings)) {
+      localStorage.setItem(
+        `assessmentResults_${userEmail}`,
+        JSON.stringify({
+          track: assessmentResult.track,
+          cluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
+          recommendedCluster: assessmentResult.recommendedCluster || assessmentResult.recommended_cluster || assessmentResult.cluster,
+          academicAptitudeScore: assessmentResult.academicAptitudeScore,
+          trackScores: assessmentResult.trackScores,
+          clusterScores: assessmentResult.clusterScores,
+          riasecScores: assessmentResult.riasecScores,
+          electives: assessmentResult.electives,
+          scores: {
+            VA: assessmentResult.scores.verbal_ability_score,
+            MA: assessmentResult.scores.mathematical_ability_score,
+            SA: assessmentResult.scores.spatial_ability_score,
+            LRA: assessmentResult.scores.logical_reasoning_score,
+          },
+          topDomains: assessmentResult.topDomains,
+          topInterests: assessmentResult.topInterests,
+          electiveRecommendations: assessmentResult.electiveRecommendations,
+          overallScore: assessmentResult.scores.overall_score,
+          aiRecommendation,
+          answers,
+          answerSnapshots,
+        })
+      );
+      localStorage.setItem(`assessmentAnswers_${userEmail}`, JSON.stringify(answers));
+      localStorage.setItem(`assessmentAnswerSnapshots_${userEmail}`, JSON.stringify(answerSnapshots));
+    } else {
+      localStorage.removeItem(`assessmentResults_${userEmail}`);
+      localStorage.removeItem(`assessmentAnswers_${userEmail}`);
+      localStorage.removeItem(`assessmentAnswerSnapshots_${userEmail}`);
+    }
     setSubmitProgress(82);
 
     try {

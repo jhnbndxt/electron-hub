@@ -324,19 +324,17 @@ function PublicAssessmentResultsView({
   const cluster = normalizedResult.cluster;
   const electives = normalizedResult.electives.length > 0 ? normalizedResult.electives : ["Elective recommendation pending"];
   const topDomains = normalizedResult.topDomains.length > 0 ? normalizedResult.topDomains : ["Balanced aptitude profile"];
-  const topInterests = normalizedResult.topInterests.length > 0 ? normalizedResult.topInterests : ["General academic interests"];
   const interestAnswerSnapshots = normalizedResult.answerSnapshots.filter(isInterestAnswerSnapshot);
   const scores = normalizedResult.scores;
   const overallScore = Math.round(normalizeResultScore(normalizedResult.overallScore));
-  const aiRecommendation = normalizedResult.aiRecommendation || {};
   const selectedElectiveDetails = electives
     .map((elective) => electivesCatalog.find(
       (candidate) => candidate.name.toLowerCase() === elective.toLowerCase()
     ))
     .filter(Boolean);
-  const aiExplanation = normalizeResultText(aiRecommendation.overallAnalysis) || (selectedElectiveDetails.length > 0
-    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives match your strengths in ${topDomains.join(" and ")} and interests connected to ${topInterests.join(" and ")}. Together, they develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")} and connect to related study and career pathways.`
-    : `Your assessment points toward the ${track} Track because your answers show strengths in ${topDomains.join(" and ")} with interests connected to ${topInterests.join(" and ")}.`);
+  const aiExplanation = selectedElectiveDetails.length > 0
+    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives build on your strengths in ${topDomains.join(" and ")}, develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")}, and connect to related study and career pathways.`
+    : `Your assessment points toward the ${track} Track based on your strengths in ${topDomains.join(" and ")}.`;
   const strongestScores = [
     { label: "Verbal Ability", score: scores.VA },
     { label: "Mathematical Ability", score: scores.MA },
@@ -346,14 +344,9 @@ function PublicAssessmentResultsView({
     .sort((first, second) => second.score - first.score)
     .slice(0, 2)
     .map(({ label, score }) => `${label} (${Math.round(score)}%)`);
-  const interestSummary = topInterests.length
-    ? ` Your reported interests include ${topInterests.join(" and ")}.`
-    : "";
   const trackExplanation =
-    normalizeResultText(aiRecommendation.trackExplanation) ||
-    `The ${track} recommendation is based on your strongest aptitude areas in ${strongestScores.join(" and ")}.${interestSummary}`;
+    `The ${track} recommendation is based on your strongest aptitude areas in ${strongestScores.join(" and ")}.`;
   const clusterExplanation =
-    normalizeResultText(aiRecommendation.clusterExplanation) ||
     (cluster ? `${cluster} is the recommended cluster within ${track}. Its assigned electives are determined by the cluster structure.` : "");
   const scoreRows = [
     { label: "Verbal Aptitude", value: scores.VA, icon: Brain },
@@ -361,16 +354,10 @@ function PublicAssessmentResultsView({
     { label: "Science / Spatial Ability", value: scores.SA, icon: Beaker },
     { label: "Logical Reasoning", value: scores.LRA, icon: Lightbulb },
   ];
-  const pathwayRows =
-    Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
-      ? aiRecommendation.careerPathways.map((pathway: any) => ({
-          category: normalizeResultText(pathway?.category || pathway?.name, "Career Pathway"),
-          careers: normalizeResultArray(pathway?.careers ?? pathway?.courses ?? pathway?.items),
-        }))
-      : electives.map((elective) => ({
-          category: elective,
-          careers: getSuggestedCoursesForPublicResult(track, elective),
-        }));
+  const pathwayRows = electives.map((elective) => ({
+    category: elective,
+    careers: getSuggestedCoursesForPublicResult(track, elective),
+  }));
   const electiveExplanations = [
     ...electives.slice(0, 2).map((elective) => {
       const catalogElective = electivesCatalog.find(
@@ -465,7 +452,6 @@ function PublicAssessmentResultsView({
                   const hasScoring = [
                     scoring?.compatibilityScore,
                     scoring?.aptitudeScore,
-                    scoring?.riasecScore,
                   ].every((score) => typeof score === "number" && Number.isFinite(score));
 
                   return (
@@ -481,10 +467,6 @@ function PublicAssessmentResultsView({
                         <div className="flex items-center justify-between gap-3">
                           <span>Aptitude Score</span>
                           <span>{Number(scoring.aptitudeScore).toFixed(2)}%</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span>RIASEC Score</span>
-                          <span>{Number(scoring.riasecScore).toFixed(2)}%</span>
                         </div>
                       </div>
                     ) : null}
@@ -517,14 +499,10 @@ function PublicAssessmentResultsView({
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className="rounded-2xl bg-white p-6 shadow-lg">
             <h2 className="text-xl font-bold text-slate-950">Profile Summary</h2>
-            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="mt-5 grid gap-4">
               <div className="rounded-xl bg-slate-50 p-4">
                 <p className="text-sm font-bold text-slate-900">Top Strengths</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{topDomains.join(", ")}</p>
-              </div>
-              <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-sm font-bold text-slate-900">Top Interest Areas</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{topInterests.join(", ")}</p>
               </div>
             </div>
           </div>
@@ -532,7 +510,7 @@ function PublicAssessmentResultsView({
           <div className="mt-6 rounded-2xl bg-white p-6 shadow-lg lg:col-span-2">
             <h2 className="text-xl font-bold text-slate-950">Your Interest Responses</h2>
             <p className="mt-2 text-sm text-slate-600">
-              These are the choices you submitted. Top interest areas above are scored separately from these responses.
+              These are the original options you selected for this assessment.
             </p>
             {interestAnswerSnapshots.length > 0 ? (
               <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -578,27 +556,14 @@ function PublicAssessmentResultsView({
           </div>
         </section>
 
-        <section className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
-          <h2 className="text-xl font-bold text-slate-950">RIASEC Interest Scores</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-600">
-            Each interest area is scored separately as a percentage of its active questions' maximum possible points.
-          </p>
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-            {["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"].map((type) => (
-              <div key={type} className="rounded-xl bg-slate-50 p-4">
-                <p className="text-sm font-semibold text-slate-600">{type}</p>
-                <p className="mt-2 text-2xl font-bold text-blue-900">
-                  {Math.round(normalizeResultScore(normalizedResult.riasecScores?.[type]))}%
-                </p>
-              </div>
-            ))}
-          </div>
-          {normalizedResult.academicAptitudeScore !== undefined && (
-            <p className="mt-5 text-sm font-semibold text-slate-700">
-              Overall Academic Aptitude Score: {normalizedResult.academicAptitudeScore.toFixed(2)}%
+        {normalizedResult.academicAptitudeScore !== undefined && (
+          <section className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
+            <h2 className="text-xl font-bold text-slate-950">Academic Aptitude</h2>
+            <p className="mt-2 text-2xl font-bold text-blue-900">
+              {normalizedResult.academicAptitudeScore.toFixed(2)}%
             </p>
-          )}
-        </section>
+          </section>
+        )}
 
         <section className="mt-6 rounded-2xl bg-white p-6 shadow-lg">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
@@ -1004,32 +969,20 @@ export function PublicAssessment() {
       );
     }
 
-    const { track, electives, scores, topDomains, topInterests, overallScore } = normalizedResults;
+    const { track, electives, scores, topDomains, overallScore } = normalizedResults;
     const trackColor = "var(--electron-blue)";
-    const secondaryColor = "var(--electron-red)";
-    const aiRecommendation = normalizedResults.aiRecommendation || {};
     const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest learning areas";
-    const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your interests";
-    const aiOverallAnalysis = normalizeResultText(aiRecommendation.overallAnalysis);
-    const aiTrackExplanation = normalizeResultText(aiRecommendation.trackExplanation);
     const aiExplanation =
-      aiOverallAnalysis ||
-      `You are showing a strong fit for the ${track} Track because your assessment points to strengths in ${topDomainSummary} and interests connected to ${topInterestSummary}. This path can help you build on how you already think, learn, and solve problems while giving you room to explore future study and career options.`;
+      `You are showing a strong fit for the ${track} Track because your assessment points to strengths in ${topDomainSummary}. This path can help you build on how you think, learn, and solve problems while exploring future study and career options.`;
     const trackExplanation =
-      aiTrackExplanation ||
       (track.toLowerCase().includes("academic")
         ? "You are likely to benefit from a college-preparatory path with structured academic subjects, research tasks, and university-oriented learning."
         : "You are likely to benefit from a practical, skills-based path with hands-on learning, technical competencies, and career-ready preparation.");
 
-    const careerPathways = Array.isArray(aiRecommendation.careerPathways) && aiRecommendation.careerPathways.length > 0
-      ? aiRecommendation.careerPathways.map((pathway: any) => ({
-          category: normalizeResultText(pathway?.category || pathway?.name, "Recommended Pathway"),
-          careers: normalizeResultArray(pathway?.careers ?? pathway?.courses ?? pathway?.items),
-        }))
-      : electives.map((elective) => ({
-          category: elective,
-          careers: getSuggestedCoursesForPublicResult(track, elective),
-        })).filter((pathway) => pathway.careers.length > 0);
+    const careerPathways = electives.map((elective) => ({
+      category: elective,
+      careers: getSuggestedCoursesForPublicResult(track, elective),
+    })).filter((pathway) => pathway.careers.length > 0);
 
     return (
       <div className="min-h-screen p-4 sm:p-6 lg:p-8" style={{ backgroundColor: "var(--electron-light-gray)" }}>
@@ -1156,19 +1109,12 @@ export function PublicAssessment() {
               <h3 className="text-xl font-bold mb-4" style={{ color: "var(--electron-dark-gray)" }}>
                 Your Profile Summary
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <div className="flex items-start gap-3">
                   <TrendingUp className="w-6 h-6 mt-1 flex-shrink-0" style={{ color: trackColor }} />
                   <div>
                     <p className="font-semibold text-gray-800 mb-1">Top Strengths</p>
                     <p className="text-gray-600">{topDomains.join(", ")}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Heart className="w-6 h-6 mt-1 flex-shrink-0" style={{ color: secondaryColor }} />
-                  <div>
-                    <p className="font-semibold text-gray-800 mb-1">Key Interests</p>
-                    <p className="text-gray-600">{topInterests.join(", ")}</p>
                   </div>
                 </div>
               </div>
@@ -1500,10 +1446,8 @@ export function PublicAssessment() {
         academicAptitudeScore: formattedResult.academicAptitudeScore,
         trackScores: formattedResult.trackScores,
         clusterScores: formattedResult.clusterScores,
-        riasecScores: formattedResult.riasecScores,
         electives: formattedResult.electives,
         topDomains: formattedResult.topDomains,
-        topInterests: formattedResult.topInterests,
       });
       setSubmitProgress(68);
     } catch (error) {

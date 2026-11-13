@@ -450,7 +450,7 @@ export function SystemConfiguration() {
           {
             key: "assessment_answers_visible",
             label: "Student Assessment Answers",
-            description: "Allow students to view their assessment score breakdown, elective compatibility, and performance analysis on their Results page.",
+            description: "Allow students to view their assessment score breakdown, elective compatibility, performance analysis, and selected interest responses on their Results page.",
           },
         ],
       },

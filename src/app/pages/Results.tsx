@@ -25,7 +25,8 @@ import {
 import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
 import { isInterestAnswerSnapshot } from "../../services/assessmentSnapshot";
-import { getSystemSettings, parseBooleanStrict } from "../../services/systemSettingsService";
+import { canViewAssessmentAnswers } from "../../services/assessmentAnswersVisibility";
+import { getSystemSettings } from "../../services/systemSettingsService";
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
@@ -80,7 +81,6 @@ interface QuestionItem {
   options: string[];
   correctAnswer: number | null;
   category: string;
-  interestType?: string | null;
 }
 
 const DOMAIN_TABS = [
@@ -122,12 +122,12 @@ const DOMAIN_TABS = [
     category: "Interests",
     icon: Heart,
     scoreKey: null,
-    description: "Measures six RIASEC interest areas using a 5-point Likert scale.",
+    description: "Shows the original selected response for each interest question.",
   },
 ];
 
 const buildAssessmentAiPayload = (result: AssessmentResults) => {
-  const { track, cluster, scores, topInterests, topDomains, electives } = result;
+  const { track, cluster, scores, topDomains, electives } = result;
   return {
     track,
     cluster: cluster || "",
@@ -138,10 +138,8 @@ const buildAssessmentAiPayload = (result: AssessmentResults) => {
     academicAptitudeScore: result.academicAptitudeScore ?? (scores.VA + scores.MA + scores.SA + scores.LRA) / 4,
     trackScores: result.trackScores || {},
     clusterScores: result.clusterScores || {},
-    riasecScores: result.riasecScores || {},
     electives,
     topDomains,
-    topInterests,
   };
 };
 
@@ -156,98 +154,93 @@ export function Results() {
   const [loading, setLoading] = useState(true);
   const [isFetchingAiRecommendation, setIsFetchingAiRecommendation] = useState(false);
   const attemptedAiRecommendationFetch = useRef(false);
-  const [assessmentAnswersVisible, setAssessmentAnswersVisible] = useState(true);
+  const [assessmentAnswersVisible, setAssessmentAnswersVisible] = useState(false);
   const [questions, setQuestions] = useState<QuestionItem[]>([]);
   const [studentAnswers, setStudentAnswers] = useState<Record<string | number, any>>({});
   const [answerSnapshots, setAnswerSnapshots] = useState<any[]>([]);
   const [activeDomainTab, setActiveDomainTab] = useState<string>("Verbal");
   const [domainFilter, setDomainFilter] = useState<"all" | "correct" | "incorrect">("all");
+  const resultsLoadSequence = useRef(0);
 
   useEffect(() => {
-    // Scroll to top instantly when component mounts
     window.scrollTo({ top: 0, behavior: "instant" });
     attemptedAiRecommendationFetch.current = false;
 
     const loadResults = async () => {
+      const requestSequence = ++resultsLoadSequence.current;
       const userEmail = userData?.email || "student@gmail.com";
       const assessmentKey = `assessmentResults_${userEmail}`;
-      const storedResultsRaw = localStorage.getItem(assessmentKey);
-      const storedResults = storedResultsRaw ? JSON.parse(storedResultsRaw) : null;
+      setLoading(true);
+      setResults(null);
+      setAnswerSnapshots([]);
+      setStudentAnswers({});
+      setQuestions([]);
 
       try {
-        const [latestResult, systemSettings] = await Promise.all([
-          getLatestAssessmentResult(userEmail),
-          getSystemSettings(),
-        ]);
+        const settingsResult = await getSystemSettings();
+        if (requestSequence !== resultsLoadSequence.current) return;
 
-        if (systemSettings?.data) {
-          setAssessmentAnswersVisible(
-            parseBooleanStrict(systemSettings.data.assessment_answers_visible, true)
-          );
+        const showAnswerDetails = canViewAssessmentAnswers(settingsResult);
+        setAssessmentAnswersVisible(showAnswerDetails);
+
+        if (!showAnswerDetails) {
+          localStorage.removeItem(assessmentKey);
+          localStorage.removeItem(`assessmentAnswers_${userEmail}`);
+          localStorage.removeItem(`assessmentAnswerSnapshots_${userEmail}`);
         }
 
-        const storedAnswerSnapshots =
-          latestResult
-            ? latestResult.answerSnapshots || []
-            : storedResults?.answerSnapshots || [];
-        setAnswerSnapshots(storedAnswerSnapshots);
-        setQuestions([]);
+        const latestResult = await getLatestAssessmentResult(userEmail, {
+          includeAnswerDetails: showAnswerDetails,
+        });
+        if (requestSequence !== resultsLoadSequence.current) return;
 
-        const rawAnswers = latestResult
-          ? latestResult.answers
-          : storedResults?.answers;
-
-        if (rawAnswers) {
-          setStudentAnswers(rawAnswers);
+        let storedResults: Partial<AssessmentResults> | null = null;
+        if (showAnswerDetails && latestResult) {
+          try {
+            const storedResultsRaw = localStorage.getItem(assessmentKey);
+            storedResults = storedResultsRaw ? JSON.parse(storedResultsRaw) : null;
+          } catch (error) {
+            console.error("Unable to read cached assessment details:", error);
+            localStorage.removeItem(assessmentKey);
+          }
         }
 
-        if (latestResult) {
-          const cluster =
-            latestResult.recommendedCluster ||
-            latestResult.recommended_cluster ||
-            latestResult.cluster ||
-            getClusterForElectives(latestResult.track, latestResult.electives);
-          setResults({
-            ...storedResults,
-            track: latestResult.track,
-            cluster,
-            electives: latestResult.electives,
-            scores: latestResult.scores,
-            topDomains: latestResult.topDomains,
-            topInterests: latestResult.topInterests,
-            electiveRecommendations: storedResults?.electiveRecommendations,
-            overallScore: latestResult.overallScore,
-            aiRecommendation: storedResults?.aiRecommendation,
-            answers: rawAnswers || undefined,
-            answerSnapshots: storedAnswerSnapshots,
-          });
-          setLoading(false);
-          return;
-        }
+        setAnswerSnapshots(showAnswerDetails ? latestResult?.answerSnapshots || [] : []);
+        setStudentAnswers(showAnswerDetails ? latestResult?.answers || {} : {});
 
-        if (storedResults) {
-          setResults({
-            ...storedResults,
-            cluster: storedResults.cluster || getClusterForElectives(storedResults.track, storedResults.electives),
-            answers: storedResults.answers || rawAnswers || undefined,
-            answerSnapshots: storedAnswerSnapshots,
-          });
-        } else {
-          setResults(null);
-        }
+        if (!latestResult) return;
+
+        const cluster =
+          latestResult.recommendedCluster ||
+          latestResult.recommended_cluster ||
+          latestResult.cluster ||
+          getClusterForElectives(latestResult.track, latestResult.electives);
+        setResults({
+          ...storedResults,
+          track: latestResult.track,
+          cluster,
+          electives: latestResult.electives,
+          scores: latestResult.scores,
+          topDomains: latestResult.topDomains,
+          topInterests: showAnswerDetails ? latestResult.topInterests : [],
+          electiveRecommendations: showAnswerDetails ? storedResults?.electiveRecommendations : undefined,
+          overallScore: latestResult.overallScore,
+          aiRecommendation: showAnswerDetails ? storedResults?.aiRecommendation : undefined,
+          answers: showAnswerDetails ? latestResult.answers || undefined : undefined,
+          answerSnapshots: showAnswerDetails ? latestResult.answerSnapshots : [],
+        });
       } catch (error) {
+        if (requestSequence !== resultsLoadSequence.current) return;
         console.error("Error loading assessment results:", error);
-        setQuestions([]);
-        if (storedResults) {
-          setResults({
-            ...storedResults,
-            cluster: storedResults.cluster || getClusterForElectives(storedResults.track, storedResults.electives),
-          });
-        } else {
-          setResults(null);
-        }
+        setAssessmentAnswersVisible(false);
+        localStorage.removeItem(assessmentKey);
+        localStorage.removeItem(`assessmentAnswers_${userEmail}`);
+        localStorage.removeItem(`assessmentAnswerSnapshots_${userEmail}`);
+        setResults(null);
+        setAnswerSnapshots([]);
+        setStudentAnswers({});
       } finally {
-        setLoading(false);
+        if (requestSequence === resultsLoadSequence.current) setLoading(false);
       }
     };
 
@@ -259,18 +252,12 @@ export function Results() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "system_settings" },
-        async (payload: any) => {
-          if (payload?.new && payload.new.setting_key === "assessment_answers_visible") {
-            setAssessmentAnswersVisible(
-              parseBooleanStrict(payload.new.setting_value, true)
-            );
-          } else {
-            const settingsResult = await getSystemSettings();
-            if (settingsResult?.data) {
-              setAssessmentAnswersVisible(
-                parseBooleanStrict(settingsResult.data.assessment_answers_visible, true)
-              );
-            }
+        (payload: any) => {
+          if (
+            payload?.new?.setting_key === "assessment_answers_visible" ||
+            payload?.old?.setting_key === "assessment_answers_visible"
+          ) {
+            void loadResults();
           }
         }
       )
@@ -284,6 +271,7 @@ export function Results() {
   useEffect(() => {
     if (
       !results ||
+      !assessmentAnswersVisible ||
       results.aiRecommendation ||
       isFetchingAiRecommendation ||
       attemptedAiRecommendationFetch.current
@@ -341,7 +329,7 @@ export function Results() {
     return () => {
       isActive = false;
     };
-  }, [isFetchingAiRecommendation, results, userData]);
+  }, [assessmentAnswersVisible, isFetchingAiRecommendation, results, userData]);
 
   const safeScores = results?.scores || { VA: 0, MA: 0, SA: 0, LRA: 0 };
 
@@ -439,29 +427,12 @@ export function Results() {
         const selectedChoice = snapshot.choices.find(
           (choice: any) => choice.id === snapshot.selectedChoiceId
         );
-        const selectedChoiceIndex = selectedChoice
-          ? snapshot.choices.findIndex((choice: any) => choice.id === selectedChoice.id)
-          : null;
-        const rating = selectedChoiceIndex !== null ? selectedChoiceIndex + 1 : null;
-        const likertTexts: Record<number, string> = {
-          1: "Strongly Disagree",
-          2: "Disagree",
-          3: "Neutral",
-          4: "Agree",
-          5: "Strongly Agree",
-        };
 
         return {
           id: snapshot.questionId,
           question: snapshot.questionText,
-          options: snapshot.choices.map((choice: any) => choice.text),
-          correctAnswer: null,
-          category: snapshot.category,
-          interestType: snapshot.interestType,
           questionNumber: idx + 1,
           selectedChoiceText: selectedChoice?.text ?? snapshot.selectedChoiceText ?? null,
-          rating,
-          ratingLabel: rating ? likertTexts[rating] : "Not answered",
         };
       });
   }, [answerSnapshots, results]);
@@ -495,38 +466,26 @@ export function Results() {
     );
   }
 
-  const { track, cluster, electives, scores, topDomains, topInterests, overallScore: storedOverallScore, aiRecommendation } = results;
+  const { track, cluster, electives, scores, topDomains, topInterests, overallScore: storedOverallScore } = results;
+  const aiRecommendation = results.aiRecommendation;
 
   // Calculate overall score (average of all domains) when not provided by stored results
   const overallScore = storedOverallScore ?? Math.round((scores.VA + scores.MA + scores.SA + scores.LRA) / 4);
   const topDomainSummary = topDomains.length > 0 ? topDomains.join(" and ") : "your strongest domains";
-  const topInterestSummary = topInterests.length > 0 ? topInterests.join(" and ") : "your preferred interests";
 
-  const strongestScores = [
-    { label: "Verbal Ability", score: scores.VA },
-    { label: "Mathematical Ability", score: scores.MA },
-    { label: "Science / Spatial Ability", score: scores.SA },
-    { label: "Logical Reasoning", score: scores.LRA },
-  ]
-    .sort((first, second) => second.score - first.score)
-    .slice(0, 2)
-    .map(({ label, score }) => `${label} (${Math.round(score)}%)`);
-  const trackNarrative = aiRecommendation?.trackExplanation ||
-    `The ${track} is based on your strongest assessment areas in ${strongestScores.join(" and ")}. ` +
-    (topInterests.length
-      ? `Your RIASEC interests provide additional context: ${topInterestSummary}.`
-      : "Your RIASEC interests are considered as supporting information.");
-  const clusterNarrative = aiRecommendation?.clusterExplanation ||
+  const trackNarrative =
+    `The ${track} is your recommended pathway based on your completed assessment.`;
+  const clusterNarrative =
     (cluster
-      ? `${cluster} is suggested based on its cluster score and the RIASEC interests relevant to this pathway.`
+      ? `${cluster} is the recommended elective cluster within the ${track}.`
       : "Your assessment result does not include a saved cluster recommendation.");
 
   const selectedElectiveDetails = electives
     .map((elective) => findCatalogElective(elective))
     .filter(Boolean);
   const analysisSummary = selectedElectiveDetails.length > 0
-    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives match your strengths in ${topDomainSummary} and interests in ${topInterestSummary}. Together, they develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")} and connect to related study and career pathways.`
-    : `Based on your assessment results, Electron Hub recommends the ${track} Track because of your strong performance in ${topDomainSummary} and your demonstrated interest in ${topInterestSummary}.`;
+    ? `Your ${track} Track recommendation is supported by ${selectedElectiveDetails.map((elective) => elective.name).join(" and ")}. These electives connect to your strengths in ${topDomainSummary}, develop ${Array.from(new Set(selectedElectiveDetails.flatMap((elective) => elective.strengths))).join(", ")}, and connect to related study and career pathways.`
+    : `Based on your assessment results, Electron Hub recommends the ${track} Track because of your performance in ${topDomainSummary}.`;
 
   const scoreRows = [
     { name: "Logic / Analytical Reasoning", score: scores.LRA, color: "#F59E0B", key: "LRA" },
@@ -724,6 +683,8 @@ export function Results() {
     elective,
     scoring: results.electiveRecommendations?.find((recommendation) => recommendation.name === elective),
     explanation: (() => {
+      if (!assessmentAnswersVisible) return "";
+
       const catalogElective = findCatalogElective(elective);
 
       if (catalogElective) {
@@ -820,10 +781,6 @@ export function Results() {
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Top strengths</p>
                       <p className="mt-3 text-lg font-semibold text-slate-900">{topDomainSummary}</p>
                     </div>
-                    <div className="rounded-3xl bg-slate-50 p-5">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">Interest match</p>
-                      <p className="mt-3 text-lg font-semibold text-slate-900">{topInterestSummary}</p>
-                    </div>
                   </div>
                 )}
               </div>
@@ -856,7 +813,7 @@ export function Results() {
                     </div>
                     {scoring &&
                     assessmentAnswersVisible &&
-                    [scoring.compatibilityScore, scoring.aptitudeScore, scoring.riasecScore].every(
+                    [scoring.compatibilityScore, scoring.aptitudeScore].every(
                       (score) => typeof score === "number" && Number.isFinite(score)
                     ) ? (
                       <div className="mt-4 grid gap-2 rounded-2xl bg-white p-4 text-sm text-slate-700">
@@ -867,10 +824,6 @@ export function Results() {
                         <div className="flex items-center justify-between gap-3">
                           <span>Aptitude Score</span>
                           <span>{Number(scoring.aptitudeScore).toFixed(2)}%</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span>RIASEC Score</span>
-                          <span>{Number(scoring.riasecScore).toFixed(2)}%</span>
                         </div>
                       </div>
                     ) : null}
@@ -971,19 +924,6 @@ export function Results() {
                       </div>
                     </div>
                   )}
-                  {results.riasecScores && Object.keys(results.riasecScores).length > 0 && (
-                    <div className="mt-6 border-t border-white/20 pt-5">
-                      <h4 className="text-sm font-bold text-white">RIASEC Interest Scores</h4>
-                      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        {["Realistic", "Investigative", "Artistic", "Social", "Enterprising", "Conventional"].map((type) => (
-                          <div key={type} className="rounded-xl bg-white/10 p-3">
-                            <p className="text-xs text-blue-100">{type}</p>
-                            <p className="mt-1 font-bold">{results.riasecScores?.[type] ?? 0}%</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </section>
             ) : (
@@ -1050,8 +990,7 @@ export function Results() {
             </div>
 
             <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-600">
-              Review your question-by-question responses, correct choices, and scoring across all cognitive aptitude domains
-              and the vocational interest inventory.
+              Review your aptitude answers and scoring, along with the exact options you selected for each interest question.
             </p>
 
             {/* Domain Tabs Bar */}
@@ -1176,25 +1115,12 @@ export function Results() {
               <div className="mt-6 rounded-2xl border border-purple-100 bg-purple-50/60 p-4 sm:p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <span className="text-xs font-bold uppercase tracking-wider text-purple-700">
-                      RIASEC Vocational Profile
-                    </span>
                     <h4 className="mt-1 text-lg font-bold text-slate-950">
-                      Interest Inventory ({resolvedInterestQuestions.length} Questions)
+                      Selected Interest Responses ({resolvedInterestQuestions.length})
                     </h4>
                     <p className="mt-1 text-xs text-slate-600">
-                      Ratings reflect student career interest intensity: 1 (Strongly Disagree) to 5 (Strongly Agree).
+                      Responses shown below are the options saved for this assessment attempt.
                     </p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {topInterests.map((interest, idx) => (
-                      <span
-                        key={idx}
-                        className="rounded-full bg-purple-100 px-3 py-1 text-xs font-bold text-purple-800"
-                      >
-                        ★ Top Match: {interest}
-                      </span>
-                    ))}
                   </div>
                 </div>
               </div>
@@ -1319,54 +1245,19 @@ export function Results() {
                         </span>
                       </div>
 
-                      {q.interestType && (
-                        <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-bold text-purple-700">
-                          RIASEC: {q.interestType}
-                        </span>
-                      )}
                     </div>
 
                     <p className="mt-3 text-base font-semibold text-slate-900 sm:text-lg">
                       {q.question}
                     </p>
 
-                    {/* Likert Scale Bar */}
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-                      <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
-                        <span>Student Response:</span>
-                        <span className="font-bold text-blue-700">
-                          {q.selectedChoiceText || q.ratingLabel}
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-5 gap-2 mt-2">
-                        {[1, 2, 3, 4, 5].map((level) => {
-                          const isSelected = q.rating === level;
-                          const labels: Record<number, string> = {
-                            1: "Strongly Disagree",
-                            2: "Disagree",
-                            3: "Neutral",
-                            4: "Agree",
-                            5: "Strongly Agree",
-                          };
-
-                          return (
-                            <div
-                              key={level}
-                              className={`flex flex-col items-center justify-center rounded-lg py-2.5 px-1 text-center transition-all ${
-                                isSelected
-                                  ? "bg-blue-600 text-white font-bold shadow-sm ring-2 ring-blue-300"
-                                  : "bg-white text-slate-600 border border-slate-200"
-                              }`}
-                            >
-                              <span className="text-base sm:text-lg font-bold">{level}</span>
-                              <span className="text-[10px] sm:text-xs leading-tight line-clamp-1 mt-0.5">
-                                {labels[level]}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
+                    <div className="mt-4 rounded-xl border border-purple-100 bg-purple-50/60 p-4">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-purple-700">
+                        Selected response
+                      </p>
+                      <p className="mt-1 font-bold text-slate-900">
+                        {q.selectedChoiceText || "Not answered"}
+                      </p>
                     </div>
                   </div>
                 )) : (

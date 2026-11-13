@@ -4,6 +4,10 @@ import {
   buildAssessmentAnswerSnapshots,
   isInterestAnswerSnapshot,
 } from '../src/services/assessmentSnapshot.js';
+import {
+  canViewAssessmentAnswers,
+  getAssessmentResultTable,
+} from '../src/services/assessmentAnswersVisibility.js';
 import { calculateRiasecScores } from '../src/utils/electiveRecommendationScoring.js';
 
 test('freezes the submitted choice when a question is edited repeatedly', () => {
@@ -129,4 +133,22 @@ test('keeps saved interest choices aligned with the existing RIASEC scoring inpu
   );
   assert.equal(scores.Realistic, 20);
   assert.equal(scores.Investigative, 100);
+});
+
+test('assessment answer visibility follows only the persisted admin setting', () => {
+  assert.equal(
+    canViewAssessmentAnswers({ source: 'supabase', data: { assessment_answers_visible: true } }),
+    true
+  );
+  assert.equal(
+    canViewAssessmentAnswers({ source: 'supabase', data: { assessment_answers_visible: false } }),
+    false
+  );
+  assert.equal(
+    canViewAssessmentAnswers({ source: 'local', data: { assessment_answers_visible: true } }),
+    false
+  );
+  assert.equal(canViewAssessmentAnswers(null), false);
+  assert.equal(getAssessmentResultTable(true), 'assessment_results');
+  assert.equal(getAssessmentResultTable(false), 'student_assessment_result_summary');
 });

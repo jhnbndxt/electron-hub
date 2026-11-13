@@ -21,6 +21,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { useAuth } from "../context/AuthContext";
 import { motion } from "motion/react";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
+import { canViewAssessmentAnswers } from "../../services/assessmentAnswersVisibility";
 import { getSystemSettings } from "../../services/systemSettingsService";
 import { LoadingState } from "../components/LoadingState";
 import { 
@@ -548,7 +549,10 @@ export function EnrollmentForm() {
         
         // Load AI assessment results
         try {
-          const result = await getLatestAssessmentResult(userEmail);
+          const settingsResult = await getSystemSettings();
+          const result = await getLatestAssessmentResult(userEmail, {
+            includeAnswerDetails: canViewAssessmentAnswers(settingsResult),
+          });
           
           if (result) {
             const cluster = result.recommendedCluster || result.recommended_cluster || result.cluster ||

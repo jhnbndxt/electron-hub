@@ -173,7 +173,7 @@ export const SYSTEM_SETTINGS_DEFINITIONS = [
     key: 'assessment_answers_visible',
     type: 'boolean',
     defaultValue: true,
-    description: 'Allow students to view their assessment score details, elective breakdowns, and performance analysis on the Results page.',
+    description: 'Allow students to view their assessment score breakdown, elective compatibility, performance analysis, and selected interest responses on the Results page.',
   },
 ];
 

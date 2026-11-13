@@ -9,6 +9,7 @@
 
 import { supabase } from '../supabase';
 import { triggerNotification } from './notificationService';
+import { getAssessmentResultTable } from './assessmentAnswersVisibility';
 
 function normalizeAnswerSnapshots(value) {
   return Array.isArray(value) ? value : [];
@@ -479,13 +480,13 @@ export async function getAssessmentHistory(userEmail) {
 /**
  * Get the most recent assessment result
  */
-export async function getLatestAssessmentResult(userEmail) {
+export async function getLatestAssessmentResult(userEmail, { includeAnswerDetails = true } = {}) {
   try {
     const student_id = await getStudentIdByEmail(userEmail);
     if (!student_id) return null;
 
     const { data, error } = await supabase
-      .from('assessment_results')
+      .from(getAssessmentResultTable(includeAnswerDetails))
       .select('*')
       .eq('student_id', student_id)
       .order('created_at', { ascending: false })
