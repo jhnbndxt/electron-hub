@@ -1,3 +1,32 @@
+const RIASEC_TYPES = [
+  'Realistic',
+  'Investigative',
+  'Artistic',
+  'Social',
+  'Enterprising',
+  'Conventional',
+];
+
+const RIASEC_TYPE_BY_CODE = {
+  R: 'Realistic',
+  I: 'Investigative',
+  A: 'Artistic',
+  S: 'Social',
+  E: 'Enterprising',
+  C: 'Conventional',
+};
+
+function getInterestType(question = {}) {
+  const type = question.interestType || question.interest_type || question.category;
+  return RIASEC_TYPES.includes(type) ? type : RIASEC_TYPE_BY_CODE[type] || null;
+}
+
+export function isInterestAnswerSnapshot(snapshot = {}) {
+  return snapshot.category === 'Interests' ||
+    snapshot.category === 'Interest' ||
+    Boolean(getInterestType(snapshot));
+}
+
 const normalizeAnswer = (answers, questionId) => {
   const value = answers?.[questionId] ?? answers?.[String(questionId)];
   return Number.isInteger(value) ? value : null;
@@ -19,6 +48,12 @@ export function buildAssessmentAnswerSnapshots(answers = {}, questionsByCategory
     .flat()
     .map((question, questionIndex) => {
       const options = Array.isArray(question.options) ? question.options : [];
+      const submittedChoiceIndex = normalizeAnswer(answers, question.id);
+      const selectedChoiceIndex = submittedChoiceIndex !== null &&
+        submittedChoiceIndex >= 0 &&
+        submittedChoiceIndex < options.length
+        ? submittedChoiceIndex
+        : null;
       const choiceOccurrences = new Map();
       const choices = options.map((text, optionIndex) => {
         const normalizedText = String(text || '');
@@ -31,7 +66,6 @@ export function buildAssessmentAnswerSnapshots(answers = {}, questionsByCategory
           letter: String.fromCharCode(65 + optionIndex),
         };
       });
-      const selectedChoiceIndex = normalizeAnswer(answers, question.id);
       const selectedChoice = selectedChoiceIndex !== null ? choices[selectedChoiceIndex] : null;
       const correctAnswer = Number.isInteger(question.correctAnswer)
         ? question.correctAnswer
@@ -44,8 +78,8 @@ export function buildAssessmentAnswerSnapshots(answers = {}, questionsByCategory
         questionId: question.id,
         questionNumber: questionIndex + 1,
         questionText: question.question,
-        category: question.category,
-        interestType: question.interestType || question.interest_type || null,
+        category: isInterestAnswerSnapshot(question) ? 'Interests' : question.category,
+        interestType: getInterestType(question),
         choices,
         selectedChoiceId: selectedChoice?.id || null,
         selectedChoiceText: selectedChoice?.text || null,

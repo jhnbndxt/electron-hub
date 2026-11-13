@@ -129,7 +129,7 @@ function mapAssessmentResult(result) {
     recommended_cluster: result.recommended_cluster || result.cluster || null,
     elective_1: electives[0] || null,
     ...(electives[1] ? { elective_2: electives[1] } : {}),
-    answers: result.answers || result.top_interests?.answers || null,
+    answers: result.answers || null,
     answerSnapshots: normalizeAnswerSnapshots(result.answer_snapshots),
   };
 }

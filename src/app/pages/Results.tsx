@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
+import { isInterestAnswerSnapshot } from "../../services/assessmentSnapshot";
 import { getSystemSettings, parseBooleanStrict } from "../../services/systemSettingsService";
 import { LoadingState } from "../components/LoadingState";
 import { getRecommendedElectronBranches } from "../utils/electronBranchRecommendations";
@@ -185,28 +186,16 @@ export function Results() {
           );
         }
 
-        const localAnswerSnapshotsRaw = localStorage.getItem(`assessmentAnswerSnapshots_${userEmail}`);
-        const localAnswerSnapshots = localAnswerSnapshotsRaw ? JSON.parse(localAnswerSnapshotsRaw) : [];
         const storedAnswerSnapshots =
-          (latestResult?.answerSnapshots?.length ? latestResult.answerSnapshots : null) ||
-          (storedResults?.answerSnapshots?.length ? storedResults.answerSnapshots : null) ||
-          localAnswerSnapshots;
+          latestResult
+            ? latestResult.answerSnapshots || []
+            : storedResults?.answerSnapshots || [];
         setAnswerSnapshots(storedAnswerSnapshots);
         setQuestions([]);
 
-        const rawAnswers =
-          latestResult?.answers ||
-          storedResults?.answers ||
-          (() => {
-            const key = `assessmentAnswers_${userEmail}`;
-            const val = localStorage.getItem(key);
-            return val ? JSON.parse(val) : null;
-          })() ||
-          (() => {
-            const key = `assessmentProgress_${userEmail}`;
-            const val = localStorage.getItem(key);
-            return val ? JSON.parse(val)?.answers : null;
-          })();
+        const rawAnswers = latestResult
+          ? latestResult.answers
+          : storedResults?.answers;
 
         if (rawAnswers) {
           setStudentAnswers(rawAnswers);
@@ -355,7 +344,6 @@ export function Results() {
   }, [isFetchingAiRecommendation, results, userData]);
 
   const safeScores = results?.scores || { VA: 0, MA: 0, SA: 0, LRA: 0 };
-  const safeTopInterests = results?.topInterests || [];
 
   const activeTabConfig = DOMAIN_TABS.find((t) => t.key === activeDomainTab) || DOMAIN_TABS[0];
 
@@ -392,7 +380,7 @@ export function Results() {
             category: snapshot.category,
             questionNumber: idx + 1,
             studentChoice: selectedChoiceIndex,
-            isCorrect: snapshot.isCorrect === true,
+            isCorrect: snapshot.isCorrect,
             points: snapshot.isCorrect === true ? 1 : 0,
           };
         });
@@ -402,9 +390,6 @@ export function Results() {
       (q) => q.category.toLowerCase() === activeTabConfig.category.toLowerCase()
     );
 
-    const total = categoryQuestions.length;
-    const targetCorrect = Math.min(total, Math.max(0, Math.round((currentDomainScore / 100) * total)));
-
     return categoryQuestions.map((q, idx) => {
       let studentChoice: number | null = null;
 
@@ -412,22 +397,9 @@ export function Results() {
         studentChoice = studentAnswers[q.id];
       } else if (studentAnswers && typeof studentAnswers[String(q.id)] === "number") {
         studentChoice = studentAnswers[String(q.id)];
-      } else if (studentAnswers && typeof studentAnswers[idx] === "number") {
-        studentChoice = studentAnswers[idx];
       }
 
-      // Fallback reconstruction matching recorded domain score for legacy rows
-      if (studentChoice === null) {
-        if (idx < targetCorrect) {
-          studentChoice = q.correctAnswer ?? 0;
-        } else {
-          const correct = q.correctAnswer ?? 0;
-          const totalOpts = q.options.length || 4;
-          studentChoice = (correct + 1) % totalOpts;
-        }
-      }
-
-      const isCorrect = studentChoice === q.correctAnswer;
+      const isCorrect = studentChoice === null ? null : studentChoice === q.correctAnswer;
       const points = isCorrect ? 1 : 0;
 
       return {
@@ -438,7 +410,7 @@ export function Results() {
         points,
       };
     });
-  }, [answerSnapshots, results, activeDomainTab, activeTabConfig, currentDomainScore, questions, studentAnswers]);
+  }, [answerSnapshots, results, activeDomainTab, activeTabConfig, questions, studentAnswers]);
 
   const displayedAptitudeQuestions = useMemo(() => {
     if (!results) return [];
@@ -446,7 +418,7 @@ export function Results() {
       return resolvedAptitudeQuestions.filter((q) => q.isCorrect);
     }
     if (domainFilter === "incorrect") {
-      return resolvedAptitudeQuestions.filter((q) => !q.isCorrect);
+      return resolvedAptitudeQuestions.filter((q) => q.isCorrect === false);
     }
     return resolvedAptitudeQuestions;
   }, [results, resolvedAptitudeQuestions, domainFilter]);
@@ -454,93 +426,45 @@ export function Results() {
   const currentDomainCorrectCount = useMemo(() => {
     return resolvedAptitudeQuestions.filter((q) => q.isCorrect).length;
   }, [resolvedAptitudeQuestions]);
-
+  const currentDomainIncorrectCount = useMemo(() => {
+    return resolvedAptitudeQuestions.filter((q) => q.isCorrect === false).length;
+  }, [resolvedAptitudeQuestions]);
+  const totalRecordedQuestionCount = answerSnapshots.length || questions.length;
   const resolvedInterestQuestions = useMemo(() => {
     if (!results) return [];
 
-    if (answerSnapshots.length > 0) {
-      return answerSnapshots
-        .filter((snapshot) => snapshot.category === "Interests")
-        .map((snapshot, idx) => {
-          const rating = snapshot.selectedChoiceId
-            ? snapshot.choices.findIndex((choice: any) => choice.id === snapshot.selectedChoiceId) + 1
-            : null;
-          const likertTexts: Record<number, string> = {
-            1: "Strongly Disagree",
-            2: "Disagree",
-            3: "Neutral",
-            4: "Agree",
-            5: "Strongly Agree",
-          };
+    return answerSnapshots
+      .filter(isInterestAnswerSnapshot)
+      .map((snapshot, idx) => {
+        const selectedChoice = snapshot.choices.find(
+          (choice: any) => choice.id === snapshot.selectedChoiceId
+        );
+        const selectedChoiceIndex = selectedChoice
+          ? snapshot.choices.findIndex((choice: any) => choice.id === selectedChoice.id)
+          : null;
+        const rating = selectedChoiceIndex !== null ? selectedChoiceIndex + 1 : null;
+        const likertTexts: Record<number, string> = {
+          1: "Strongly Disagree",
+          2: "Disagree",
+          3: "Neutral",
+          4: "Agree",
+          5: "Strongly Agree",
+        };
 
-          return {
-            id: snapshot.questionId,
-            question: snapshot.questionText,
-            options: snapshot.choices.map((choice: any) => choice.text),
-            correctAnswer: null,
-            category: snapshot.category,
-            interestType: snapshot.interestType,
-            questionNumber: idx + 1,
-            rating,
-            ratingLabel: rating ? likertTexts[rating] : "Not answered",
-          };
-        });
-    }
-
-    const interestQuestions = questions.filter(
-      (q) => q.category.toLowerCase() === "interests"
-    );
-
-    return interestQuestions.map((q, idx) => {
-      let rating: number | null = null;
-
-      if (studentAnswers) {
-        const val = studentAnswers[q.id] ?? studentAnswers[String(q.id)] ?? studentAnswers[idx];
-        if (typeof val === "number") {
-          rating = val >= 1 && val <= 5 ? val : val + 1;
-        }
-      }
-
-      // Fallback reconstruction matching topInterests for legacy rows
-      if (rating === null || rating < 1 || rating > 5) {
-        const interestType = (q.interestType || "").toLowerCase();
-        const isTopMatch = safeTopInterests.some((top) => {
-          const t = top.toLowerCase();
-          return (
-            t.includes(interestType) ||
-            interestType.includes(t) ||
-            (interestType === "investigative" && (t.includes("academic") || t.includes("tech") || t.includes("science") || t.includes("math"))) ||
-            (interestType === "realistic" && (t.includes("practical") || t.includes("tech") || t.includes("hands-on") || t.includes("repair"))) ||
-            (interestType === "artistic" && (t.includes("creative") || t.includes("art") || t.includes("design") || t.includes("media"))) ||
-            (interestType === "social" && (t.includes("help") || t.includes("social") || t.includes("teach") || t.includes("doctor"))) ||
-            (interestType === "enterprising" && (t.includes("business") || t.includes("leader") || t.includes("entrepreneur"))) ||
-            (interestType === "conventional" && (t.includes("home") || t.includes("office") || t.includes("organ")))
-          );
-        });
-
-        if (isTopMatch) {
-          rating = idx % 3 === 0 ? 5 : 4;
-        } else {
-          rating = idx % 2 === 0 ? 3 : 2;
-        }
-      }
-
-      const LIKERT_TEXTS: Record<number, string> = {
-        1: "Strongly Disagree",
-        2: "Disagree",
-        3: "Neutral",
-        4: "Agree",
-        5: "Strongly Agree",
-      };
-
-      return {
-        ...q,
-        questionNumber: idx + 1,
-        rating,
-        ratingLabel: LIKERT_TEXTS[rating] || "Neutral",
-      };
-    });
-  }, [answerSnapshots, results, questions, safeTopInterests, studentAnswers]);
+        return {
+          id: snapshot.questionId,
+          question: snapshot.questionText,
+          options: snapshot.choices.map((choice: any) => choice.text),
+          correctAnswer: null,
+          category: snapshot.category,
+          interestType: snapshot.interestType,
+          questionNumber: idx + 1,
+          selectedChoiceText: selectedChoice?.text ?? snapshot.selectedChoiceText ?? null,
+          rating,
+          ratingLabel: rating ? likertTexts[rating] : "Not answered",
+        };
+      });
+  }, [answerSnapshots, results]);
 
   if (loading) {
     return (
@@ -1117,7 +1041,7 @@ export function Results() {
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-semibold text-blue-700">
-                  {questions.length} Questions Total
+                  {totalRecordedQuestionCount} Questions Total
                 </span>
                 <span className="inline-flex items-center rounded-full bg-slate-100 px-3.5 py-1.5 text-xs font-semibold text-slate-700">
                   Overall Score: {overallScore}%
@@ -1135,9 +1059,15 @@ export function Results() {
               {DOMAIN_TABS.map((tab) => {
                 const TabIcon = tab.icon;
                 const isActive = activeDomainTab === tab.key;
-                const tabCount = questions.filter(
-                  (q) => q.category.toLowerCase() === tab.category.toLowerCase()
-                ).length || (tab.key === "Interests" ? 18 : 15);
+                const tabCount = answerSnapshots.length > 0
+                  ? answerSnapshots.filter((snapshot) =>
+                      tab.category === "Interests"
+                        ? isInterestAnswerSnapshot(snapshot)
+                        : snapshot.category?.toLowerCase() === tab.category.toLowerCase()
+                    ).length
+                  : questions.filter(
+                      (q) => q.category.toLowerCase() === tab.category.toLowerCase()
+                    ).length;
 
                 const tabScore =
                   tab.scoreKey === "VA"
@@ -1237,7 +1167,7 @@ export function Results() {
                           : "text-rose-700 hover:bg-rose-50"
                       }`}
                     >
-                      Incorrect ({resolvedAptitudeQuestions.length - currentDomainCorrectCount})
+                      Incorrect ({currentDomainIncorrectCount})
                     </button>
                   </div>
                 </div>
@@ -1250,7 +1180,7 @@ export function Results() {
                       RIASEC Vocational Profile
                     </span>
                     <h4 className="mt-1 text-lg font-bold text-slate-950">
-                      Interest Inventory (18 Questions)
+                      Interest Inventory ({resolvedInterestQuestions.length} Questions)
                     </h4>
                     <p className="mt-1 text-xs text-slate-600">
                       Ratings reflect student career interest intensity: 1 (Strongly Disagree) to 5 (Strongly Agree).
@@ -1289,15 +1219,19 @@ export function Results() {
                           </span>
                         </div>
 
-                        {q.isCorrect ? (
+                        {q.isCorrect === true ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">
                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                             +1 pt (Correct)
                           </span>
-                        ) : (
+                        ) : q.isCorrect === false ? (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-bold text-rose-700 shadow-sm">
                             <XCircle className="h-3.5 w-3.5 text-rose-600" />
                             0 pts (Incorrect)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-600 shadow-sm">
+                            Not answered
                           </span>
                         )}
                       </div>
@@ -1370,7 +1304,7 @@ export function Results() {
                   </div>
                 )
               ) : (
-                resolvedInterestQuestions.map((q) => (
+                resolvedInterestQuestions.length > 0 ? resolvedInterestQuestions.map((q) => (
                   <div
                     key={q.id}
                     className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition-all hover:border-slate-300"
@@ -1381,7 +1315,7 @@ export function Results() {
                           {q.questionNumber}
                         </span>
                         <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                          Question {q.questionNumber} of 18
+                          Question {q.questionNumber} of {resolvedInterestQuestions.length}
                         </span>
                       </div>
 
@@ -1401,7 +1335,7 @@ export function Results() {
                       <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2">
                         <span>Student Response:</span>
                         <span className="font-bold text-blue-700">
-                          {q.rating} / 5 — {q.ratingLabel}
+                          {q.selectedChoiceText || q.ratingLabel}
                         </span>
                       </div>
 
@@ -1435,7 +1369,11 @@ export function Results() {
                       </div>
                     </div>
                   </div>
-                ))
+                )) : (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center text-slate-500">
+                    Individual interest responses were not saved with this assessment attempt.
+                  </div>
+                )
               )}
             </div>
           </section>

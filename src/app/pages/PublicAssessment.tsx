@@ -9,7 +9,7 @@ import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
-import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
+import { buildAssessmentAnswerSnapshots, isInterestAnswerSnapshot } from "../../services/assessmentSnapshot";
 import electivesCatalog, { getClusterForElectives } from "../../data/electives.js";
 import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
@@ -325,6 +325,7 @@ function PublicAssessmentResultsView({
   const electives = normalizedResult.electives.length > 0 ? normalizedResult.electives : ["Elective recommendation pending"];
   const topDomains = normalizedResult.topDomains.length > 0 ? normalizedResult.topDomains : ["Balanced aptitude profile"];
   const topInterests = normalizedResult.topInterests.length > 0 ? normalizedResult.topInterests : ["General academic interests"];
+  const interestAnswerSnapshots = normalizedResult.answerSnapshots.filter(isInterestAnswerSnapshot);
   const scores = normalizedResult.scores;
   const overallScore = Math.round(normalizeResultScore(normalizedResult.overallScore));
   const aiRecommendation = normalizedResult.aiRecommendation || {};
@@ -522,10 +523,33 @@ function PublicAssessmentResultsView({
                 <p className="mt-2 text-sm leading-6 text-slate-600">{topDomains.join(", ")}</p>
               </div>
               <div className="rounded-xl bg-slate-50 p-4">
-                <p className="text-sm font-bold text-slate-900">Key Interests</p>
+                <p className="text-sm font-bold text-slate-900">Top Interest Areas</p>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{topInterests.join(", ")}</p>
               </div>
             </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-white p-6 shadow-lg lg:col-span-2">
+            <h2 className="text-xl font-bold text-slate-950">Your Interest Responses</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              These are the choices you submitted. Top interest areas above are scored separately from these responses.
+            </p>
+            {interestAnswerSnapshots.length > 0 ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {interestAnswerSnapshots.map((snapshot) => (
+                  <div key={snapshot.questionId} className="rounded-xl bg-slate-50 p-4">
+                    <p className="text-sm font-medium text-slate-800">{snapshot.questionText}</p>
+                    <p className="mt-2 text-sm font-bold text-purple-800">
+                      {snapshot.selectedChoiceText || "Not answered"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
+                Individual interest responses were not saved with this assessment result.
+              </p>
+            )}
           </div>
 
           <div className="rounded-2xl bg-white p-6 shadow-lg">
