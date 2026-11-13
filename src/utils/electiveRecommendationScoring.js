@@ -116,6 +116,13 @@ export function getRiasecResponseScore(answer, question) {
     return 0;
   }
 
+  // Interest controls persist their literal 1–5 Likert rating. Do not treat
+  // that rating as a zero-based options-array index: doing so shifts ratings
+  // 1–4 and handles rating 5 inconsistently.
+  if (response >= 1 && response <= 5) {
+    return response;
+  }
+
   const options = Array.isArray(question?.options) ? question.options : [];
   const selectedOption = options[response];
   if (selectedOption !== undefined) {
@@ -133,7 +140,7 @@ export function getRiasecResponseScore(answer, question) {
     if (normalizedOption.includes('agree')) return 4;
   }
 
-  return response >= 1 && response <= 5 ? response : 0;
+  return 0;
 }
 
 export function calculateRiasecScores(answers = {}, interestQuestions = []) {
