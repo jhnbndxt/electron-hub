@@ -9,7 +9,7 @@ import { LoadingState } from "../components/LoadingState";
 import { ProcessingModal } from "../components/modals/ProcessingModal";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
 import { savePublicAssessmentResult } from "../../services/assessmentResultService";
-import { buildAssessmentAnswerSnapshots, isInterestAnswerSnapshot } from "../../services/assessmentSnapshot";
+import { buildAssessmentAnswerSnapshots, isInterestAnswerSnapshot, normalizeAssessmentAnswerSnapshots, resolveAssessmentCorrectAnswer } from "../../services/assessmentSnapshot";
 import electivesCatalog, { getClusterForElectives } from "../../data/electives.js";
 import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
@@ -194,9 +194,7 @@ const normalizeAssessmentResult = (result: any): AssessmentResult | null => {
       ? result.electiveRecommendations
       : [],
     overallScore: normalizeResultScore(result.overallScore ?? result.overall_score ?? rawScores.overall_score),
-    answerSnapshots: Array.isArray(result.answerSnapshots ?? result.answer_snapshots)
-      ? (result.answerSnapshots ?? result.answer_snapshots)
-      : [],
+    answerSnapshots: normalizeAssessmentAnswerSnapshots(result.answerSnapshots ?? result.answer_snapshots),
     aiRecommendation: result.aiRecommendation || {},
   };
 };
@@ -548,7 +546,7 @@ function PublicAssessmentResultsView({
                       {isInterest ? (
                         <div className="rounded-2xl border border-purple-100 bg-purple-50/60 p-4 sm:p-5"><h3 className="text-lg font-bold text-slate-950">Selected Interest Responses ({section.snapshots.length})</h3><p className="mt-1 text-xs text-slate-600">Responses saved for this assessment attempt.</p></div>
                       ) : (
-                        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-blue-700">Aptitude Domain</p><p className="mt-2 text-2xl font-bold text-slate-950">{Math.round(score)}% Score <span className="text-sm font-medium text-slate-600">({correctCount} of {section.snapshots.length} correct)</span></p></div><div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setAnswerFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "all" ? "bg-blue-600 text-white" : "text-slate-600"}`}>All ({section.snapshots.length})</button><button onClick={() => setAnswerFilter("correct")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "correct" ? "bg-emerald-600 text-white" : "text-emerald-700"}`}>Correct ({correctCount})</button><button onClick={() => setAnswerFilter("incorrect")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "incorrect" ? "bg-rose-600 text-white" : "text-rose-700"}`}>Incorrect ({incorrectCount})</button></div></div></div>
+                        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-xs font-bold uppercase tracking-wider text-blue-700">Aptitude Domain</p><p className="mt-2 text-2xl font-bold text-slate-950">{Math.round(section.snapshots.some((item) => item.isCorrect === true || item.isCorrect === false) ? (correctCount / section.snapshots.filter((item) => item.isCorrect === true || item.isCorrect === false).length) * 100 : score)}% Score <span className="text-sm font-medium text-slate-600">({correctCount} of {section.snapshots.length} correct)</span></p></div><div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1"><button onClick={() => setAnswerFilter("all")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "all" ? "bg-blue-600 text-white" : "text-slate-600"}`}>All ({section.snapshots.length})</button><button onClick={() => setAnswerFilter("correct")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "correct" ? "bg-emerald-600 text-white" : "text-emerald-700"}`}>Correct ({correctCount})</button><button onClick={() => setAnswerFilter("incorrect")} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${answerFilter === "incorrect" ? "bg-rose-600 text-white" : "text-rose-700"}`}>Incorrect ({incorrectCount})</button></div></div></div>
                       )}
                       <div className="mt-6 space-y-4">
                         {visibleSnapshots.map((snapshot, index) => {
@@ -936,7 +934,12 @@ export function PublicAssessment() {
         id: question.id,
         question: question.question,
         options: question.options || [],
-        correctAnswer: question.correct_answer,
+        correctAnswer: resolveAssessmentCorrectAnswer({
+          question: question.question,
+          category: question.category,
+          options: question.options || [],
+          correctAnswer: question.correct_answer,
+        }),
         category: question.category,
         interestType: question.interest_type || null,
       }));

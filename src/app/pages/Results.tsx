@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { getLatestAssessmentResult } from "../../services/assessmentResultService";
-import { isInterestAnswerSnapshot } from "../../services/assessmentSnapshot";
+import { isInterestAnswerSnapshot, normalizeAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
 import { canViewAssessmentAnswers } from "../../services/assessmentAnswersVisibility";
 import { getSystemSettings } from "../../services/systemSettingsService";
 import { LoadingState } from "../components/LoadingState";
@@ -205,7 +205,7 @@ export function Results() {
           }
         }
 
-        setAnswerSnapshots(showAnswerDetails ? latestResult?.answerSnapshots || [] : []);
+        setAnswerSnapshots(showAnswerDetails ? normalizeAssessmentAnswerSnapshots(latestResult?.answerSnapshots) : []);
         setStudentAnswers(showAnswerDetails ? latestResult?.answers || {} : {});
 
         if (!latestResult) return;
@@ -417,6 +417,14 @@ export function Results() {
   const currentDomainIncorrectCount = useMemo(() => {
     return resolvedAptitudeQuestions.filter((q) => q.isCorrect === false).length;
   }, [resolvedAptitudeQuestions]);
+  const currentDomainSnapshotScore = useMemo(() => {
+    const scoredQuestions = resolvedAptitudeQuestions.filter(
+      (question) => question.isCorrect === true || question.isCorrect === false
+    );
+    return scoredQuestions.length > 0
+      ? Math.round((currentDomainCorrectCount / scoredQuestions.length) * 100)
+      : currentDomainScore;
+  }, [currentDomainCorrectCount, currentDomainScore, resolvedAptitudeQuestions]);
   const totalRecordedQuestionCount = answerSnapshots.length || questions.length;
   const resolvedInterestQuestions = useMemo(() => {
     if (!results) return [];
@@ -1125,7 +1133,7 @@ export function Results() {
                     </div>
                     <div className="mt-2 flex items-baseline gap-3">
                       <p className="text-2xl font-bold text-slate-950">
-                        {currentDomainScore}% Score
+                        {currentDomainSnapshotScore}% Score
                       </p>
                       <p className="text-sm font-medium text-slate-600">
                         ({currentDomainCorrectCount} of {resolvedAptitudeQuestions.length} correct • +{currentDomainCorrectCount} pts)

@@ -13,7 +13,7 @@ import { createAuditLog } from "../../services/adminService";
 import { getSystemSettings } from "../../services/systemSettingsService";
 import { supabase } from "../../supabase";
 import { requestAssessmentAiRecommendation } from "../utils/assessmentAi";
-import { buildAssessmentAnswerSnapshots } from "../../services/assessmentSnapshot";
+import { buildAssessmentAnswerSnapshots, resolveAssessmentCorrectAnswer } from "../../services/assessmentSnapshot";
 import { FIVE_MINUTES_IN_SECONDS, formatAssessmentDuration, getAssessmentDurationSeconds, getRemainingAssessmentSeconds } from "../utils/assessmentTimer";
 
 interface Question {
@@ -289,7 +289,12 @@ export function Assessment() {
         id: question.id,
         question: question.question,
         options: question.options || [],
-        correctAnswer: question.correct_answer,
+        correctAnswer: resolveAssessmentCorrectAnswer({
+          question: question.question,
+          category: question.category,
+          options: question.options || [],
+          correctAnswer: question.correct_answer,
+        }),
         category: question.category,
         interestType: question.interest_type || null,
       }));
