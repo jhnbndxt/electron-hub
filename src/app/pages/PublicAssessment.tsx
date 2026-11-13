@@ -317,7 +317,13 @@ function PublicAssessmentResultsView({
   const cluster = normalizedResult.cluster;
   const electives = normalizedResult.electives.length > 0 ? normalizedResult.electives : ["Elective recommendation pending"];
   const topDomains = normalizedResult.topDomains.length > 0 ? normalizedResult.topDomains : ["Balanced aptitude profile"];
-  const interestAnswerSnapshots = normalizedResult.answerSnapshots.filter(isInterestAnswerSnapshot);
+  const answerSections = [
+    { key: "Verbal", label: "Verbal", snapshots: normalizedResult.answerSnapshots.filter((snapshot) => snapshot.category === "Verbal") },
+    { key: "Math", label: "Math", snapshots: normalizedResult.answerSnapshots.filter((snapshot) => snapshot.category === "Math") },
+    { key: "Science", label: "Science", snapshots: normalizedResult.answerSnapshots.filter((snapshot) => snapshot.category === "Science") },
+    { key: "Logical", label: "Logical", snapshots: normalizedResult.answerSnapshots.filter((snapshot) => snapshot.category === "Logical") },
+    { key: "Interests", label: "Interests", snapshots: normalizedResult.answerSnapshots.filter(isInterestAnswerSnapshot) },
+  ];
   const scores = normalizedResult.scores;
   const overallScore = Math.round(normalizeResultScore(normalizedResult.overallScore));
   const selectedElectiveDetails = electives
@@ -501,24 +507,54 @@ function PublicAssessmentResultsView({
           </div>
 
           <div className="mt-6 rounded-2xl bg-white p-6 shadow-lg lg:col-span-2">
-            <h2 className="text-xl font-bold text-slate-950">Your Interest Responses</h2>
+            <h2 className="text-xl font-bold text-slate-950">Your Assessment Answers</h2>
             <p className="mt-2 text-sm text-slate-600">
-              These are the original options you selected for this assessment.
+              These are the original answers you selected in every assessment section.
             </p>
-            {interestAnswerSnapshots.length > 0 ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {interestAnswerSnapshots.map((snapshot) => (
-                  <div key={snapshot.questionId} className="rounded-xl bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-800">{snapshot.questionText}</p>
-                    <p className="mt-2 text-sm font-bold text-purple-800">
-                      {snapshot.selectedChoiceText || "Not answered"}
-                    </p>
+            {normalizedResult.answerSnapshots.length > 0 ? (
+              <div className="mt-5 grid gap-5 xl:grid-cols-2">
+                {answerSections.map((section) => (
+                  <div key={section.key} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-bold text-slate-900">{section.label}</h3>
+                      <span className="rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200">
+                        {section.snapshots.length} {section.snapshots.length === 1 ? "answer" : "answers"}
+                      </span>
+                    </div>
+                    {section.snapshots.length > 0 ? (
+                      <div className="mt-3 space-y-3">
+                        {section.snapshots.map((snapshot) => {
+                          const selectedChoice = Array.isArray(snapshot.choices)
+                            ? snapshot.choices.find((choice: any) => choice.id === snapshot.selectedChoiceId)
+                            : null;
+                          const selectedAnswer = selectedChoice?.text ?? snapshot.selectedChoiceText ?? "Not answered";
+                          const rating = Number.isInteger(snapshot.selectedRating) ? snapshot.selectedRating : null;
+                          const isInterest = section.key === "Interests";
+
+                          return (
+                            <div key={snapshot.questionId} className="rounded-lg border border-slate-200 bg-white p-3">
+                              <p className="text-sm font-medium text-slate-800">{snapshot.questionText}</p>
+                              <p className={`mt-2 text-sm font-bold ${isInterest ? "text-purple-800" : "text-blue-800"}`}>
+                                {isInterest && rating !== null ? `${rating} — ${selectedAnswer}` : selectedAnswer}
+                              </p>
+                              {!isInterest && snapshot.isCorrect !== null && snapshot.isCorrect !== undefined && (
+                                <p className={`mt-1 text-xs font-bold ${snapshot.isCorrect ? "text-emerald-700" : "text-rose-700"}`}>
+                                  {snapshot.isCorrect ? "Correct" : "Incorrect"}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-500">No saved answers for this section.</p>
+                    )}
                   </div>
                 ))}
               </div>
             ) : (
               <p className="mt-4 rounded-xl bg-slate-50 p-4 text-sm text-slate-600">
-                Individual interest responses were not saved with this assessment result.
+                Individual answers were not saved with this assessment result.
               </p>
             )}
           </div>
