@@ -306,10 +306,55 @@ function getAssistantRoutes(userRole: AssistantContext["userRole"]): AssistantRo
     };
   }
 
+  if (userRole === "registrar") {
+    return {
+      assessment: "/registrar/assessment-management",
+      enrollment: "/registrar/pending",
+      documents: "/registrar/pending",
+      payment: "/registrar/pending",
+      paymentHistory: "/registrar/pending",
+      results: "/registrar/assessment-management",
+      dashboard: "/registrar/pending",
+      login: "/registrar/pending",
+      register: "/registrar/pending",
+      contact: "/contact",
+    };
+  }
+
+  if (userRole === "branchcoordinator") {
+    return {
+      assessment: "/branchcoordinator/assessment-management",
+      enrollment: "/branchcoordinator/pending",
+      documents: "/branchcoordinator/pending",
+      payment: "/branchcoordinator/payments",
+      paymentHistory: "/branchcoordinator/cashier-dashboard/history",
+      results: "/branchcoordinator/assessment-management",
+      dashboard: "/branchcoordinator",
+      login: "/branchcoordinator",
+      register: "/branchcoordinator",
+      contact: "/contact",
+    };
+  }
+
+  if (userRole === "cashier") {
+    return {
+      assessment: "/cashier",
+      enrollment: "/cashier",
+      documents: "/cashier",
+      payment: "/cashier",
+      paymentHistory: "/cashier/history",
+      results: "/cashier",
+      dashboard: "/cashier",
+      login: "/cashier",
+      register: "/cashier",
+      contact: "/contact",
+    };
+  }
+
   return {
     assessment: "/assessment",
-    enrollment: "/enrollment",
-    documents: "/enrollment",
+    enrollment: "/enrollment-info",
+    documents: "/enrollment-info",
     payment: "/login",
     paymentHistory: "/login",
     results: "/assessment",
@@ -318,6 +363,12 @@ function getAssistantRoutes(userRole: AssistantContext["userRole"]): AssistantRo
     register: "/register",
     contact: "/contact",
   };
+}
+
+// Chat actions are persisted locally. Keep links saved by older versions from
+// leading to the retired /enrollment route.
+function getWorkingAssistantLink(path: string, routes: AssistantRoutes) {
+  return path === "/enrollment" ? routes.enrollment : path;
 }
 
 function getCurrentProgressStep(progress: AssistantContext["enrollmentProgress"]) {
@@ -1018,7 +1069,7 @@ export function ChatAssistantShell({
                                       return (
                                         <a
                                           key={`${message.id}-${action.label}`}
-                                          href={action.to}
+                                          href={getWorkingAssistantLink(action.to, assistantContext.routes)}
                                           className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-blue-900"
                                         >
                                           {content}
