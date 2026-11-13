@@ -131,7 +131,12 @@ export function Assessment() {
     localStorage.removeItem("assessment_questions");
 
     const initializeAssessment = async () => {
-      const userEmail = userData?.email || "student@gmail.com";
+      const userEmail = String(userData?.email || "").trim().toLowerCase();
+      if (!userEmail) {
+        setAssessmentCompleted(false);
+        setLoading(false);
+        return;
+      }
       const settingsResult = await getSystemSettings();
       const existingResult = await getLatestAssessmentResult(userEmail, {
         includeAnswerDetails: canViewAssessmentAnswers(settingsResult),
@@ -145,28 +150,29 @@ export function Assessment() {
 
       const publicResults = localStorage.getItem("publicAssessmentResults");
       if (publicResults && userEmail) {
-        const visibilitySettings = await getSystemSettings();
-        if (canViewAssessmentAnswers(visibilitySettings)) {
-          localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
-        } else {
-          localStorage.removeItem(`assessmentResults_${userEmail}`);
-          localStorage.removeItem(`assessmentAnswers_${userEmail}`);
-          localStorage.removeItem(`assessmentAnswerSnapshots_${userEmail}`);
-        }
-
         try {
           const publicAssessment = JSON.parse(publicResults);
-          await saveAssessmentResult(userEmail, publicAssessment);
+          const publicEmail = String(publicAssessment?.userInfo?.email || "").trim().toLowerCase();
+
+          // Do not assign a browser-wide public assessment to a signed-in
+          // student unless its saved email exactly matches the account email.
+          if (publicEmail === userEmail) {
+            const visibilitySettings = await getSystemSettings();
+            if (canViewAssessmentAnswers(visibilitySettings)) {
+              localStorage.setItem(`assessmentResults_${userEmail}`, publicResults);
+            }
+
+            await saveAssessmentResult(userEmail, publicAssessment);
+            localStorage.removeItem("publicAssessmentResults");
+            updateEnrollmentProgress("AI Assessment Completed", "completed");
+            updateEnrollmentProgress("Documents Submitted", "current");
+            setAssessmentCompleted(true);
+            setLoading(false);
+            return;
+          }
         } catch (error) {
           console.error("Error saving assessment result:", error);
         }
-
-        localStorage.removeItem("publicAssessmentResults");
-        updateEnrollmentProgress("AI Assessment Completed", "completed");
-        updateEnrollmentProgress("Documents Submitted", "current");
-        setAssessmentCompleted(true);
-        setLoading(false);
-        return;
       }
 
       await loadQuestionsFromSupabase();

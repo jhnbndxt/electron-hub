@@ -248,7 +248,7 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
 
     const { data: existingDoc, error: existingDocError } = await supabase
       .from('enrollment_documents')
-      .select('id')
+      .select('id, status')
       .eq('enrollment_id', enrollmentId)
       .eq('document_type', documentType)
       .maybeSingle();
@@ -280,7 +280,7 @@ export const uploadDocument = async (enrollmentId, file, documentType) => {
       file_path: fileName,
       file_url: publicUrl,
       file_size: file.size || null,
-      status: 'pending_review',
+      status: existingDoc?.status === 'rejected' ? 'reuploaded' : 'pending_review',
       updated_at: new Date().toISOString(),
     };
     const isMissingFileSizeColumn = (error) =>

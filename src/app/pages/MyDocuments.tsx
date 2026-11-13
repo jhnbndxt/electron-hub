@@ -9,6 +9,7 @@ import toast from "react-hot-toast";
 import DocumentViewerModal from "../components/DocumentViewerModal";
 import { ConfirmationModal } from "../components/ConfirmationModal";
 import { downloadDocument } from "../utils/documentFiles";
+import { uploadDocument } from "../../services/enrollmentService";
 
 
 interface DocumentStatus {
@@ -335,67 +336,8 @@ export function MyDocuments() {
       }
 
       const docType = DOC_NAME_TO_KEY[docName] || docName;
-      const timestamp = Date.now();
-      const fileExt = file.name.split(".").pop();
-      const storagePath = `${currentEnrollmentId}/${docType}/${timestamp}.${fileExt}`;
-
-      // Upload file to Supabase Storage
-      const { error: storageError } = await supabase.storage
-        .from("enrollment_documents")
-        .upload(storagePath, file, { upsert: true });
-
-      if (storageError) {
-        console.error("Storage upload error:", storageError);
-        toast.error(`Upload failed: ${storageError.message}`);
-        setUploadingDoc(null);
-        return;
-      }
-
-      // Get the public URL
-      const { data: urlData } = supabase.storage
-        .from("enrollment_documents")
-        .getPublicUrl(storagePath);
-
-      // Check if a record for this document type already exists
-      const { data: existingDoc } = await supabase
-        .from("enrollment_documents")
-        .select("id, status")
-        .eq("enrollment_id", currentEnrollmentId)
-        .eq("document_type", docType)
-        .maybeSingle();
-
-      const isRejectedCorrection = existingDoc?.status === "rejected";
-      const nextStatus = isRejectedCorrection ? "reuploaded" : "pending_review";
-
-      if (existingDoc) {
-        // Update the existing record
-        const { error: updateError } = await supabase
-          .from("enrollment_documents")
-          .update({
-            file_url: urlData.publicUrl,
-            file_path: storagePath,
-            file_name: file.name,
-            uploaded_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            status: nextStatus,
-            rejection_comment: null,
-          })
-          .eq("id", existingDoc.id);
-        if (updateError) throw updateError;
-      } else {
-        // Insert a new record
-        const { error: insertError } = await supabase.from("enrollment_documents").insert({
-          enrollment_id: currentEnrollmentId,
-          document_type: docType,
-          file_url: urlData.publicUrl,
-          file_path: storagePath,
-          file_name: file.name,
-          status: nextStatus,
-          uploaded_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        if (insertError) throw insertError;
-      }
+      const { error: uploadError } = await uploadDocument(currentEnrollmentId, file, docType);
+      if (uploadError) throw new Error(uploadError);
 
       const isAlreadyEnrolled = String(currentEnrollmentStatus || "").toLowerCase() === "enrolled";
       if (!isAlreadyEnrolled) {
