@@ -136,12 +136,12 @@ export const chatbotKnowledge = {
 
 export const chatbotKeywordCategories = {
   school: ["school", "campus", "branch", "address", "location", "contact", "phone", "office hours", "facebook"],
-  enrollment: ["enroll", "enrollment", "register", "registration", "application", "process", "next step", "status", "progress"],
-  documents: ["document", "requirements", "requirement", "form 138", "form 137", "psa", "birth certificate", "diploma", "good moral", "id picture", "upload", "reupload", "re-upload", "rejected"],
-  payments: ["payment", "pay", "gcash", "bank", "cash", "receipt", "reference number", "queue", "cashier", "tuition"],
-  voucher: ["voucher", "deped", "free tuition", "eligible", "eligibility", "esc", "subsidy", "public school", "suc", "luc"],
-  assessment: ["assessment", "ai assessment", "test", "aptitude", "interest", "recommendation", "recommended", "strand", "track", "elective"],
-  navigation: ["where", "how do i go", "open", "page", "tab", "dashboard", "profile", "my documents", "payment history", "results"],
+  enrollment: ["enroll", "enrollment", "register", "registration", "application", "process", "next step", "status", "progress", "paano mag enroll", "enrollment ko", "status ko"],
+  documents: ["document", "requirements", "requirement", "form 138", "form 137", "psa", "birth certificate", "diploma", "good moral", "id picture", "upload", "reupload", "re-upload", "rejected", "dokumento", "requirements ko", "i-upload"],
+  payments: ["payment", "pay", "gcash", "bank", "cash", "receipt", "reference number", "queue", "cashier", "tuition", "bayad", "magbayad", "resibo"],
+  voucher: ["voucher", "deped", "free tuition", "eligible", "eligibility", "esc", "subsidy", "public school", "suc", "luc", "scholarship", "libre tuition"],
+  assessment: ["assessment", "ai assessment", "test", "aptitude", "interest", "recommendation", "recommended", "strand", "track", "elective", "anong strand", "ano track", "pagsusulit"],
+  navigation: ["where", "how do i go", "open", "page", "tab", "dashboard", "profile", "my documents", "payment history", "results", "saan", "paano pumunta"],
   workflows: ["registrar", "review", "approval", "approved", "verify", "verified", "cashier", "pending"],
 };
 
@@ -267,6 +267,43 @@ export function retrieveChatbotKnowledge(message = "", limit = 3) {
     title: chatbotKnowledge[category]?.title || category,
     content: stringifyKnowledgeSection(chatbotKnowledge[category]),
   }));
+}
+
+// Deterministic guidance keeps the assistant useful even when the external AI
+// service is unavailable. It only uses the student's supplied progress, never
+// makes eligibility or approval decisions on their behalf.
+export function getContextAwareChatbotReply(message = "", context = {}) {
+  const normalized = normalizeChatbotText(message);
+  const currentStep = String(context.currentStep || "").trim();
+  const category = retrieveChatbotKnowledge(message, 1)[0]?.category || "enrollment";
+
+  if (/\b(status|progress|next step|what next|status ko)\b/.test(normalized) && currentStep) {
+    return {
+      category: "enrollment",
+      reply: `Your current enrollment stage is ${currentStep}. Follow the instruction shown on your dashboard; the responsible office will update the next stage once its review is complete.`,
+    };
+  }
+
+  const responses = {
+    documents: normalized.includes("reject") || normalized.includes("reupload") || normalized.includes("re-upload")
+      ? "If a document was rejected, open My Documents, replace only the rejected file with a clear and complete copy, then wait for registrar review. Check the rejection remark first so you correct the right issue."
+      : "Upload clear, complete copies of the required documents in My Documents. The usual requirements are Form 138, PSA Birth Certificate, 2x2 ID Picture, and Grade 10 Diploma; some applicants may also need Good Moral, Form 137, or ESC Certificate.",
+    payments: normalized.includes("locked") || normalized.includes("cannot pay") || normalized.includes("disabled")
+      ? "Payment unlocks after the registrar approves the enrollment form and documents. It can remain locked when voucher eligibility is being reviewed or tuition is covered. The registrar gives the final confirmation."
+      : "You can pay through GCash, bank transfer, or cash payment once payment is unlocked. For online payments, submit the reference number and receipt; for cash, follow the queue number and schedule shown in the portal.",
+    voucher: "Voucher eligibility is verified by the registrar. It may apply to eligible Grade 10 completers from DepEd public schools, SUCs/LUCs, or current ESC grantees from private schools. Do not pay while the portal shows that voucher review is still in progress.",
+    assessment: "The AI Assessment uses aptitude and interest responses to suggest a track and electives. Complete every section, then open Results to review the recommendation before submitting your enrollment form.",
+    tracks: "Your assessment result is a guide, not a final restriction. Review the recommended track and electives in Results, then discuss any preferred alternative with the registrar before your application is finalized.",
+    school: "Electron College of Technical Education - Malanday is at 596 McArthur Highway, Malanday, Valenzuela City. Office hours are Monday to Saturday, 8:00 AM to 5:00 PM.",
+    workflows: "The registrar reviews applications and documents, while the cashier verifies payment proof or cash payment completion. The dashboard stage tells you which office or student action is currently needed.",
+    navigation: "Use your dashboard as the starting point: Assessment for the test, Results for recommendations, Enrollment for the form, My Documents for uploads, and Payment for payment instructions after approval.",
+    enrollment: "Follow this order: create an account, complete the AI Assessment, submit the enrollment form and documents, wait for registrar review, pay if required, then wait for cashier verification and final enrollment confirmation.",
+  };
+
+  return {
+    category,
+    reply: responses[category] || responses.enrollment,
+  };
 }
 
 export function isEnrollmentRelated(message = "") {

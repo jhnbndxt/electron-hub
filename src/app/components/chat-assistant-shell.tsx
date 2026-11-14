@@ -17,7 +17,7 @@ import {
 import { useAuth } from "../context/AuthContext";
 import chatbotLogo from "../../assets/chatbot-logo.png";
 import convoAiLogo from "../../assets/convo-ai-logo.png";
-import { findDirectFaq, retrieveChatbotKnowledge } from "../../data/chatbotKnowledge.js";
+import { findDirectFaq, getContextAwareChatbotReply } from "../../data/chatbotKnowledge.js";
 
 export interface ChatAssistantShellProps {
   isVisible?: boolean;
@@ -269,18 +269,13 @@ function buildFaqReply(input: string, context: AssistantContext) {
 }
 
 function buildRetrievalFallbackReply(input: string, context: AssistantContext) {
-  const knowledge = retrieveChatbotKnowledge(input, 1);
-  const category = knowledge[0]?.category;
+  const fallback = getContextAwareChatbotReply(input, {
+    currentStep: getCurrentProgressStep(context.enrollmentProgress),
+  });
+  const category = fallback.category;
 
   return {
-    text:
-      category === "documents"
-        ? "For documents, upload clear and readable files in the My Documents page. If one was rejected, replace it there and wait for registrar review."
-        : category === "payments"
-        ? "Payment becomes available after registrar approval unless voucher eligibility keeps it locked. Use the Payment page for GCash, bank transfer, or cash payment instructions."
-        : category === "voucher"
-        ? "Voucher eligibility is checked by the registrar. Public school Grade 10 completers, SUC/LUC completers, and current ESC grantees may qualify."
-        : "I can help with enrollment, assessment, documents, payment, voucher, and portal navigation. Please check the related dashboard page for the next action.",
+    text: fallback.reply,
     actions: getCategoryActions(category, context),
     source: "retrieval" as const,
   };

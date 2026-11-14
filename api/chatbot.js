@@ -1,5 +1,6 @@
 import {
   findDirectFaq,
+  getContextAwareChatbotReply,
   isEnrollmentRelated,
   retrieveChatbotKnowledge,
 } from "../src/data/chatbotKnowledge.js";
@@ -45,7 +46,7 @@ function buildPrompt({ message, knowledge, context, recentMessages }) {
     `Student context: ${JSON.stringify(compactContext(context))}`,
     `Recent chat: ${JSON.stringify((recentMessages || []).slice(-3))}`,
     `Relevant knowledge: ${knowledge.map((item) => `[${item.category}] ${item.content}`).join("\n\n")}`,
-    "Answer in 2-5 short sentences. If unsupported by the knowledge, say so and redirect to registrar/cashier or official support.",
+    "Answer in 2-5 short sentences. Match the student's language (English, Filipino, or Taglish). If unsupported by the knowledge, say so and redirect to registrar/cashier or official support.",
   ].join("\n\n");
 }
 
@@ -125,12 +126,12 @@ export default async function handler(request, response) {
   const knowledge = retrieveChatbotKnowledge(trimmedMessage, 3);
 
   if (!process.env.GROQ_API_KEY) {
+    const fallback = getContextAwareChatbotReply(trimmedMessage, context);
     return sendJson(response, 200, {
       success: true,
       source: "retrieval",
-      reply:
-        "I can help with that. Please use the related dashboard page and follow the enrollment instructions shown there. For official decisions, the registrar or cashier has the final confirmation.",
-      category: knowledge[0]?.category || "enrollment",
+      reply: fallback.reply,
+      category: fallback.category,
       knowledge,
     });
   }
@@ -152,12 +153,12 @@ export default async function handler(request, response) {
     });
   } catch (error) {
     console.error("Chatbot Groq error:", error);
+    const fallback = getContextAwareChatbotReply(trimmedMessage, context);
     return sendJson(response, 200, {
       success: true,
       source: "retrieval-fallback",
-      reply:
-        "I can help, but the AI response service is temporarily unavailable. Based on the enrollment guide, please check the related dashboard page or contact the registrar/cashier for official confirmation.",
-      category: knowledge[0]?.category || "enrollment",
+      reply: fallback.reply,
+      category: fallback.category,
       knowledge,
     });
   }
