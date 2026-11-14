@@ -79,7 +79,7 @@ function joinName(...parts: unknown[]) {
 
 function FieldItem({ label, value }: { label: string; value: unknown }) {
   return (
-    <div className="min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
+    <div className="student-profile-field min-w-0 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3">
       <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{label}</p>
       <p className="mt-1 break-words text-sm font-semibold leading-6 text-slate-900 [overflow-wrap:anywhere]">{valueOrDash(value)}</p>
     </div>
@@ -98,8 +98,8 @@ function RecordSection({
   children: ReactNode;
 }) {
   return (
-    <section className="min-w-0 rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/70 sm:p-6">
-      <div className="mb-5 flex items-start gap-3">
+    <section className="student-profile-section min-w-0 rounded-2xl border border-white/70 bg-white p-5 shadow-lg shadow-blue-950/5 ring-1 ring-white/70 sm:p-6">
+      <div className="student-profile-section-heading mb-5 flex items-start gap-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-800">
           <Icon className="h-5 w-5" />
         </div>
@@ -306,7 +306,7 @@ export function StudentProfile() {
   ];
 
   return (
-    <div className="portal-dashboard-page min-w-0 max-w-full overflow-x-hidden p-4 pt-10 sm:p-6 lg:p-8">
+    <div className="portal-dashboard-page student-profile-page min-w-0 max-w-full overflow-x-hidden p-3 pt-7 sm:p-6 lg:p-8">
       <div className="mb-6">
         <button
           onClick={() => navigate(recordsPath)}
@@ -355,11 +355,11 @@ export function StudentProfile() {
           </div>
         </div>
 
-        <div className="grid gap-3 bg-slate-50/80 p-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="student-profile-metrics grid grid-cols-2 gap-2 bg-slate-50/80 p-3 sm:gap-3 sm:p-4 sm:grid-cols-2 xl:grid-cols-4">
           {overviewMetrics.map((metric) => {
             const Icon = metric.icon;
             return (
-              <div key={metric.label} className="rounded-xl border border-white/70 bg-white p-4 shadow-sm">
+              <div key={metric.label} className="student-profile-metric rounded-xl border border-white/70 bg-white p-3 shadow-sm sm:p-4">
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-800">
                   <Icon className="h-4 w-4" />
                 </div>
