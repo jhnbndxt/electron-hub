@@ -283,9 +283,6 @@ export async function getQuestionStats() {
   return questionsByCategory ? buildQuestionStats(questionsByCategory) : null;
 }
 
-/**
- * Format a complete assessment result payload for storage and UI consumption.
- */
 export async function formatAssessmentResult(answers, questionsByCategory = null) {
   try {
     const groupedQuestions = await resolveQuestionsByCategory(questionsByCategory);
