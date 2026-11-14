@@ -4,11 +4,11 @@ import { validatePaymentAmount } from '../src/utils/paymentAmountValidation.js';
 import { escapeCSVCell, formatCurrencyForCSV } from '../src/utils/csvExportCore.js';
 
 test('validates tuition amounts strictly', () => {
-  for (const value of ['12', '12.5', '12.50', '0.99']) {
+  for (const value of ['1', '1.00', '12', '12.5', '12.50']) {
     assert.equal(validatePaymentAmount(value), '', value);
   }
 
-  for (const value of ['12.', '.5', '1.2.3', 'abc', '-5', '', '12.345']) {
+  for (const value of ['0', '0.99', '12.', '.5', '1.2.3', 'abc', '-5', '', '12.345']) {
     assert.notEqual(validatePaymentAmount(value), '', value);
   }
 });

@@ -1,4 +1,6 @@
-export const PAYMENT_AMOUNT_PATTERN = /^0(\.\d{1,2})?$/;
+// Philippine peso amounts may include up to two decimal places. The smallest
+// valid configured tuition/payment amount is PHP 1.00.
+export const PAYMENT_AMOUNT_PATTERN = /^\d+(?:\.\d{1,2})?$/;
 export const INVALID_PAYMENT_AMOUNT_MESSAGE = 'Invalid Amount. Please enter a valid amount based on the required payment.';
 
 export function validatePaymentAmount(value) {
@@ -9,5 +11,5 @@ export function validatePaymentAmount(value) {
   }
 
   const amount = Number(normalizedValue);
-  return Number.isFinite(amount) && amount > 0 ? '' : INVALID_PAYMENT_AMOUNT_MESSAGE;
+  return Number.isFinite(amount) && amount >= 1 ? '' : INVALID_PAYMENT_AMOUNT_MESSAGE;
 }
