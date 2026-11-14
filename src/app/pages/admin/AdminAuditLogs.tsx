@@ -265,8 +265,28 @@ export function AdminAuditLogs() {
           </h2>
         </div>
 
-        {/* Table */}
-        <div className="overflow-x-auto">
+        {/* Mobile activity cards */}
+        <div className="divide-y divide-gray-200 md:hidden">
+          {filteredLogs.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-gray-500">{allLogs.length === 0 ? "No activity logs yet." : "No logs match your filters."}</p>
+          ) : filteredLogs.map((log) => {
+            const statusStyle = getStatusStyle(log.status || "success");
+            return (
+              <article key={log.id} className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <span className="inline-flex max-w-[70%] items-center gap-1 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"><FileText className="h-3.5 w-3.5 shrink-0" />{log.action}</span>
+                  <span className="shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold" style={{ backgroundColor: statusStyle.bg, color: statusStyle.text, borderColor: statusStyle.border }}>{(log.status || "success").replace(/^./, (letter) => letter.toUpperCase())}</span>
+                </div>
+                <div><p className="font-medium text-gray-900">{log.user}</p>{log.email && <p className="break-all text-xs text-gray-500">{log.email}</p>}</div>
+                <p className="text-sm leading-5 text-gray-600">{log.details}</p>
+                <p className="border-t border-gray-100 pt-3 font-mono text-xs text-gray-500">{formatTimestamp(log.timestamp)}</p>
+              </article>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[900px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-200">
